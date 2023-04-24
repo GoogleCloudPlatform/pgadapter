@@ -292,7 +292,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
   public void testSimpleMetadata() throws Exception {
     String checkTableExistsSql =
         "with "
-            + PG_CLASS_PREFIX
+            + EMULATED_PG_CLASS_PREFIX
             + ",\n"
             + "pg_namespace as (\n"
             + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"

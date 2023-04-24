@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PG_TYPE_CTE_EMULATED;
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -31,8 +33,6 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgClass;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -100,14 +100,13 @@ import org.postgresql.util.PGobject;
 public abstract class AbstractMockServerTest {
   private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
 
-  public static final String PG_TYPE_PREFIX =
-      new PgNamespace().getTableExpression() + ",\n" + new PgType().getTableExpression();
+  public static final String PG_TYPE_PREFIX = PG_NAMESPACE_CTE + ",\n" + PG_TYPE_CTE_EMULATED;
   public static final String PG_CLASS_PREFIX = String.format(PgClass.PG_CLASS_CTE, "-1", "-1");
   public static final String EMULATED_PG_CLASS_PREFIX =
       String.format(
           PgClass.PG_CLASS_CTE,
           "'''\"' || t.table_schema || '\".\"' || t.table_name || '\"'''",
-          "'''\"' || i.table_schema || '\".\"' || i.index_name || '\"'''");
+          "'''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"'''");
   public static final String EMULATED_PG_ATTRIBUTE_PREFIX = PgAttribute.PG_ATTRIBUTE_CTE;
   public static final String EMULATED_PG_ATTRDEF_PREFIX = PgAttrdef.PG_ATTRDEF_CTE;
 
@@ -201,6 +200,14 @@ public abstract class AbstractMockServerTest {
           .bind("p1")
           .to(Oid.JSONB)
           .build();
+  protected static final String SELECT_TYPE_INFO_MULTI_SCHEMA =
+      "with "
+          + PG_TYPE_PREFIX
+          + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1";
+  protected static final Statement SELECT_JSONB_TYPE_INFO_MULTI_SCHEMA =
+      Statement.newBuilder(SELECT_TYPE_INFO_MULTI_SCHEMA).bind("p1").to(Oid.JSONB).build();
+  protected static final Statement SELECT_JSONB_ARRAY_TYPE_INFO_MULTI_SCHEMA =
+      Statement.newBuilder(SELECT_TYPE_INFO_MULTI_SCHEMA).bind("p1").to(Oid.JSONB_ARRAY).build();
   protected static final ResultSet SELECT_JSONB_TYPE_INFO_RESULT_SET =
       ResultSet.newBuilder()
           .setMetadata(
@@ -229,6 +236,36 @@ public abstract class AbstractMockServerTest {
                   .addValues(Value.newBuilder().setBoolValue(true).build())
                   .addValues(Value.newBuilder().setStringValue("public").build())
                   .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                  .build())
+          .build();
+  protected static final ResultSet SELECT_JSONB_ARRAY_TYPE_INFO_RESULT_SET =
+      ResultSet.newBuilder()
+          .setMetadata(
+              ResultSetMetadata.newBuilder()
+                  .setRowType(
+                      StructType.newBuilder()
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("")
+                                  .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("nspname")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("typname")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                  .build())
+                          .build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setBoolValue(true).build())
+                  .addValues(Value.newBuilder().setStringValue("public").build())
+                  .addValues(Value.newBuilder().setStringValue("_jsonb").build())
                   .build())
           .build();
 
@@ -912,6 +949,15 @@ public abstract class AbstractMockServerTest {
             SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL, SELECT_JSONB_TYPE_BY_NAME_RESULT_SET));
     mockSpannerService.putStatementResult(
         StatementResult.query(SELECT_JSONB_TYPE_INFO, SELECT_JSONB_TYPE_INFO_RESULT_SET));
+    mockSpannerService.putStatementResult(
+        StatementResult.query(
+            Statement.of(SELECT_TYPE_INFO_MULTI_SCHEMA), SELECT_JSONB_TYPE_INFO_RESULT_SET));
+    mockSpannerService.putStatementResult(
+        StatementResult.query(
+            SELECT_JSONB_TYPE_INFO_MULTI_SCHEMA, SELECT_JSONB_TYPE_INFO_RESULT_SET));
+    mockSpannerService.putStatementResult(
+        StatementResult.query(
+            SELECT_JSONB_ARRAY_TYPE_INFO_MULTI_SCHEMA, SELECT_JSONB_ARRAY_TYPE_INFO_RESULT_SET));
     mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));
     mockSpanner.putStatementResult(

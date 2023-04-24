@@ -6,7 +6,7 @@
   "devDependencies": {
     "@types/node": "^18.14.5",
     "ts-node": "10.9.1",
-    "typescript": "5.0.2"
+    "typescript": "5.0.4"
   },
   "dependencies": {
     "pg": "^8.9.0",

@@ -29,20 +29,32 @@ public class RegexQueryPartReplacer implements QueryPartReplacer {
   private final Supplier<String> replacement;
   private final ReplacementStatus replacementStatus;
 
+  /** Replace all occurrences of the given pattern with the given static replacement. */
   public static RegexQueryPartReplacer replace(Pattern pattern, String replacement) {
     return new RegexQueryPartReplacer(
         pattern, Suppliers.ofInstance(replacement), ReplacementStatus.CONTINUE);
   }
 
+  /**
+   * Replace all occurrences of the given pattern with the value that is returned by the given
+   * {@link Supplier} function.
+   */
   public static RegexQueryPartReplacer replace(Pattern pattern, Supplier<String> replacement) {
     return new RegexQueryPartReplacer(pattern, replacement, ReplacementStatus.CONTINUE);
   }
 
+  /**
+   * Replace the first occurrence of the given pattern with the given static value and then stop.
+   */
   public static RegexQueryPartReplacer replaceAndStop(Pattern pattern, String replacement) {
     return new RegexQueryPartReplacer(
         pattern, Suppliers.ofInstance(replacement), ReplacementStatus.STOP);
   }
 
+  /**
+   * Replace the first occurrence of the given pattern with the value that is returned by the given
+   * {@link Supplier} function and then stop.
+   */
   public static RegexQueryPartReplacer replaceAndStop(
       Pattern pattern, Supplier<String> replacement) {
     return new RegexQueryPartReplacer(pattern, replacement, ReplacementStatus.STOP);

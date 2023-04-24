@@ -731,7 +731,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   public void testCreateDataModel() throws Exception {
     String checkTableExistsSql =
         "with "
-            + PG_CLASS_PREFIX
+            + EMULATED_PG_CLASS_PREFIX
             + ",\n"
             + "pg_namespace as (\n"
             + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
@@ -849,7 +849,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   public void testMetadataReflect() throws Exception {
     String sql =
         "with "
-            + PG_CLASS_PREFIX
+            + EMULATED_PG_CLASS_PREFIX
             + ",\n"
             + "pg_namespace as (\n"
             + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"

@@ -65,7 +65,7 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + ") range where false),\n"
               + PG_TYPE_PREFIX
               + ",\n"
-              + PG_CLASS_PREFIX
+              + EMULATED_PG_CLASS_PREFIX
               + ",\n"
               + "pg_proc as (\n"
               + "select * from (select 0::bigint as oid, ''::varchar as proname, 0::bigint as pronamespace, 0::bigint as proowner, 0::bigint as prolang, 0.0::float8 as procost, 0.0::float8 as prorows, 0::bigint as provariadic, ''::varchar as prosupport, ''::varchar as prokind, false::bool as prosecdef, false::bool as proleakproof, false::bool as proisstrict, false::bool as proretset, ''::varchar as provolatile, ''::varchar as proparallel, 0::bigint as pronargs, 0::bigint as pronargdefaults, 0::bigint as prorettype, 0::bigint as proargtypes, '{}'::bigint[] as proallargtypes, '{}'::varchar[] as proargmodes, '{}'::text[] as proargnames, ''::varchar as proargdefaults, '{}'::bigint[] as protrftypes, ''::text as prosrc, ''::text as probin, ''::varchar as prosqlbody, '{}'::text[] as proconfig, '{}'::bigint[] as proacl\n"
@@ -431,11 +431,10 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
           "with "
               + PG_TYPE_PREFIX
               + ",\n"
-              + PG_CLASS_PREFIX
+              + EMULATED_PG_CLASS_PREFIX
               + ",\n"
-              + "pg_attribute as (\n"
-              + "select * from (select 0::bigint as attrelid, '' as attname, 0::bigint as atttypid, 0::bigint as attstattarget, 0::bigint as attlen, 0::bigint as attnum, 0::bigint as attndims, -1::bigint as attcacheoff, 0::bigint as atttypmod, true as attbyval, '' as attalign, '' as attstorage, '' as attcompression, false as attnotnull, true as atthasdef, false as atthasmissing, '' as attidentity, '' as attgenerated, false as attisdropped, true as attislocal, 0 as attinhcount, 0 as attcollation, '{}'::bigint[] as attacl, '{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval\n"
-              + ") a where false)\n"
+              + EMULATED_PG_ATTRIBUTE_PREFIX
+              + "\n"
               + "-- Load field definitions for (free-standing) composite types\n"
               + "SELECT typ.oid, att.attname, att.atttypid\n"
               + "FROM pg_type AS typ\n"

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.18.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.3...v0.18.4) (2023-04-15)
+
+
+### Documentation
+
+* recommend psycopg3 over psycopg2 ([#742](https://github.com/GoogleCloudPlatform/pgadapter/issues/742)) ([8aec410](https://github.com/GoogleCloudPlatform/pgadapter/commit/8aec410c4ff14df6b3787d0988bb868665cdf1b7))
+
+
+### Dependencies
+
+* bump JDBC driver to 42.6.0 ([#747](https://github.com/GoogleCloudPlatform/pgadapter/issues/747)) ([9bdb5f4](https://github.com/GoogleCloudPlatform/pgadapter/commit/9bdb5f477ffcfd3861e43305bcf8c229a437b7e8))
+* bump Spanner client lib version to 6.40.0 ([#781](https://github.com/GoogleCloudPlatform/pgadapter/issues/781)) ([419c833](https://github.com/GoogleCloudPlatform/pgadapter/commit/419c8336eed28115520e4cc03d28b2ff60415138))
+* pin the SQLAlchemy 2.x version used for tests ([#759](https://github.com/GoogleCloudPlatform/pgadapter/issues/759)) ([2a78f4c](https://github.com/GoogleCloudPlatform/pgadapter/commit/2a78f4cd0b72f0f7432081816a3b6173ed65c613))
+
 ## [0.18.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.2...v0.18.3) (2023-03-20)
 
 

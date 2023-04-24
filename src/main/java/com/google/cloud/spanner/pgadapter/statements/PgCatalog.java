@@ -24,7 +24,9 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClie
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
 import com.google.cloud.spanner.pgadapter.utils.RegexQueryPartReplacer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -112,15 +114,16 @@ public class PgCatalog {
   private static final ImmutableList<QueryPartReplacer> DEFAULT_FUNCTION_REPLACEMENTS =
       ImmutableList.of(
           RegexQueryPartReplacer.replace(
-              Pattern.compile("pg_catalog.pg_table_is_visible\\s*\\(.+\\)"), "true"),
+              Pattern.compile("pg_catalog.pg_table_is_visible\\s*\\(.+\\)"),
+              Suppliers.ofInstance("true")),
           RegexQueryPartReplacer.replace(
-              Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"), "true"),
+              Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"), Suppliers.ofInstance("true")),
           RegexQueryPartReplacer.replace(
               Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*true\\s*\\)\\)"),
-              " IN ('pg_catalog', 'public')"),
+              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")),
           RegexQueryPartReplacer.replace(
               Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*false\\s*\\)\\)"),
-              " IN ('public')"));
+              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")));
 
   private final ImmutableSet<String> checkPrefixes;
 
@@ -136,7 +139,6 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
           .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
           .put(new TableOrIndexName(null, "pg_range"), new PgRange())
-          .put(new TableOrIndexName(null, "pg_type"), new PgType())
           .put(new TableOrIndexName(null, "pg_sequence"), new PgSequence())
           .put(new TableOrIndexName(null, "pg_sequences"), new PgSequences())
           .put(
@@ -165,6 +167,7 @@ public class PgCatalog {
             .put(new TableOrIndexName(null, "pg_attrdef"), new PgAttrdef())
             .put(new TableOrIndexName(null, "pg_constraint"), new PgConstraint())
             .put(new TableOrIndexName(null, "pg_index"), new PgIndex())
+            .put(new TableOrIndexName(null, "pg_type"), new PgType())
             .put(new TableOrIndexName(null, "pg_settings"), new PgSettings());
     wellKnownClient
         .getPgCatalogTables()
@@ -173,13 +176,18 @@ public class PgCatalog {
 
     this.functionReplacements =
         ImmutableList.<QueryPartReplacer>builder()
-            .addAll(DEFAULT_FUNCTION_REPLACEMENTS)
+            .addAll(getDefaultFunctionReplacements())
             .add(
                 RegexQueryPartReplacer.replace(
                     Pattern.compile("version\\(\\)"),
                     () -> "'" + sessionState.getServerVersion() + "'"))
-            .addAll(wellKnownClient.getFunctionReplacements())
+            .addAll(wellKnownClient.getQueryPartReplacements())
             .build();
+  }
+
+  @VisibleForTesting
+  ImmutableList<QueryPartReplacer> getDefaultFunctionReplacements() {
+    return DEFAULT_FUNCTION_REPLACEMENTS;
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */
@@ -317,9 +325,15 @@ public class PgCatalog {
     }
   }
 
+  // This is defined outside the PgType class, because Java 8 does not allow static initialization
+  // inside inner classes.
   @InternalApi
-  public static class PgType implements PgCatalogTable {
-    private static final ImmutableSet<TableOrIndexName> DEPENDENCIES =
+  public static final String PG_TYPE_CTE_EMULATED =
+      PgType.PG_TYPE_CTE.replace("0 as typrelid", "'0'::varchar as typrelid");
+
+  @InternalApi
+  public class PgType implements PgCatalogTable {
+    private final ImmutableSet<TableOrIndexName> DEPENDENCIES =
         ImmutableSet.of(new TableOrIndexName(null, "pg_namespace"));
     private static final String GENERATION_SQL =
         "select 'select '\n"
@@ -365,7 +379,7 @@ public class PgCatalog {
             + "where typname in ('bool', 'bytea', 'int2', 'int4', 'int8', 'float4', 'float8',\n"
             + "                  'numeric', 'varchar', 'text', 'jsonb', 'timestamp', 'timestamptz', 'date')\n"
             + ";\n";
-    private static final String PG_TYPE_CTE =
+    public static final String PG_TYPE_CTE =
         "pg_type as (\n"
             + "  select 16 as oid, 'bool' as typname, 11 as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'boolean' as spanner_type union all\n"
             + "  select 17 as oid, 'bytea' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1001 as typarray, 'byteain' as typinput, 'byteaout' as typoutput, 'bytearecv' as typreceive, 'byteasend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'bytea' as spanner_type union all\n"
@@ -399,7 +413,7 @@ public class PgCatalog {
 
     @Override
     public String getTableExpression() {
-      return PG_TYPE_CTE;
+      return sessionState.isEmulatePgClassTables() ? PG_TYPE_CTE_EMULATED : PG_TYPE_CTE;
     }
 
     @Override
@@ -493,7 +507,7 @@ public class PgCatalog {
             + "    '{}'::text[] as reloptions,\n"
             + "    0 as relpartbound\n"
             + "from information_schema.indexes i\n"
-            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name)\n"
+            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name, index_name)\n"
             + "group by i.index_name, i.table_name, i.table_schema\n"
             + ")";
 
@@ -503,7 +517,7 @@ public class PgCatalog {
         return String.format(
             PG_CLASS_CTE,
             "'''\"' || t.table_schema || '\".\"' || t.table_name || '\"'''",
-            "'''\"' || i.table_schema || '\".\"' || i.index_name || '\"'''");
+            "'''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"'''");
       }
       return String.format(PG_CLASS_CTE, "-1", "-1");
     }
@@ -529,8 +543,9 @@ public class PgCatalog {
     }
   }
 
-  private static class PgRange implements PgCatalogTable {
-    private static final String PG_RANGE_CTE =
+  @InternalApi
+  public static class PgRange implements PgCatalogTable {
+    public static final String PG_RANGE_CTE =
         "pg_range as (\n"
             + "select * from ("
             + "select 0::bigint as rngtypid, 0::bigint as rngsubtype, 0::bigint as rngmultitypid, "
@@ -545,7 +560,7 @@ public class PgCatalog {
 
   @InternalApi
   public class PgAttribute implements PgCatalogTable {
-    private static final String EMPTY_PG_ATTRIBUTE_CTE =
+    public static final String EMPTY_PG_ATTRIBUTE_CTE =
         "pg_attribute as (\n"
             + "select * from ("
             + "select 0::bigint as attrelid, '' as attname, 0::bigint as atttypid, 0::bigint as attstattarget, "
@@ -595,6 +610,45 @@ public class PgCatalog {
             + "        '{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval,\n"
             + "        c.spanner_type\n"
             + "from information_schema.columns c\n"
+            + "union all\n"
+            + "select  '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as attrelid,\n"
+            + "        i.column_name as attname,\n"
+            + "        case regexp_replace(c.spanner_type, '\\(.*\\)', '')\n"
+            + "            when 'boolean' then 16\n"
+            + "            when 'bytea' then 17\n"
+            + "            when 'bigint' then 20\n"
+            + "            when 'double precision' then 701\n"
+            + "            when 'character varying' then 1043\n"
+            + "            when 'date' then 1082\n"
+            + "            when 'timestamp with time zone' then 1184\n"
+            + "            when 'numeric' then 1700\n"
+            + "            when 'jsonb' then 3802\n"
+            + "            when 'boolean[]' then 1000\n"
+            + "            when 'bytea[]' then 1001\n"
+            + "            when 'bigint[]' then 1016\n"
+            + "            when 'double precision[]' then 1022\n"
+            + "            when 'character varying[]' then 1015\n"
+            + "            when 'date[]' then 1182\n"
+            + "            when 'timestamp with time zone[]' then 1185\n"
+            + "            when 'numeric[]' then 1231\n"
+            + "            when 'jsonb[]' then 3807\n"
+            + "            else 0\n"
+            + "        end as atttypid,\n"
+            + "        0::bigint as attstattarget,\n"
+            + "        character_maximum_length as attlen, c.ordinal_position as attnum,\n"
+            + "        case data_type when 'ARRAY' then 1::bigint else 0::bigint end as attndims,\n"
+            + "        -1::bigint as attcacheoff,\n"
+            + "        coalesce(c.character_maximum_length, -1::bigint) as atttypmod, true as attbyval,\n"
+            + "        'i' as attalign, 'p' as attstorage, ''::varchar as attcompression,\n"
+            + "        c.is_nullable='NO' as attnotnull,\n"
+            + "        (c.column_default is not null or c.generation_expression is not null) as atthasdef,\n"
+            + "        false as atthasmissing,'' as attidentity,\n"
+            + "        case c.generation_expression is not null when true then 's' else '' end as attgenerated,\n"
+            + "        false as attisdropped, true as attislocal, 0 as attinhcount, null::bigint as attcollation, '{}'::bigint[] as attacl,\n"
+            + "        '{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval,\n"
+            + "        c.spanner_type\n"
+            + "from information_schema.index_columns i\n"
+            + "inner join information_schema.columns c using (table_catalog, table_schema, table_name, column_name)"
             + ")";
 
     @Override
@@ -605,7 +659,7 @@ public class PgCatalog {
 
   @InternalApi
   public class PgAttrdef implements PgCatalogTable {
-    private static final String EMPTY_PG_ATTRDEF_CTE =
+    public static final String EMPTY_PG_ATTRDEF_CTE =
         "pg_attrdef as (\n"
             + "select * from ("
             + "select 0::bigint as oid, 0::bigint as adrelid, 0::bigint as adnum, ''::varchar as adbin"
@@ -640,7 +694,7 @@ public class PgCatalog {
             + "        else ''\n"
             + "    end as contype, false as condeferrable, false as condeferred, true as convalidated,\n"
             + "    '''\"' || tc.table_schema || '\".\"' || tc.table_name || '\"''' as conrelid,\n"
-            + "    0::bigint as contypid, 0::bigint as conindid, 0::bigint as conparentid,\n"
+            + "    0::bigint as contypid, '0'::varchar as conindid, '0'::varchar as conparentid,\n"
             + "    '''\"' || uc.table_schema || '\".\"' || uc.table_name || '\"''' as confrelid,\n"
             + "    case rc.update_rule\n"
             + "        when 'CASCADE' then 'c'\n"
@@ -707,7 +761,7 @@ public class PgCatalog {
             + "where tc.constraint_schema='public' and not substr(tc.constraint_name, 1, length('CK_IS_NOT_NULL_')) = 'CK_IS_NOT_NULL_'\n"
             + ")";
 
-    private static final String EMPTY_PG_CONSTRAINT_CTE =
+    public static final String EMPTY_PG_CONSTRAINT_CTE =
         "pg_constraint as (\n"
             + "select * from ("
             + "select    0::bigint as oid, ''::varchar as conname, 0::bigint as connamespace, ''  as contype,\n"
@@ -730,7 +784,7 @@ public class PgCatalog {
   public class PgIndex implements PgCatalogTable {
     public static final String PG_INDEX_CTE =
         "pg_index as (\n"
-            + "select '''\"' || i.table_schema || '\".\"' || i.index_name || '\"''' as indexrelid,\n"
+            + "select '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as indexrelid,\n"
             + "       '''\"' || i.table_schema || '\".\"' || i.table_name || '\"''' as indrelid,\n"
             + "       count(1) as indnatts, sum(case ic.ordinal_position is null when true then 0 else 1 end) as indnkeyatts,\n"
             + "       i.is_unique='YES' as indisunique, i.is_unique='YES' and i.is_null_filtered='NO' as indnullsnotdistinct,\n"
@@ -746,7 +800,7 @@ public class PgCatalog {
             + "group by i.table_schema, i.table_name, i.index_name, i.is_unique, i.is_null_filtered, i.index_type, i.filter\n"
             + ")";
 
-    private static final String EMPTY_PG_INDEX_CTE =
+    public static final String EMPTY_PG_INDEX_CTE =
         "pg_index as (\n"
             + "select * from (\n"
             + "select 0::bigint as indexrelid,\n"
@@ -828,8 +882,9 @@ public class PgCatalog {
     }
   }
 
-  private static class PgExtension implements PgCatalogTable {
-    private static final String PG_EXTENSION_CTE =
+  @InternalApi
+  public static class PgExtension implements PgCatalogTable {
+    public static final String PG_EXTENSION_CTE =
         "pg_extension as (\n"
             + "select * from ("
             + "select 0::bigint as oid, ''::varchar as extname, 0::bigint as extowner, "

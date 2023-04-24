@@ -99,7 +99,7 @@
 
 -disable_default_local_statements
   * PGAdapter will execute some specific statements without a round-trip to Cloud Spanner. This is done
-    for statements that are currently not supported by Cloud Sapnner, such as `select current_schema()`.
+    for statements that are currently not supported by Cloud Spanner, such as `select current_schema()`.
     Set this option to disable this local execution. This will cause unsupported statements to fail.
 
 -debug
@@ -113,7 +113,7 @@
     defined via %s in the output_pattern string. Set matcher_array to [] if no
     matches exist. Alternatively, you may place the matching group names 
     directly within the output_pattern string using matcher.replaceAll() rules
-    (that is to say, placing the item within braces, preceeded by a dollar sign);
+    (that is to say, placing the item within braces, preceded by a dollar sign);
     For this specific case, matcher_array must be left empty. User-specified 
     patterns will precede internal matches. Escaped and general regex syntax 
     matches Java RegEx syntax; more information on the Java RegEx syntax found 

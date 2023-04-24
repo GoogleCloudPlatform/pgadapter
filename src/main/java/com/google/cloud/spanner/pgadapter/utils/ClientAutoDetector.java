@@ -31,6 +31,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -181,16 +182,18 @@ public class ClientAutoDetector {
       final ImmutableList<QueryPartReplacer> functionReplacements =
           ImmutableList.of(
               RegexQueryPartReplacer.replace(
-                  Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"), "false"),
+                  Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
+                  Suppliers.ofInstance("false")),
               RegexQueryPartReplacer.replace(
-                  Pattern.compile("proc\\.oid = typ\\.typreceive"), "false"),
+                  Pattern.compile("proc\\.oid = typ\\.typreceive"), Suppliers.ofInstance("false")),
               RegexQueryPartReplacer.replace(
                   Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
-                  "WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
+                  Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem")),
               RegexQueryPartReplacer.replace(
                   Pattern.compile(
                       "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
-                  "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype"));
+                  Suppliers.ofInstance(
+                      "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype")));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -213,7 +216,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
       }
     },
@@ -221,10 +224,11 @@ public class ClientAutoDetector {
       final ImmutableList<QueryPartReplacer> functionReplacements =
           ImmutableList.of(
               RegexQueryPartReplacer.replace(
-                  Pattern.compile("oid::regtype::text AS regtype"), "'' as regtype"),
+                  Pattern.compile("oid::regtype::text AS regtype"),
+                  Suppliers.ofInstance("'' as regtype")),
               RegexQueryPartReplacer.replace(
                   Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
-                  "WHERE t.typname = \\$1"));
+                  Suppliers.ofInstance("WHERE t.typname = \\$1")));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -244,7 +248,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
       }
     },
@@ -317,7 +321,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
       }
 
@@ -401,7 +405,7 @@ public class ClientAutoDetector {
       return ImmutableMap.of();
     }
 
-    public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
+    public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
       return ImmutableList.of();
     }
 

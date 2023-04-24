@@ -913,7 +913,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                 + "SELECT c.relname "
                 + "FROM pg_class c "
                 + "LEFT JOIN pg_namespace n ON n.oid = c.relnamespace "
-                + "WHERE n.nspname  IN ('public') "
+                + "WHERE n.nspname  IN ('pg_catalog', 'public') "
                 + "AND c.relname = '%s' "
                 + "AND c.relkind IN (%s)",
             table,
@@ -1025,7 +1025,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + "SELECT c.relname "
                         + "FROM pg_class c "
                         + "LEFT JOIN pg_namespace n ON n.oid = c.relnamespace "
-                        + "WHERE n.nspname  IN ('public') "
+                        + "WHERE n.nspname  IN ('pg_catalog', 'public') "
                         + "AND c.relkind IN (%s)",
                     relKinds)),
             ResultSet.newBuilder()
@@ -1262,7 +1262,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + "  LEFT JOIN pg_namespace n ON n.oid = c.relnamespace\n"
                         + "WHERE c.relname = '%s'\n"
                         + "  AND c.relkind IN ('r','p')\n"
-                        + "  AND n.nspname  IN ('public')\n",
+                        + "  AND n.nspname  IN ('pg_catalog', 'public')\n",
                     table)),
             ResultSet.newBuilder()
                 .setMetadata(
@@ -1304,7 +1304,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + "WHERE i.relkind IN ('i', 'I')\n"
                         + "  AND d.indisprimary = 'f'\n"
                         + "  AND t.relname = '%s'\n"
-                        + "  AND n.nspname  IN ('public')\n"
+                        + "  AND n.nspname  IN ('pg_catalog', 'public')\n"
                         + "ORDER BY i.relname\n",
                     table)),
             ResultSet.newBuilder()
@@ -1365,7 +1365,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + "            JOIN pg_namespace n ON n.oid = c.connamespace\n"
                         + "            WHERE c.contype = 'c'\n"
                         + "              AND t.relname = '%s'\n"
-                        + "              AND n.nspname  IN ('public')\n",
+                        + "              AND n.nspname  IN ('pg_catalog', 'public')\n",
                     table)),
             ResultSet.newBuilder()
                 .setMetadata(
@@ -1417,7 +1417,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + "JOIN pg_namespace t3 ON c.connamespace = t3.oid\n"
                         + "WHERE c.contype = 'f'\n"
                         + "  AND t1.relname = '%s'\n"
-                        + "  AND t3.nspname  IN ('public')\n"
+                        + "  AND t3.nspname  IN ('pg_catalog', 'public')\n"
                         + "ORDER BY c.conname\n",
                     table)),
             ResultSet.newBuilder()
