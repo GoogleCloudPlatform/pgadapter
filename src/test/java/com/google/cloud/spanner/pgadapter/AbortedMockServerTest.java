@@ -1319,7 +1319,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(359, count);
+        assertEquals(360, count);
       }
     }
   }
