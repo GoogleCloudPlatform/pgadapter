@@ -38,7 +38,6 @@ import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.postgresql.core.Oid;
@@ -180,18 +179,21 @@ public class ClientAutoDetector {
       }
     },
     NPGSQL {
-      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
-          ImmutableMap.of(
-              Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
-              Suppliers.ofInstance("false"),
-              Pattern.compile("proc\\.oid = typ\\.typreceive"),
-              Suppliers.ofInstance("false"),
-              Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
-              Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
-              Pattern.compile(
-                  "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
-              Suppliers.ofInstance(
-                  "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype"));
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
+                  Suppliers.ofInstance("false")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("proc\\.oid = typ\\.typreceive"), Suppliers.ofInstance("false")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
+                  Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
+                  Suppliers.ofInstance(
+                      "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype")));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -214,17 +216,19 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
       }
     },
     SQLALCHEMY2 {
-      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
-          ImmutableMap.of(
-              Pattern.compile("oid::regtype::text AS regtype"),
-              Suppliers.ofInstance("'' as regtype"),
-              Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
-              Suppliers.ofInstance("WHERE t.typname = \\$1"));
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("oid::regtype::text AS regtype"),
+                  Suppliers.ofInstance("'' as regtype")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
+                  Suppliers.ofInstance("WHERE t.typname = \\$1")));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -244,7 +248,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
       }
     },
@@ -304,8 +308,8 @@ public class ClientAutoDetector {
       return ImmutableMap.of();
     }
 
-    public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
-      return ImmutableMap.of();
+    public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+      return ImmutableList.of();
     }
 
     /** Creates specific notice messages for a client after startup. */
