@@ -661,7 +661,7 @@ public class BackendConnection {
     @Override
     void execute() {
       try {
-        spannerConnection.releaseSavepoint(rollbackToStatement.getSavepointName());
+        spannerConnection.rollbackToSavepoint(rollbackToStatement.getSavepointName());
         result.set(NO_RESULT);
       } catch (Exception exception) {
         PGException pgException =
