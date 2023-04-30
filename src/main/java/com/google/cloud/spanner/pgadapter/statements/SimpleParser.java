@@ -773,6 +773,53 @@ public class SimpleParser {
     }
   }
 
+  Long readIntegerLiteral() {
+    skipWhitespaces();
+    int startPos = pos;
+    if (skipNumericLiteral()) {
+      try {
+        return Long.valueOf(sql.substring(startPos, pos));
+      } catch (NumberFormatException ignore) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  boolean peekNumericLiteral() {
+    int originalPos = pos;
+    if (skipNumericLiteral()) {
+      pos = originalPos;
+      return true;
+    }
+    return false;
+  }
+
+  boolean skipNumericLiteral() {
+    skipWhitespaces();
+    int startPos = pos;
+    if (eatToken("+") || eatToken("-")) {
+      startPos++;
+    }
+    if (eatKeyword("inf")) {
+      return true;
+    }
+    boolean foundDecimalDot = false;
+    while (pos < sql.length()) {
+      if (!foundDecimalDot && sql.charAt(pos) == '.') {
+        foundDecimalDot = true;
+        pos++;
+      } else if (Character.isDigit(sql.charAt(pos))) {
+        pos++;
+      } else if (!isValidEndOfKeyword(pos)) {
+        return false;
+      } else {
+        break;
+      }
+    }
+    return pos > startPos;
+  }
+
   QuotedString readSingleQuotedString() {
     return readQuotedString(SINGLE_QUOTE, false);
   }

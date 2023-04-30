@@ -508,7 +508,7 @@ public class ConnectionHandler extends Thread {
   }
 
   /** Closes all named and unnamed portals on this connection. */
-  private void closeAllPortals() {
+  public void closeAllPortals() {
     for (IntermediatePortalStatement statement : portalsMap.values()) {
       try {
         statement.close();
