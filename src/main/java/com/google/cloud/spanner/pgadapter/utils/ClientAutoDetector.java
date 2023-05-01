@@ -19,9 +19,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttrdef;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttribute;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgConstraint;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -41,7 +38,6 @@ import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.postgresql.core.Oid;
@@ -183,24 +179,21 @@ public class ClientAutoDetector {
       }
     },
     NPGSQL {
-      final ImmutableMap<String, String> tableReplacements =
-          ImmutableMap.of(
-              "pg_catalog.pg_attribute", "pg_attribute", "pg_attribute", "pg_attribute");
-      final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
-          ImmutableMap.of("pg_attribute", new EmptyPgAttribute());
-
-      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
-          ImmutableMap.of(
-              Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
-              Suppliers.ofInstance("false"),
-              Pattern.compile("proc\\.oid = typ\\.typreceive"),
-              Suppliers.ofInstance("false"),
-              Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
-              Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
-              Pattern.compile(
-                  "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
-              Suppliers.ofInstance(
-                  "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype"));
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
+                  Suppliers.ofInstance("false")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("proc\\.oid = typ\\.typreceive"), Suppliers.ofInstance("false")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
+                  Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
+                  Suppliers.ofInstance(
+                      "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype")));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -223,27 +216,19 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<String, String> getTableReplacements() {
-        return tableReplacements;
-      }
-
-      @Override
-      public ImmutableMap<String, PgCatalogTable> getPgCatalogTables() {
-        return pgCatalogTables;
-      }
-
-      @Override
-      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
       }
     },
     SQLALCHEMY2 {
-      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
-          ImmutableMap.of(
-              Pattern.compile("oid::regtype::text AS regtype"),
-              Suppliers.ofInstance("'' as regtype"),
-              Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
-              Suppliers.ofInstance("WHERE t.typname = \\$1"));
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("oid::regtype::text AS regtype"),
+                  Suppliers.ofInstance("'' as regtype")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
+                  Suppliers.ofInstance("WHERE t.typname = \\$1")));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -263,32 +248,13 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
       }
     },
     PRISMA {
       final ImmutableMap<String, String> tableReplacements =
-          ImmutableMap.of(
-              "pg_catalog.pg_constraint",
-              "pg_constraint",
-              "pg_constraint",
-              "pg_constraint",
-              "pg_catalog.pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_catalog.pg_attrdef",
-              "pg_attrdef",
-              "pg_attrdef",
-              "pg_attrdef",
-              "_prisma_migrations",
-              "prisma_migrations");
-      final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
-          ImmutableMap.of(
-              "pg_constraint", new EmptyPgConstraint(),
-              "pg_attribute", new EmptyPgAttribute(),
-              "pg_attrdef", new EmptyPgAttrdef());
+          ImmutableMap.of("_prisma_migrations", "prisma_migrations");
       private final ImmutableSet<String> checkPgCatalogPrefixes =
           ImmutableSet.<String>builder()
               .addAll(DEFAULT_CHECK_PG_CATALOG_PREFIXES)
@@ -310,6 +276,11 @@ public class ClientAutoDetector {
       }
 
       @Override
+      public ImmutableMap<String, String> getDefaultParameters() {
+        return ImmutableMap.of("spanner.emulate_pg_class_tables", "true");
+      }
+
+      @Override
       public ImmutableSet<String> getPgCatalogCheckPrefixes() {
         return checkPgCatalogPrefixes;
       }
@@ -320,25 +291,22 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<String, PgCatalogTable> getPgCatalogTables() {
-        return pgCatalogTables;
-      }
-
-      @Override
-      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
-        return ImmutableMap.of(
-            Pattern.compile("\\s+namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
-            () -> " \\$1::varchar[] is not null",
-            Pattern.compile("\\s+pg_namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
-            () -> " \\$1::varchar[] is not null",
-            Pattern.compile("\\s+n\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
-            () -> " \\$1::varchar[] is not null",
-            Pattern.compile("\\s+table_schema\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
-            () -> " \\$1::varchar[] is not null",
-            Pattern.compile("format_type\\(.*,.*\\)"),
-            () -> "''",
-            Pattern.compile("pg_get_expr\\(.*,.*\\)"),
-            () -> "''");
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " \\$1::varchar[] is not null"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+pg_namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " \\$1::varchar[] is not null"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+n\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " \\$1::varchar[] is not null"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+table_schema\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " \\$1::varchar[] is not null"),
+            RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"), () -> "''"),
+            RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"), () -> "''"));
       }
     },
     UNSPECIFIED {
@@ -397,8 +365,8 @@ public class ClientAutoDetector {
       return ImmutableMap.of();
     }
 
-    public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
-      return ImmutableMap.of();
+    public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+      return ImmutableList.of();
     }
 
     /** Creates specific notice messages for a client after startup. */
