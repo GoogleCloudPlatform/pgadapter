@@ -503,6 +503,20 @@ public class SimpleParserTest {
   }
 
   @Test
+  public void testReadQueryParameter() {
+    assertEquals("$1", new SimpleParser("$1").readQueryParameter());
+    assertEquals("$9999999", new SimpleParser("$9999999").readQueryParameter());
+    assertEquals("$1", new SimpleParser("  \n\t /*comment*/$1\n--comment\n").readQueryParameter());
+
+    assertNull(new SimpleParser("foo").readQueryParameter());
+    assertNull(new SimpleParser("   ").readQueryParameter());
+    assertNull(new SimpleParser("$foo").readQueryParameter());
+    assertNull(new SimpleParser("$").readQueryParameter());
+    assertNull(new SimpleParser("$ ").readQueryParameter());
+    assertNull(new SimpleParser("").readQueryParameter());
+  }
+
+  @Test
   public void testAddLimitIfParameterizedOffset() {
     Statement statement;
 
