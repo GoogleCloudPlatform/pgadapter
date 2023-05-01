@@ -113,6 +113,11 @@ public class SessionState {
     initCopySettings(this.settings);
   }
 
+  @VisibleForTesting
+  Map<String, PGSetting> getSettings() {
+    return this.settings;
+  }
+
   void initSettingValue(String key, String value) {
     PGSetting setting = this.settings.get(key);
     if (setting != null) {
@@ -401,6 +406,22 @@ public class SessionState {
     PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);
     if (setting == null) {
       return true;
+    }
+    return tryGetFirstNonNull(
+        true,
+        () -> BooleanParser.toBoolean(setting.getSetting()),
+        () -> BooleanParser.toBoolean(setting.getResetVal()),
+        () -> BooleanParser.toBoolean(setting.getBootVal()));
+  }
+
+  /**
+   * Returns the current setting for replacing pg_class tables with common table expressions that
+   * use the object name as OID.
+   */
+  public boolean isEmulatePgClassTables() {
+    PGSetting setting = internalGet(toKey("spanner", "emulate_pg_class_tables"), false);
+    if (setting == null) {
+      return false;
     }
     return tryGetFirstNonNull(
         true,

@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -40,6 +41,12 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCollation;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgConstraint;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgExtension;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgIndex;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -552,7 +559,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         new String[] {"SELECT version()", "select version()", "select * from version()"}) {
 
       try (Connection connection = DriverManager.getConnection(createUrl())) {
-        String version = null;
+        String version;
         try (ResultSet resultSet =
             connection.createStatement().executeQuery("show server_version")) {
           assertTrue(resultSet.next());
@@ -3382,13 +3389,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testInformationSchemaQueryInTransactionWithReplacedPgCatalogTables()
       throws SQLException {
     String sql = "SELECT 1 FROM pg_namespace";
-    String replacedSql =
-        "with pg_namespace as (\n"
-            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-            + "  from information_schema.schemata\n"
-            + ")\n"
-            + "SELECT 1 FROM pg_namespace";
+    String replacedSql = "with " + PG_NAMESPACE_CTE + "\nSELECT 1 FROM pg_namespace";
     // Register a result for the query. Note that we don't really care what the result is, just that
     // there is a result.
     mockSpanner.putStatementResult(
@@ -3871,7 +3872,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(359, count);
+        assertEquals(360, count);
       }
     }
   }
@@ -4154,13 +4155,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       mockSpanner.putStatementResult(
           StatementResult.query(
-              Statement.of(
-                  "with pg_namespace as (\n"
-                      + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                      + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                      + "  from information_schema.schemata\n"
-                      + ")\n"
-                      + "select * from pg_namespace"),
+              Statement.of("with " + PG_NAMESPACE_CTE + "\n" + "select * from pg_namespace"),
               SELECT1_RESULTSET));
       // Just verify that this works, we don't care about the result.
       try (ResultSet resultSet =
@@ -4771,6 +4766,133 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().hasBegin());
     assertEquals(1, request.getStatementsCount());
     assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testEmulatePgClass() throws SQLException {
+    String withEmulation = "with " + EMULATED_PG_CLASS_PREFIX + "\nselect 1 from pg_class";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(withEmulation), SELECT1_RESULTSET));
+    String withoutEmulation = "with " + PG_CLASS_PREFIX + "\nselect 1 from pg_class";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(withoutEmulation), EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgCollation.PG_COLLATION_CTE + "\nselect 1 from pg_collation"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgExtension.PG_EXTENSION_CTE + "\nselect 1 from pg_extension"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgAttribute.EMPTY_PG_ATTRIBUTE_CTE + "\nselect 1 from pg_attribute"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + EMULATED_PG_ATTRIBUTE_PREFIX + "\nselect 1 from pg_attribute"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgAttrdef.EMPTY_PG_ATTRDEF_CTE + "\nselect 1 from pg_attrdef"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgAttrdef.PG_ATTRDEF_CTE + "\nselect 1 from pg_attrdef"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgConstraint.EMPTY_PG_CONSTRAINT_CTE + "\nselect 1 from pg_constraint"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgConstraint.PG_CONSTRAINT_CTE + "\nselect 1 from pg_constraint"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgIndex.EMPTY_PG_INDEX_CTE + "\nselect 1 from pg_index"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgIndex.PG_INDEX_CTE + "\nselect 1 from pg_index"),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (boolean emulate : new boolean[] {true, false}) {
+        connection.createStatement().execute("set spanner.emulate_pg_class_tables=" + emulate);
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_class")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_collation")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_extension")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_attribute")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_attrdef")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_constraint")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_index")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(withEmulation))
+            .count());
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(withoutEmulation))
+            .count());
   }
 
   @Ignore("Only used for manual performance testing")

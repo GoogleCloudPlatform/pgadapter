@@ -85,7 +85,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
     testEnv.cleanUp();
   }
 
-  private static Iterable<String> getDdlStatements() {
+  static Iterable<String> getDdlStatements() {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     builder.addAll(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
     builder.addAll(
@@ -108,9 +108,10 @@ public class ITJdbcMetadataTest implements IntegrationTest {
                 + "\talbum int8 not null references albums (album_id),\n"
                 + "\ttrack int8 not null,\n"
                 + "\tattempt int8 not null,\n"
-                + "\trecording_time timestamptz not null,\n"
+                + "\trecording_time timestamptz not null default (now()),\n"
                 + "\tprimary key (album, track, attempt),\n"
-                + "\tforeign key (album, track) references tracks (album_id, track_number)\n"
+                + "\tforeign key (album, track) references tracks (album_id, track_number),\n"
+                + "\tconstraint recording_attempt_greater_than_zero check (attempt > 0)\n"
                 + ")"));
     return builder.build();
   }
