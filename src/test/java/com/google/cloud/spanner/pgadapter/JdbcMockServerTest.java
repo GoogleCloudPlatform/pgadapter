@@ -2008,7 +2008,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // Add a result for the limited query that is empty.
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder("select * from foo offset $1 limit 9223372036854775807")
+            Statement.newBuilder("select * from foo offset $1 limit 4611686018427387903")
                 .bind("p1")
                 .to(0L)
                 .build(),

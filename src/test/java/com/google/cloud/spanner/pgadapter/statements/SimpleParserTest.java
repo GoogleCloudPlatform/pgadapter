@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString.unescapeQuotedStringValue;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.unquoteOrFoldIdentifier;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -76,6 +77,7 @@ public class SimpleParserTest {
   public void testTableOrIndexName() {
     assertEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "foo"));
     assertNotEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "bar"));
+    assertFalse(new TableOrIndexName(null, "bar").equals(new Object()));
   }
 
   @Test
@@ -131,6 +133,16 @@ public class SimpleParserTest {
     assertTrue(new SimpleParser("\t(   foo").eatToken("("));
     assertFalse(new SimpleParser("foo(").eatToken("("));
     assertFalse(new SimpleParser("").eatToken("("));
+  }
+
+  @Test
+  public void testUnquoteOrFoldIdentifier() {
+    assertEquals("test", unquoteOrFoldIdentifier("test"));
+    assertEquals("test", unquoteOrFoldIdentifier("TEST"));
+    assertEquals("test", unquoteOrFoldIdentifier("Test"));
+    assertEquals("test", unquoteOrFoldIdentifier("\"test\""));
+    assertEquals("TEST", unquoteOrFoldIdentifier("\"TEST\""));
+    assertEquals("Test", unquoteOrFoldIdentifier("\"Test\""));
   }
 
   @Test
@@ -429,6 +441,14 @@ public class SimpleParserTest {
 
   @Test
   public void testQuotedString() {
+    QuotedString quotedString = new QuotedString(false, '\'', "'test'");
+    assertEquals("test", quotedString.getValue());
+    assertEquals("test", quotedString.getValue());
+    assertThrows(PGException.class, () -> new QuotedString(false, '\'', "'").getValue());
+    assertThrows(PGException.class, () -> new QuotedString(false, '\'', "'foo").getValue());
+    assertThrows(PGException.class, () -> new QuotedString(true, '\'', "'").getValue());
+    assertThrows(PGException.class, () -> new QuotedString(true, '\'', "'foo").getValue());
+
     assertEquals("test", new SimpleParser("'test'").readQuotedString('\'').getValue());
     assertEquals("test", new SimpleParser("e'test'").readQuotedString('\'').getValue());
     PGException exception =
@@ -595,6 +615,21 @@ public class SimpleParserTest {
             .to(1L)
             .build();
     assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to((Long) null)
+            .build();
+    assertEquals(
+        Statement.newBuilder("select * from foo where id=$1 offset $2 limit 4611686018427387903")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to((Long) null)
+            .build(),
+        addLimitIfParameterizedOffset(statement));
 
     statement =
         Statement.newBuilder("select * from foo where id=$1 offset $2")
@@ -604,7 +639,7 @@ public class SimpleParserTest {
             .to(1L)
             .build();
     assertEquals(
-        Statement.newBuilder("select * from foo where id=$1 offset $2 limit 9223372036854775806")
+        Statement.newBuilder("select * from foo where id=$1 offset $2 limit 4611686018427387903")
             .bind("p1")
             .to(1L)
             .bind("p2")
@@ -620,7 +655,7 @@ public class SimpleParserTest {
             .build();
     assertEquals(
         Statement.newBuilder(
-                "select * from foo where id=$1   offset   $2    limit 9223372036854775806")
+                "select * from foo where id=$1   offset   $2    limit 4611686018427387903")
             .bind("p1")
             .to(1L)
             .bind("p2")
@@ -636,7 +671,7 @@ public class SimpleParserTest {
             .build();
     assertEquals(
         Statement.newBuilder(
-                "select * from foo where id=$1 offset $2 /* some comment */ limit 9223372036854775806")
+                "select * from foo where id=$1 offset $2 /* some comment */ limit 4611686018427387903")
             .bind("p1")
             .to(1L)
             .bind("p2")
@@ -653,7 +688,7 @@ public class SimpleParserTest {
             .build();
     assertEquals(
         Statement.newBuilder(
-                "select * from foo where id=$1 offset -- Single line comment\n$2 /* some comment */ limit 9223372036854775806")
+                "select * from foo where id=$1 offset -- Single line comment\n$2 /* some comment */ limit 4611686018427387903")
             .bind("p1")
             .to(1L)
             .bind("p2")
@@ -674,7 +709,7 @@ public class SimpleParserTest {
 
     statement = Statement.of("select * from foo where id=$1 offset $2");
     assertEquals(
-        Statement.of("select * from foo where id=$1 offset $2 limit 9223372036854775807"),
+        Statement.of("select * from foo where id=$1 offset $2 limit 4611686018427387903"),
         addLimitIfParameterizedOffset(statement));
   }
 }

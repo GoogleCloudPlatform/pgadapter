@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -237,7 +236,7 @@ public class SimpleParser {
       return statement;
     }
     if (parser.eatKeyword("limit")) {
-      // If the statement contains a LIMIT clausem, then we're OK.
+      // If the statement contains a LIMIT clause, then we're OK.
       return statement;
     }
     String parameter;
@@ -252,15 +251,11 @@ public class SimpleParser {
         return statement;
       }
       // The statement contains an OFFSET clause using a query parameter and no LIMIT clause.
-      // Append a LIMIT clause equal to Long.MAX_VALUE - OFFSET.
-      long limit = Long.MAX_VALUE;
-      Value value = statement.getParameters().get("p" + parameter.substring(1));
-      if (value != null
-          && !value.isNull()
-          && value.getType() != null
-          && value.getType().getCode() == Code.INT64) {
-        limit = Long.MAX_VALUE - value.getInt64();
-      }
+      // Append a LIMIT clause equal to Long.MAX_VALUE / 2.
+      // We could also calculate it based on the actual OFFSET value, but that would make the
+      // query more prone to cache misses. Also, adding the LIMIT clause with a query parameter
+      // would structurally change the query, something that we also don't want.
+      long limit = Long.MAX_VALUE / 2;
       return copyStatement(
           statement,
           parser.sql.substring(0, parser.pos)
