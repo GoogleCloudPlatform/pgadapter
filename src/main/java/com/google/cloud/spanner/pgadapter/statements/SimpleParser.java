@@ -24,6 +24,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -230,6 +231,11 @@ public class SimpleParser {
    * clause and no LIMIT clause.
    */
   static Statement addLimitIfParameterizedOffset(Statement statement) {
+    String sqlLowerCase = statement.getSql().toLowerCase(Locale.ENGLISH);
+    // If there is no offset clause, then we know that we don't have to analyze any further.
+    if (!sqlLowerCase.contains("offset")) {
+      return statement;
+    }
     SimpleParser parser = new SimpleParser(statement.getSql());
     parser.parseExpressionUntilKeyword(ImmutableList.of("limit", "offset"), true, false, false);
     if (parser.pos >= parser.getSql().length()) {
