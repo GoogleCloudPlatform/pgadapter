@@ -295,16 +295,23 @@ public class ClientAutoDetector {
         return ImmutableList.of(
             RegexQueryPartReplacer.replace(
                 Pattern.compile("\\s+namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
-                () -> " \\$1::varchar[] is not null"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), namespace.nspname) > 0"),
             RegexQueryPartReplacer.replace(
                 Pattern.compile("\\s+pg_namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
-                () -> " \\$1::varchar[] is not null"),
+                () ->
+                    " strpos(array_to_string(cast(\\$1 as text[]), ','), pg_namespace.nspname) > 0"),
             RegexQueryPartReplacer.replace(
                 Pattern.compile("\\s+n\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
-                () -> " \\$1::varchar[] is not null"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), n.nspname) > 0"),
             RegexQueryPartReplacer.replace(
                 Pattern.compile("\\s+table_schema\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
-                () -> " \\$1::varchar[] is not null"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), table_schema) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+schemaname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), schemaname) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("JOIN pg_description d ON d\\.objoid = t\\.oid"),
+                () -> "JOIN pg_description d ON false"),
             RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"), () -> "''"),
             RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"), () -> "''"));
       }

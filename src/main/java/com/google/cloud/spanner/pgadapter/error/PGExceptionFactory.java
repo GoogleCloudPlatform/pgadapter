@@ -19,10 +19,14 @@ import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TR
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import io.grpc.StatusRuntimeException;
+import java.util.regex.Pattern;
 
 /** Factory class for {@link PGException} instances. */
 @InternalApi
 public class PGExceptionFactory {
+  private static final Pattern RELATION_NOT_FOUND_PATTERN =
+      Pattern.compile("relation .+ does not exist");
+
   private PGExceptionFactory() {}
 
   /**
@@ -69,6 +73,11 @@ public class PGExceptionFactory {
 
   /** Converts the given {@link SpannerException} to a {@link PGException}. */
   public static PGException toPGException(SpannerException spannerException) {
+    if (RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
+      return PGException.newBuilder(extractMessage(spannerException))
+          .setSQLState(SQLState.UndefinedTable)
+          .build();
+    }
     return newPGException(extractMessage(spannerException));
   }
 

@@ -384,6 +384,14 @@ public class SessionState {
     return getStringSetting(null, "server_version", OptionsMetadata.DEFAULT_SERVER_VERSION);
   }
 
+  /** Returns the PostgreSQL version number. */
+  public String getServerVersionNum() {
+    return getStringSetting(
+        null,
+        "server_version_num",
+        OptionsMetadata.toServerVersionNum(OptionsMetadata.DEFAULT_SERVER_VERSION));
+  }
+
   /**
    * Returns whether transaction statements should be ignored and all statements should be executed
    * in autocommit mode.
