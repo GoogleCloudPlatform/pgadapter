@@ -9,7 +9,7 @@ PGAdapter can be used with the following drivers and clients:
 2. `JDBC`: Versions 42.x and higher are supported. See [JDBC support](docs/jdbc.md) for more details.
 3. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 4. `psycopg2`: Version 2.9.3 and higher are supported. See [psycopg2](docs/psycopg2.md) for more details.
-5. `psycopg3`: Version 3.1.x and higher have experimental support. See [psycopg3 support](docs/psycopg3.md) for more details.
+5. `psycopg3`: Version 3.1.x and higher are supported. See [psycopg3 support](docs/psycopg3.md) for more details.
 6. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 7. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
 8. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
@@ -20,7 +20,7 @@ PGAdapter can be used with the following frameworks and tools:
    for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
 1. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
    See also [this directory](samples/golang/gorm) for a sample application using `gorm`.
-1. `SQLAlchemy 2.x`: Version 2.0.1 and higher has _experimental support_.
+1. `SQLAlchemy 2.x`: Version 2.0.1 and higher are supported.
    See also [this directory](samples/python/sqlalchemy2-sample) for a sample application using `SQLAlchemy 2.x`.
 1. `SQLAlchemy 1.x`: Version 1.4.45 and higher has _experimental support_. It is recommended to use `SQLAlchemy 2.x`
    instead of `SQLAlchemy 1.4.x` for the [best possible performance](docs/sqlalchemy.md#limitations). 
