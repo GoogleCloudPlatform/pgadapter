@@ -396,8 +396,8 @@ public class SessionState {
    * Returns whether statements with an OFFSET clause that uses a parameter should be automatically
    * appended with a LIMIT clause. The LIMIT clause will use the literal Long.MAX_VALUE for unbound
    * statements, and Long.MAX_VALUE - offset for bound statements.
-   * <p>
-   * This method will be removed in the future.
+   *
+   * <p>This method will be removed in the future.
    */
   // TODO: Remove when Cloud Spanner supports parametrized OFFSET clauses without a LIMIT clause.
   @InternalApi
