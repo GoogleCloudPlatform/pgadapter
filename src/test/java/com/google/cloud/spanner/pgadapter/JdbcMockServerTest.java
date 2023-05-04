@@ -1998,6 +1998,43 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testParameterizedOffsetWithoutLimit() throws SQLException {
+    // Add a result for the non-limited query that contains one row.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from foo offset $1").bind("p1").to(0L).build(),
+            SELECT1_RESULTSET));
+    // Add a result for the limited query that is empty.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from foo offset $1 limit 4611686018427387903")
+                .bind("p1")
+                .to(0L)
+                .build(),
+            EMPTY_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (boolean addLimit : new boolean[] {true, false}) {
+        connection.createStatement().execute("set spanner.auto_add_limit_clause=" + addLimit);
+        try (PreparedStatement statement =
+            connection.prepareStatement("select * from foo offset ?")) {
+          statement.setLong(1, 0);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            // We should get the empty result set when the auto-limit feature is enabled.
+            if (addLimit) {
+              assertFalse(resultSet.next());
+            } else {
+              assertTrue(resultSet.next());
+              assertEquals(1L, resultSet.getLong(1));
+              assertFalse(resultSet.next());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   public void testTwoQueries() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
