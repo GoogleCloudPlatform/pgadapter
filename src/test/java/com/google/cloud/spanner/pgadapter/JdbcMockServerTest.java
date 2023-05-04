@@ -81,6 +81,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -102,11 +103,9 @@ import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
-import org.postgresql.jdbc.PSQLSavepoint;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
-import org.postgresql.util.PSQLState;
 
 @RunWith(Parameterized.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -1994,6 +1993,43 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             exception.getMessage().contains("Too many values in insert clause"));
 
         connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  public void testParameterizedOffsetWithoutLimit() throws SQLException {
+    // Add a result for the non-limited query that contains one row.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from foo offset $1").bind("p1").to(0L).build(),
+            SELECT1_RESULTSET));
+    // Add a result for the limited query that is empty.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from foo offset $1 limit 4611686018427387903")
+                .bind("p1")
+                .to(0L)
+                .build(),
+            EMPTY_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (boolean addLimit : new boolean[] {true, false}) {
+        connection.createStatement().execute("set spanner.auto_add_limit_clause=" + addLimit);
+        try (PreparedStatement statement =
+            connection.prepareStatement("select * from foo offset ?")) {
+          statement.setLong(1, 0);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            // We should get the empty result set when the auto-limit feature is enabled.
+            if (addLimit) {
+              assertFalse(resultSet.next());
+            } else {
+              assertTrue(resultSet.next());
+              assertEquals(1L, resultSet.getLong(1));
+              assertFalse(resultSet.next());
+            }
+          }
+        }
       }
     }
   }
@@ -4678,7 +4714,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testUnnamedSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      assertNotNull(connection.setSavepoint());
+      Savepoint savepoint = connection.setSavepoint();
+      assertNotNull(savepoint);
+      assertEquals(0, savepoint.getSavepointId());
+
+      Savepoint savepoint2 = connection.setSavepoint();
+      assertEquals(1, savepoint2.getSavepointId());
     }
   }
 
@@ -4686,7 +4727,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testNamedSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      assertEquals("my-savepoint", connection.setSavepoint("my-savepoint").getSavepointName());
+      assertEquals("my_savepoint", connection.setSavepoint("my_savepoint").getSavepointName());
     }
   }
 
@@ -4694,7 +4735,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testReleaseSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
+      Savepoint savepoint = connection.setSavepoint("my_savepoint");
       connection.releaseSavepoint(savepoint);
     }
   }
@@ -4703,10 +4744,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testRollbackToSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
-      PSQLException exception =
-          assertThrows(PSQLException.class, () -> connection.rollback(savepoint));
-      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+      Savepoint savepoint = connection.setSavepoint("my_savepoint");
+      connection.rollback(savepoint);
     }
   }
 

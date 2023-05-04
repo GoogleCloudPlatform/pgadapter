@@ -34,6 +34,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.connection.SavepointSupport;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -240,6 +241,7 @@ public class ConnectionHandler extends Thread {
       spannerConnection.close();
       throw e;
     }
+    spannerConnection.setSavepointSupport(SavepointSupport.ENABLED);
     this.spannerConnection = spannerConnection;
     this.databaseId = connectionOptions.getDatabaseId();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
