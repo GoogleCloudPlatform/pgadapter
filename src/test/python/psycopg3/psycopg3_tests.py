@@ -19,7 +19,8 @@ from decimal import Decimal
 
 import pytz
 import psycopg
-from psycopg import Copy
+from psycopg import Copy, Rollback
+from psycopg.errors import InFailedSqlTransaction
 from psycopg.types.json import Jsonb
 
 
@@ -496,8 +497,6 @@ def named_cursor(conn_string: str):
       print_all_types(row)
 
 
-# This method is currently not being used, as nested transactions are not yet
-# supported.
 def nested_transaction(conn_string: str):
   with psycopg.connect(conn_string) as conn:
     with conn.transaction() as tx1:
@@ -505,6 +504,27 @@ def nested_transaction(conn_string: str):
         row = conn.execute(
           "SELECT * FROM all_types WHERE col_bigint=%s", (1,)).fetchone()
         print_all_types(row)
+
+
+def rollback_nested_transaction(conn_string: str):
+  with psycopg.connect(conn_string) as conn:
+    with conn.transaction():
+      try:
+        with conn.transaction():
+          conn.execute(
+            "SELECT * FROM all_types WHERE col_bigint=%s", (1,)).fetchone()
+          raise ValueError("Test rollback of savepoint")
+        print("Nested transaction succeeded")
+      except ValueError as e:
+        # We should come here, as the inner transaction always raises an error.
+        print("Nested transaction failed with error:", e)
+      try:
+        conn.execute(
+          "SELECT * FROM all_types WHERE col_bigint=%s", (1,)).fetchone()
+        print("Rolling back to a savepoint succeeded")
+      except InFailedSqlTransaction as e:
+        print("Outer transaction failed with error:", e)
+        raise Rollback()
 
 
 def create_batch_insert_values(batch_size: int):
