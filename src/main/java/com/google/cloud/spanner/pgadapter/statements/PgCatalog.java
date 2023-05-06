@@ -91,6 +91,16 @@ public class PgCatalog {
           .put(new TableOrIndexName("pg_catalog", "pg_enum"), new TableOrIndexName(null, "pg_enum"))
           .put(new TableOrIndexName(null, "pg_enum"), new TableOrIndexName(null, "pg_enum"))
           .put(
+              new TableOrIndexName("pg_catalog", "pg_language"),
+              new TableOrIndexName(null, "pg_language"))
+          .put(new TableOrIndexName(null, "pg_language"), new TableOrIndexName(null, "pg_language"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_advisory_lock"),
+              new TableOrIndexName(null, "pg_advisory_lock"))
+          .put(
+              new TableOrIndexName(null, "pg_advisory_lock"),
+              new TableOrIndexName(null, "pg_advisory_lock"))
+          .put(
               new TableOrIndexName("pg_catalog", "pg_range"),
               new TableOrIndexName(null, "pg_range"))
           .put(new TableOrIndexName(null, "pg_range"), new TableOrIndexName(null, "pg_range"))
@@ -145,6 +155,7 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_collation"), new PgCollation())
           .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
           .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
+          .put(new TableOrIndexName(null, "pg_language"), new EmptyPgLanguage())
           .put(new TableOrIndexName(null, "pg_range"), new PgRange())
           .put(new TableOrIndexName(null, "pg_sequence"), new PgSequence())
           .put(new TableOrIndexName(null, "pg_sequences"), new PgSequences())
@@ -868,6 +879,22 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_ENUM_CTE;
+    }
+  }
+
+  @InternalApi
+  public static class EmptyPgLanguage implements PgCatalogTable {
+    private static final String PG_LANGUAGE_CTE =
+        "pg_language as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, ''::varchar as lanname, 0::bigint as lanowner, false as lanispl, "
+            + "false as lanpltrusted, 0::bigint as lanplcallfoid, 0::bigint as laninline, 0::bigint as lanvalidator, "
+            + "null::bigint[] as lanacl\n"
+            + ") l where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_LANGUAGE_CTE;
     }
   }
 

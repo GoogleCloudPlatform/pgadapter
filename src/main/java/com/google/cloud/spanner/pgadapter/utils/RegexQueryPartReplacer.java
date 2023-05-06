@@ -28,11 +28,12 @@ public class RegexQueryPartReplacer implements QueryPartReplacer {
   private final Pattern pattern;
   private final Supplier<String> replacement;
   private final ReplacementStatus replacementStatus;
+  private final boolean replaceEntireStatement;
 
   /** Replace all occurrences of the given pattern with the given static replacement. */
   public static RegexQueryPartReplacer replace(Pattern pattern, String replacement) {
     return new RegexQueryPartReplacer(
-        pattern, Suppliers.ofInstance(replacement), ReplacementStatus.CONTINUE);
+        pattern, Suppliers.ofInstance(replacement), ReplacementStatus.CONTINUE, false);
   }
 
   /**
@@ -40,7 +41,7 @@ public class RegexQueryPartReplacer implements QueryPartReplacer {
    * {@link Supplier} function.
    */
   public static RegexQueryPartReplacer replace(Pattern pattern, Supplier<String> replacement) {
-    return new RegexQueryPartReplacer(pattern, replacement, ReplacementStatus.CONTINUE);
+    return new RegexQueryPartReplacer(pattern, replacement, ReplacementStatus.CONTINUE, false);
   }
 
   /**
@@ -48,7 +49,7 @@ public class RegexQueryPartReplacer implements QueryPartReplacer {
    */
   public static RegexQueryPartReplacer replaceAndStop(Pattern pattern, String replacement) {
     return new RegexQueryPartReplacer(
-        pattern, Suppliers.ofInstance(replacement), ReplacementStatus.STOP);
+        pattern, Suppliers.ofInstance(replacement), ReplacementStatus.STOP, false);
   }
 
   /**
@@ -57,20 +58,32 @@ public class RegexQueryPartReplacer implements QueryPartReplacer {
    */
   public static RegexQueryPartReplacer replaceAndStop(
       Pattern pattern, Supplier<String> replacement) {
-    return new RegexQueryPartReplacer(pattern, replacement, ReplacementStatus.STOP);
+    return new RegexQueryPartReplacer(pattern, replacement, ReplacementStatus.STOP, false);
+  }
+  /** Replace the entire with the given static value and then stop. */
+  public static RegexQueryPartReplacer replaceAllAndStop(Pattern pattern, String replacement) {
+    return new RegexQueryPartReplacer(
+        pattern, Suppliers.ofInstance(replacement), ReplacementStatus.STOP, true);
   }
 
   private RegexQueryPartReplacer(
-      Pattern pattern, Supplier<String> replacement, ReplacementStatus replacementStatus) {
+      Pattern pattern,
+      Supplier<String> replacement,
+      ReplacementStatus replacementStatus,
+      boolean replaceEntireStatement) {
     this.pattern = pattern;
     this.replacement = replacement;
     this.replacementStatus = replacementStatus;
+    this.replaceEntireStatement = replaceEntireStatement;
   }
 
   @Override
   public Tuple<String, ReplacementStatus> replace(String sql) {
     Matcher matcher = pattern.matcher(sql);
     if (matcher.find()) {
+      if (replaceEntireStatement) {
+        return Tuple.of(replacement.get(), replacementStatus);
+      }
       return Tuple.of(matcher.replaceAll(replacement.get()), replacementStatus);
     }
     return Tuple.of(sql, ReplacementStatus.CONTINUE);

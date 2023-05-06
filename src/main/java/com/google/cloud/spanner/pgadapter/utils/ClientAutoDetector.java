@@ -310,10 +310,128 @@ public class ClientAutoDetector {
                 Pattern.compile("\\s+schemaname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
                 () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), schemaname) > 0"),
             RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+sequence_schema\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), sequence_schema) > 0"),
+            RegexQueryPartReplacer.replace(
                 Pattern.compile("JOIN pg_description d ON d\\.objoid = t\\.oid"),
                 () -> "JOIN pg_description d ON false"),
+            RegexQueryPartReplacer.replace(Pattern.compile("pg_get_functiondef\\s*\\(.+\\)"), "''"),
             RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"), () -> "''"),
-            RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"), () -> "''"));
+            RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"), () -> "''"),
+            RegexQueryPartReplacer.replaceAllAndStop(
+                Pattern.compile("SELECT pg_advisory_lock\\(72707369\\)"), "select 72707369"),
+            RegexQueryPartReplacer.replaceAllAndStop(
+                Pattern.compile("SELECT pg_advisory_unlock\\(72707369\\)"), "select true"),
+            RegexQueryPartReplacer.replaceAllAndStop(
+                Pattern.compile(
+                    "SELECT\\s+"
+                        + "\\s+con.oid\\s+AS \"con_id\",\\s*"
+                        + "\\s+att2.attname\\s+AS \"child_column\",\\s*"
+                        + "\\s+cl.relname\\s+AS \"parent_table\",\\s*"
+                        + "\\s+att.attname\\s+AS \"parent_column\",\\s*"
+                        + "\\s+con.confdeltype,\\s*"
+                        + "\\s+con.confupdtype,\\s*"
+                        + "\\s+rel_ns.nspname\\s+AS \"referenced_schema_name\",\\s*"
+                        + "\\s+conname\\s+AS constraint_name,\\s*"
+                        + "\\s+child,\\s*"
+                        + "\\s+parent,\\s*"
+                        + "\\s+table_name,\\s*"
+                        + "\\s+namespace,\\s*"
+                        + "\\s+condeferrable,\\s*"
+                        + "\\s+condeferred\\s+"
+                        + "FROM\\s+\\(SELECT\\s+"
+                        + "\\s+ns.nspname AS \"namespace\",\\s*"
+                        + "\\s+unnest\\(con1.conkey\\)\\s+AS \"parent\",\\s*"
+                        + "\\s+unnest\\(con1.confkey\\)\\s+AS \"child\",\\s*"),
+                "select '''\"' || rc.constraint_schema || '\".\"' || rc.constraint_name || '\"''' as \"con_id\",\n"
+                    + "       kcu.column_name as \"child_column\", unique_ccu.table_name as \"parent_table\",\n"
+                    + "       unique_ccu.column_name as \"parent_column\",\n"
+                    + "       case rc.delete_rule\n"
+                    + "           when 'NO_ACTION' then 'a'\n"
+                    + "           else 'a'\n"
+                    + "           end as confdeltype,\n"
+                    + "       case rc.update_rule\n"
+                    + "           when 'NO_ACTION' then 'a'\n"
+                    + "           else 'a'\n"
+                    + "           end as confupdtype,\n"
+                    + "       unique_ccu.table_schema as \"referenced_schema_name\", rc.constraint_name as constraint_name,\n"
+                    + "       parent_col.ordinal_position as child,\n"
+                    + "       child_col.ordinal_position as parent,\n"
+                    + "       tc.table_name as table_name, tc.table_schema as namespace,\n"
+                    + "       tc.is_deferrable != 'NO' as condeferrable, false as condeferred\n"
+                    + "from information_schema.referential_constraints rc\n"
+                    + "inner join information_schema.table_constraints tc on\n"
+                    + "    rc.constraint_catalog=tc.constraint_catalog and\n"
+                    + "    rc.constraint_schema=tc.constraint_schema and\n"
+                    + "    rc.constraint_name=tc.constraint_name\n"
+                    + "inner join information_schema.key_column_usage kcu on\n"
+                    + "    rc.constraint_catalog=kcu.constraint_catalog and\n"
+                    + "    rc.constraint_schema=kcu.constraint_schema and\n"
+                    + "    rc.constraint_name=kcu.constraint_name\n"
+                    + "inner join information_schema.key_column_usage unique_ccu on\n"
+                    + "    rc.unique_constraint_catalog=unique_ccu.constraint_catalog and\n"
+                    + "    rc.unique_constraint_schema=unique_ccu.constraint_schema and\n"
+                    + "    rc.unique_constraint_name=unique_ccu.constraint_name and\n"
+                    + "    kcu.position_in_unique_constraint=unique_ccu.ordinal_position\n"
+                    + "inner join information_schema.columns parent_col on\n"
+                    + "    unique_ccu.table_catalog=parent_col.table_catalog and\n"
+                    + "    unique_ccu.table_schema=parent_col.table_schema and\n"
+                    + "    unique_ccu.table_name=parent_col.table_name and\n"
+                    + "    unique_ccu.column_name=parent_col.column_name\n"
+                    + "inner join information_schema.columns child_col on\n"
+                    + "    kcu.table_catalog=child_col.table_catalog and\n"
+                    + "    kcu.table_schema=child_col.table_schema and\n"
+                    + "    kcu.table_name=child_col.table_name and\n"
+                    + "    kcu.column_name=child_col.column_name\n"
+                    + "where rc.constraint_schema=(cast($1 as text[]))[0]"
+                    + "order by namespace, table_name, constraint_name, con_id, kcu.ordinal_position;\n"),
+            RegexQueryPartReplacer.replaceAllAndStop(
+                Pattern.compile(
+                    "\\s*WITH rawindex AS \\(\\s*"
+                        + "\\s*SELECT\\s*"
+                        + "\\s*indrelid,\\s*"
+                        + "\\s*indexrelid,\\s*"
+                        + "\\s*indisunique,\\s*"
+                        + "\\s*indisprimary,\\s*"
+                        + "\\s*unnest\\(indkey\\) AS indkeyid,\\s*"
+                        + "\\s*generate_subscripts\\(indkey, 1\\) AS indkeyidx,\\s*"
+                        + "\\s*unnest\\(indclass\\) AS indclass,\\s*"
+                        + "\\s*unnest\\(indoption\\) AS indoption\\s*"
+                        + "\\s*FROM pg_index\\s*--\\s*https://www.postgresql.org/docs/current/catalog-pg-index.html\\s*"
+                        + "\\s*WHERE\\s*"
+                        + "\\s*indpred IS NULL -- filter out partial indexes\\s*"
+                        + "\\s*AND array_position\\(indkey::int2\\[\\], 0::int2\\) IS NULL -- filter out expression indexes\\s*"
+                        + "\\)\\s*"
+                        + "SELECT\\s*"
+                        + "\\s*schemainfo\\.nspname AS namespace,\\s*"
+                        + "\\s*indexinfo\\.relname AS index_name,\\s*"
+                        + "\\s*tableinfo\\.relname AS table_name,\\s*"
+                        + "\\s*columninfo\\.attname AS column_name,\\s*"
+                        + "\\s*rawindex\\.indisunique AS is_unique,\\s*"
+                        + "\\s*rawindex\\.indisprimary AS is_primary_key,\\s*"
+                        + "\\s*rawindex\\.indkeyidx AS column_index,\\s*"
+                        + "\\s*opclass\\.opcname AS opclass,\\s*"
+                        + "\\s*opclass\\.opcdefault AS opcdefault,\\s*"
+                        + "\\s*indexaccess\\.amname AS index_algo,\\s*"),
+                "select\n"
+                    + "    i.table_schema as namespace,\n"
+                    + "    i.index_name as index_name,\n"
+                    + "    i.table_name AS table_name,\n"
+                    + "    ic.column_name AS column_name,\n"
+                    + "    i.is_unique = 'YES' as is_unique,\n"
+                    + "    i.index_type = 'PRIMARY_KEY' as is_primary_key,\n"
+                    + "    ic.ordinal_position as column_index,\n"
+                    + "    null as opclass,\n"
+                    + "    null as opcdefault,\n"
+                    + "    'btree' as index_algo,\n"
+                    + "    ic.column_ordering as column_order,\n"
+                    + "    false as nulls_first,\n"
+                    + "    false as condeferrable,\n"
+                    + "    false as condeferred\n"
+                    + "from information_schema.indexes i\n"
+                    + "inner join information_schema.index_columns ic using (table_catalog, table_schema, table_name, index_name)\n"
+                    + "where i.table_schema=(cast($1 as text[]))[0]\n"
+                    + "order by namespace, table_name, index_name, column_index\n"));
       }
     },
     UNSPECIFIED {
