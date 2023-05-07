@@ -19,11 +19,8 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
-import java.util.List;
 
 public class FetchStatement extends AbstractFetchOrMoveStatement {
-
-  private final ParsedFetchStatement fetchStatement;
 
   public FetchStatement(
       ConnectionHandler connectionHandler,
@@ -42,8 +39,13 @@ public class FetchStatement extends AbstractFetchOrMoveStatement {
             originalStatement),
         NO_PARAMS,
         ImmutableList.of(),
-        ImmutableList.of());
-    this.fetchStatement = parse(originalStatement.getSql(), "fetch", ParsedFetchStatement.class);
+        ImmutableList.of(),
+        parse(originalStatement.getSql(), "fetch", ParsedFetchStatement.class));
+  }
+
+  @Override
+  public String getCommandTag() {
+    return "FETCH";
   }
 
   static class ParsedFetchStatement extends ParsedFetchOrMoveStatement {

@@ -86,9 +86,8 @@ public class FetchAndMoveStatementTest {
   }
 
   ParsedFetchOrMoveStatement parse(String type, String expression) {
-    Class<? extends ParsedFetchOrMoveStatement> clazz = "fetch".equalsIgnoreCase(type)
-        ? ParsedFetchStatement.class
-        : ParsedMoveStatement.class;
+    Class<? extends ParsedFetchOrMoveStatement> clazz =
+        "fetch".equalsIgnoreCase(type) ? ParsedFetchStatement.class : ParsedMoveStatement.class;
     return AbstractFetchOrMoveStatement.parse(String.format(expression, type), type, clazz);
   }
 }

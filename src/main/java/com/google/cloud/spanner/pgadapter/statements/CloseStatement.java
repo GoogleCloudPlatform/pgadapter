@@ -65,7 +65,7 @@ public class CloseStatement extends IntermediatePortalStatement {
 
   @Override
   public String getCommandTag() {
-    return "CLOSE";
+    return "CLOSE CURSOR";
   }
 
   @Override

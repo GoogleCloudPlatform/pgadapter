@@ -20,10 +20,11 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
-import com.google.cloud.spanner.pgadapter.statements.FetchStatement.ParsedFetchStatement;
-import com.google.cloud.spanner.pgadapter.statements.MoveStatement.ParsedMoveStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
+import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import java.util.Arrays;
@@ -67,13 +68,17 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
     }
   }
 
+  private final ParsedFetchOrMoveStatement fetchOrMoveStatement;
+
   public AbstractFetchOrMoveStatement(
       String name,
       IntermediatePreparedStatement preparedStatement,
       byte[][] parameters,
       List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      List<Short> resultFormatCodes,
+      ParsedFetchOrMoveStatement fetchOrMoveStatement) {
     super(name, preparedStatement, parameters, parameterFormatCodes, resultFormatCodes);
+    this.fetchOrMoveStatement = fetchOrMoveStatement;
   }
 
   @Override
@@ -85,10 +90,23 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
   public void executeAsync(BackendConnection backendConnection) {
     if (!this.executed) {
       try {
-        setFutureStatementResult(Futures.immediateFuture(new NoResult(getCommandTag())));
+        new DescribeMessage(
+                connectionHandler,
+                PreparedType.Portal,
+                fetchOrMoveStatement.name,
+                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
+            .send();
+        new ExecuteMessage(
+                connectionHandler,
+                fetchOrMoveStatement.name,
+                1,
+                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
+            .send();
+        //        setFutureStatementResult(Futures.immediateFuture(new NoResult()));
+        // Set a null result to indicate that this statement should not return any result.
+        setFutureStatementResult(Futures.immediateFuture(null));
       } catch (Exception exception) {
         setFutureStatementResult(Futures.immediateFailedFuture(exception));
-        return;
       }
     }
   }
@@ -169,9 +187,12 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
     }
 
     try {
-      return clazz.getDeclaredConstructor(String.class, Direction.class, Long.class).newInstance(unquoteOrFoldIdentifier(name.name), direction, count);
+      return clazz
+          .getDeclaredConstructor(String.class, Direction.class, Long.class)
+          .newInstance(unquoteOrFoldIdentifier(name.name), direction, count);
     } catch (Exception exception) {
-      throw PGExceptionFactory.newPGException("internal error: " + exception.getMessage(), SQLState.InternalError);
+      throw PGExceptionFactory.newPGException(
+          "internal error: " + exception.getMessage(), SQLState.InternalError);
     }
   }
 }

@@ -32,8 +32,6 @@ import com.google.cloud.spanner.pgadapter.statements.DeclareStatement.ParsedDecl
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
-import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -113,7 +111,7 @@ public class DeclareStatement extends IntermediatePortalStatement {
 
   @Override
   public String getCommandTag() {
-    return "DECLARE";
+    return "DECLARE CURSOR";
   }
 
   @Override
@@ -131,7 +129,7 @@ public class DeclareStatement extends IntermediatePortalStatement {
         }
         new ParseMessage(
                 connectionHandler,
-                declareStatement.name,
+                "",
                 new int[0],
                 declareStatement.parsedPreparedStatement,
                 declareStatement.originalPreparedStatement)
@@ -143,17 +141,11 @@ public class DeclareStatement extends IntermediatePortalStatement {
                 new byte[0][],
                 ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
             .send();
-        new DescribeMessage(
-                connectionHandler,
-                PreparedType.Statement,
-                declareStatement.name,
-                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-            .send();
       } catch (Exception exception) {
         setFutureStatementResult(Futures.immediateFailedFuture(exception));
         return;
       }
-      setFutureStatementResult(Futures.immediateFuture(new NoResult(getCommandTag())));
+      setFutureStatementResult(Futures.immediateFuture(new NoResult()));
     }
   }
 

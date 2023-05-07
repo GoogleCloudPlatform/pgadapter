@@ -1015,7 +1015,7 @@ public abstract class AbstractMockServerTest {
         "-c",
         "", // empty credentials file, as we are using a plain text connection.
         "-s",
-        "0", // port 0 to let the OS pick an available port
+        "57838", // port 0 to let the OS pick an available port
         "-e",
         String.format("localhost:%d", spannerServer.getPort()),
         "-r",

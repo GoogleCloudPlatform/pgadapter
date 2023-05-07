@@ -24,7 +24,12 @@ public class MoveStatement extends AbstractFetchOrMoveStatement {
       byte[][] parameters,
       List<Short> parameterFormatCodes,
       List<Short> resultFormatCodes) {
-    super(name, preparedStatement, parameters, parameterFormatCodes, resultFormatCodes);
+    super(name, preparedStatement, parameters, parameterFormatCodes, resultFormatCodes, null);
+  }
+
+  @Override
+  public String getCommandTag() {
+    return "MOVE";
   }
 
   static class ParsedMoveStatement extends ParsedFetchOrMoveStatement {

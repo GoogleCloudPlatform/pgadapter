@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
@@ -86,8 +87,8 @@ public class ExtendedQueryProtocolHandler {
    * before sending the wire-protocol responses to the frontend. A flush does not commit the
    * implicit transaction (if any).
    *
-   * <p>This method will execute a {@link #sync()} if it determines that the next message in the
-   * buffer is a Sync message.
+   * <p>This method will execute a {@link #sync(boolean)} if it determines that the next message in
+   * the buffer is a Sync message.
    */
   public void flush() throws Exception {
     if (isExtendedProtocol()) {
@@ -98,7 +99,7 @@ public class ExtendedQueryProtocolHandler {
         // Do a sync instead of a flush, as the next message is a sync. This tells the backend
         // connection that it is safe to for example use a read-only transaction if the buffer only
         // contains queries.
-        sync();
+        sync(false);
       } else {
         internalFlush();
       }
@@ -117,19 +118,29 @@ public class ExtendedQueryProtocolHandler {
    * pending database statements are first executed, before sending the wire-protocol responses to
    * the frontend.
    */
-  public void sync() throws Exception {
+  public void sync(boolean includeReadyResponse) throws Exception {
     backendConnection.sync();
-    flushMessages();
+    flushMessages(includeReadyResponse);
   }
 
   /** Flushes the wire-protocol messages to the frontend. */
   private void flushMessages() throws Exception {
+    flushMessages(false);
+  }
+
+  private void flushMessages(boolean includeReadyResponse) throws Exception {
     try {
       for (AbstractQueryProtocolMessage message : messages) {
         message.flush();
         if (message.isReturnedErrorResponse()) {
           break;
         }
+      }
+      if (includeReadyResponse) {
+        new ReadyResponse(
+                connectionHandler.getConnectionMetadata().getOutputStream(),
+                getBackendConnection().getConnectionState().getReadyResponseStatus())
+            .send(false);
       }
       if (Thread.interrupted()) {
         throw PGExceptionFactory.newQueryCancelledException();
