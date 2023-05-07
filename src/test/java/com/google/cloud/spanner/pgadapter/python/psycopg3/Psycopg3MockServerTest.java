@@ -1368,7 +1368,6 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  @Ignore("Nested transactions are not yet supported")
   public void testNestedTransaction() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(
@@ -1389,7 +1388,34 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
+        result);
+  }
+
+  @Test
+  public void testRollbackNestedTransaction() throws Exception {
+    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql), ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
+
+    String result = execute("rollback_nested_transaction");
+    assertEquals(
+        "Nested transaction failed with error: Test rollback of savepoint\n"
+            + "Rolling back to a savepoint succeeded\n",
         result);
   }
 
