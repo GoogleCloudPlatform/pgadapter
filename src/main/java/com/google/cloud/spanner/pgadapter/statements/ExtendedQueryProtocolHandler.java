@@ -136,14 +136,14 @@ public class ExtendedQueryProtocolHandler {
           break;
         }
       }
+      if (Thread.interrupted()) {
+        throw PGExceptionFactory.newQueryCancelledException();
+      }
       if (includeReadyResponse) {
         new ReadyResponse(
                 connectionHandler.getConnectionMetadata().getOutputStream(),
                 getBackendConnection().getConnectionState().getReadyResponseStatus())
             .send(false);
-      }
-      if (Thread.interrupted()) {
-        throw PGExceptionFactory.newQueryCancelledException();
       }
     } finally {
       connectionHandler.getConnectionMetadata().getOutputStream().flush();
