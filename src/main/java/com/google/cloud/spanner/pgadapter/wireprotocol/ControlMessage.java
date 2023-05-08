@@ -331,7 +331,8 @@ public abstract class ControlMessage extends WireMessage {
     }
 
     sendSuffix(describedResult);
-    return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
+    return new SendResultSetState(
+        describedResult.getCommandTag(), rows, hasData && mode == QueryMode.EXTENDED);
   }
 
   private void sendPrefix(IntermediateStatement describedResult, ResultSet resultSet)

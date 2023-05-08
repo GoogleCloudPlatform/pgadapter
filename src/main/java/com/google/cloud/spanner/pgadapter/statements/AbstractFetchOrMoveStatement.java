@@ -99,10 +99,10 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
         new ExecuteMessage(
                 connectionHandler,
                 fetchOrMoveStatement.name,
-                1,
+                100,
+                "FETCH",
                 ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
             .send();
-        //        setFutureStatementResult(Futures.immediateFuture(new NoResult()));
         // Set a null result to indicate that this statement should not return any result.
         setFutureStatementResult(Futures.immediateFuture(null));
       } catch (Exception exception) {

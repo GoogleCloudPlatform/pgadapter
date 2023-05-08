@@ -37,6 +37,7 @@ import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.DataOutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -320,6 +321,10 @@ public class IntermediateStatement {
   /** @return the extracted command (first word) from the SQL statement. */
   public String getCommand() {
     return this.command;
+  }
+
+  public void setCommandTag(String commandTag) {
+    this.commandTag = Preconditions.checkNotNull(commandTag);
   }
 
   /** @return the extracted command (first word) from the really executed SQL statement. */
