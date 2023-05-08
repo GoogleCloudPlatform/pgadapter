@@ -271,10 +271,12 @@ public abstract class ControlMessage extends WireMessage {
         if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
           SendResultSetState state = sendResultSet(statement, mode, maxRows);
           statement.setHasMoreData(state.hasMoreRows());
-          if (state.hasMoreRows()) {
+          if (state.hasMoreRows() && mode == QueryMode.EXTENDED) {
             new PortalSuspendedResponse(this.outputStream).send(false);
           } else {
-            statement.close();
+            if (!state.hasMoreRows() && mode == QueryMode.EXTENDED) {
+              statement.close();
+            }
             new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
                 .send(false);
           }
@@ -331,8 +333,7 @@ public abstract class ControlMessage extends WireMessage {
     }
 
     sendSuffix(describedResult);
-    return new SendResultSetState(
-        describedResult.getCommandTag(), rows, hasData && mode == QueryMode.EXTENDED);
+    return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
   }
 
   private void sendPrefix(IntermediateStatement describedResult, ResultSet resultSet)

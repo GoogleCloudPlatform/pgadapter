@@ -33,7 +33,7 @@ public class MoveStatement extends AbstractFetchOrMoveStatement {
   }
 
   static class ParsedMoveStatement extends ParsedFetchOrMoveStatement {
-    ParsedMoveStatement(String name, Direction direction, Long count) {
+    ParsedMoveStatement(String name, Direction direction, Integer count) {
       super(name, direction, count);
     }
   }

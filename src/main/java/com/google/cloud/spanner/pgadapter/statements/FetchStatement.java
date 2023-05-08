@@ -49,7 +49,7 @@ public class FetchStatement extends AbstractFetchOrMoveStatement {
   }
 
   static class ParsedFetchStatement extends ParsedFetchOrMoveStatement {
-    ParsedFetchStatement(String name, Direction direction, Long count) {
+    ParsedFetchStatement(String name, Direction direction, Integer count) {
       super(name, direction, count);
     }
   }

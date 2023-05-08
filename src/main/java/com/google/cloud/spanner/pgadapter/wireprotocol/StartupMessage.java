@@ -76,7 +76,7 @@ public class StartupMessage extends BootstrapMessage {
     connection.connectToSpanner(database, credentials);
     for (Entry<String, String> parameter :
         Iterables.concat(
-            connection.getWellKnownClient().getDefaultParameters().entrySet(),
+            connection.getWellKnownClient().getDefaultParameters(parameters).entrySet(),
             parameters.entrySet())) {
       connection
           .getExtendedQueryProtocolHandler()

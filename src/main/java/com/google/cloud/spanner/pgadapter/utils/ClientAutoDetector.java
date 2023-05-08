@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
@@ -80,6 +81,29 @@ public class ClientAutoDetector {
               .build();
         }
         return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+    },
+    PG_FDW {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // postgres_fdw by default sends its own name.
+        return parameters.containsKey("application_name")
+            && parameters
+                .get("application_name")
+                .toLowerCase(Locale.ENGLISH)
+                .contains("postgres_fdw");
+      }
+
+      @Override
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
+        if (!(parameters.containsKey("application_name")
+            && parameters
+                .get("application_name")
+                .toLowerCase(Locale.ENGLISH)
+                .contains("readonly=false"))) {
+          return ImmutableMap.of("options", "-c spanner.readonly=true");
+        }
+        return super.getDefaultParameters(parameters);
       }
     },
     PGBENCH {
@@ -159,7 +183,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<String, String> getDefaultParameters() {
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
         return ImmutableMap.of(
             "spanner.guess_types", String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE));
       }
@@ -323,7 +347,7 @@ public class ClientAutoDetector {
       return ImmutableList.of();
     }
 
-    public ImmutableMap<String, String> getDefaultParameters() {
+    public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
       return ImmutableMap.of();
     }
   }

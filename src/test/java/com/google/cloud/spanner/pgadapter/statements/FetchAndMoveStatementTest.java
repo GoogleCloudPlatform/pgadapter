@@ -45,22 +45,23 @@ public class FetchAndMoveStatementTest {
       assertThrows(PGException.class, () -> parse(type, "%s from in foo"));
 
       assertEquals(Direction.ABSOLUTE, parse(type, "%s absolute 10 foo").direction);
-      assertEquals(10L, parse(type, "%s absolute 10 foo").count.longValue());
+      assertEquals(10, parse(type, "%s absolute 10 foo").count.intValue());
       assertThrows(PGException.class, () -> parse(type, "%s absolute 99.4 foo"));
       assertThrows(PGException.class, () -> parse(type, "%s absolute foo"));
       assertEquals(Direction.RELATIVE, parse(type, "%s relative 10 foo").direction);
       assertThrows(PGException.class, () -> parse(type, "%s relative 99.4 foo"));
-      assertEquals(10L, parse(type, "%s relative 10 foo").count.longValue());
+      assertEquals(10, parse(type, "%s relative 10 foo").count.intValue());
       assertThrows(PGException.class, () -> parse(type, "%s relative foo"));
 
-      assertEquals(1L, parse(type, "%s 1 foo").count.longValue());
-      assertEquals(1L, parse(type, "%s +1 foo").count.longValue());
-      assertEquals(1L, parse(type, "%s 1 \"my-cursor\"").count.longValue());
-      assertEquals(99L, parse(type, "%s   --comment\n99/*comment*/foo").count.longValue());
-      assertEquals(Long.MAX_VALUE, parse(type, "%s " + Long.MAX_VALUE + " foo").count.longValue());
-      assertEquals(-1L, parse(type, "%s -1 foo").count.longValue());
-      assertEquals(-1L, parse(type, "%s relative -1 foo").count.longValue());
-      assertEquals(-1L, parse(type, "%s absolute -1 foo").count.longValue());
+      assertEquals(1, parse(type, "%s 1 foo").count.intValue());
+      assertEquals(1, parse(type, "%s +1 foo").count.intValue());
+      assertEquals(1, parse(type, "%s 1 \"my-cursor\"").count.intValue());
+      assertEquals(99, parse(type, "%s   --comment\n99/*comment*/foo").count.intValue());
+      assertEquals(
+          Integer.MAX_VALUE, parse(type, "%s " + Integer.MAX_VALUE + " foo").count.intValue());
+      assertEquals(-1, parse(type, "%s -1 foo").count.intValue());
+      assertEquals(-1, parse(type, "%s relative -1 foo").count.intValue());
+      assertEquals(-1, parse(type, "%s absolute -1 foo").count.intValue());
       assertThrows(PGException.class, () -> parse(type, "%s 99.9 foo"));
       assertThrows(PGException.class, () -> parse(type, "%s +inf foo"));
       assertThrows(PGException.class, () -> parse(type, "%s -inf foo"));

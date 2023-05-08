@@ -59,9 +59,9 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
   abstract static class ParsedFetchOrMoveStatement {
     final String name;
     final Direction direction;
-    final Long count;
+    final Integer count;
 
-    ParsedFetchOrMoveStatement(String name, Direction direction, Long count) {
+    ParsedFetchOrMoveStatement(String name, Direction direction, Integer count) {
       this.name = name;
       this.direction = direction;
       this.count = count;
@@ -99,8 +99,9 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
         new ExecuteMessage(
                 connectionHandler,
                 fetchOrMoveStatement.name,
-                100,
+                fetchOrMoveStatement.count == null ? 1 : fetchOrMoveStatement.count,
                 "FETCH",
+                false,
                 ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
             .send();
         // Set a null result to indicate that this statement should not return any result.
@@ -186,10 +187,11 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
           "unexpected tokens after cursor name: " + sql, SQLState.SyntaxError);
     }
 
+    Integer integerCount = count == null ? null : count.intValue();
     try {
       return clazz
-          .getDeclaredConstructor(String.class, Direction.class, Long.class)
-          .newInstance(unquoteOrFoldIdentifier(name.name), direction, count);
+          .getDeclaredConstructor(String.class, Direction.class, Integer.class)
+          .newInstance(unquoteOrFoldIdentifier(name.name), direction, integerCount);
     } catch (Exception exception) {
       throw PGExceptionFactory.newPGException(
           "internal error: " + exception.getMessage(), SQLState.InternalError);
