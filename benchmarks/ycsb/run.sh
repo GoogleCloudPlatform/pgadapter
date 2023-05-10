@@ -68,7 +68,7 @@ EOT
 
 cat <<EOT >> cloudspanner.properties
 db.driver=com.google.cloud.spanner.jdbc.JdbcDriver
-db.url=jdbc:cloudspanner:/projects/$SPANNER_PROJECT/instances/$SPANNER_INSTANCE/databases/$SPANNER_DATABASE?minSessions=1000;maxSessions=1000;numChannels=20
+db.url=jdbc:cloudspanner:/projects/$SPANNER_PROJECT/instances/$SPANNER_INSTANCE/databases/$SPANNER_DATABASE?maxSessions=1000;minSessions=1000;numChannels=20
 db.user=
 db.passwd=
 EOT
