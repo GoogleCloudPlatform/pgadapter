@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -40,6 +41,12 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCollation;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgConstraint;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgExtension;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgIndex;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -74,9 +81,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -94,11 +103,9 @@ import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
-import org.postgresql.jdbc.PSQLSavepoint;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
-import org.postgresql.util.PSQLState;
 
 @RunWith(Parameterized.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -551,7 +558,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         new String[] {"SELECT version()", "select version()", "select * from version()"}) {
 
       try (Connection connection = DriverManager.getConnection(createUrl())) {
-        String version = null;
+        String version;
         try (ResultSet resultSet =
             connection.createStatement().executeQuery("show server_version")) {
           assertTrue(resultSet.next());
@@ -1991,6 +1998,43 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testParameterizedOffsetWithoutLimit() throws SQLException {
+    // Add a result for the non-limited query that contains one row.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from foo offset $1").bind("p1").to(0L).build(),
+            SELECT1_RESULTSET));
+    // Add a result for the limited query that is empty.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from foo offset $1 limit 4611686018427387903")
+                .bind("p1")
+                .to(0L)
+                .build(),
+            EMPTY_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (boolean addLimit : new boolean[] {true, false}) {
+        connection.createStatement().execute("set spanner.auto_add_limit_clause=" + addLimit);
+        try (PreparedStatement statement =
+            connection.prepareStatement("select * from foo offset ?")) {
+          statement.setLong(1, 0);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            // We should get the empty result set when the auto-limit feature is enabled.
+            if (addLimit) {
+              assertFalse(resultSet.next());
+            } else {
+              assertTrue(resultSet.next());
+              assertEquals(1L, resultSet.getLong(1));
+              assertFalse(resultSet.next());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   public void testTwoQueries() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
@@ -2916,6 +2960,42 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testJulianDate() throws SQLException {
+    String sql = "select d from foo";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("d")
+                                        .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("0300-02-20").build())
+                        .build())
+                .build()));
+    String binaryTransferEnable = "&binaryTransferEnable=" + Oid.DATE;
+
+    try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
+      connection.createStatement().execute("set time zone 'utc'");
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(LocalDate.of(300, 2, 20), resultSet.getDate(1).toLocalDate());
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testRandomResults() throws SQLException {
     for (boolean binary : new boolean[] {false, true}) {
       // Also get the random results using the normal Spanner client to compare the results with
@@ -2969,7 +3049,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   resultSet.getObject(col + 1);
                 }
               }
-              assertEqual(spannerResult, resultSet, binary);
+              assertEqual(spannerResult, resultSet);
               rowCount++;
             }
             assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
@@ -3033,8 +3113,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  private void assertEqual(
-      com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult, boolean binary)
+  private void assertEqual(com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult)
       throws SQLException {
     assertEquals(spannerResult.getColumnCount(), pgResult.getMetaData().getColumnCount());
     for (int col = 0; col < spannerResult.getColumnCount(); col++) {
@@ -3046,11 +3125,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       switch (spannerResult.getColumnType(col).getCode()) {
         case BOOL:
-          if (!binary) {
-            // Skip for binary for now, as there is a bug in the PG JDBC driver for decoding binary
-            // bool values.
-            assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
-          }
+          assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
           break;
         case INT64:
           assertEquals(spannerResult.getLong(col), pgResult.getLong(col + 1));
@@ -3073,12 +3148,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               pgResult.getTimestamp(col + 1).getTime());
           break;
         case DATE:
-          assertEquals(
+          LocalDate expected =
               LocalDate.of(
                   spannerResult.getDate(col).getYear(),
                   spannerResult.getDate(col).getMonth(),
-                  spannerResult.getDate(col).getDayOfMonth()),
-              pgResult.getDate(col + 1).toLocalDate());
+                  spannerResult.getDate(col).getDayOfMonth());
+          if ((expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER)
+              || (expected.getYear() <= 1582
+                  && expected.getMonth() == Month.FEBRUARY
+                  && expected.getDayOfMonth() > 20)) {
+            // Just assert that we can get the value. Dates in the Julian/Gregorian cutover period
+            // are weird, as are potential intercalaris values.
+            assertNotNull(pgResult.getDate(col + 1).toLocalDate());
+          } else {
+            assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());
+          }
           break;
         case PG_JSONB:
           assertEquals(spannerResult.getPgJsonb(col), pgResult.getString(col + 1));
@@ -3304,13 +3388,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testInformationSchemaQueryInTransactionWithReplacedPgCatalogTables()
       throws SQLException {
     String sql = "SELECT 1 FROM pg_namespace";
-    String replacedSql =
-        "with pg_namespace as (\n"
-            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-            + "  from information_schema.schemata\n"
-            + ")\n"
-            + "SELECT 1 FROM pg_namespace";
+    String replacedSql = "with " + PG_NAMESPACE_CTE + "\nSELECT 1 FROM pg_namespace";
     // Register a result for the query. Note that we don't really care what the result is, just that
     // there is a result.
     mockSpanner.putStatementResult(
@@ -3793,7 +3871,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(359, count);
+        assertEquals(360, count);
       }
     }
   }
@@ -4076,13 +4154,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       mockSpanner.putStatementResult(
           StatementResult.query(
-              Statement.of(
-                  "with pg_namespace as (\n"
-                      + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                      + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                      + "  from information_schema.schemata\n"
-                      + ")\n"
-                      + "select * from pg_namespace"),
+              Statement.of("with " + PG_NAMESPACE_CTE + "\n" + "select * from pg_namespace"),
               SELECT1_RESULTSET));
       // Just verify that this works, we don't care about the result.
       try (ResultSet resultSet =
@@ -4642,7 +4714,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testUnnamedSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      assertNotNull(connection.setSavepoint());
+      Savepoint savepoint = connection.setSavepoint();
+      assertNotNull(savepoint);
+      assertEquals(0, savepoint.getSavepointId());
+
+      Savepoint savepoint2 = connection.setSavepoint();
+      assertEquals(1, savepoint2.getSavepointId());
     }
   }
 
@@ -4650,7 +4727,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testNamedSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      assertEquals("my-savepoint", connection.setSavepoint("my-savepoint").getSavepointName());
+      assertEquals("my_savepoint", connection.setSavepoint("my_savepoint").getSavepointName());
     }
   }
 
@@ -4658,7 +4735,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testReleaseSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
+      Savepoint savepoint = connection.setSavepoint("my_savepoint");
       connection.releaseSavepoint(savepoint);
     }
   }
@@ -4667,10 +4744,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testRollbackToSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
-      PSQLException exception =
-          assertThrows(PSQLException.class, () -> connection.rollback(savepoint));
-      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+      Savepoint savepoint = connection.setSavepoint("my_savepoint");
+      connection.rollback(savepoint);
     }
   }
 
@@ -4693,6 +4768,133 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().hasBegin());
     assertEquals(1, request.getStatementsCount());
     assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testEmulatePgClass() throws SQLException {
+    String withEmulation = "with " + EMULATED_PG_CLASS_PREFIX + "\nselect 1 from pg_class";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(withEmulation), SELECT1_RESULTSET));
+    String withoutEmulation = "with " + PG_CLASS_PREFIX + "\nselect 1 from pg_class";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(withoutEmulation), EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgCollation.PG_COLLATION_CTE + "\nselect 1 from pg_collation"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgExtension.PG_EXTENSION_CTE + "\nselect 1 from pg_extension"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgAttribute.EMPTY_PG_ATTRIBUTE_CTE + "\nselect 1 from pg_attribute"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + EMULATED_PG_ATTRIBUTE_PREFIX + "\nselect 1 from pg_attribute"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgAttrdef.EMPTY_PG_ATTRDEF_CTE + "\nselect 1 from pg_attrdef"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgAttrdef.PG_ATTRDEF_CTE + "\nselect 1 from pg_attrdef"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgConstraint.EMPTY_PG_CONSTRAINT_CTE + "\nselect 1 from pg_constraint"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgConstraint.PG_CONSTRAINT_CTE + "\nselect 1 from pg_constraint"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgIndex.EMPTY_PG_INDEX_CTE + "\nselect 1 from pg_index"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgIndex.PG_INDEX_CTE + "\nselect 1 from pg_index"),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (boolean emulate : new boolean[] {true, false}) {
+        connection.createStatement().execute("set spanner.emulate_pg_class_tables=" + emulate);
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_class")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_collation")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_extension")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_attribute")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_attrdef")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_constraint")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_index")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(withEmulation))
+            .count());
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(withoutEmulation))
+            .count());
   }
 
   @Ignore("Only used for manual performance testing")

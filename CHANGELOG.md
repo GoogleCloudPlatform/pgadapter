@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.19.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.4...v0.19.0) (2023-05-05)
+
+
+### Features
+
+* automatically add LIMIT clause ([#792](https://github.com/GoogleCloudPlatform/pgadapter/issues/792)) ([c382392](https://github.com/GoogleCloudPlatform/pgadapter/commit/c38239213dabab0c17cd1b1ffedfe033607cbcbc))
+* emulate pg_class and related tables ([#766](https://github.com/GoogleCloudPlatform/pgadapter/issues/766)) ([e602750](https://github.com/GoogleCloudPlatform/pgadapter/commit/e60275074ca7de8e88d63c6aa7465d90780b9a59))
+* support savepoints ([#796](https://github.com/GoogleCloudPlatform/pgadapter/issues/796)) ([570fb96](https://github.com/GoogleCloudPlatform/pgadapter/commit/570fb96b4b42e903000e4e5efd3428bfca90f57d))
+
+
+### Documentation
+
+* add sample for Cloud Run ([#770](https://github.com/GoogleCloudPlatform/pgadapter/issues/770)) ([751030d](https://github.com/GoogleCloudPlatform/pgadapter/commit/751030db44797ab5a006b6b0ffadc34d66bb16c3))
+* document psycopg3 and SQLAlchemy 2.x support ([#801](https://github.com/GoogleCloudPlatform/pgadapter/issues/801)) ([fe73c63](https://github.com/GoogleCloudPlatform/pgadapter/commit/fe73c6353cfa539e5f73945fa74e0d9df5d5b02e))
+
+## [0.18.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.3...v0.18.4) (2023-04-15)
+
+
+### Documentation
+
+* recommend psycopg3 over psycopg2 ([#742](https://github.com/GoogleCloudPlatform/pgadapter/issues/742)) ([8aec410](https://github.com/GoogleCloudPlatform/pgadapter/commit/8aec410c4ff14df6b3787d0988bb868665cdf1b7))
+
+
+### Dependencies
+
+* bump JDBC driver to 42.6.0 ([#747](https://github.com/GoogleCloudPlatform/pgadapter/issues/747)) ([9bdb5f4](https://github.com/GoogleCloudPlatform/pgadapter/commit/9bdb5f477ffcfd3861e43305bcf8c229a437b7e8))
+* bump Spanner client lib version to 6.40.0 ([#781](https://github.com/GoogleCloudPlatform/pgadapter/issues/781)) ([419c833](https://github.com/GoogleCloudPlatform/pgadapter/commit/419c8336eed28115520e4cc03d28b2ff60415138))
+* pin the SQLAlchemy 2.x version used for tests ([#759](https://github.com/GoogleCloudPlatform/pgadapter/issues/759)) ([2a78f4c](https://github.com/GoogleCloudPlatform/pgadapter/commit/2a78f4cd0b72f0f7432081816a3b6173ed65c613))
+
 ## [0.18.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.2...v0.18.3) (2023-03-20)
 
 

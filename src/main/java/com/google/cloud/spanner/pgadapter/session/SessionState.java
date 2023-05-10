@@ -113,6 +113,11 @@ public class SessionState {
     initCopySettings(this.settings);
   }
 
+  @VisibleForTesting
+  Map<String, PGSetting> getSettings() {
+    return this.settings;
+  }
+
   void initSettingValue(String key, String value) {
     PGSetting setting = this.settings.get(key);
     if (setting != null) {
@@ -387,11 +392,40 @@ public class SessionState {
     return getBoolSetting("spanner", "force_autocommit", false);
   }
 
+  /**
+   * Returns whether statements with an OFFSET clause that uses a parameter should be automatically
+   * appended with a LIMIT clause. The LIMIT clause will use the literal Long.MAX_VALUE for unbound
+   * statements, and Long.MAX_VALUE - offset for bound statements.
+   *
+   * <p>This method will be removed in the future.
+   */
+  // TODO: Remove when Cloud Spanner supports parametrized OFFSET clauses without a LIMIT clause.
+  @InternalApi
+  public boolean isAutoAddLimitClause() {
+    return getBoolSetting("spanner", "auto_add_limit_clause", false);
+  }
+
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
   public boolean isReplacePgCatalogTables() {
     PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);
     if (setting == null) {
       return true;
+    }
+    return tryGetFirstNonNull(
+        true,
+        () -> BooleanParser.toBoolean(setting.getSetting()),
+        () -> BooleanParser.toBoolean(setting.getResetVal()),
+        () -> BooleanParser.toBoolean(setting.getBootVal()));
+  }
+
+  /**
+   * Returns the current setting for replacing pg_class tables with common table expressions that
+   * use the object name as OID.
+   */
+  public boolean isEmulatePgClassTables() {
+    PGSetting setting = internalGet(toKey("spanner", "emulate_pg_class_tables"), false);
+    if (setting == null) {
+      return false;
     }
     return tryGetFirstNonNull(
         true,

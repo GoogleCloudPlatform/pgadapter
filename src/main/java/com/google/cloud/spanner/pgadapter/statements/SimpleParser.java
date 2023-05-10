@@ -24,6 +24,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -223,6 +224,52 @@ public class SimpleParser {
       builder.bind(param.getKey()).to(param.getValue());
     }
     return builder.build();
+  }
+
+  /**
+   * Adds a LIMIT clause to the given statement if the statement contains a parameterized OFFSET
+   * clause and no LIMIT clause.
+   */
+  static Statement addLimitIfParameterizedOffset(Statement statement) {
+    String sqlLowerCase = statement.getSql().toLowerCase(Locale.ENGLISH);
+    // If there is no offset clause, then we know that we don't have to analyze any further.
+    if (!sqlLowerCase.contains("offset")) {
+      return statement;
+    }
+    SimpleParser parser = new SimpleParser(statement.getSql());
+    parser.parseExpressionUntilKeyword(ImmutableList.of("limit", "offset"), true, false, false);
+    if (parser.pos >= parser.getSql().length()) {
+      return statement;
+    }
+    if (parser.eatKeyword("limit")) {
+      // If the statement contains a LIMIT clause, then we're OK.
+      return statement;
+    }
+    String parameter;
+    if (parser.eatKeyword("offset") && (parameter = parser.readQueryParameter()) != null) {
+      // Check if we have a LIMIT clause after the OFFSET clause.
+      if (parser.peekKeyword("limit")) {
+        return statement;
+      }
+      // This is probably an invalid query. Do not modify it to prevent the user getting an error
+      // message for a query that they did not write.
+      if (parser.hasMoreTokens()) {
+        return statement;
+      }
+      // The statement contains an OFFSET clause using a query parameter and no LIMIT clause.
+      // Append a LIMIT clause equal to Long.MAX_VALUE / 2.
+      // We could also calculate it based on the actual OFFSET value, but that would make the
+      // query more prone to cache misses. Also, adding the LIMIT clause with a query parameter
+      // would structurally change the query, something that we also don't want.
+      long limit = Long.MAX_VALUE / 2;
+      return copyStatement(
+          statement,
+          parser.sql.substring(0, parser.pos)
+              + " limit "
+              + limit
+              + parser.sql.substring(parser.pos));
+    }
+    return statement;
   }
 
   private String sql;
@@ -659,6 +706,22 @@ public class SimpleParser {
       return true;
     }
     return false;
+  }
+
+  String readQueryParameter() {
+    if (eat(true, false, "$")) {
+      int startPos = pos - 1;
+      if (pos == sql.length() || !Character.isDigit(sql.charAt(pos))) {
+        return null;
+      }
+      while (pos < sql.length() && Character.isDigit(sql.charAt(pos))) {
+        pos++;
+      }
+      if (Character.isDigit(sql.charAt(pos - 1))) {
+        return sql.substring(startPos, pos);
+      }
+    }
+    return null;
   }
 
   boolean peekJoinKeyword() {
