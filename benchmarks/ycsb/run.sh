@@ -8,8 +8,9 @@ DATABASES=$(gcloud spanner databases list --instance $SPANNER_INSTANCE --filter=
 if [[ "$DATABASES" != *"$SPANNER_DATABASE"* ]]; then
   gcloud spanner databases create $SPANNER_DATABASE --instance=$SPANNER_INSTANCE --database-dialect='POSTGRESQL'
 fi
+SPANNER_PROJECT=$(gcloud --quiet config get project)
 
-java -jar pgadapter.jar -p $(gcloud --quiet config get project) -i $SPANNER_INSTANCE -r="minSessions=1000;maxSessions=1000;numChannels=20" &
+java -jar pgadapter.jar -p $SPANNER_PROJECT -i $SPANNER_INSTANCE -r="minSessions=1000;maxSessions=1000;numChannels=20" &
 sleep 6
 export PGDATABASE=$SPANNER_DATABASE
 psql -h localhost -c "CREATE TABLE IF NOT EXISTS usertable (
@@ -65,6 +66,13 @@ db.user=
 db.passwd=
 EOT
 
+cat <<EOT >> cloudspanner.properties
+db.driver=com.google.cloud.spanner.jdbc.JdbcDriver
+db.url=jdbc:cloudspanner:/projects/$SPANNER_PROJECT/instances/$SPANNER_INSTANCE/databases/$SPANNER_DATABASE
+db.user=
+db.passwd=
+EOT
+
 psql -h localhost -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; delete from usertable;"
 
 # Load workloada
@@ -80,11 +88,17 @@ psql -h localhost -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; 
 # Run workloads a, b, c, f, and d.
 for WORKLOAD in a b c f d
 do
-  for DEPLOYMENT in java_tcp java_uds
+  for DEPLOYMENT in java_tcp java_uds cloud_spanner
   do
     if [ $DEPLOYMENT == 'java_tcp' ]
     then
       CONN=tcp.properties
+    elif [ $DEPLOYMENT == 'java_uds' ]
+    then
+      CONN=uds.properties
+    elif [ $DEPLOYMENT == 'cloud_spanner' ]
+    then
+      CONN=cloudspanner.properties
     else
       CONN=uds.properties
     fi
