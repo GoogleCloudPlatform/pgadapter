@@ -1,6 +1,6 @@
 # PGAdapter and SQLAlchemy 2.x
 
-PGAdapter has experimental support for [SQLAlchemy 2.0](https://docs.sqlalchemy.org/en/20/)
+PGAdapter supports [SQLAlchemy 2.0](https://docs.sqlalchemy.org/en/20/)
 with the `psycopg` driver. This document shows how to use this sample application, and lists the
 limitations when working with `SQLAlchemy 2.x` with PGAdapter.
 

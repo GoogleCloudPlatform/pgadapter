@@ -1,12 +1,15 @@
 # PGAdapter - SQLAlchemy 2.x Connection Options
 
+PGAdapter supports [SQLAlchemy 2.0.1](https://docs.sqlalchemy.org/en/20/) and higher.
+
 ## Limitations
-PGAdapter has experimental support for SQLAlchemy 2.x with Cloud Spanner PostgreSQL databases. It 
+PGAdapter supports SQLAlchemy 2.x with Cloud Spanner PostgreSQL databases. It 
 has been tested with SQLAlchemy 2.0.1 and psycopg 3.1.8. Developing new applications using
 SQLAlchemy 2.x is possible as long as the listed limitations are taken into account.
 Porting an existing application from PostgreSQL to Cloud Spanner is likely to require code changes.
 
-PGAdapter does not support SQLAlchemy 2.x with any other engines than psycopg 3.x.
+PGAdapter does not support SQLAlchemy 2.x with any other engines than [psycopg 3.x](https://www.psycopg.org/psycopg3/).
+Using psycopg2 with SQLAlchemy 2.x is not supported.
 
 See [Limitations](../samples/python/sqlalchemy2-sample/README.md#limitations) in the `sqlalchemy2-sample`
 directory for a full list of limitations.

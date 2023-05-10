@@ -1,6 +1,6 @@
 # PGAdapter - psycopg3 Connection Options
 
-PGAdapter has experimental support for the [Python psycopg3 driver](https://www.psycopg.org/psycopg3/docs/index.html).
+PGAdapter supports the [Python psycopg3 driver](https://www.psycopg.org/psycopg3/docs/index.html).
 
 ## Sample Application
 
