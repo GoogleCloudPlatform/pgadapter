@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // This file defines tests that can be called from Java and that will connect to any PGAdapter
@@ -112,7 +112,7 @@ func TestQueryWithParameter(connString string) *C.char {
 	defer conn.Close(ctx)
 
 	var value string
-	err = conn.QueryRow(ctx, "SELECT * FROM FOO WHERE BAR=$1", "baz").Scan(&value)
+	err = conn.QueryRow(ctx, "SELECT * FROM FOO WHERE BAR=$1", 100).Scan(&value)
 	if err != nil {
 		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
 	}
@@ -153,14 +153,16 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 			pgtype.Float8ArrayOID, pgtype.Int4ArrayOID, pgtype.NumericArrayOID,
 			pgtype.TimestamptzArrayOID, pgtype.DateArrayOID,
 			pgtype.VarcharArrayOID, pgtype.JSONBArrayOID} {
-			formats[o] = conn.ConnInfo().ResultFormatCodeForOID(o)
+			formats[o] = conn.TypeMap().FormatCodeForOID(o)
+			// formats[o] = conn.ConnInfo().ResultFormatCodeForOID(o)
 		}
 		formats[uint32(oid)] = format
 		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1", formats)
 	} else {
 		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1")
 	}
-	var arrayBigint, arrayBool, arrayBytea, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
+	var arrayBigint, arrayBool, arrayBytea, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar interface{}
+	var arrayJsonb pgtype.JSONBArray
 	err = row.Scan(
 		&bigintValue,
 		&boolValue,

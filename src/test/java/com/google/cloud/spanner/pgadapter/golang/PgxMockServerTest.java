@@ -199,7 +199,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                                 .addFields(
                                     Field.newBuilder()
                                         .setName("p1")
-                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
                                         .build())
                                 .build()))
                 .build()));
@@ -211,7 +211,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .setMetadata(metadata)
                 .addRows(
                     ListValue.newBuilder()
-                        .addValues(Value.newBuilder().setStringValue("baz").build())
+                        .addValues(Value.newBuilder().setStringValue("100").build())
                         .build())
                 .build()));
 
@@ -257,12 +257,11 @@ public class PgxMockServerTest extends AbstractMockServerTest {
       for (int format : new int[] {0, 1}) {
         String res = pgxTest.TestQueryAllDataTypes(createConnString(), oid, format);
 
-        assertNull(res);
+        assertNull("Oid: " + oid, res);
         List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
         // pgx by default always uses prepared statements. As this statement does not contain any
         // parameters, we don't need to describe the parameter types, so it is 'only' sent twice to
-        // the
-        // backend.
+        // the backend.
         assertEquals(2, requests.size());
         ExecuteSqlRequest describeRequest = requests.get(0);
         assertEquals(sql, describeRequest.getSql());
@@ -314,7 +313,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p5")
                 .to(1L)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
                 .bind("p7")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p8")
@@ -386,7 +385,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p5")
                 .to(1L)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
                 .bind("p7")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p8")
@@ -407,7 +406,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p15")
                 .toInt64Array(Arrays.asList(-1L, null, -2L))
                 .bind("p16")
-                .toPgNumericArray(Arrays.asList("-6.626", null, "3.14"))
+                .toPgNumericArray(Arrays.asList("-6626e-3", null, "314e-2"))
                 .bind("p17")
                 .toTimestampArray(
                     Arrays.asList(
@@ -485,7 +484,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p5")
                 .to(1L)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
                 .bind("p7")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p8")
@@ -962,7 +961,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
               .bind("p5")
               .to(i)
               .bind("p6")
-              .to(com.google.cloud.spanner.Value.pgNumeric(i + ".123"))
+              .to(com.google.cloud.spanner.Value.pgNumeric(i == 0 ? "123e-3" : i + "123e-3"))
               .bind("p7")
               .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", i)))
               .bind("p8")
@@ -1189,7 +1188,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                   .bind("p5")
                   .to(1L)
                   .bind("p6")
-                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                  .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
                   .bind("p7")
                   .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                   .bind("p8")
