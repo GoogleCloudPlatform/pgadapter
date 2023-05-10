@@ -32,6 +32,7 @@ RUN tar xfvz ycsb-0.17.0.tar.gz
 RUN mv ycsb-0.17.0 ycsb
 
 ADD https://repo1.maven.org/maven2/org/postgresql/postgresql/42.5.0/postgresql-42.5.0.jar /ycsb/jdbc-binding/lib/postgresql-42.5.0.jar
+ADD https://repo1.maven.org/maven2/com/google/cloud/google-cloud-spanner-jdbc/2.9.14/google-cloud-spanner-jdbc-2.9.14-single-jar-with-dependencies.jar /ycsb/jdbc-binding/lib/google-cloud-spanner-jdbc-2.9.14-single-jar-with-dependencies.jar
 ADD https://repo1.maven.org/maven2/com/kohlschutter/junixsocket/junixsocket-common/2.6.0/junixsocket-common-2.6.0.jar /ycsb/jdbc-binding/lib/junixsocket-common-2.6.0.jar
 ADD https://repo1.maven.org/maven2/com/kohlschutter/junixsocket/junixsocket-native-common/2.6.0/junixsocket-native-common-2.6.0.jar /ycsb/jdbc-binding/lib/junixsocket-native-common-2.6.0.jar
 
