@@ -26,6 +26,8 @@ import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryLockStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryUnlockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
@@ -291,6 +293,25 @@ public class ClientAutoDetector {
       }
 
       @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(SelectPrismaAdvisoryLockStatement.INSTANCE)
+              .add(SelectPrismaAdvisoryUnlockStatement.INSTANCE)
+              .build();
+        }
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getDdlReplacements() {
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("(\\s+)_prisma_migrations(\\s+)"), "$1prisma_migrations$2"));
+      }
+
+      @Override
       public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return ImmutableList.of(
             RegexQueryPartReplacer.replace(
@@ -318,10 +339,11 @@ public class ClientAutoDetector {
             RegexQueryPartReplacer.replace(Pattern.compile("pg_get_functiondef\\s*\\(.+\\)"), "''"),
             RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"), () -> "''"),
             RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"), () -> "''"),
-            RegexQueryPartReplacer.replaceAllAndStop(
-                Pattern.compile("SELECT pg_advisory_lock\\(72707369\\)"), "select 72707369"),
-            RegexQueryPartReplacer.replaceAllAndStop(
-                Pattern.compile("SELECT pg_advisory_unlock\\(72707369\\)"), "select true"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("info\\.udt_name as full_data_type"),
+                "regexp_replace(info.spanner_type, '\\(.*\\)', '') as spanner_type, (select typname from pg_type where spanner_type=regexp_replace(info.spanner_type, '\\(.*\\)', '')) as full_data_type"),
+            //                "info.spanner_type, (select typname from pg_type where
+            // spanner_type=info.spanner_type) as full_data_type"),
             RegexQueryPartReplacer.replaceAllAndStop(
                 Pattern.compile(
                     "SELECT\\s+"
@@ -491,6 +513,10 @@ public class ClientAutoDetector {
     }
 
     public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+      return ImmutableList.of();
+    }
+
+    public ImmutableList<QueryPartReplacer> getDdlReplacements() {
       return ImmutableList.of();
     }
 

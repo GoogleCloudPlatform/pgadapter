@@ -255,6 +255,7 @@ public class BackendConnection {
           if (analyze) {
             result.set(NO_RESULT);
           } else {
+
             result.set(ddlExecutor.execute(parsedStatement, statement));
           }
         } else {
@@ -708,7 +709,9 @@ public class BackendConnection {
             () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
-    this.ddlExecutor = new DdlExecutor(databaseId, this);
+    this.ddlExecutor =
+        new DdlExecutor(
+            databaseId, this, Suppliers.memoize(() -> wellKnownClient.get().getDdlReplacements()));
     this.localStatements =
         Suppliers.memoize(
             () -> {

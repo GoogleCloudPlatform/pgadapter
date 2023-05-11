@@ -95,12 +95,6 @@ public class PgCatalog {
               new TableOrIndexName(null, "pg_language"))
           .put(new TableOrIndexName(null, "pg_language"), new TableOrIndexName(null, "pg_language"))
           .put(
-              new TableOrIndexName("pg_catalog", "pg_advisory_lock"),
-              new TableOrIndexName(null, "pg_advisory_lock"))
-          .put(
-              new TableOrIndexName(null, "pg_advisory_lock"),
-              new TableOrIndexName(null, "pg_advisory_lock"))
-          .put(
               new TableOrIndexName("pg_catalog", "pg_range"),
               new TableOrIndexName(null, "pg_range"))
           .put(new TableOrIndexName(null, "pg_range"), new TableOrIndexName(null, "pg_range"))
@@ -119,6 +113,9 @@ public class PgCatalog {
           .put(
               new TableOrIndexName("information_schema", "sequences"),
               new TableOrIndexName(null, "pg_information_schema_sequences"))
+          //          .put(
+          //              new TableOrIndexName("information_schema", "columns"),
+          //              new TableOrIndexName("information_schema", "columns"))
           .put(
               new TableOrIndexName("pg_catalog", "pg_extension"),
               new TableOrIndexName(null, "pg_extension"))
@@ -188,6 +185,7 @@ public class PgCatalog {
             .put(new TableOrIndexName(null, "pg_index"), new PgIndex())
             .put(new TableOrIndexName(null, "pg_type"), new PgType())
             .put(new TableOrIndexName(null, "pg_settings"), new PgSettings());
+    //            .put(new TableOrIndexName("information_schema", "columns"), new PgType());
     wellKnownClient
         .getPgCatalogTables()
         .forEach((k, v) -> pgCatalogTablesBuilder.put(TableOrIndexName.parse(k), v));
@@ -364,6 +362,11 @@ public class PgCatalog {
             + "           ''::text as description\n"
             + "  ) t where false\n"
             + ")";
+
+    @Override
+    public ImmutableSet<TableOrIndexName> getDependencies() {
+      return ImmutableSet.of(new TableOrIndexName(null, "pg_type"));
+    }
 
     @Override
     public String getTableExpression() {

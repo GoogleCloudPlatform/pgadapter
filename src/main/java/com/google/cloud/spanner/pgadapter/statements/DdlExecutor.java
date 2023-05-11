@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.AbstractLazyInitializer;
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
@@ -32,10 +33,14 @@ import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * {@link DdlExecutor} inspects DDL statements before executing these to support commonly used DDL
@@ -124,6 +129,7 @@ class DdlExecutor {
   private final AbstractLazyInitializer<Boolean> backendSupportsIfExists;
   private final BackendConnection backendConnection;
   private final Connection connection;
+  private final Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements;
 
   /**
    * Constructor only intended for testing. This will create an executor that always assumes that
@@ -138,22 +144,29 @@ class DdlExecutor {
             return Boolean.FALSE;
           }
         },
-        backendConnection);
+        backendConnection,
+        Suppliers.ofInstance(ImmutableList.of()));
   }
 
   /** Constructor for a {@link DdlExecutor} for the given database and connection. */
-  DdlExecutor(DatabaseId databaseId, BackendConnection backendConnection) {
+  DdlExecutor(
+      DatabaseId databaseId,
+      BackendConnection backendConnection,
+      Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements) {
     this(
         new BackendSupportsIfExists(databaseId, backendConnection.getSpannerConnection()),
-        backendConnection);
+        backendConnection,
+        ddlStatementReplacements);
   }
 
   private DdlExecutor(
       AbstractLazyInitializer<Boolean> backendSupportsIfExists,
-      BackendConnection backendConnection) {
+      BackendConnection backendConnection,
+      Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements) {
     this.backendConnection = backendConnection;
     this.connection = backendConnection.getSpannerConnection();
     this.backendSupportsIfExists = backendSupportsIfExists;
+    this.ddlStatementReplacements = ddlStatementReplacements;
   }
 
   /**
@@ -176,11 +189,29 @@ class DdlExecutor {
    * statement depending on the result of the `if [not] exists` check.
    */
   StatementResult execute(ParsedStatement parsedStatement, Statement statement) {
+    if (!ddlStatementReplacements.get().isEmpty()) {
+      String replaced = applyReplacers(statement.getSql());
+      if (!replaced.equals(statement.getSql())) {
+        statement = Statement.of(replaced);
+        parsedStatement = AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+      }
+    }
     Statement translated = translate(parsedStatement, statement);
     if (translated != null) {
       return connection.execute(translated);
     }
     return NOT_EXECUTED;
+  }
+
+  private String applyReplacers(String sql) {
+    for (QueryPartReplacer functionReplacement : ddlStatementReplacements.get()) {
+      Tuple<String, ReplacementStatus> result = functionReplacement.replace(sql);
+      if (result.y() == ReplacementStatus.STOP) {
+        return result.x();
+      }
+      sql = result.x();
+    }
+    return sql;
   }
 
   /**
