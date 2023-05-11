@@ -14,11 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
-import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseId;
-import com.google.cloud.spanner.Spanner;
-import com.google.cloud.spanner.SpannerOptions;
-import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -36,17 +32,28 @@ public class LatencyBenchmark {
   }
 
   public void run() {
-    SpannerOptions options =
-        SpannerOptions.newBuilder().setProjectId(PROJECT_ID).build();
-    JavaClientRunner javaClientRunner = new JavaClientRunner(DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID));
-    List<Duration> results = javaClientRunner.execute("select col_varchar from latency_test where col_bigint=$1", 100);
+    DatabaseId databaseId = DatabaseId.of(PROJECT_ID, INSTANCE_ID, DATABASE_ID);
     
-    printResults(results);
+    int numExecutions = 100;
+    
+    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
+    List<Duration> javaClientResults = javaClientRunner.execute("select col_varchar from latency_test where col_bigint=$1", numExecutions);
+    printResults("Java Client Library", javaClientResults);
+
+    JdbcRunner jdbcRunner = new JdbcRunner(databaseId);
+    List<Duration> jdbcResults = jdbcRunner.execute("select col_varchar from latency_test where col_bigint=?", numExecutions);
+    printResults("Cloud Spanner JDBC Driver", jdbcResults);
+
+    JdbcRunner pgJdbcRunner = new JdbcRunner(databaseId);
+    List<Duration> pgJdbcResults = pgJdbcRunner.execute("select col_varchar from latency_test where col_bigint=?", numExecutions);
+    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
   }
   
-  public void printResults(List<Duration> results) {
+  public void printResults(String header, List<Duration> results) {
     List<Duration> orderedResults = new ArrayList<>(results);
     Collections.sort(orderedResults);
+    System.out.println();
+    System.out.println(header);
     System.out.printf("Number of queries: %d\n", orderedResults.size());
     System.out.printf(
         "P50: %.2fms\n", orderedResults.get(orderedResults.size() / 2).get(ChronoUnit.NANOS) / 1_000_000.0f);
