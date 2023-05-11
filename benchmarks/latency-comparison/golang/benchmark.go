@@ -1,8 +1,9 @@
 package main
 
 import (
-	"cloud.google.com/pgadapter-latency-benchmark/runners"
 	"fmt"
+
+	"cloud.google.com/pgadapter-latency-benchmark/runners"
 	"github.com/montanaflynn/stats"
 )
 
@@ -11,24 +12,38 @@ func main() {
 	db := "projects/cloud-spanner-pg-adapter/instances/pgadapter-ycsb-regional-test/databases/latency-test"
 	sql := "select col_varchar from latency_test where col_bigint=$1"
 
+	startPgAdapter := false
+
 	fmt.Println("Running client library benchmark")
 	clientLibRunTimes, err := runners.RunClientLib(db, sql, numExecutions)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Running pgx benchmark using TCP")
-	pgxTcpRunTimes, err := runners.RunPgx(db, sql, numExecutions, false)
+	pgxTcpRunTimes, err := runners.RunPgx(db, sql, numExecutions, false, startPgAdapter)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Running pgx benchmark using Unix Domain Socket")
-	pgxUdsRunTimes, err := runners.RunPgx(db, sql, numExecutions, true)
+	pgxUdsRunTimes, err := runners.RunPgx(db, sql, numExecutions, true, startPgAdapter)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Running pgx benchmark using TCP")
+	pgxV4TcpRunTimes, err := runners.RunPgxV4(db, sql, numExecutions, false, startPgAdapter)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Running pgx v4 benchmark using Unix Domain Socket")
+	pgxV4UdsRunTimes, err := runners.RunPgxV4(db, sql, numExecutions, true, startPgAdapter)
 	if err != nil {
 		panic(err)
 	}
 	printReport("Go Client Library", clientLibRunTimes)
 	printReport("pgx with PGAdapter over TCP", pgxTcpRunTimes)
 	printReport("pgx with PGAdapter over UDS", pgxUdsRunTimes)
+	printReport("pgx v4 with PGAdapter over TCP", pgxV4TcpRunTimes)
+	printReport("pgx v4 with PGAdapter over UDS", pgxV4UdsRunTimes)
 }
 
 func printReport(header string, runTimes []float64) {

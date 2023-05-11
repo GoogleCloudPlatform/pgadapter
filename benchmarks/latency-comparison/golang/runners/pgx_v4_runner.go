@@ -5,13 +5,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"regexp"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v4"
 )
 
-func RunPgx(db, sql string, numExecutions int, useUnixSocket, startPgAdapter bool) ([]float64, error) {
+func RunPgxV4(db, sql string, numExecutions int, useUnixSocket, startPgAdapter bool) ([]float64, error) {
 	ctx := context.Background()
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -47,13 +46,13 @@ func RunPgx(db, sql string, numExecutions int, useUnixSocket, startPgAdapter boo
 	defer conn.Close(ctx)
 
 	// Run one query to warm up.
-	if _, err := executePgxQuery(ctx, conn, sql); err != nil {
+	if _, err := executePgxV4Query(ctx, conn, sql); err != nil {
 		return nil, err
 	}
 
 	runTimes := make([]float64, numExecutions)
 	for n := 0; n < numExecutions; n++ {
-		runTimes[n], err = executePgxQuery(ctx, conn, sql)
+		runTimes[n], err = executePgxV4Query(ctx, conn, sql)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +60,7 @@ func RunPgx(db, sql string, numExecutions int, useUnixSocket, startPgAdapter boo
 	return runTimes, nil
 }
 
-func executePgxQuery(ctx context.Context, conn *pgx.Conn, sql string) (float64, error) {
+func executePgxV4Query(ctx context.Context, conn *pgx.Conn, sql string) (float64, error) {
 	start := time.Now()
 
 	var res *string
@@ -78,17 +77,4 @@ func executePgxQuery(ctx context.Context, conn *pgx.Conn, sql string) (float64, 
 	}
 	end := float64(time.Since(start).Microseconds()) / 1e3
 	return end, nil
-}
-
-var (
-	validDBPattern = regexp.MustCompile("^projects/(?P<project>[^/]+)/instances/(?P<instance>[^/]+)/databases/(?P<database>[^/]+)$")
-)
-
-func parseDatabaseName(db string) (project, instance, database string, err error) {
-	matches := validDBPattern.FindStringSubmatch(db)
-	if len(matches) == 0 {
-		return "", "", "", fmt.Errorf("Failed to parse database name from %q according to pattern %q",
-			db, validDBPattern.String())
-	}
-	return matches[1], matches[2], matches[3], nil
 }
