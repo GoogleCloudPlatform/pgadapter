@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"os"
+	"time"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -67,6 +68,7 @@ func StartPGAdapterWithCredentials(ctx context.Context, project, instance string
 		AlwaysPullImage: true,
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true
+			config.Binds = []string{"/tmp:/tmp"}
 		},
 		Cmd: []string{
 			"-p", project,
@@ -95,6 +97,7 @@ func StartPGAdapterWithCredentials(ctx context.Context, project, instance string
 	if err != nil {
 		return 0, stopPGAdapter, err
 	}
+	time.Sleep(time.Second)
 	return mappedPort.Int(), stopPGAdapter, nil
 }
 

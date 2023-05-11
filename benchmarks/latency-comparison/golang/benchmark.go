@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	numExecutions := 500
+	numExecutions := 100
 	db := "projects/cloud-spanner-pg-adapter/instances/pgadapter-ycsb-regional-test/databases/latency-test"
 	sql := "select col_varchar from latency_test where col_bigint=$1"
 
@@ -16,13 +16,19 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Running pgx benchmark")
-	pgxRunTimes, err := runners.RunPgx(db, sql, numExecutions)
+	fmt.Println("Running pgx benchmark using TCP")
+	pgxTcpRunTimes, err := runners.RunPgx(db, sql, numExecutions, false)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Running pgx benchmark using Unix Domain Socket")
+	pgxUdsRunTimes, err := runners.RunPgx(db, sql, numExecutions, true)
 	if err != nil {
 		panic(err)
 	}
 	printReport("Go Client Library", clientLibRunTimes)
-	printReport("pgx with PGAdapter", pgxRunTimes)
+	printReport("pgx with PGAdapter over TCP", pgxTcpRunTimes)
+	printReport("pgx with PGAdapter over UDS", pgxUdsRunTimes)
 }
 
 func printReport(header string, runTimes []float64) {
