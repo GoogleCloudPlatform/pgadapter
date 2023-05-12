@@ -1,37 +1,19 @@
 package runners
 
 import (
-	"cloud.google.com/pgadapter-latency-benchmark/runners/pgadapter"
 	"context"
 	"fmt"
 	"math/rand"
-	"regexp"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-func RunPgx(db, sql string, numOperations, numClients int, useUnixSocket, startPgAdapter bool) ([]float64, error) {
+func RunPgx(database, sql string, numOperations, numClients, port int, useUnixSocket bool) ([]float64, error) {
 	ctx := context.Background()
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	// Start PGAdapter in a Docker container.
-	project, instance, database, err := parseDatabaseName(db)
-	if err != nil {
-		return nil, err
-	}
-	var port int
-	if startPgAdapter {
-		var cleanup func()
-		port, cleanup, err = pgadapter.StartPGAdapter(context.Background(), project, instance)
-		defer cleanup()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		port = 5432
-	}
+	var err error
 
 	// Connect to Cloud Spanner through PGAdapter.
 	var connString string
@@ -91,17 +73,4 @@ func executePgxQuery(ctx context.Context, conn *pgx.Conn, sql string) (float64, 
 	}
 	end := float64(time.Since(start).Microseconds()) / 1e3
 	return end, nil
-}
-
-var (
-	validDBPattern = regexp.MustCompile("^projects/(?P<project>[^/]+)/instances/(?P<instance>[^/]+)/databases/(?P<database>[^/]+)$")
-)
-
-func parseDatabaseName(db string) (project, instance, database string, err error) {
-	matches := validDBPattern.FindStringSubmatch(db)
-	if len(matches) == 0 {
-		return "", "", "", fmt.Errorf("Failed to parse database name from %q according to pattern %q",
-			db, validDBPattern.String())
-	}
-	return matches[1], matches[2], matches[3], nil
 }

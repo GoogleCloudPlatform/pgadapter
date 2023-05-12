@@ -1,7 +1,6 @@
 package runners
 
 import (
-	"cloud.google.com/pgadapter-latency-benchmark/runners/pgadapter"
 	"context"
 	"fmt"
 	"math/rand"
@@ -11,26 +10,10 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-func RunPgxV4(db, sql string, numOperations, numClients int, useUnixSocket, startPgAdapter bool) ([]float64, error) {
+func RunPgxV4(database, sql string, numOperations, numClients, port int, useUnixSocket bool) ([]float64, error) {
 	ctx := context.Background()
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	// Start PGAdapter in a Docker container.
-	project, instance, database, err := parseDatabaseName(db)
-	if err != nil {
-		return nil, err
-	}
-	var port int
-	if startPgAdapter {
-		var cleanup func()
-		port, cleanup, err = pgadapter.StartPGAdapter(context.Background(), project, instance)
-		defer cleanup()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		port = 5432
-	}
+	var err error
 
 	// Connect to Cloud Spanner through PGAdapter.
 	var connString string
