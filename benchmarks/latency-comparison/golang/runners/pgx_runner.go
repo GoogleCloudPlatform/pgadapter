@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func RunPgx(database, sql string, numOperations, numClients, port int, useUnixSocket bool) ([]float64, error) {
+func RunPgx(database, sql string, numOperations, numClients int, host string, port int, useUnixSocket bool) ([]float64, error) {
 	ctx := context.Background()
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 	var err error
@@ -18,9 +18,9 @@ func RunPgx(database, sql string, numOperations, numClients, port int, useUnixSo
 	// Connect to Cloud Spanner through PGAdapter.
 	var connString string
 	if useUnixSocket {
-		connString = fmt.Sprintf("host=/tmp port=5432 database=%s", database)
+		connString = fmt.Sprintf("host=%s port=%d database=%s", host, port, database)
 	} else {
-		connString = fmt.Sprintf("postgres://uid:pwd@localhost:%d/%s?sslmode=disable", port, database)
+		connString = fmt.Sprintf("postgres://uid:pwd@%s:%d/%s?sslmode=disable", host, port, database)
 	}
 	conns := make([]*pgx.Conn, numClients)
 	for c := 0; c < numClients; c++ {
