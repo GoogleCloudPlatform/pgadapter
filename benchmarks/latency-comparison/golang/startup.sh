@@ -14,4 +14,4 @@
 java -jar /home/pgadapter/pgadapter.jar -p cloud-spanner-pg-adapter -i pgadapter-ycsb-regional-test &
 
 # Run the benchmark.
-exec "/app/benchmark"
+exec "/app/benchmark -embedded=false"
