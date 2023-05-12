@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-func RunPgx(db, sql string, numExecutions int, useUnixSocket, startPgAdapter bool) ([]float64, error) {
+func RunPgx(db, sql string, numOperations, numClients int, useUnixSocket, startPgAdapter bool) ([]float64, error) {
 	ctx := context.Background()
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -32,7 +33,6 @@ func RunPgx(db, sql string, numExecutions int, useUnixSocket, startPgAdapter boo
 		port = 5432
 	}
 
-	fmt.Println("Started PGAdapter - Now running pgx benchmark")
 	// Connect to Cloud Spanner through PGAdapter.
 	var connString string
 	if useUnixSocket {
@@ -40,24 +40,37 @@ func RunPgx(db, sql string, numExecutions int, useUnixSocket, startPgAdapter boo
 	} else {
 		connString = fmt.Sprintf("postgres://uid:pwd@localhost:%d/%s?sslmode=disable", port, database)
 	}
-	conn, err := pgx.Connect(ctx, connString)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close(ctx)
-
-	// Run one query to warm up.
-	if _, err := executePgxQuery(ctx, conn, sql); err != nil {
-		return nil, err
-	}
-
-	runTimes := make([]float64, numExecutions)
-	for n := 0; n < numExecutions; n++ {
-		runTimes[n], err = executePgxQuery(ctx, conn, sql)
+	conns := make([]*pgx.Conn, numClients)
+	for c := 0; c < numClients; c++ {
+		conns[c], err = pgx.Connect(ctx, connString)
 		if err != nil {
 			return nil, err
 		}
+		defer conns[c].Close(ctx)
 	}
+
+	// Run one query to warm up.
+	if _, err := executePgxQuery(ctx, conns[0], sql); err != nil {
+		return nil, err
+	}
+
+	runTimes := make([]float64, numOperations*numClients)
+	wg := sync.WaitGroup{}
+	wg.Add(numClients)
+	for c := 0; c < numClients; c++ {
+		clientIndex := c
+		go func() error {
+			defer wg.Done()
+			for n := 0; n < numOperations; n++ {
+				runTimes[clientIndex*numOperations+n], err = executePgxQuery(ctx, conns[clientIndex], sql)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}()
+	}
+	wg.Wait()
 	return runTimes, nil
 }
 

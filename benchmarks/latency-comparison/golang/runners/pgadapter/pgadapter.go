@@ -64,7 +64,7 @@ func StartPGAdapterWithCredentials(ctx context.Context, project, instance string
 		return 0, func() {}, err
 	}
 	req := testcontainers.ContainerRequest{
-		Image:           "gcr.io/cloud-spanner-pg-adapter/pgadapter:v0.18.4",
+		Image:           "gcr.io/cloud-spanner-pg-adapter/pgadapter",
 		AlwaysPullImage: true,
 		HostConfigModifier: func(config *container.HostConfig) {
 			config.AutoRemove = true

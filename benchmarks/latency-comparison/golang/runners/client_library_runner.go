@@ -4,6 +4,7 @@ import (
 	"context"
 	"google.golang.org/api/iterator"
 	"math/rand"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -11,7 +12,7 @@ import (
 
 var rnd *rand.Rand
 
-func RunClientLib(db, sql string, numExecutions int) ([]float64, error) {
+func RunClientLib(db, sql string, numOperations, numClients int) ([]float64, error) {
 	ctx := context.Background()
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 	client, err := spanner.NewClient(ctx, db)
@@ -25,14 +26,23 @@ func RunClientLib(db, sql string, numExecutions int) ([]float64, error) {
 		return nil, err
 	}
 
-	runTimes := make([]float64, numExecutions)
-	for n := 0; n < numExecutions; n++ {
-		runTimes[n], err = executeClientLibQuery(ctx, client, sql)
-		if err != nil {
-			return nil, err
-		}
+	runTimes := make([]float64, numOperations*numClients)
+	wg := sync.WaitGroup{}
+	wg.Add(numClients)
+	for c := 0; c < numClients; c++ {
+		clientIndex := c
+		go func() error {
+			defer wg.Done()
+			for n := 0; n < numOperations; n++ {
+				runTimes[clientIndex*numOperations+n], err = executeClientLibQuery(ctx, client, sql)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}()
 	}
-
+	wg.Wait()
 	return runTimes, nil
 }
 
