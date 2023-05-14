@@ -308,7 +308,18 @@ public class ClientAutoDetector {
       public ImmutableList<QueryPartReplacer> getDdlReplacements() {
         return ImmutableList.of(
             RegexQueryPartReplacer.replace(
-                Pattern.compile("(\\s+)_prisma_migrations(\\s+)"), "$1prisma_migrations$2"));
+                Pattern.compile("(\\s+)_prisma_migrations"), "$1prisma_migrations"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])timestamp([\\s,()])", Pattern.CASE_INSENSITIVE),
+                "$1timestamptz$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])timestamptz\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1timestamptz$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("CONSTRAINT\\s+.*\\s+PRIMARY KEY\\s*\\(", Pattern.CASE_INSENSITIVE),
+                "PRIMARY KEY ("),
+            RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+DELETE\\s+RESTRICT"), ""),
+            RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+UPDATE\\s+CASCADE"), ""));
       }
 
       @Override
@@ -340,10 +351,18 @@ public class ClientAutoDetector {
             RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"), () -> "''"),
             RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"), () -> "''"),
             RegexQueryPartReplacer.replace(
+                Pattern.compile("SELECT\\s+" + "tbl\\.relname\\s+AS\\s+table_name"),
+                "SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile(
+                    "SELECT\\s+"
+                        + "oid\\.namespace,\\s*"
+                        + "info\\.table_name,\\s*"
+                        + "info\\.column_name,"),
+                "SELECT oid.namespace, replace(info.table_name, 'prisma_migrations', '_prisma_migrations') AS table_name, info.column_name,"),
+            RegexQueryPartReplacer.replace(
                 Pattern.compile("info\\.udt_name as full_data_type"),
-                "regexp_replace(info.spanner_type, '\\(.*\\)', '') as spanner_type, (select typname from pg_type where spanner_type=regexp_replace(info.spanner_type, '\\(.*\\)', '')) as full_data_type"),
-            //                "info.spanner_type, (select typname from pg_type where
-            // spanner_type=info.spanner_type) as full_data_type"),
+                "(select typname from pg_type where spanner_type=regexp_replace(info.spanner_type, '\\\\(.*\\\\)', '')) as full_data_type"),
             RegexQueryPartReplacer.replaceAllAndStop(
                 Pattern.compile(
                     "SELECT\\s+"
