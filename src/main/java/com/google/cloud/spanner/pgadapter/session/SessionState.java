@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 
 /** {@link SessionState} contains all session variables for a connection. */
 @InternalApi
@@ -265,6 +266,12 @@ public class SessionState {
   /** Returns the current value of the specified setting. */
   public PGSetting get(String extension, String name) {
     return internalGet(toKey(extension, name), true);
+  }
+
+  /** Returns the current value of the specified setting or null if undefined. */
+  @Nullable
+  public PGSetting tryGet(String extension, String name) {
+    return internalGet(toKey(extension, name), false);
   }
 
   private PGSetting internalGet(String key, boolean throwForUnknownParam) {

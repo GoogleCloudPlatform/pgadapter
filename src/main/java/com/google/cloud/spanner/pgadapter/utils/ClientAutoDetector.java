@@ -19,6 +19,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.postgresql.core.Oid;
 
 /**
@@ -316,6 +318,12 @@ public class ClientAutoDetector {
                 Pattern.compile("([\\s,()])timestamptz\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
                 "$1timestamptz$2"),
             RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])numeric\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1numeric$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])decimal\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1numeric$2"),
+            RegexQueryPartReplacer.replace(
                 Pattern.compile("CONSTRAINT\\s+.*\\s+PRIMARY KEY\\s*\\(", Pattern.CASE_INSENSITIVE),
                 "PRIMARY KEY ("),
             RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+DELETE\\s+RESTRICT"), ""),
@@ -328,6 +336,10 @@ public class ClientAutoDetector {
             RegexQueryPartReplacer.replace(
                 Pattern.compile("\\s+namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
                 () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), namespace.nspname) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+schemainfo\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () ->
+                    " strpos(array_to_string(cast(\\$1 as text[]), ','), schemainfo.nspname) > 0"),
             RegexQueryPartReplacer.replace(
                 Pattern.compile("\\s+pg_namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
                 () ->
@@ -347,6 +359,8 @@ public class ClientAutoDetector {
             RegexQueryPartReplacer.replace(
                 Pattern.compile("JOIN pg_description d ON d\\.objoid = t\\.oid"),
                 () -> "JOIN pg_description d ON false"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("pg_get_constraintdef\\s*\\(.+\\)\\s*AS\\s+"), "conbin AS "),
             RegexQueryPartReplacer.replace(Pattern.compile("pg_get_functiondef\\s*\\(.+\\)"), "''"),
             RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"), () -> "''"),
             RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"), () -> "''"),
@@ -433,27 +447,7 @@ public class ClientAutoDetector {
                         + "\\s*indrelid,\\s*"
                         + "\\s*indexrelid,\\s*"
                         + "\\s*indisunique,\\s*"
-                        + "\\s*indisprimary,\\s*"
-                        + "\\s*unnest\\(indkey\\) AS indkeyid,\\s*"
-                        + "\\s*generate_subscripts\\(indkey, 1\\) AS indkeyidx,\\s*"
-                        + "\\s*unnest\\(indclass\\) AS indclass,\\s*"
-                        + "\\s*unnest\\(indoption\\) AS indoption\\s*"
-                        + "\\s*FROM pg_index\\s*--\\s*https://www.postgresql.org/docs/current/catalog-pg-index.html\\s*"
-                        + "\\s*WHERE\\s*"
-                        + "\\s*indpred IS NULL -- filter out partial indexes\\s*"
-                        + "\\s*AND array_position\\(indkey::int2\\[\\], 0::int2\\) IS NULL -- filter out expression indexes\\s*"
-                        + "\\)\\s*"
-                        + "SELECT\\s*"
-                        + "\\s*schemainfo\\.nspname AS namespace,\\s*"
-                        + "\\s*indexinfo\\.relname AS index_name,\\s*"
-                        + "\\s*tableinfo\\.relname AS table_name,\\s*"
-                        + "\\s*columninfo\\.attname AS column_name,\\s*"
-                        + "\\s*rawindex\\.indisunique AS is_unique,\\s*"
-                        + "\\s*rawindex\\.indisprimary AS is_primary_key,\\s*"
-                        + "\\s*rawindex\\.indkeyidx AS column_index,\\s*"
-                        + "\\s*opclass\\.opcname AS opclass,\\s*"
-                        + "\\s*opclass\\.opcdefault AS opcdefault,\\s*"
-                        + "\\s*indexaccess\\.amname AS index_algo,\\s*"),
+                        + "\\s*indisprimary,\\s*"),
                 "select\n"
                     + "    i.table_schema as namespace,\n"
                     + "    i.index_name as index_name,\n"
@@ -496,6 +490,13 @@ public class ClientAutoDetector {
         // defaults defined in this enum.
         return true;
       }
+
+      @Override
+      boolean isClient(PGSetting setting) {
+        // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
+        // defaults defined in this enum.
+        return true;
+      }
     };
 
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
@@ -509,6 +510,10 @@ public class ClientAutoDetector {
     }
 
     boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
+      return false;
+    }
+
+    boolean isClient(PGSetting setting) {
       return false;
     }
 
@@ -594,6 +599,20 @@ public class ClientAutoDetector {
       List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
     for (WellKnownClient client : WellKnownClient.values()) {
       if (client.isClient(skippedParseMessages, parseMessage)) {
+        return client;
+      }
+    }
+    // The following line should never be reached.
+    throw new IllegalStateException("UNSPECIFIED.isClient() should have returned true");
+  }
+
+  /** Detect the client based on a session state setting. */
+  public static @Nonnull WellKnownClient detectClient(@Nullable PGSetting setting) {
+    if (setting == null || setting.getSetting() == null) {
+      return WellKnownClient.UNSPECIFIED;
+    }
+    for (WellKnownClient client : WellKnownClient.values()) {
+      if (client.name().equalsIgnoreCase(setting.getSetting()) || client.isClient(setting)) {
         return client;
       }
     }

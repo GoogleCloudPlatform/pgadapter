@@ -2306,6 +2306,26 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .to("foo")
                 .build(),
             SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select table_schema, index_name "
+                        + "from information_schema.indexes "
+                        + "where table_schema=$1 "
+                        + "and table_name=$2 "
+                        + "and not index_type = 'PRIMARY_KEY' "
+                        + "and spanner_is_managed = 'NO'")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(StructType.newBuilder().build())
+                        .build())
+                .build()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {

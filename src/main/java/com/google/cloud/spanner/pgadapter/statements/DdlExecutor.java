@@ -198,22 +198,22 @@ class DdlExecutor {
     }
     Statement translated = translate(parsedStatement, statement);
     if (translated != null) {
-      ImmutableList<Statement> allStatements = getDependentStatements(statement);
+      ImmutableList<Statement> allStatements = getDependentStatements(translated);
       if (allStatements.size() == 1) {
         return connection.execute(allStatements.get(0));
       } else {
         boolean startedBatch = false;
         try {
           if (!connection.isDdlBatchActive()) {
-            connection.startBatchDdl();
+            connection.execute(Statement.of("START BATCH DDL"));
             startedBatch = true;
           }
+          StatementResult result = null;
           for (Statement dropDependency : allStatements) {
-            connection.execute(dropDependency);
+            result = connection.execute(dropDependency);
           }
-          StatementResult result = connection.execute(statement);
           if (startedBatch) {
-            connection.runBatch();
+            result = connection.execute(Statement.of("RUN BATCH"));
           }
           return result;
         } catch (Throwable t) {
