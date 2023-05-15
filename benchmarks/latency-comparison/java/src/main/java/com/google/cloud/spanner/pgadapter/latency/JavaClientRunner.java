@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-public class JavaClientRunner {
+public class JavaClientRunner implements BenchmarkRunner {
   private final Random random = new Random();
   private final DatabaseId databaseId;
   private long numNullValues;
@@ -37,8 +37,9 @@ public class JavaClientRunner {
     this.databaseId = databaseId;
   }
   
-  public List<Duration> execute(String sql, int numExecutions) {
-    List<Duration> results = new ArrayList<>(numExecutions);
+  @Override
+  public List<Duration> execute(String sql, int numClients, int numOperations) {
+    List<Duration> results = new ArrayList<>(numOperations);
     SpannerOptions options = SpannerOptions.newBuilder()
         .setProjectId(databaseId.getInstanceId().getProject())
         .build();
@@ -47,7 +48,7 @@ public class JavaClientRunner {
       // Execute one query to make sure everything has been warmed up.
       executeQuery(client, sql);
       
-      for (int i=0; i<numExecutions; i++) {
+      for (int i=0; i<numOperations; i++) {
         results.add(executeQuery(client, sql));
       }
     }

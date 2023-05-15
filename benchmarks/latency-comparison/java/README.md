@@ -1,8 +1,7 @@
-# Latency Comparison - pgx driver vs Cloud Spanner Go Client Library
+# Latency Comparison - PostgreSQL JDBC driver vs Cloud Spanner JDBC driver
 
 This benchmark tests the latency of executing a simple, single-row query using the PostgreSQL
-`pgx` driver with PGAdapter compared to executing the same query using the [native Cloud Spanner
-Go client library](https://pkg.go.dev/cloud.google.com/go/spanner).
+JDBC driver with PGAdapter compared to executing the same query using the Cloud Spanner JDBC driver.
 
 ## Setup
 
@@ -17,6 +16,11 @@ export GOOGLE_CLOUD_PROJECT=my-project
 export SPANNER_INSTANCE=my-instance
 export SPANNER_DATABASE=my-database
 ```
+
+## Running
+
+The benchmark application includes PGAdapter as a dependency and automatically starts PGAdapter as
+an in-process service. 
 
 ## Run using Docker
 

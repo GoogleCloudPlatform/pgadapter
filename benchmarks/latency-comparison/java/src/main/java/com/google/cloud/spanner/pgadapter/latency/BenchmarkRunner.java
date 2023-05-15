@@ -17,8 +17,8 @@ package com.google.cloud.spanner.pgadapter.latency;
 import java.time.Duration;
 import java.util.List;
 
-interface BenchmarkRunner {
+public interface BenchmarkRunner {
 
-  List<Duration> execute(String sql, int numExecutions);
+  List<Duration> execute(String sql, int numClients, int numOperations);
 
 }

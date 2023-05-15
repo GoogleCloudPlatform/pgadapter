@@ -8,7 +8,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Random;
 
-abstract class AbstractJdbcRunner implements BenchmarkRunner {
+public abstract class AbstractJdbcRunner implements BenchmarkRunner {
   private final Random random = new Random();
   private long numNullValues;
   private long numNonNullValues;

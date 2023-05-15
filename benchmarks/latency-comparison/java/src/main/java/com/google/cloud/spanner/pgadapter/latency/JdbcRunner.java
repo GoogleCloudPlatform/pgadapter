@@ -31,7 +31,7 @@ public class JdbcRunner extends AbstractJdbcRunner {
   }
 
   @Override
-  public List<Duration> execute(String sql, int numExecutions) {
+  public List<Duration> execute(String sql, int numClients, int numExecutions) {
     List<Duration> results = new ArrayList<>(numExecutions);
     try (Connection connection = DriverManager.getConnection(String.format("jdbc:cloudspanner:/%s", databaseId.getName()))) {
       // Execute one query to make sure everything has been warmed up.
