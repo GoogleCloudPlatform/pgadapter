@@ -306,7 +306,6 @@ public class PgCatalog {
     return null;
   }
 
-  @InternalApi
   public interface PgCatalogTable {
     String getTableExpression();
 
@@ -353,7 +352,6 @@ public class PgCatalog {
   public static final String PG_DESCRIPTION_CTE_EMULATED =
       String.format(PG_DESCRIPTION_CTE_FORMAT, "''::varchar", "''::varchar");
 
-  @InternalApi
   public class PgDescription implements PgCatalogTable {
     static final String PG_DESCRIPTION_CTE_FORMAT =
         "pg_description as (\n"
