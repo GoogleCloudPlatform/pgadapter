@@ -1,3 +1,16 @@
+/*
+Copyright 2023 Google LLC
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package main
 
 import (
@@ -29,7 +42,7 @@ func main() {
 	db := flag.String("database", fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseId), "The database to use for benchmarking.")
 	numClients := flag.Int("clients", 16, "The number of clients that will be executing queries in parallel.")
 	numOperations := flag.Int("operations", 1000, "The number of operations that that each client will run. The total number of operations is clients*operations.")
-	embedded := flag.Bool("embedded", true, "Starts an embedded PGAdapter container along with the benchmark. Setting this option will ignore any host or port settings for PGAdapter.")
+	embedded := flag.Bool("embedded", false, "Starts an embedded PGAdapter container along with the benchmark. Setting this option will ignore any host or port settings for PGAdapter.\nNOTE: Running PGAdapter in a Docker container while the application runs on the host machine will add significant latency, as all communication between the application and PGAdapter will have to cross the Docker network bridge. You should only use this option for testing purposes, and not for actual performance benchmarking.")
 	host := flag.String("host", "localhost", "The host name where PGAdapter is running. Only used if embedded=false.")
 	port := flag.Int("port", 5432, "The port number where PGAdapter is running. Only used if embedded=false.")
 	uds := flag.Bool("uds", false, "Run a benchmark using Unix Domain Socket in addition to TCP.")
@@ -58,6 +71,7 @@ func main() {
 	sql := "select col_varchar from latency_test where col_bigint=$1"
 	fmt.Println()
 	fmt.Println("Running benchmark with the following settings:")
+	fmt.Printf("Database: %s\n", *db)
 	fmt.Printf("Clients: %d\n", *numClients)
 	fmt.Printf("Operations: %d\n", *numOperations)
 	fmt.Println()

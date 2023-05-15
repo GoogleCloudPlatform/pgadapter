@@ -5,7 +5,17 @@ native Cloud Spanner client libraries and drivers. The tests in this directory f
 latency difference between using PGAdapter or not, and therefore use simple statements that
 operate on a single row at a time.
 
-## Setup
+The goal is that PGAdapter should not add any measurable latency over using the corresponding native
+Cloud Spanner driver, as long as the following guidelines are followed:
+1. PGAdapter and your application should run on the same host. Note that running your application
+   on your local host machine while PGAdapter is running in a Docker container will incur a latency
+   penalty, as all communication between your application and PGAdapter will have to pass through
+   the host-to-Docker network bridge. Instead, you should either run both your application and
+   PGAdapter on the host machine, or run both in Docker.
+2. When running PGAdapter and your application in Docker, they should be using the same Docker
+   network.
+
+## Setup Test Database
 
 All tests in this directory use a database with a single table. Follow these steps to create a
 database that you can use for these tests:
