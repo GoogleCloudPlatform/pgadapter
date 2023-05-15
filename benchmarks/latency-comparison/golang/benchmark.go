@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"regexp"
 
 	"cloud.google.com/pgadapter-latency-benchmark/runners"
@@ -12,12 +13,26 @@ import (
 )
 
 func main() {
-	db := flag.String("database", "projects/cloud-spanner-pg-adapter/instances/pgadapter-ycsb-regional-test/databases/latency-test", "The database to use for benchmarking.")
-	numOperations := flag.Int("operations", 1000, "The number of operations that that each client will run. The total number of operations is clients*operations.")
+	projectId, _ := os.LookupEnv("GOOGLE_CLOUD_PROJECT")
+	if projectId == "" {
+		projectId = "my-project"
+	}
+	instanceId, _ := os.LookupEnv("SPANNER_INSTANCE")
+	if instanceId == "" {
+		instanceId = "my-instance"
+	}
+	databaseId, _ := os.LookupEnv("SPANNER_DATABASE")
+	if databaseId == "" {
+		databaseId = "my-database"
+	}
+
+	db := flag.String("database", fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectId, instanceId, databaseId), "The database to use for benchmarking.")
 	numClients := flag.Int("clients", 16, "The number of clients that will be executing queries in parallel.")
+	numOperations := flag.Int("operations", 1000, "The number of operations that that each client will run. The total number of operations is clients*operations.")
 	embedded := flag.Bool("embedded", true, "Starts an embedded PGAdapter container along with the benchmark. Setting this option will ignore any host or port settings for PGAdapter.")
 	host := flag.String("host", "localhost", "The host name where PGAdapter is running. Only used if embedded=false.")
 	port := flag.Int("port", 5432, "The port number where PGAdapter is running. Only used if embedded=false.")
+	uds := flag.Bool("uds", false, "Run a benchmark using Unix Domain Socket in addition to TCP.")
 	dir := flag.String("dir", "/tmp", "The directory where PGAdapter listens for Unix Domain Socket connections. Only used if embedded=false.")
 	udsPort := flag.Int("udsport", 0, "The port number where PGAdapter is listening for Unix Domain Sockets. Only used if embedded=false.")
 	flag.Parse()
@@ -42,18 +57,19 @@ func main() {
 
 	sql := "select col_varchar from latency_test where col_bigint=$1"
 	fmt.Println()
+	fmt.Println("Running benchmark with the following settings:")
+	fmt.Printf("Clients: %d\n", *numClients)
+	fmt.Printf("Operations: %d\n", *numOperations)
+	fmt.Println()
+
 	fmt.Println("Running native Cloud Spanner client library benchmark")
 	clientLibRunTimes, err := runners.RunClientLib(*db, sql, *numOperations, *numClients)
 	if err != nil {
 		panic(err)
 	}
+
 	fmt.Println("Running pgx v5 benchmark using TCP against PGAdapter")
 	pgxTcpRunTimes, err := runners.RunPgx(*db, sql, *numOperations, *numClients, *host, *port, false)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Running pgx v5 benchmark using Unix Domain Socket against PGAdapter")
-	pgxUdsRunTimes, err := runners.RunPgx(*db, sql, *numOperations, *numClients, *dir, *udsPort, true)
 	if err != nil {
 		panic(err)
 	}
@@ -62,16 +78,29 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Running pgx v4 benchmark using Unix Domain Socket against PGAdapter")
-	pgxV4UdsRunTimes, err := runners.RunPgxV4(*db, sql, *numOperations, *numClients, *dir, *udsPort, true)
-	if err != nil {
-		panic(err)
+
+	var pgxUdsRunTimes []float64
+	var pgxV4UdsRunTimes []float64
+	if *uds {
+		fmt.Println("Running pgx v5 benchmark using Unix Domain Socket against PGAdapter")
+		pgxUdsRunTimes, err = runners.RunPgx(*db, sql, *numOperations, *numClients, *dir, *udsPort, true)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Running pgx v4 benchmark using Unix Domain Socket against PGAdapter")
+		pgxV4UdsRunTimes, err = runners.RunPgxV4(*db, sql, *numOperations, *numClients, *dir, *udsPort, true)
+		if err != nil {
+			panic(err)
+		}
 	}
+
 	printReport("Cloud Spanner native Go Client Library", *numClients, clientLibRunTimes)
 	printReport("pgx v5 with PGAdapter over TCP", *numClients, pgxTcpRunTimes)
-	printReport("pgx v5 with PGAdapter over UDS", *numClients, pgxUdsRunTimes)
 	printReport("pgx v4 with PGAdapter over TCP", *numClients, pgxV4TcpRunTimes)
-	printReport("pgx v4 with PGAdapter over UDS", *numClients, pgxV4UdsRunTimes)
+	if *uds {
+		printReport("pgx v5 with PGAdapter over UDS", *numClients, pgxUdsRunTimes)
+		printReport("pgx v4 with PGAdapter over UDS", *numClients, pgxV4UdsRunTimes)
+	}
 }
 
 func printReport(header string, numClients int, runTimes []float64) {

@@ -2,19 +2,25 @@ package runners
 
 import (
 	"context"
-	"google.golang.org/api/iterator"
 	"math/rand"
 	"sync"
 	"time"
+
+	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/spanner"
 )
 
 var rnd *rand.Rand
+var m *sync.Mutex
+
+func init() {
+	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
+	m = &sync.Mutex{}
+}
 
 func RunClientLib(db, sql string, numOperations, numClients int) ([]float64, error) {
 	ctx := context.Background()
-	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 	client, err := spanner.NewClient(ctx, db)
 	if err != nil {
 		return nil, err
@@ -50,7 +56,7 @@ func executeClientLibQuery(ctx context.Context, client *spanner.Client, sql stri
 	start := time.Now()
 	stmt := spanner.Statement{
 		SQL:    sql,
-		Params: map[string]interface{}{"p1": rnd.Int63n(100000)},
+		Params: map[string]interface{}{"p1": randId(100000)},
 	}
 	numNull := 0
 	numNonNull := 0
@@ -76,4 +82,10 @@ func executeClientLibQuery(ctx context.Context, client *spanner.Client, sql stri
 	}
 	end := float64(time.Since(start).Microseconds()) / 1e3
 	return end, nil
+}
+
+func randId(n int64) int64 {
+	m.Lock()
+	defer m.Unlock()
+	return rnd.Int63n(n)
 }

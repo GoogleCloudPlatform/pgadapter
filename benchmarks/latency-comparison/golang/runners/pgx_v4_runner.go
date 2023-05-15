@@ -3,7 +3,6 @@ package runners
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 
 func RunPgxV4(database, sql string, numOperations, numClients int, host string, port int, useUnixSocket bool) ([]float64, error) {
 	ctx := context.Background()
-	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 	var err error
 
 	// Connect to Cloud Spanner through PGAdapter.
@@ -60,7 +58,7 @@ func executePgxV4Query(ctx context.Context, conn *pgx.Conn, sql string) (float64
 	start := time.Now()
 
 	var res *string
-	err := conn.QueryRow(ctx, sql, rnd.Int63n(100000)).Scan(&res)
+	err := conn.QueryRow(ctx, sql, randId(100000)).Scan(&res)
 	if err != nil && err != pgx.ErrNoRows {
 		return 0, err
 	}

@@ -1,78 +1,54 @@
-# PGAdapter Cloud Run Sample for Go
+# Latency Comparison - pgx driver vs Cloud Spanner Go Client Library
 
-This sample application shows how to build and deploy a Go application with PGAdapter to Google Cloud Run.
+This benchmark tests the latency of executing a simple, single-row query using the PostgreSQL
+`pgx` driver with PGAdapter compared to executing the same query using the [native Cloud Spanner
+Go client library](https://pkg.go.dev/cloud.google.com/go/spanner).
 
-## Build
+## Setup
 
-First build the Docker image locally and tag it. Replace the `IMAGE_URL` in the script with your own repository.
-Make sure that the repository that you are referencing exists.
-See https://cloud.google.com/artifact-registry/docs/repositories/create-repos for more information on how to set up
-Google Cloud artifact repositories.
+You must first create a database with a test table before you can run this benchmark.
+See [the setup instructions here](../README.md#setup) for how to do that.
 
-```shell
-export IMAGE_URL=my-location-docker.pkg.dev/my-project/my-repository/my-image:latest
-docker build . --tag $IMAGE_URL
-```
+## Run directly the host machine
 
-Example: `export IMAGE_URL=europe-north1-docker.pkg.dev/my-project/sample-test/pgadapter-sample:latest`
-
-Test the Docker image locally:
+You can run the benchmark as a native Go application directly on your host machine if you have Go
+and Java installed on your system. The benchmark will automatically start PGAdapter in an embedded Docker container.
 
 ```shell
-docker run \
-  --rm \
-  -v /path/to/local_credentials.json:/credentials.json:ro \
-  --env GOOGLE_APPLICATION_CREDENTIALS=/credentials.json \
-  --env SPANNER_PROJECT=my-project \
-  --env SPANNER_INSTANCE=my-instance \
-  --env SPANNER_DATABASE=my-database \
-  $IMAGE_URL
+go build benchmark.go
+./benchmark
 ```
 
-Verify that the connection to Cloud Spanner works correctly by opening a new shell and executing:
+## Run in Docker
+
+You can also run the benchmark in a Docker container if you do not have Go installed on your
+system.
+
+```
+docker build . --tag benchmark
+
+```
+
+## Arguments
+
+The benchmark application accepts the following command line arguments:
+* database: The fully qualified database name to use for the benchmark. Defaults to `projects/$GOOGLE_CLOUD_PROJECT/instances/$SPANNER_INSTANCE/databases/$SPANNER_DATABASE`.
+* clients: The number of parallel clients that execute queries. Defaults to 16.
+* operations: The number of operations (queries) that each client executes. Defaults to 1,000.
+* embedded (true/false): Whether to start PGAdapter as an embedded test container together with the
+  benchmark application. Defaults to true. Set to false if you want to start and configure PGAdapter
+  manually.
+* host: The host name where PGAdapter runs. This argument is only used if `embedded=false`.
+* port: The port number where PGAdapter runs. This argument is only used if `embedded=false`.
+* uds (true/false): Also execute benchmarks using Unix Domain Sockets. Defaults to false.
+* dir: The directory where PGAdapter listens for Unix Domain Socket connections. Defaults to `/tmp`. This argument is only used if `embedded=false`.
+* udsport: The port number where PGAdapter listens for Unix Domain Socket connections. Defaults to
+  the same port number as for TCP.  This argument is only used if `embedded=false`.
+
+## Examples
+
+Run a benchmark with 32 parallel clients each executing 5,000 operations:
 
 ```shell
-curl http://localhost:8080
+./benchmark -clients=32 -operations=5000
 ```
-
-## Deploying to Cloud Run
-
-Push the Docker image to Artifact Registry:
-
-```shell
-gcloud auth configure-docker
-docker push $IMAGE_URL
-```
-
-Then deploy the image as a service on Cloud Run:
-
-```shell
-export SERVICE=my-service
-gcloud run deploy $SERVICE \
-  --image $IMAGE_URL \
-  --update-env-vars SPANNER_PROJECT=my-project,SPANNER_INSTANCE=my-instance,SPANNER_DATABASE=my-database
-```
-
-__NOTE__: This example does not specify any credentials for PGAdapter when it is run on Cloud Run. This means that
-PGAdapter will use the default credentials that is used by Cloud Run. This is by default the default compute engine
-service account. See https://cloud.google.com/run/docs/securing/service-identity for more information on how service
-accounts work on Google Cloud Run.
-
-Test the service (replace URL with your actual service URL):
-
-```shell
-curl https://my-service-xyz.run.app
-```
-
-### Authenticated Cloud Run Service
-
-If your Cloud Run service requires authentication, then first add an IAM binding for your own account and include
-an authentication header with the request:
-
-```shell
-gcloud run services add-iam-policy-binding my-service \
-  --member='user:your-email@gmail.com' \
-  --role='roles/run.invoker'
-curl -H "Authorization: Bearer $(gcloud auth print-identity-token)" https://my-service-xyz.run.app
-```
-
