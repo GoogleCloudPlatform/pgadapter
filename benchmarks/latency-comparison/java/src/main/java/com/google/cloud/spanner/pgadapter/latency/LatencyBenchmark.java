@@ -76,28 +76,31 @@ public class LatencyBenchmark {
     System.out.printf("Database: %s\n", databaseId);
     System.out.printf("Clients: %d\n", clients);
     System.out.printf("Operations: %d\n", operations);
+
     System.out.println();
-
-    System.out.println("Running benchmark for Java Client Library");
-    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
-    List<Duration> javaClientResults =
-        javaClientRunner.execute(
-            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
-    printResults("Java Client Library", javaClientResults);
-
-    System.out.println("Running benchmark for Cloud Spanner JDBC driver");
-    JdbcRunner jdbcRunner = new JdbcRunner(databaseId);
-    List<Duration> jdbcResults =
-        jdbcRunner.execute(
-            "select col_varchar from latency_test where col_bigint=?", clients, operations);
-    printResults("Cloud Spanner JDBC Driver", jdbcResults);
-
     System.out.println("Running benchmark for PostgreSQL JDBC driver");
     JdbcRunner pgJdbcRunner = new JdbcRunner(databaseId);
     List<Duration> pgJdbcResults =
         pgJdbcRunner.execute(
             "select col_varchar from latency_test where col_bigint=?", clients, operations);
+
+    System.out.println();
+    System.out.println("Running benchmark for Cloud Spanner JDBC driver");
+    JdbcRunner jdbcRunner = new JdbcRunner(databaseId);
+    List<Duration> jdbcResults =
+        jdbcRunner.execute(
+            "select col_varchar from latency_test where col_bigint=?", clients, operations);
+
+    System.out.println();
+    System.out.println("Running benchmark for Java Client Library");
+    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
+    List<Duration> javaClientResults =
+        javaClientRunner.execute(
+            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
+
     printResults("PostgreSQL JDBC Driver", pgJdbcResults);
+    printResults("Cloud Spanner JDBC Driver", jdbcResults);
+    printResults("Java Client Library", javaClientResults);
   }
 
   public void printResults(String header, List<Duration> results) {

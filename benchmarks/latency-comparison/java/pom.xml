@@ -91,6 +91,7 @@
         <version>3.0.0</version>
         <configuration>
           <mainClass>com.google.cloud.spanner.pgadapter.latency.LatencyBenchmark</mainClass>
+          <cleanupDaemonThreads>false</cleanupDaemonThreads>
         </configuration>
       </plugin>
       <plugin>

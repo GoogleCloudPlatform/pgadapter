@@ -24,7 +24,7 @@ The benchmark application includes PGAdapter as a dependency and automatically s
 an in-process service.
 
 ```shell
-mvn exec:java -Dexec.args="--clients=16 --operations=1000"
+mvn clean compile exec:java -Dexec.args="--clients=16 --operations=1000"
 ```
 
 ## Arguments
@@ -39,5 +39,5 @@ The benchmark application accepts the following command line arguments:
 Run a benchmark with 32 parallel clients each executing 5,000 operations:
 
 ```shell
-mvn exec:java -Dexec.args="--clients=32 --operations=5000"
+mvn clean compile exec:java -Dexec.args="--clients=32 --operations=5000"
 ```

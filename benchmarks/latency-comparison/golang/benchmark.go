@@ -76,12 +76,6 @@ func main() {
 	fmt.Printf("Operations: %d\n", *numOperations)
 	fmt.Println()
 
-	fmt.Println("Running native Cloud Spanner client library benchmark")
-	clientLibRunTimes, err := runners.RunClientLib(*db, sql, *numOperations, *numClients)
-	if err != nil {
-		panic(err)
-	}
-
 	fmt.Println("Running pgx v5 benchmark using TCP against PGAdapter")
 	pgxTcpRunTimes, err := runners.RunPgx(*db, sql, *numOperations, *numClients, *host, *port, false)
 	if err != nil {
@@ -108,13 +102,19 @@ func main() {
 		}
 	}
 
-	printReport("Cloud Spanner native Go Client Library", *numClients, clientLibRunTimes)
+	fmt.Println("Running native Cloud Spanner client library benchmark")
+	clientLibRunTimes, err := runners.RunClientLib(*db, sql, *numOperations, *numClients)
+	if err != nil {
+		panic(err)
+	}
+
 	printReport("pgx v5 with PGAdapter over TCP", *numClients, pgxTcpRunTimes)
 	printReport("pgx v4 with PGAdapter over TCP", *numClients, pgxV4TcpRunTimes)
 	if *uds {
 		printReport("pgx v5 with PGAdapter over UDS", *numClients, pgxUdsRunTimes)
 		printReport("pgx v4 with PGAdapter over UDS", *numClients, pgxV4UdsRunTimes)
 	}
+	printReport("Cloud Spanner native Go Client Library", *numClients, clientLibRunTimes)
 }
 
 func printReport(header string, numClients int, runTimes []float64) {
