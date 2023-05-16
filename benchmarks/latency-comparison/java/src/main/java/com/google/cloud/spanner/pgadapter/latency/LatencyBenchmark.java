@@ -38,21 +38,6 @@ public class LatencyBenchmark {
         "operations",
         true,
         "The number of clients that will be executing queries in parallel.");
-    options.addOption(
-        "e",
-        "embedded",
-        true,
-        "Starts an embedded PGAdapter container along with the benchmark. Setting this option will ignore any host or port settings for PGAdapter.");
-    options.addOption(
-        "h",
-        "host",
-        true,
-        "The host name where PGAdapter is running. Only used if embedded=false.");
-    options.addOption(
-        "p",
-        "port",
-        true,
-        "The port number where PGAdapter is running. Only used if embedded=false.");
     CommandLineParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(options, args);
 

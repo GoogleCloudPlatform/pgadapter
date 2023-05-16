@@ -35,8 +35,8 @@ docker run \
   --env SPANNER_INSTANCE \
   --env SPANNER_DATABASE \
   benchmark \
-    -clients=16 \
-    -operations=1000
+    -clients=32 \
+    -operations=5000
 ```
 
 
