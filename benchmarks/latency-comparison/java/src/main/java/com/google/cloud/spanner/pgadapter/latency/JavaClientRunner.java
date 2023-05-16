@@ -18,51 +18,69 @@ import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Stopwatch;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 
-public class JavaClientRunner implements BenchmarkRunner {
-  private final Random random = new Random();
+public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
   private long numNullValues;
   private long numNonNullValues;
-  
+
   JavaClientRunner(DatabaseId databaseId) {
     this.databaseId = databaseId;
   }
-  
+
   @Override
   public List<Duration> execute(String sql, int numClients, int numOperations) {
-    List<Duration> results = new ArrayList<>(numOperations);
-    SpannerOptions options = SpannerOptions.newBuilder()
-        .setProjectId(databaseId.getInstanceId().getProject())
-        .build();
+    SpannerOptions options =
+        SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject()).build();
     try (Spanner spanner = options.getService()) {
-      DatabaseClient client = spanner.getDatabaseClient(databaseId);
-      // Execute one query to make sure everything has been warmed up.
-      executeQuery(client, sql);
-      
-      for (int i=0; i<numOperations; i++) {
-        results.add(executeQuery(client, sql));
+      DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
+
+      List<Future<List<Duration>>> results = new ArrayList<>(numClients);
+      ExecutorService service = Executors.newFixedThreadPool(numClients);
+      for (int client = 0; client < numClients; client++) {
+        results.add(service.submit(() -> runBenchmark(databaseClient, sql, numOperations)));
       }
+      return collectResults(service, results, numClients, numOperations);
+    } catch (Throwable t) {
+      throw SpannerExceptionFactory.asSpannerException(t);
     }
-    
+  }
+
+  private List<Duration> runBenchmark(
+      DatabaseClient databaseClient, String sql, int numOperations) {
+    List<Duration> results = new ArrayList<>(numOperations);
+    // Execute one query to make sure everything has been warmed up.
+    executeQuery(databaseClient, sql);
+
+    for (int i = 0; i < numOperations; i++) {
+      results.add(executeQuery(databaseClient, sql));
+    }
     return results;
   }
-  
+
   private Duration executeQuery(DatabaseClient client, String sql) {
     Stopwatch watch = Stopwatch.createStarted();
-    try (ResultSet resultSet = client.singleUse().executeQuery(Statement.newBuilder(sql)
-            .bind("p1").to(random.nextInt(100000))
-        .build())) {
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(
+                Statement.newBuilder(sql)
+                    .bind("p1")
+                    .to(ThreadLocalRandom.current().nextInt(100000))
+                    .build())) {
       while (resultSet.next()) {
-        for (int i=0; i<resultSet.getColumnCount(); i++) {
+        for (int i = 0; i < resultSet.getColumnCount(); i++) {
           if (resultSet.isNull(i)) {
             numNullValues++;
           } else {
@@ -73,5 +91,4 @@ public class JavaClientRunner implements BenchmarkRunner {
     }
     return watch.elapsed();
   }
-
 }

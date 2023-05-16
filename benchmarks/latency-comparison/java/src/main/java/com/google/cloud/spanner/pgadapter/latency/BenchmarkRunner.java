@@ -20,5 +20,4 @@ import java.util.List;
 public interface BenchmarkRunner {
 
   List<Duration> execute(String sql, int numClients, int numOperations);
-
 }

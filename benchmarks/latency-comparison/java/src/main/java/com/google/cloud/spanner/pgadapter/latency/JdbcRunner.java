@@ -15,36 +15,15 @@
 package com.google.cloud.spanner.pgadapter.latency;
 
 import com.google.cloud.spanner.DatabaseId;
-import com.google.cloud.spanner.SpannerExceptionFactory;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 
 public class JdbcRunner extends AbstractJdbcRunner {
-  private final DatabaseId databaseId;
 
   JdbcRunner(DatabaseId databaseId) {
-    this.databaseId = databaseId;
+    super(databaseId);
   }
 
   @Override
-  public List<Duration> execute(String sql, int numClients, int numExecutions) {
-    List<Duration> results = new ArrayList<>(numExecutions);
-    try (Connection connection = DriverManager.getConnection(String.format("jdbc:cloudspanner:/%s", databaseId.getName()))) {
-      // Execute one query to make sure everything has been warmed up.
-      executeQuery(connection, sql);
-
-      for (int i=0; i<numExecutions; i++) {
-        results.add(executeQuery(connection, sql));
-      }
-      
-    } catch (SQLException exception) {
-      throw SpannerExceptionFactory.newSpannerException(exception);
-    }
-    return results;
+  protected String createUrl() {
+    return String.format("jdbc:cloudspanner:/%s", databaseId.getName());
   }
-  
 }

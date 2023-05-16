@@ -18,68 +18,39 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 public class PgJdbcRunner extends AbstractJdbcRunner {
-  private final DatabaseId databaseId;
+  private ProxyServer proxyServer;
 
   PgJdbcRunner(DatabaseId databaseId) {
-    this.databaseId = databaseId;
+    super(databaseId);
   }
 
   @Override
   public List<Duration> execute(String sql, int numClients, int numOperations) {
     // Start PGAdapter in-process.
-    OptionsMetadata options = new OptionsMetadata(new String[]{
-        "-p", databaseId.getInstanceId().getProject(),
-        "-i", databaseId.getInstanceId().getInstance()
-    });
-    ProxyServer proxyServer = new ProxyServer(options);
+    OptionsMetadata options =
+        new OptionsMetadata(
+            new String[] {
+              "-p", databaseId.getInstanceId().getProject(),
+              "-i", databaseId.getInstanceId().getInstance()
+            });
+    proxyServer = new ProxyServer(options);
     try {
       proxyServer.startServer();
-      String url = String.format(
-          "jdbc:postgresql://localhost:%d/%s",
-          proxyServer.getLocalPort(), databaseId.getDatabase());
-      List<Future<List<Duration>>> results = new ArrayList<>(numClients);
-      ExecutorService service = Executors.newFixedThreadPool(numClients);
-      for (int client = 0; client < numClients; client++) {
-        results.add(service.submit(() -> runBenchmark(url, sql, numOperations)));
-      }
-      service.awaitTermination(60L, TimeUnit.MINUTES);
-      List<Duration> allResults = new ArrayList<>(numClients * numOperations);
-      for (Future<List<Duration>> result : results) {
-        allResults.addAll(result.get());
-      }
-      return allResults;
+      return super.execute(sql, numClients, numOperations);
     } catch (Throwable t) {
       throw SpannerExceptionFactory.asSpannerException(t);
     } finally {
       proxyServer.stopServer();
     }
   }
-    
-  private List<Duration> runBenchmark(String url, String sql, int numOperations) {
-    List<Duration> results = new ArrayList<>(numOperations);
-    try (Connection connection = DriverManager.getConnection(url)) {
-      // Execute one query to make sure everything has been warmed up.
-      executeQuery(connection, sql);
-      
-      for (int i = 0; i < numOperations; i++) {
-        results.add(executeQuery(connection, sql));
-      }
-    } catch (SQLException exception) {
-      throw SpannerExceptionFactory.newSpannerException(exception);
-    }
-    return results;
-  }
 
+  @Override
+  protected String createUrl() {
+    return String.format(
+        "jdbc:postgresql://localhost:%d/%s", proxyServer.getLocalPort(), databaseId.getDatabase());
+  }
 }
