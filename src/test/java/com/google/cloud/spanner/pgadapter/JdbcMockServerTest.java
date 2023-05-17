@@ -388,6 +388,44 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSetWellKnownClient() throws SQLException {
+    for (String client : new String[] {"pgx", "npgsql", "sqlalchemy2"}) {
+      try (Connection connection =
+          DriverManager.getConnection(
+              String.format(
+                  "jdbc:postgresql://localhost:%d/?options=-c%%20spanner.well_known_client=%s",
+                  pgServer.getLocalPort(), client))) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("show spanner.well_known_client")) {
+          assertTrue(resultSet.next());
+          assertEquals(client.toUpperCase(), resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        PSQLException exception =
+            assertThrows(
+                PSQLException.class,
+                () -> connection.createStatement().execute("set spanner.well_known_client='foo'"));
+        assertNotNull(exception.getServerErrorMessage());
+        assertEquals(
+            "parameter \"spanner.well_known_client\" cannot be set after connection start",
+            exception.getServerErrorMessage().getMessage());
+      }
+    }
+    try (Connection connection =
+        DriverManager.getConnection(
+            String.format(
+                "jdbc:postgresql://localhost:%d/?options=-c%%20spanner.well_known_client=%s",
+                pgServer.getLocalPort(), "foo"))) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.well_known_client")) {
+        assertTrue(resultSet.next());
+        assertEquals("foo", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testPreparedStatementParameterMetadata() throws SQLException {
     String sql = "SELECT * FROM foo WHERE id=? or value=?";
     String pgSql = "SELECT * FROM foo WHERE id=$1 or value=$2";
@@ -3871,7 +3909,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(360, count);
+        assertEquals(361, count);
       }
     }
   }
