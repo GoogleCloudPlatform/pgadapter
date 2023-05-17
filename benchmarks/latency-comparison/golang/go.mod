@@ -26,7 +26,7 @@ require (
 	github.com/cncf/xds/go v0.0.0-20230105202645-06c439db220b // indirect
 	github.com/containerd/containerd v1.6.19 // indirect
 	github.com/cpuguy83/dockercfg v0.3.1 // indirect
-	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/envoyproxy/go-control-plane v0.10.3 // indirect
