@@ -1,7 +1,9 @@
 # Google Cloud Spanner PGAdapter
 
-PGAdapter is a proxy which translates the PostgreSQL wire-protocol into the
+PGAdapter is a proxy that translates the PostgreSQL wire-protocol into the
 equivalent for Spanner databases [that use the PostgreSQL interface](https://cloud.google.com/spanner/docs/postgresql-interface).
+It enables you to use standard PostgreSQL drivers and tools with Cloud Spanner and is designed for
+the [lowest possible latency](benchmarks/latency-comparison/README.md).
 
 ## Drivers and Clients
 PGAdapter can be used with the following drivers and clients:
