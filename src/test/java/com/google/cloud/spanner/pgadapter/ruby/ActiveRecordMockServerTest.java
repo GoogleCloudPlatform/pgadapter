@@ -15,6 +15,9 @@
 package com.google.cloud.spanner.pgadapter.ruby;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -37,7 +40,11 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
@@ -45,7 +52,9 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.PGProperty;
 import org.postgresql.core.Oid;
+import org.postgresql.util.PSQLException;
 
 @Category(RubyTest.class)
 @RunWith(JUnit4.class)
@@ -186,6 +195,62 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
   @BeforeClass
   public static void installGems() throws Exception {
     createVirtualEnv(DIRECTORY_NAME);
+  }
+
+  @Test
+  public void testErrorHints() throws SQLException {
+    // Emulate an ActiveRecord connection.
+    String url =
+        String.format(
+            "jdbc:postgresql://localhost:%d/db?%s=rails&%s=090000",
+            pgServer.getLocalPort(),
+            PGProperty.APPLICATION_NAME.getName(),
+            PGProperty.ASSUME_MIN_SERVER_VERSION.getName());
+    try (Connection connection = DriverManager.getConnection(url)) {
+      connection.createStatement().execute("begin transaction");
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection.createStatement().execute("create table foo (id bigint primary key)"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          "Using Ruby ActiveRecord migrations requires that the option 'spanner.ddl_transaction_mode=AutocommitExplicitTransaction' has been set. "
+              + "Please add \"spanner.ddl_transaction_mode\": \"AutocommitExplicitTransaction\" to the \"variables\" section of your database.yml file.\n"
+              + "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/samples/ruby/activerecord/README.md for more information.",
+          exception.getServerErrorMessage().getHint());
+      connection.createStatement().execute("rollback");
+
+      mockSpanner.putStatementResult(
+          StatementResult.exception(
+              Statement.of("SELECT pg_try_advisory_lock(12345)"),
+              Status.INVALID_ARGUMENT
+                  .withDescription("Advisory locks are not supported")
+                  .asRuntimeException()));
+      exception =
+          assertThrows(
+              PSQLException.class,
+              () -> connection.createStatement().execute("SELECT pg_try_advisory_lock(12345)"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          "PGAdapter does not support advisory locks. Please 'add advisory_locks: false' to your database.yml file. "
+              + "See https://edgeguides.rubyonrails.org/configuring.html#configuring-a-postgresql-database for more information.",
+          exception.getServerErrorMessage().getHint());
+
+      // Other errors should not return any hints.
+      mockSpanner.putStatementResult(
+          StatementResult.exception(
+              Statement.of("SELECT * FROM foo"),
+              Status.NOT_FOUND.withDescription("Table foo not found").asRuntimeException()));
+      exception =
+          assertThrows(
+              PSQLException.class, () -> connection.createStatement().execute("SELECT * FROM foo"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          exception.getServerErrorMessage().getMessage(),
+          "Table foo not found - Statement: 'SELECT * FROM foo'");
+      assertNull(exception.getServerErrorMessage().getHint());
+    }
   }
 
   @Test
