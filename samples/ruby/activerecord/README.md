@@ -25,7 +25,7 @@ Alternatively, you can also set the following environment variables to configure
 
 ```shell
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-PGPORT=5433
+PGPORT=5432
 PGDATABASE=projects/my-project/instances/my-instance/databases/my-database
 ```
 
@@ -127,6 +127,10 @@ The following limitations are currently known:
 | Upsert                         | `upsert` and `upsert_all` are not supported.                                                                                                                                                                                                                                                                                                             |
 | SELECT ... FOR UPDATE          | Pessimistic locking / `SELECT ... FOR UPDATE` is not supported.                                                                                                                                                                                                                                                                                          |
 | Transaction isolation level    | Only isolation level `:serializable` is supported.                                                                                                                                                                                                                                                                                                       |
+
+### Schema Dumper
+Dumping the schema of a database is not guaranteed to produce a complete result. There is currently
+no workaround for this limitation.
 
 ### Generated Primary Keys
 Generated primary keys are not supported and should be replaced with primary key definitions that

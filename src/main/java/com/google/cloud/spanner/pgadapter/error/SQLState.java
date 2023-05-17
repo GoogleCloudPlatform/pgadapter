@@ -149,6 +149,10 @@ public enum SQLState {
   InFailedSqlTransaction("25P02"),
   IdleInTransactionSessionTimeout("25P03"),
 
+  // Class 3B — Savepoint Exception
+  SavepointException("3B000"),
+  InvalidSavepointSpecification("3B001"),
+
   // Class 42 — Syntax Error or Access Rule Violation
   SyntaxErrorOrAccessRuleViolation("42000"),
   SyntaxError("42601"),

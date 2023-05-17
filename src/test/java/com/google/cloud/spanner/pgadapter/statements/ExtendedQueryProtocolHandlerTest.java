@@ -116,7 +116,7 @@ public class ExtendedQueryProtocolHandlerTest {
         ImmutableList.of(parseMessage, bindMessage, describeMessage, executeMessage),
         handler.getMessages());
 
-    handler.sync();
+    handler.sync(false);
 
     assertEquals(0, handler.getMessages().size());
     verify(backendConnection, never()).flush();
@@ -139,7 +139,7 @@ public class ExtendedQueryProtocolHandlerTest {
     handler.buffer(parseMessage);
 
     Thread.currentThread().interrupt();
-    PGException exception = assertThrows(PGException.class, handler::sync);
+    PGException exception = assertThrows(PGException.class, () -> handler.sync(false));
     assertEquals("Query cancelled", exception.getMessage());
     assertEquals(SQLState.QueryCanceled, exception.getSQLState());
   }

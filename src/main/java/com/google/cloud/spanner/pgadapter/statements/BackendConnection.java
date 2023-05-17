@@ -295,7 +295,13 @@ public class BackendConnection {
     }
 
     Statement bindStatement(Statement statement) {
-      return statementBinder.apply(statement);
+      Statement boundStatement = statementBinder.apply(statement);
+      // Add a LIMIT clause to the statement if it contains an OFFSET clause that uses a query
+      // parameter and there is no existing LIMIT clause in the query.
+      if (sessionState.isAutoAddLimitClause()) {
+        return SimpleParser.addLimitIfParameterizedOffset(boundStatement);
+      }
+      return boundStatement;
     }
 
     StatementResult analyzeOrExecute(Statement statement) {
@@ -604,7 +610,16 @@ public class BackendConnection {
 
     @Override
     void execute() {
-      result.set(NO_RESULT);
+      try {
+        checkConnectionState();
+        spannerConnection.savepoint(savepointStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
+        result.setException(pgException);
+        throw pgException;
+      }
     }
   }
 
@@ -623,7 +638,16 @@ public class BackendConnection {
 
     @Override
     void execute() {
-      result.set(NO_RESULT);
+      try {
+        checkConnectionState();
+        spannerConnection.releaseSavepoint(releaseStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
+        result.setException(pgException);
+        throw pgException;
+      }
     }
   }
 
@@ -642,11 +666,15 @@ public class BackendConnection {
 
     @Override
     void execute() {
-      throw setAndReturn(
-          result,
-          PGExceptionFactory.newPGException(
-              "Statement 'ROLLBACK [WORK | TRANSACTION] TO [SAVEPOINT] savepoint_name' is not supported",
-              SQLState.FeatureNotSupported));
+      try {
+        spannerConnection.rollbackToSavepoint(rollbackToStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
+        result.setException(pgException);
+        throw pgException;
+      }
     }
   }
 
