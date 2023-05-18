@@ -109,12 +109,6 @@
         <configuration>
           <mainClass>com.google.cloud.spanner.pgadapter.latency.LatencyBenchmark</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>
-          <systemProperties>
-            <property>
-              <name>java.util.logging.config.file</name>
-              <value>src/main/resources/logging.properties</value>
-            </property>
-          </systemProperties>
         </configuration>
       </plugin>
       <plugin>
