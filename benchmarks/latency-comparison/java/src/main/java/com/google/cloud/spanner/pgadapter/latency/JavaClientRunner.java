@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.latency;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
@@ -35,14 +36,23 @@ public class JavaClientRunner extends AbstractRunner {
   private long numNullValues;
   private long numNonNullValues;
 
-  JavaClientRunner(DatabaseId databaseId) {
+  JavaClientRunner(DatabaseId databaseId, Boolean useSharedSessions, Integer numChannels) {
+    super(useSharedSessions, numChannels);
     this.databaseId = databaseId;
   }
 
   @Override
   public List<Duration> execute(String sql, int numClients, int numOperations) {
-    SpannerOptions options =
-        SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject()).build();
+    SpannerOptions.Builder builder =
+        SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject());
+    if (numChannels != null) {
+      builder.setNumChannels(numChannels);
+    }
+    if (useSharedSessions != null) {
+      builder.setSessionPoolOption(
+          SessionPoolOptions.newBuilder().setUseSharedSessions(useSharedSessions).build());
+    }
+    SpannerOptions options = builder.build();
     try (Spanner spanner = options.getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
 

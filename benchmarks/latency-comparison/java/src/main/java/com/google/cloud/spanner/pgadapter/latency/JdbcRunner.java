@@ -18,12 +18,19 @@ import com.google.cloud.spanner.DatabaseId;
 
 public class JdbcRunner extends AbstractJdbcRunner {
 
-  JdbcRunner(DatabaseId databaseId) {
-    super(databaseId);
+  JdbcRunner(DatabaseId databaseId, Boolean useSharedSessions, Integer numChannels) {
+    super(databaseId, useSharedSessions, numChannels);
   }
 
   @Override
   protected String createUrl() {
-    return String.format("jdbc:cloudspanner:/%s", databaseId.getName());
+    String url = String.format("jdbc:cloudspanner:/%s", databaseId.getName());
+    if (useSharedSessions != null) {
+      url += ";useSharedSessions=" + useSharedSessions;
+    }
+    if (numChannels != null) {
+      url += ";numChannels=" + numChannels;
+    }
+    return url;
   }
 }

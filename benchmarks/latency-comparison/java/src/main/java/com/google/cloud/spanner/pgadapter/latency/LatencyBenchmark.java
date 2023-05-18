@@ -38,6 +38,9 @@ public class LatencyBenchmark {
         "operations",
         true,
         "The number of clients that will be executing queries in parallel.");
+    options.addOption(
+        null, "useSharedSessions", true, "Use shared sessions for read-only operations");
+    options.addOption(null, "numChannels", true, "The number of gRPC channels to use");
     CommandLineParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(options, args);
 
@@ -70,30 +73,41 @@ public class LatencyBenchmark {
         commandLine.hasOption('c') ? Integer.parseInt(commandLine.getOptionValue('c')) : 16;
     int operations =
         commandLine.hasOption('o') ? Integer.parseInt(commandLine.getOptionValue('o')) : 1000;
+    Boolean useSharedSessions =
+        commandLine.hasOption("useSharedSessions")
+            ? Boolean.parseBoolean(commandLine.getOptionValue("useSharedSessions"))
+            : null;
+    Integer numChannels =
+        commandLine.hasOption("numChannels")
+            ? Integer.parseInt(commandLine.getOptionValue("numChannels"))
+            : null;
 
     System.out.println();
     System.out.println("Running benchmark with the following options");
     System.out.printf("Database: %s\n", databaseId);
     System.out.printf("Clients: %d\n", clients);
     System.out.printf("Operations: %d\n", operations);
+    System.out.printf("Shared sessions: %s\n", useSharedSessions);
+    System.out.printf("Num channels: %d\n", numChannels);
 
     System.out.println();
     System.out.println("Running benchmark for PostgreSQL JDBC driver");
-    JdbcRunner pgJdbcRunner = new JdbcRunner(databaseId);
+    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, useSharedSessions, numChannels);
     List<Duration> pgJdbcResults =
         pgJdbcRunner.execute(
             "select col_varchar from latency_test where col_bigint=?", clients, operations);
 
     System.out.println();
     System.out.println("Running benchmark for Cloud Spanner JDBC driver");
-    JdbcRunner jdbcRunner = new JdbcRunner(databaseId);
+    JdbcRunner jdbcRunner = new JdbcRunner(databaseId, useSharedSessions, numChannels);
     List<Duration> jdbcResults =
         jdbcRunner.execute(
             "select col_varchar from latency_test where col_bigint=?", clients, operations);
 
     System.out.println();
     System.out.println("Running benchmark for Java Client Library");
-    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
+    JavaClientRunner javaClientRunner =
+        new JavaClientRunner(databaseId, useSharedSessions, numChannels);
     List<Duration> javaClientResults =
         javaClientRunner.execute(
             "select col_varchar from latency_test where col_bigint=$1", clients, operations);

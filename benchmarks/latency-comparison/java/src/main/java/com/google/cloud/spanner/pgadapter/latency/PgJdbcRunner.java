@@ -24,19 +24,14 @@ import java.util.List;
 public class PgJdbcRunner extends AbstractJdbcRunner {
   private ProxyServer proxyServer;
 
-  PgJdbcRunner(DatabaseId databaseId) {
-    super(databaseId);
+  PgJdbcRunner(DatabaseId databaseId, Boolean useSharedSessions, Integer numChannels) {
+    super(databaseId, useSharedSessions, numChannels);
   }
 
   @Override
   public List<Duration> execute(String sql, int numClients, int numOperations) {
     // Start PGAdapter in-process.
-    OptionsMetadata options =
-        new OptionsMetadata(
-            new String[] {
-              "-p", databaseId.getInstanceId().getProject(),
-              "-i", databaseId.getInstanceId().getInstance()
-            });
+    OptionsMetadata options = new OptionsMetadata(createPGAdapterOptions());
     proxyServer = new ProxyServer(options);
     try {
       proxyServer.startServer();
@@ -46,6 +41,30 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
     } finally {
       proxyServer.stopServer();
     }
+  }
+
+  private String[] createPGAdapterOptions() {
+    if (useSharedSessions == null && numChannels == null) {
+      return new String[] {
+        "-p", databaseId.getInstanceId().getProject(),
+        "-i", databaseId.getInstanceId().getInstance()
+      };
+    }
+    String url = "";
+    if (useSharedSessions != null) {
+      url += "useSharedSessions=" + useSharedSessions;
+    }
+    if (numChannels != null) {
+      if (!"".equals(url)) {
+        url += ";";
+      }
+      url += "numChannels=" + numChannels;
+    }
+    return new String[] {
+      "-p", databaseId.getInstanceId().getProject(),
+      "-i", databaseId.getInstanceId().getInstance(),
+      "-r", url
+    };
   }
 
   @Override

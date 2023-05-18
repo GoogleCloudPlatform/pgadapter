@@ -23,6 +23,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 abstract class AbstractRunner implements BenchmarkRunner {
+  final Boolean useSharedSessions;
+  final Integer numChannels;
+
+  AbstractRunner(Boolean useSharedSessions, Integer numChannels) {
+    this.useSharedSessions = useSharedSessions;
+    this.numChannels = numChannels;
+  }
+
   protected List<Duration> collectResults(
       ExecutorService service,
       List<Future<List<Duration>>> results,

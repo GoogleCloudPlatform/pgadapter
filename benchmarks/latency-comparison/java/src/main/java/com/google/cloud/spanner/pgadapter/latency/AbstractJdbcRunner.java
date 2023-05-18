@@ -35,7 +35,8 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
   private long numNullValues;
   private long numNonNullValues;
 
-  public AbstractJdbcRunner(DatabaseId databaseId) {
+  public AbstractJdbcRunner(DatabaseId databaseId, Boolean useSharedSessions, Integer numChannels) {
+    super(useSharedSessions, numChannels);
     this.databaseId = databaseId;
   }
 
