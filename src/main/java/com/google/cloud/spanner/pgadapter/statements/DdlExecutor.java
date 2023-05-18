@@ -178,7 +178,35 @@ class DdlExecutor {
   StatementResult execute(ParsedStatement parsedStatement, Statement statement) {
     Statement translated = translate(parsedStatement, statement);
     if (translated != null) {
-      return connection.execute(translated);
+      if (!backendConnection.getSessionState().isSupportDropCascade()) {
+        return connection.execute(translated);
+      } else {
+        ImmutableList<Statement> allStatements = getDependentStatements(translated);
+        if (allStatements.size() == 1) {
+          return connection.execute(allStatements.get(0));
+        } else {
+          boolean startedBatch = false;
+          try {
+            if (!connection.isDdlBatchActive()) {
+              connection.execute(Statement.of("START BATCH DDL"));
+              startedBatch = true;
+            }
+            StatementResult result = null;
+            for (Statement dropDependency : allStatements) {
+              result = connection.execute(dropDependency);
+            }
+            if (startedBatch) {
+              result = connection.execute(Statement.of("RUN BATCH"));
+            }
+            return result;
+          } catch (Throwable t) {
+            if (startedBatch && connection.isDdlBatchActive()) {
+              connection.abortBatch();
+            }
+            throw t;
+          }
+        }
+      }
     }
     return NOT_EXECUTED;
   }
@@ -382,5 +410,122 @@ class DdlExecutor {
       }
     }
     return createTableStatement;
+  }
+
+  ImmutableList<Statement> getDependentStatements(Statement statement) {
+    ImmutableList<Statement> defaultResult = ImmutableList.of(statement);
+    SimpleParser parser = new SimpleParser(statement.getSql());
+    if (!parser.eatKeyword("drop")) {
+      return defaultResult;
+    }
+    parser.eatKeyword("if", "exists");
+    if (parser.eatKeyword("table")) {
+      TableOrIndexName tableName = parser.readTableOrIndexName();
+      if (tableName == null || parser.hasMoreTokens()) {
+        return defaultResult;
+      }
+      ImmutableList.Builder<Statement> builder = ImmutableList.builder();
+      builder.addAll(getDropDependentIndexesStatements(tableName));
+      builder.add(statement);
+      return builder.build();
+    } else if (parser.eatKeyword("schema")) {
+      TableOrIndexName schemaName = parser.readTableOrIndexName();
+      if (schemaName == null || schemaName.schema != null) {
+        return defaultResult;
+      }
+      if (!parser.eatKeyword("cascade")) {
+        return defaultResult;
+      }
+      ImmutableList.Builder<Statement> builder = ImmutableList.builder();
+      builder.addAll(getDropSchemaIndexesStatements(schemaName));
+      builder.addAll(getDropSchemaTablesStatements(schemaName));
+      return builder.build();
+    }
+    return defaultResult;
+  }
+
+  ImmutableList<Statement> getDropDependentIndexesStatements(TableOrIndexName tableName) {
+    DatabaseClient client = connection.getDatabaseClient();
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(
+                Statement.newBuilder(
+                        "select table_schema, index_name "
+                            + "from information_schema.indexes "
+                            + "where table_schema=$1 and table_name=$2 "
+                            + "and not index_type = 'PRIMARY_KEY' "
+                            + "and spanner_is_managed = 'NO'")
+                    .bind("p1")
+                    .to(
+                        unquoteIdentifier(
+                            tableName.schema == null
+                                ? backendConnection.getCurrentSchema()
+                                : tableName.schema))
+                    .bind("p2")
+                    .to(unquoteIdentifier(tableName.name))
+                    .build())) {
+      ImmutableList.Builder<Statement> dropStatements = ImmutableList.builder();
+      while (resultSet.next()) {
+        dropStatements.add(
+            Statement.of(
+                String.format(
+                    "drop index \"%s\".\"%s\"",
+                    resultSet.getString("table_schema"), resultSet.getString("index_name"))));
+      }
+      return dropStatements.build();
+    }
+  }
+
+  ImmutableList<Statement> getDropSchemaIndexesStatements(TableOrIndexName schemaName) {
+    DatabaseClient client = connection.getDatabaseClient();
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(
+                Statement.newBuilder(
+                        "select table_schema, index_name "
+                            + "from information_schema.indexes "
+                            + "where table_schema=$1 "
+                            + "and not index_type = 'PRIMARY_KEY' "
+                            + "and spanner_is_managed = 'NO'")
+                    .bind("p1")
+                    .to(unquoteIdentifier(schemaName.name))
+                    .build())) {
+      ImmutableList.Builder<Statement> dropStatements = ImmutableList.builder();
+      while (resultSet.next()) {
+        dropStatements.add(
+            Statement.of(
+                String.format(
+                    "drop index \"%s\".\"%s\"",
+                    resultSet.getString("table_schema"), resultSet.getString("index_name"))));
+      }
+      return dropStatements.build();
+    }
+  }
+
+  ImmutableList<Statement> getDropSchemaTablesStatements(TableOrIndexName schemaName) {
+    DatabaseClient client = connection.getDatabaseClient();
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(
+                Statement.newBuilder(
+                        "select table_schema, table_name "
+                            + "from information_schema.tables "
+                            + "where table_schema=$1")
+                    .bind("p1")
+                    .to(unquoteIdentifier(schemaName.name))
+                    .build())) {
+      ImmutableList.Builder<Statement> dropStatements = ImmutableList.builder();
+      while (resultSet.next()) {
+        dropStatements.add(
+            Statement.of(
+                String.format(
+                    "drop table \"%s\".\"%s\"",
+                    resultSet.getString("table_schema"), resultSet.getString("table_name"))));
+      }
+      return dropStatements.build();
+    }
   }
 }

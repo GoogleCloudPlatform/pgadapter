@@ -393,6 +393,14 @@ public class SessionState {
   }
 
   /**
+   * Returns whether DROP ... CASCADE statements are supported. This also includes implicit
+   * cascading operations, such as dropping indexes of tables that are being dropped.
+   */
+  public boolean isSupportDropCascade() {
+    return getBoolSetting("spanner", "support_drop_cascade", false);
+  }
+
+  /**
    * Returns whether statements with an OFFSET clause that uses a parameter should be automatically
    * appended with a LIMIT clause. The LIMIT clause will use the literal Long.MAX_VALUE for unbound
    * statements, and Long.MAX_VALUE - offset for bound statements.
