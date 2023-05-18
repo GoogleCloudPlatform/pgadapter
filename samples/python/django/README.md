@@ -1,0 +1,169 @@
+# PGAdapter and Django
+
+PGAdapter can be used in combination with Django, but with a number of limitations. This sample
+shows the command line arguments and configuration that is needed in order to use Django with
+PGAdapter.
+
+## Start PGAdapter
+You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
+pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
+to run PGAdapter.
+
+```shell
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
+docker run \
+  -d -p 5432:5432 \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS \
+  -v /tmp:/tmp \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
+  -p my-project -i my-instance \
+  -x
+```
+
+## Creating the Sample Data Model
+Run the following command in this directory. Replace the host, port and database name with the actual host, port and
+database name for your PGAdapter and database setup.
+
+```shell
+psql -h localhost -p 5432 -d my-database -f sample-schema.sql
+```
+
+You can also drop an existing data model using the `drop_data_model.sql` script:
+
+```shell
+psql -h localhost -p 5432 -d my-database -f drop-data-model.sql
+```
+
+## Data Types
+Cloud Spanner supports the following data types in combination with `Django`.
+
+| PostgreSQL Type                        | Django Model Field |
+|----------------------------------------|--------------------|
+| boolean                                | BoolField          |
+| bigint / int8                          | BigIntegerField    |
+| varchar                                | CharField          |
+| text                                   | CharField          |
+| float8 / double precision              | FloatField         |
+| numeric                                | DecimalField       |
+| timestamptz / timestamp with time zone | DateTimeField      |
+| bytea                                  | BinaryField        |
+| date                                   | DateField          |
+| jsonb                                  | JSONField          |
+  
+
+## Limitations
+The following limitations are currently known:
+
+| Limitation             | Workaround                                                                                                                                                                                                                                              |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Annotate               | Cloud Spanner does not support selecting columns in an aggregation query that are not included in the aggregation functions or `GROUP BY` clause. Adding an aggregation on a query using `annotate` will therefore often generate an unsupported query. |
+| Generated primary keys | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Avoid using fields like `AutoField`, `BigAutoField`, etc. . The recommended type of primary key is a client side generated `UUID` stored as a string.          |
+| Savepoint              | Cloud Spanner does not support `savepoints`. Creating or rolling back to a `Savepoint` in django is not supported in PGAdapter.                                                                                                                         |
+| Nested Atomic Blocks   | Nested atomic blocks use `savepoints`, which is currently not supported by Cloud Spanner. Ensure to set `savepoint=False` when using nested atomic blocks.                                                                                              |
+| Interleaved Table      | Django does not support composite primary keys. Interleaved tables in Cloud Spanner require composite primary keys. A possible workaround for using interleaved tables is documented below.                                                             |
+| Jsonb Query            | Cloud Spanner does not support queries on JSONB fields that are not explicitly casted to respective data type of that field while Django originally generates queries without Casting. A possible workaround for the same is documented below.          |
+
+
+### Annotate
+`annotate` is not fully supported in the PGAdapter.
+
+
+### Generated Primary Keys
+`Sequences` are not supported. Hence, auto increment primary key is not supported and should be replaced with primary key definitions that
+are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
+for more information on choosing a good primary key. This sample uses UUIDs that are generated by the client for primary
+keys.
+
+### Savepoint
+`savepoints` are not supported in Cloud Spanner. The following functions in Django are therefore also not supported:
+
+```python
+from django.db import  transaction
+transaction.savepoint()
+transaction.savepoint_rollback()
+transaction.savepoint_commit()
+transaction.clean_savepoints()
+```
+
+### Nested Atomic Blocks
+`Savepoints` are not supported in Cloud Spanner. Nested atomic blocks in `django` will by default create a
+`Savepoint` when an inner block is entered. You can suppress this behavior by adding `savepoint=False` to
+the `@transaction.atomic` annotation.
+
+```python
+from django.db import transaction
+
+#Always include 'savepoint=False' to ensure Django doesn't create any savepoint
+@transaction.atomic(savepoint=False)
+def func():
+  do_stuff
+  with transaction.atomic(savepoint=False):
+    do_some_more_stuff
+```
+
+### Interleaved Tables
+[Interleaved tables](https://cloud.google.com/spanner/docs/schema-and-data-model#primary-keys) in Cloud Spanner require composite primary keys. Django does not support models with a composite primary key. You
+can work around these limitations and use an interleaved table with Cloud Spanner and Django as follows:
+
+1. Manually create the interleaved table in your database by executing a `CREATE TABLE` statement. This table will use a composite primary key.
+2. Define the model in Python code so that the parent key column of the table is defined as a `ForeignKey` referencing the parent table, and the child key column is defined as the primary key of the table.
+3. Add a unique index to the child primary key column. This will ensure that the child primary key part is always globally unique, and can be used to efficiently look up a single row.
+
+Example:
+
+```sql
+CREATE TABLE tracks (
+    track_id character varying NOT NULL,
+    id character varying NOT NULL,
+    ...
+    PRIMARY KEY(id, track_number)
+) INTERLEAVE IN PARENT albums ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX unique_idx_track_id ON tracks(track_id);
+```
+
+```python
+class Track(BaseModel):
+  class Meta():
+    db_table = 'tracks'
+  track_id = models.CharField(primary_key=True, null=False)
+  album = models.ForeignKey(Album, on_delete=models.DO_NOTHING, db_column='id')
+```
+
+Note that using the standard `save` function in Django is not supported for interleaved tables, as this function will also try to update the `album` column. This column is part of the primary key definition of the table and cannot be updated. Add a `force_insert=True` to create new child records:
+
+```python
+track.save(force_insert=True)
+```
+
+See the sample application for more details and a working example.
+
+### Query on JSONB Field
+In order to make a query involving the fields inside JSONB column, Cloud Spanner requires us to typecast the field to the corresponding data type(See [this](https://cloud.google.com/spanner/docs/working-with-jsonb#query)). Django doesn't do this by default and hence, using filter directly would fail. 
+In order to make sure Django generates queries that have this typecasting present, you should first annotate the respective field and then apply filter to it.
+
+Example:
+```python
+#this will make sure that the rating field in the venue_feature jsonb column is typecasted to Float
+typecasted_queryset = Venue.objects.annotate(rating=Cast(venue_feature__rating, output_field=FloatField()))
+
+#now you filter based on rating
+filtered_queryset = typecasted_queryset.filter(rating__gte=3.5)
+```
+
+Note that comparing a `string` jsonb field using this method will require you to add additional double quotes `""` around the value because the string fields in JSONB are stored with quotes in the table.
+
+```python
+#here country is a string field inside the JSONB column venue_feature
+typecasted_queryset = Venue.objects.annotate(country=Cast(venue_feature__country, output_field=CharField()))
+
+#in order to compare the country with some value,
+#you need to apply double quotes surrounding the actual value
+india_queryset = typecasted_queryset.filter(country='"India"')
+req_country = 'USA'
+usa_queryset = typecasted_queryset.filter(country='"'+req_country+'"')
+```
+
+See the sample application for more details and a working example.
