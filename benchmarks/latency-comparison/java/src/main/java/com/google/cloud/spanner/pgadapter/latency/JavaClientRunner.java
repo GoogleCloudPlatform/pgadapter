@@ -83,7 +83,7 @@ public class JavaClientRunner extends AbstractRunner {
     Stopwatch watch = Stopwatch.createStarted();
     try (ResultSet resultSet =
         client
-            .singleUse()
+            .singleUseReadOnlyTransaction()
             .executeQuery(
                 Statement.newBuilder(sql)
                     .bind("p1")
