@@ -18,6 +18,7 @@ import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SessionPoolOptions;
+import com.google.cloud.spanner.SessionPoolOptions.ReturnPosition;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
@@ -36,8 +37,12 @@ public class JavaClientRunner extends AbstractRunner {
   private long numNullValues;
   private long numNonNullValues;
 
-  JavaClientRunner(DatabaseId databaseId, Boolean useSharedSessions, Integer numChannels) {
-    super(useSharedSessions, numChannels);
+  JavaClientRunner(
+      DatabaseId databaseId,
+      Boolean useSharedSessions,
+      Integer numChannels,
+      ReturnPosition sessionReturnPosition) {
+    super(useSharedSessions, numChannels, sessionReturnPosition);
     this.databaseId = databaseId;
   }
 
@@ -48,9 +53,15 @@ public class JavaClientRunner extends AbstractRunner {
     if (numChannels != null) {
       builder.setNumChannels(numChannels);
     }
-    if (useSharedSessions != null) {
-      builder.setSessionPoolOption(
-          SessionPoolOptions.newBuilder().setUseSharedSessions(useSharedSessions).build());
+    if (useSharedSessions != null || sessionReturnPosition != null) {
+      SessionPoolOptions.Builder sessionPoolOptions = SessionPoolOptions.newBuilder();
+      if (useSharedSessions != null) {
+        sessionPoolOptions.setUseSharedSessions(useSharedSessions);
+      }
+      if (sessionReturnPosition != null) {
+        sessionPoolOptions.setReturnPosition(sessionReturnPosition);
+      }
+      builder.setSessionPoolOption(sessionPoolOptions.build());
     }
     SpannerOptions options = builder.build();
     try (Spanner spanner = options.getService()) {

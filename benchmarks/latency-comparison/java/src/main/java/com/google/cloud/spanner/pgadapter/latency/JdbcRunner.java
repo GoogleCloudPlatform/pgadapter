@@ -15,11 +15,16 @@
 package com.google.cloud.spanner.pgadapter.latency;
 
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.SessionPoolOptions.ReturnPosition;
 
 public class JdbcRunner extends AbstractJdbcRunner {
 
-  JdbcRunner(DatabaseId databaseId, Boolean useSharedSessions, Integer numChannels) {
-    super(databaseId, useSharedSessions, numChannels);
+  JdbcRunner(
+      DatabaseId databaseId,
+      Boolean useSharedSessions,
+      Integer numChannels,
+      ReturnPosition sessionReturnPosition) {
+    super(databaseId, useSharedSessions, numChannels, sessionReturnPosition);
   }
 
   @Override
@@ -30,6 +35,9 @@ public class JdbcRunner extends AbstractJdbcRunner {
     }
     if (numChannels != null) {
       url += ";numChannels=" + numChannels;
+    }
+    if (sessionReturnPosition != null) {
+      url += ";sessionReturnPosition=" + sessionReturnPosition;
     }
     return url;
   }

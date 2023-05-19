@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import com.google.cloud.spanner.SessionPoolOptions.ReturnPosition;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,10 +26,13 @@ import java.util.concurrent.TimeoutException;
 abstract class AbstractRunner implements BenchmarkRunner {
   final Boolean useSharedSessions;
   final Integer numChannels;
+  final ReturnPosition sessionReturnPosition;
 
-  AbstractRunner(Boolean useSharedSessions, Integer numChannels) {
+  AbstractRunner(
+      Boolean useSharedSessions, Integer numChannels, ReturnPosition sessionReturnPosition) {
     this.useSharedSessions = useSharedSessions;
     this.numChannels = numChannels;
+    this.sessionReturnPosition = sessionReturnPosition;
   }
 
   protected List<Duration> collectResults(

@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.latency;
 
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.SessionPoolOptions.ReturnPosition;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -27,8 +28,12 @@ import java.util.logging.Logger;
 public class PgJdbcRunner extends AbstractJdbcRunner {
   private ProxyServer proxyServer;
 
-  PgJdbcRunner(DatabaseId databaseId, Boolean useSharedSessions, Integer numChannels) {
-    super(databaseId, useSharedSessions, numChannels);
+  PgJdbcRunner(
+      DatabaseId databaseId,
+      Boolean useSharedSessions,
+      Integer numChannels,
+      ReturnPosition sessionReturnPosition) {
+    super(databaseId, useSharedSessions, numChannels, sessionReturnPosition);
   }
 
   @Override
@@ -53,7 +58,7 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
   }
 
   private String[] createPGAdapterOptions() {
-    if (useSharedSessions == null && numChannels == null) {
+    if (useSharedSessions == null && numChannels == null && sessionReturnPosition == null) {
       return new String[] {
         "-p", databaseId.getInstanceId().getProject(),
         "-i", databaseId.getInstanceId().getInstance(),
@@ -69,6 +74,12 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
         url += ";";
       }
       url += "numChannels=" + numChannels;
+    }
+    if (sessionReturnPosition != null) {
+      if (!"".equals(url)) {
+        url += ";";
+      }
+      url += "sessionReturnPosition=" + sessionReturnPosition;
     }
     return new String[] {
       "-p",
