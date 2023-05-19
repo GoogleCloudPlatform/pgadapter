@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.latency;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.SessionPoolOptions.ReturnPosition;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.time.Duration;
@@ -54,6 +55,7 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
       throw SpannerExceptionFactory.asSpannerException(t);
     } finally {
       proxyServer.stopServer();
+      SpannerPool.closeSpannerPool();
     }
   }
 

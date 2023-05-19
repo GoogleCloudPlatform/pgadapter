@@ -16,6 +16,9 @@ package com.google.cloud.spanner.pgadapter.latency;
 
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.SessionPoolOptions.ReturnPosition;
+import com.google.cloud.spanner.connection.SpannerPool;
+import java.time.Duration;
+import java.util.List;
 
 public class JdbcRunner extends AbstractJdbcRunner {
 
@@ -25,6 +28,15 @@ public class JdbcRunner extends AbstractJdbcRunner {
       Integer numChannels,
       ReturnPosition sessionReturnPosition) {
     super(databaseId, useSharedSessions, numChannels, sessionReturnPosition);
+  }
+
+  @Override
+  public List<Duration> execute(String sql, int numClients, int numOperations) {
+    try {
+      return super.execute(sql, numClients, numOperations);
+    } finally {
+      SpannerPool.closeSpannerPool();
+    }
   }
 
   @Override
