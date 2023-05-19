@@ -79,7 +79,7 @@ public class LatencyBenchmark {
 
     System.out.println();
     System.out.println("Running benchmark for PostgreSQL JDBC driver");
-    JdbcRunner pgJdbcRunner = new JdbcRunner(databaseId);
+    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
     List<Duration> pgJdbcResults =
         pgJdbcRunner.execute(
             "select col_varchar from latency_test where col_bigint=?", clients, operations);
