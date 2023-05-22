@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.19.0...v0.19.1) (2023-05-17)
+
+
+### Performance Improvements
+
+* add latency comparision test ([#790](https://github.com/GoogleCloudPlatform/pgadapter/issues/790)) ([9be6b09](https://github.com/GoogleCloudPlatform/pgadapter/commit/9be6b09d5e156d7f916d25467ca679e028aa19d1))
+* bundle Ready response with the rest ([#806](https://github.com/GoogleCloudPlatform/pgadapter/issues/806)) ([af98023](https://github.com/GoogleCloudPlatform/pgadapter/commit/af98023a7363d6a2bb2bfb356b747f3ed8499e0e))
+
 ## [0.19.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.4...v0.19.0) (2023-05-05)
 
 

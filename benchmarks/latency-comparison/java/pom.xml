@@ -1,5 +1,5 @@
 <!--
- Copyright 2022 Google LLC
+ Copyright 2023 Google LLC
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -12,8 +12,8 @@
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <properties>
     <java.version>1.8</java.version>
     <maven.compiler.source>1.8</maven.compiler.source>
@@ -25,26 +25,46 @@
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.google.cloud</groupId>
-  <artifactId>google-cloud-spanner-pgadapter-samples-jdbc</artifactId>
+  <artifactId>google-cloud-spanner-pgadapter-latency-comparison</artifactId>
   <version>0.1.0-SNAPSHOT</version>
-  <name>Google Cloud Spanner PGAdapter JDBC Sample</name>
+  <name>Google Cloud Spanner PGAdapter Latency Comparison</name>
   <packaging>jar</packaging>
   <description>
-    Sample for using the PostgreSQL JDBC driver with PGAdapter
+    Benchmark test for comparing the latency of the PostgreSQL JDBC driver with the Cloud Spanner JDBC driver.
   </description>
+  <parent>
+    <groupId>com.google.cloud</groupId>
+    <artifactId>google-cloud-shared-config</artifactId>
+    <version>1.5.3</version>
+  </parent>
 
   <dependencies>
+    <dependency>
+      <groupId>com.google.auto.value</groupId>
+      <artifactId>auto-value-annotations</artifactId>
+      <version>1.10.1</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-pgadapter</artifactId>
+      <version>0.19.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-jdbc</artifactId>
+      <version>2.9.14</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.cloud</groupId>
+          <artifactId>google-cloud-spanner</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <version>42.6.0</version>
       <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.19.1</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
@@ -57,21 +77,26 @@
       <artifactId>junixsocket-common</artifactId>
       <version>${junixsocket.version}</version>
     </dependency>
+    <dependency>
+      <groupId>commons-cli</groupId>
+      <artifactId>commons-cli</artifactId>
+      <version>1.5.0</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>3.1.0</version>
+        <version>3.0.0</version>
         <configuration>
-          <mainClass>com.google.cloud.spanner.pgadapter.sample.SampleApplication</mainClass>
+          <mainClass>com.google.cloud.spanner.pgadapter.latency.LatencyBenchmark</mainClass>
+          <cleanupDaemonThreads>false</cleanupDaemonThreads>
         </configuration>
       </plugin>
       <plugin>
         <groupId>com.coveo</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.13</version>
         <executions>
           <execution>
             <goals>
