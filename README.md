@@ -29,6 +29,9 @@ PGAdapter can be used with the following frameworks and tools:
    See also [this directory](samples/python/sqlalchemy-sample) for a sample application using `SQLAlchemy 1.x`.
 1. `pgbench` can be used with PGAdapter, but with some limitations. See [pgbench.md](docs/pgbench.md)
    for more details.
+1. `Ruby ActiveRecord`: Version 7.x has _experimental support_ and with limitations. Please read the
+   instructions in [PGAdapter - Ruby ActiveRecord Connection Options](docs/ruby-activerecord.md)
+   carefully for how to set up ActiveRecord to work with PGAdapter.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
