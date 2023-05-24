@@ -91,7 +91,7 @@ public class LatencyBenchmark {
         commandLine.hasOption('o') ? Integer.parseInt(commandLine.getOptionValue('o')) : 1000;
     int transactions =
         commandLine.hasOption('t') ? Integer.parseInt(commandLine.getOptionValue('t')) : 100;
-    int queriesInTransaction = commandLine.hasOption('q') ? Integer.parseInt(commandLine.getOptionValue('q')) : 5;
+    int queriesInTransaction = commandLine.hasOption('q') ? Integer.parseInt(commandLine.getOptionValue('q')) : 10;
     int updatesInTransaction = commandLine.hasOption('u') ? Integer.parseInt(commandLine.getOptionValue('u')) : 5;
     boolean delayBeginTransaction = commandLine.hasOption("delayBeginTransaction");
 
@@ -108,12 +108,12 @@ public class LatencyBenchmark {
     String jdbcQuery = "select col_varchar from latency_test where col_bigint=?";
     String jdbcUpdate = "update latency_test set col_varchar=? where col_bigint=?";
 
-    System.out.println();
-    System.out.println("Running benchmark for PostgreSQL JDBC driver");
-    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, delayBeginTransaction);
-    List<Duration> pgJdbcResults = pgJdbcRunner.execute(jdbcQuery, clients, operations);
-    List<Duration> pgJdbcTransactionResults = pgJdbcRunner.executeTransaction(jdbcQuery, jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
-    pgJdbcRunner.shutdown();
+//    System.out.println();
+//    System.out.println("Running benchmark for PostgreSQL JDBC driver");
+//    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, delayBeginTransaction);
+//    List<Duration> pgJdbcResults = pgJdbcRunner.execute(jdbcQuery, clients, operations);
+//    List<Duration> pgJdbcTransactionResults = pgJdbcRunner.executeTransaction(jdbcQuery, jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
+//    pgJdbcRunner.shutdown();
 
     System.out.println();
     System.out.println("Running benchmark for Cloud Spanner JDBC driver");
@@ -124,19 +124,19 @@ public class LatencyBenchmark {
     List<Duration> jdbcTransactionResults = jdbcRunner.executeTransaction(jdbcQuery, jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
     jdbcRunner.shutdown();
 
-    System.out.println();
-    System.out.println("Running benchmark for Java Client Library");
-    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
-    List<Duration> javaClientResults =
-        javaClientRunner.execute(
-            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
-    javaClientRunner.shutdown();
+//    System.out.println();
+//    System.out.println("Running benchmark for Java Client Library");
+//    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
+//    List<Duration> javaClientResults =
+//        javaClientRunner.execute(
+//            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
+//    javaClientRunner.shutdown();
 
-    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
+//    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
-    printResults("Java Client Library", javaClientResults);
+//    printResults("Java Client Library", javaClientResults);
     
-    printTransactionResults("PostgreSQL JDBC Driver - Transactions", pgJdbcTransactionResults, queriesInTransaction, updatesInTransaction);
+//    printTransactionResults("PostgreSQL JDBC Driver - Transactions", pgJdbcTransactionResults, queriesInTransaction, updatesInTransaction);
     printTransactionResults("Cloud Spanner JDBC Driver - Transactions", jdbcTransactionResults, queriesInTransaction, updatesInTransaction);
   }
 
@@ -153,7 +153,6 @@ public class LatencyBenchmark {
     System.out.printf("Total number of transactions: %d\n", results.size());
     System.out.printf("Reads per transaction: %d\n", queriesInTransaction);
     System.out.printf("Writes per transaction: %d\n", updatesInTransaction);
-    System.out.printf("Avg: %.2fms\n", avg(results));
     printDurations(results);
   }
   
