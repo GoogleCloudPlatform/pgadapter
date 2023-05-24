@@ -135,7 +135,9 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
             for (int u = 0; u < numUpdatesInTransaction; u++) {
               executeUpdate(connection, update);
             }
+            System.out.println("Committing transaction");
             connection.commit();
+            System.out.println("Successfully committed");
             break;
           } catch (JdbcAbortedDueToConcurrentModificationException aborted) {
             // retry transaction after a delay.
