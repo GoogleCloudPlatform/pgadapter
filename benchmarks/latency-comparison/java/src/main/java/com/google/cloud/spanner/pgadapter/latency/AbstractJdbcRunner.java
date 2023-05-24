@@ -147,10 +147,11 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
         }
         results.add(watch.elapsed());
       }
-    } catch (SQLException exception) {
+    } catch (Throwable exception) {
       exception.printStackTrace();
       throw SpannerExceptionFactory.newSpannerException(exception);
     }
+    System.out.println("Finished running benchmark");
     return results;
   }
 
