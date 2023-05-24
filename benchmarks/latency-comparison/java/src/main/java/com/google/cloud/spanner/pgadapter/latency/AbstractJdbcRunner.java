@@ -145,6 +145,7 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
             }
           }
         }
+        System.out.printf("Finished transaction %d/%d\n", i, numTransactions);
         results.add(watch.elapsed());
       }
     } catch (Throwable exception) {
