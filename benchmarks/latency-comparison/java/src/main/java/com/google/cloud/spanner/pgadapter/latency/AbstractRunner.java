@@ -23,6 +23,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 abstract class AbstractRunner implements BenchmarkRunner {
+
+  @Override
+  public void shutdown() {
+    // no-op
+  }
+  
   protected List<Duration> collectResults(
       ExecutorService service,
       List<Future<List<Duration>>> results,

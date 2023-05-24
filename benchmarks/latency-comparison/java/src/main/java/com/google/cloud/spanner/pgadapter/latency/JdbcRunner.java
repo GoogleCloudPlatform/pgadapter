@@ -18,12 +18,12 @@ import com.google.cloud.spanner.DatabaseId;
 
 public class JdbcRunner extends AbstractJdbcRunner {
 
-  JdbcRunner(DatabaseId databaseId) {
-    super(databaseId);
+  JdbcRunner(DatabaseId databaseId, boolean delayBeginTransaction) {
+    super(databaseId, delayBeginTransaction);
   }
 
   @Override
   protected String createUrl() {
-    return String.format("jdbc:cloudspanner:/%s", databaseId.getName());
+    return String.format("jdbc:cloudspanner:/%s?delayTransactionStartUntilFirstWrite=%s", databaseId.getName(), delayBeginTransaction);
   }
 }

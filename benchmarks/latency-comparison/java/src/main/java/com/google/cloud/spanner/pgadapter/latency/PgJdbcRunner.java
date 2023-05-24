@@ -15,24 +15,17 @@
 package com.google.cloud.spanner.pgadapter.latency;
 
 import com.google.cloud.spanner.DatabaseId;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import java.time.Duration;
-import java.util.List;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class PgJdbcRunner extends AbstractJdbcRunner {
-  private ProxyServer proxyServer;
+  private final ProxyServer proxyServer;
 
-  PgJdbcRunner(DatabaseId databaseId) {
-    super(databaseId);
-  }
-
-  @Override
-  public List<Duration> execute(String sql, int numClients, int numOperations) {
+  PgJdbcRunner(DatabaseId databaseId, boolean delayBeginTransaction) {
+    super(databaseId, delayBeginTransaction);
     // Silence the PGAdapter logging.
     Logger root = Logger.getLogger("");
     root.setLevel(Level.WARNING);
@@ -43,19 +36,18 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
     OptionsMetadata options =
         new OptionsMetadata(
             new String[] {
-              "-p", databaseId.getInstanceId().getProject(),
-              "-i", databaseId.getInstanceId().getInstance(),
-              "-dir=", "-s=0"
+                "-p", databaseId.getInstanceId().getProject(),
+                "-i", databaseId.getInstanceId().getInstance(),
+                "-dir=", "-s=0", "-r",
+                String.format("delayTransactionStartUntilFirstWrite=%s", delayBeginTransaction)
             });
     proxyServer = new ProxyServer(options);
-    try {
-      proxyServer.startServer();
-      return super.execute(sql, numClients, numOperations);
-    } catch (Throwable t) {
-      throw SpannerExceptionFactory.asSpannerException(t);
-    } finally {
-      proxyServer.stopServer();
-    }
+    proxyServer.startServer();
+  }
+  
+  @Override
+  public void shutdown() {
+    proxyServer.stopServer();
   }
 
   @Override

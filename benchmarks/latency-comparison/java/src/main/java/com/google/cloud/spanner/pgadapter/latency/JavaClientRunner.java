@@ -57,6 +57,12 @@ public class JavaClientRunner extends AbstractRunner {
     }
   }
 
+  @Override
+  public List<Duration> executeTransaction(String query, String update, int numClients,
+      int numTransactions, int numQueriesInTransaction, int numUpdatesInTransaction) {
+    return null;
+  }
+
   private List<Duration> runBenchmark(
       DatabaseClient databaseClient, String sql, int numOperations) {
     List<Duration> results = new ArrayList<>(numOperations);

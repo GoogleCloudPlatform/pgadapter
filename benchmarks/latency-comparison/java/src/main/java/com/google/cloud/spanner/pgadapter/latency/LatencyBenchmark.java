@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.latency;
 
 import com.google.cloud.spanner.DatabaseId;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -37,7 +36,27 @@ public class LatencyBenchmark {
         "o",
         "operations",
         true,
-        "The number of clients that will be executing queries in parallel.");
+        "The number of operations that will be executed by each client.");
+    options.addOption(
+        "t",
+        "transactions",
+        true,
+        "The number of transactions that will be executed by each client.");
+    options.addOption(
+        "q",
+        "queries",
+        true,
+        "The number of queries that will be executed in each transaction.");
+    options.addOption(
+        "u",
+        "updates",
+        true,
+        "The number of updates that will be executed in each transaction.");
+    options.addOption(
+        null,
+        "delayBeginTransaction",
+        false,
+        "Enables the 'Delay transaction start until first write' option.");
     CommandLineParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(options, args);
 
@@ -70,26 +89,40 @@ public class LatencyBenchmark {
         commandLine.hasOption('c') ? Integer.parseInt(commandLine.getOptionValue('c')) : 16;
     int operations =
         commandLine.hasOption('o') ? Integer.parseInt(commandLine.getOptionValue('o')) : 1000;
+    int transactions =
+        commandLine.hasOption('t') ? Integer.parseInt(commandLine.getOptionValue('t')) : 100;
+    int queriesInTransaction = commandLine.hasOption('q') ? Integer.parseInt(commandLine.getOptionValue('q')) : 5;
+    int updatesInTransaction = commandLine.hasOption('u') ? Integer.parseInt(commandLine.getOptionValue('u')) : 5;
+    boolean delayBeginTransaction = commandLine.hasOption("delayBeginTransaction");
 
     System.out.println();
     System.out.println("Running benchmark with the following options");
     System.out.printf("Database: %s\n", databaseId);
     System.out.printf("Clients: %d\n", clients);
     System.out.printf("Operations: %d\n", operations);
+    System.out.printf("Transactions: %d\n", transactions);
+    System.out.printf("Queries in transaction: %d\n", queriesInTransaction);
+    System.out.printf("Updates in transaction: %d\n", updatesInTransaction);
+    System.out.printf("Delay begin transaction: %s\n", delayBeginTransaction);
+    
+    String jdbcQuery = "select col_varchar from latency_test where col_bigint=?";
+    String jdbcUpdate = "update latency_test set col_varchar=? where col_bigint=?";
 
     System.out.println();
     System.out.println("Running benchmark for PostgreSQL JDBC driver");
-    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
-    List<Duration> pgJdbcResults =
-        pgJdbcRunner.execute(
-            "select col_varchar from latency_test where col_bigint=?", clients, operations);
+    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, delayBeginTransaction);
+    List<Duration> pgJdbcResults = pgJdbcRunner.execute(jdbcQuery, clients, operations);
+    List<Duration> pgJdbcTransactionResults = pgJdbcRunner.executeTransaction(jdbcQuery, jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
+    pgJdbcRunner.shutdown();
 
     System.out.println();
     System.out.println("Running benchmark for Cloud Spanner JDBC driver");
-    JdbcRunner jdbcRunner = new JdbcRunner(databaseId);
+    JdbcRunner jdbcRunner = new JdbcRunner(databaseId, delayBeginTransaction);
     List<Duration> jdbcResults =
         jdbcRunner.execute(
             "select col_varchar from latency_test where col_bigint=?", clients, operations);
+    List<Duration> jdbcTransactionResults = jdbcRunner.executeTransaction(jdbcQuery, jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
+    jdbcRunner.shutdown();
 
     System.out.println();
     System.out.println("Running benchmark for Java Client Library");
@@ -97,32 +130,50 @@ public class LatencyBenchmark {
     List<Duration> javaClientResults =
         javaClientRunner.execute(
             "select col_varchar from latency_test where col_bigint=$1", clients, operations);
+    javaClientRunner.shutdown();
 
     printResults("PostgreSQL JDBC Driver", pgJdbcResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
     printResults("Java Client Library", javaClientResults);
+    
+    printTransactionResults("PostgreSQL JDBC Driver - Transactions", pgJdbcTransactionResults, queriesInTransaction, updatesInTransaction);
+    printTransactionResults("Cloud Spanner JDBC Driver - Transactions", jdbcTransactionResults, queriesInTransaction, updatesInTransaction);
   }
 
   public void printResults(String header, List<Duration> results) {
-    List<Duration> orderedResults = new ArrayList<>(results);
-    Collections.sort(orderedResults);
     System.out.println();
     System.out.println(header);
-    System.out.printf("Total number of queries: %d\n", orderedResults.size());
+    System.out.printf("Total number of queries: %d\n", results.size());
+    printDurations(results);
+  }
+
+  public void printTransactionResults(String header, List<Duration> results, int queriesInTransaction, int updatesInTransaction) {
+    System.out.println();
+    System.out.println(header);
+    System.out.printf("Total number of transactions: %d\n", results.size());
+    System.out.printf("Reads per transaction: %d\n", queriesInTransaction);
+    System.out.printf("Writes per transaction: %d\n", updatesInTransaction);
+    System.out.printf("Avg: %.2fms\n", avg(results));
+    printDurations(results);
+  }
+  
+  private void printDurations(List<Duration> results) {
+    List<Duration> orderedResults = new ArrayList<>(results);
+    Collections.sort(orderedResults);
     System.out.printf("Avg: %.2fms\n", avg(results));
     System.out.printf(
         "P50: %.2fms\n",
-        orderedResults.get(orderedResults.size() / 2).get(ChronoUnit.NANOS) / 1_000_000.0f);
+        orderedResults.get(orderedResults.size() / 2).toNanos() / 1_000_000.0f);
     System.out.printf(
         "P95: %.2fms\n",
-        orderedResults.get(95 * orderedResults.size() / 100).get(ChronoUnit.NANOS) / 1_000_000.0f);
+        orderedResults.get(95 * orderedResults.size() / 100).toNanos() / 1_000_000.0f);
     System.out.printf(
         "P99: %.2fms\n",
-        orderedResults.get(99 * orderedResults.size() / 100).get(ChronoUnit.NANOS) / 1_000_000.0f);
+        orderedResults.get(99 * orderedResults.size() / 100).toNanos() / 1_000_000.0f);
   }
 
   private double avg(List<Duration> results) {
     return results.stream()
-        .collect(Collectors.averagingDouble(result -> result.get(ChronoUnit.NANOS) / 1_000_000.0f));
+        .collect(Collectors.averagingDouble(result -> result.toNanos() / 1_000_000.0f));
   }
 }
