@@ -179,13 +179,11 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
             connection.commit();
             break;
           } catch (JdbcAbortedDueToConcurrentModificationException aborted) {
+            connection.rollback();
             // retry transaction after a delay.
             if (aborted.getCause().getRetryDelayInMillis() > 0L) {
-              System.out.printf("Sleeping for %d millis\n", aborted.getCause().getRetryDelayInMillis());
               //noinspection BusyWait
               Thread.sleep(aborted.getCause().getRetryDelayInMillis());
-            } else {
-              System.out.println("Retrying without delay");
             }
           }
         }
