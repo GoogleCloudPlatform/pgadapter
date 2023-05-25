@@ -47,6 +47,15 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
   public List<Duration> execute(String sql, int numClients, int numOperations) {
     System.out.println();
     System.out.println("Running query benchmark");
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Execute a couple of queries to make sure everything has been warmed up.
+      for (int i = 0; i < 4; i++) {
+        executeQuery(connection, sql);
+      }
+    } catch (SQLException exception) {
+      throw SpannerExceptionFactory.asSpannerException(exception);
+    }
+
     try {
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
       ExecutorService service = Executors.newFixedThreadPool(numClients);
@@ -125,6 +134,14 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
       int numUpdatesInTransaction) {
     System.out.println();
     System.out.println("Running transactions benchmark");
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Execute a couple of queries to make sure everything has been warmed up.
+      for (int i = 0; i < 4; i++) {
+        executeQuery(connection, query);
+      }
+    } catch (SQLException exception) {
+      throw SpannerExceptionFactory.asSpannerException(exception);
+    }
     try {
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
       ExecutorService service = Executors.newFixedThreadPool(numClients);
@@ -166,7 +183,7 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
                 + Strings.repeat("#", percentage / 5)
                 + Strings.repeat(" ", 20 - percentage / 5)
                 + "]";
-//        System.out.printf("\r%s %d%%", dashes, percentage);
+        //        System.out.printf("\r%s %d%%", dashes, percentage);
         Stopwatch watch = Stopwatch.createStarted();
         while (true) {
           try {
@@ -193,7 +210,7 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
       exception.printStackTrace();
       throw SpannerExceptionFactory.newSpannerException(exception);
     }
-//    System.out.println();
+    //    System.out.println();
     return results;
   }
 }
