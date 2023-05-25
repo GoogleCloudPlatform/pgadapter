@@ -36,15 +36,19 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
     OptionsMetadata options =
         new OptionsMetadata(
             new String[] {
-                "-p", databaseId.getInstanceId().getProject(),
-                "-i", databaseId.getInstanceId().getInstance(),
-                "-dir=", "-s=0", "-r",
-                String.format("delayTransactionStartUntilFirstWrite=%s", delayBeginTransaction)
+              "-p",
+              databaseId.getInstanceId().getProject(),
+              "-i",
+              databaseId.getInstanceId().getInstance(),
+              "-dir=",
+              "-s=0",
+              "-r",
+              String.format("delayTransactionStartUntilFirstWrite=%s", delayBeginTransaction)
             });
     proxyServer = new ProxyServer(options);
     proxyServer.startServer();
   }
-  
+
   @Override
   public void shutdown() {
     proxyServer.stopServer();

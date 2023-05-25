@@ -33,25 +33,16 @@ public class LatencyBenchmark {
     options.addOption(
         "c", "clients", true, "The number of clients that will be executing queries in parallel.");
     options.addOption(
-        "o",
-        "operations",
-        true,
-        "The number of operations that will be executed by each client.");
+        "o", "operations", true, "The number of operations that will be executed by each client.");
     options.addOption(
         "t",
         "transactions",
         true,
         "The number of transactions that will be executed by each client.");
     options.addOption(
-        "q",
-        "queries",
-        true,
-        "The number of queries that will be executed in each transaction.");
+        "q", "queries", true, "The number of queries that will be executed in each transaction.");
     options.addOption(
-        "u",
-        "updates",
-        true,
-        "The number of updates that will be executed in each transaction.");
+        "u", "updates", true, "The number of updates that will be executed in each transaction.");
     options.addOption(
         null,
         "delayBeginTransaction",
@@ -91,8 +82,10 @@ public class LatencyBenchmark {
         commandLine.hasOption('o') ? Integer.parseInt(commandLine.getOptionValue('o')) : 1000;
     int transactions =
         commandLine.hasOption('t') ? Integer.parseInt(commandLine.getOptionValue('t')) : 100;
-    int queriesInTransaction = commandLine.hasOption('q') ? Integer.parseInt(commandLine.getOptionValue('q')) : 10;
-    int updatesInTransaction = commandLine.hasOption('u') ? Integer.parseInt(commandLine.getOptionValue('u')) : 5;
+    int queriesInTransaction =
+        commandLine.hasOption('q') ? Integer.parseInt(commandLine.getOptionValue('q')) : 10;
+    int updatesInTransaction =
+        commandLine.hasOption('u') ? Integer.parseInt(commandLine.getOptionValue('u')) : 5;
     boolean delayBeginTransaction = commandLine.hasOption("delayBeginTransaction");
 
     System.out.println();
@@ -104,16 +97,17 @@ public class LatencyBenchmark {
     System.out.printf("Queries in transaction: %d\n", queriesInTransaction);
     System.out.printf("Updates in transaction: %d\n", updatesInTransaction);
     System.out.printf("Delay begin transaction: %s\n", delayBeginTransaction);
-    
+
     String jdbcQuery = "select col_varchar from latency_test where col_bigint=?";
     String jdbcUpdate = "update latency_test set col_varchar=? where col_bigint=?";
 
-//    System.out.println();
-//    System.out.println("Running benchmark for PostgreSQL JDBC driver");
-//    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, delayBeginTransaction);
-//    List<Duration> pgJdbcResults = pgJdbcRunner.execute(jdbcQuery, clients, operations);
-//    List<Duration> pgJdbcTransactionResults = pgJdbcRunner.executeTransaction(jdbcQuery, jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
-//    pgJdbcRunner.shutdown();
+    //    System.out.println();
+    //    System.out.println("Running benchmark for PostgreSQL JDBC driver");
+    //    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, delayBeginTransaction);
+    //    List<Duration> pgJdbcResults = pgJdbcRunner.execute(jdbcQuery, clients, operations);
+    //    List<Duration> pgJdbcTransactionResults = pgJdbcRunner.executeTransaction(jdbcQuery,
+    // jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
+    //    pgJdbcRunner.shutdown();
 
     System.out.println();
     System.out.println("Running benchmark for Cloud Spanner JDBC driver");
@@ -121,23 +115,35 @@ public class LatencyBenchmark {
     List<Duration> jdbcResults =
         jdbcRunner.execute(
             "select col_varchar from latency_test where col_bigint=?", clients, operations);
-    List<Duration> jdbcTransactionResults = jdbcRunner.executeTransaction(jdbcQuery, jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
+    List<Duration> jdbcTransactionResults =
+        jdbcRunner.executeTransaction(
+            jdbcQuery,
+            jdbcUpdate,
+            clients,
+            transactions,
+            queriesInTransaction,
+            updatesInTransaction);
     jdbcRunner.shutdown();
 
-//    System.out.println();
-//    System.out.println("Running benchmark for Java Client Library");
-//    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
-//    List<Duration> javaClientResults =
-//        javaClientRunner.execute(
-//            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
-//    javaClientRunner.shutdown();
+    //    System.out.println();
+    //    System.out.println("Running benchmark for Java Client Library");
+    //    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
+    //    List<Duration> javaClientResults =
+    //        javaClientRunner.execute(
+    //            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
+    //    javaClientRunner.shutdown();
 
-//    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
+    //    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
-//    printResults("Java Client Library", javaClientResults);
-    
-//    printTransactionResults("PostgreSQL JDBC Driver - Transactions", pgJdbcTransactionResults, queriesInTransaction, updatesInTransaction);
-    printTransactionResults("Cloud Spanner JDBC Driver - Transactions", jdbcTransactionResults, queriesInTransaction, updatesInTransaction);
+    //    printResults("Java Client Library", javaClientResults);
+
+    //    printTransactionResults("PostgreSQL JDBC Driver - Transactions", pgJdbcTransactionResults,
+    // queriesInTransaction, updatesInTransaction);
+    printTransactionResults(
+        "Cloud Spanner JDBC Driver - Transactions",
+        jdbcTransactionResults,
+        queriesInTransaction,
+        updatesInTransaction);
   }
 
   public void printResults(String header, List<Duration> results) {
@@ -147,7 +153,8 @@ public class LatencyBenchmark {
     printDurations(results);
   }
 
-  public void printTransactionResults(String header, List<Duration> results, int queriesInTransaction, int updatesInTransaction) {
+  public void printTransactionResults(
+      String header, List<Duration> results, int queriesInTransaction, int updatesInTransaction) {
     System.out.println();
     System.out.println(header);
     System.out.printf("Total number of transactions: %d\n", results.size());
@@ -155,14 +162,13 @@ public class LatencyBenchmark {
     System.out.printf("Writes per transaction: %d\n", updatesInTransaction);
     printDurations(results);
   }
-  
+
   private void printDurations(List<Duration> results) {
     List<Duration> orderedResults = new ArrayList<>(results);
     Collections.sort(orderedResults);
     System.out.printf("Avg: %.2fms\n", avg(results));
     System.out.printf(
-        "P50: %.2fms\n",
-        orderedResults.get(orderedResults.size() / 2).toNanos() / 1_000_000.0f);
+        "P50: %.2fms\n", orderedResults.get(orderedResults.size() / 2).toNanos() / 1_000_000.0f);
     System.out.printf(
         "P95: %.2fms\n",
         orderedResults.get(95 * orderedResults.size() / 100).toNanos() / 1_000_000.0f);

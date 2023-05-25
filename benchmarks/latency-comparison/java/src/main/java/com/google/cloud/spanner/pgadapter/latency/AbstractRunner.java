@@ -28,7 +28,7 @@ abstract class AbstractRunner implements BenchmarkRunner {
   public void shutdown() {
     // no-op
   }
-  
+
   protected List<Duration> collectResults(
       ExecutorService service,
       List<Future<List<Duration>>> results,
@@ -36,11 +36,9 @@ abstract class AbstractRunner implements BenchmarkRunner {
       int numOperations)
       throws Exception {
     service.shutdown();
-    System.out.println("Waiting for tasks to finish");
     if (!service.awaitTermination(60L, TimeUnit.MINUTES)) {
       throw new TimeoutException();
     }
-    System.out.println("Collecting results");
     List<Duration> allResults = new ArrayList<>(numClients * numOperations);
     for (Future<List<Duration>> result : results) {
       allResults.addAll(result.get());

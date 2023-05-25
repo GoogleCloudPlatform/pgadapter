@@ -18,10 +18,16 @@ import java.time.Duration;
 import java.util.List;
 
 public interface BenchmarkRunner {
-  
+
   void shutdown();
 
   List<Duration> execute(String sql, int numClients, int numOperations);
-  
-  List<Duration> executeTransaction(String query, String update, int numClients, int numTransactions, int numQueriesInTransaction, int numUpdatesInTransaction);
+
+  List<Duration> executeTransaction(
+      String query,
+      String update,
+      int numClients,
+      int numTransactions,
+      int numQueriesInTransaction,
+      int numUpdatesInTransaction);
 }

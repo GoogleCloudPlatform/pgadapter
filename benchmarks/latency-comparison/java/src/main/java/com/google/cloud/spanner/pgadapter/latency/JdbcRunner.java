@@ -24,6 +24,8 @@ public class JdbcRunner extends AbstractJdbcRunner {
 
   @Override
   protected String createUrl() {
-    return String.format("jdbc:cloudspanner:/%s?delayTransactionStartUntilFirstWrite=%s", databaseId.getName(), delayBeginTransaction);
+    return String.format(
+        "jdbc:cloudspanner:/%s?delayTransactionStartUntilFirstWrite=%s",
+        databaseId.getName(), delayBeginTransaction);
   }
 }
