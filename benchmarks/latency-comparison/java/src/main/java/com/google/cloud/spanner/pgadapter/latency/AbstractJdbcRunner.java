@@ -152,8 +152,7 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
       String update,
       int numTransactions,
       int numQueriesInTransaction,
-      int numUpdatesInTransaction)
-      throws InterruptedException {
+      int numUpdatesInTransaction) {
     List<Duration> results = new ArrayList<>(numTransactions);
     try (Connection connection = DriverManager.getConnection(url)) {
       // Execute one query to make sure everything has been warmed up.
@@ -167,7 +166,7 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
                 + Strings.repeat("#", percentage / 5)
                 + Strings.repeat(" ", 20 - percentage / 5)
                 + "]";
-        System.out.printf("\r%s %d%%", dashes, percentage);
+//        System.out.printf("\r%s %d%%", dashes, percentage);
         Stopwatch watch = Stopwatch.createStarted();
         while (true) {
           try {
@@ -182,8 +181,11 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
           } catch (JdbcAbortedDueToConcurrentModificationException aborted) {
             // retry transaction after a delay.
             if (aborted.getCause().getRetryDelayInMillis() > 0L) {
+              System.out.printf("Sleeping for %d millis\n", aborted.getCause().getRetryDelayInMillis());
               //noinspection BusyWait
               Thread.sleep(aborted.getCause().getRetryDelayInMillis());
+            } else {
+              System.out.println("Retrying without delay");
             }
           }
         }
@@ -193,7 +195,7 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
       exception.printStackTrace();
       throw SpannerExceptionFactory.newSpannerException(exception);
     }
-    System.out.println();
+//    System.out.println();
     return results;
   }
 }
