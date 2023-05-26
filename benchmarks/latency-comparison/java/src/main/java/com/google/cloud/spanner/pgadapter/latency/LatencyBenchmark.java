@@ -48,6 +48,7 @@ public class LatencyBenchmark {
         "delayBeginTransaction",
         false,
         "Enables the 'Delay transaction start until first write' option.");
+    options.addOption(null, "skipPg", false, "Skips PostgreSQL tests.");
     CommandLineParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(options, args);
 
@@ -81,12 +82,9 @@ public class LatencyBenchmark {
     int operations =
         commandLine.hasOption('o') ? Integer.parseInt(commandLine.getOptionValue('o')) : 1000;
     int transactions =
-        commandLine.hasOption('t') ? Integer.parseInt(commandLine.getOptionValue('t')) : 100;
-    int queriesInTransaction =
-        commandLine.hasOption('q') ? Integer.parseInt(commandLine.getOptionValue('q')) : 10;
-    int updatesInTransaction =
-        commandLine.hasOption('u') ? Integer.parseInt(commandLine.getOptionValue('u')) : 5;
+        commandLine.hasOption('t') ? Integer.parseInt(commandLine.getOptionValue('t')) : 0;
     boolean delayBeginTransaction = commandLine.hasOption("delayBeginTransaction");
+    boolean skipPg = commandLine.hasOption("skipPg");
 
     System.out.println();
     System.out.println("Running benchmark with the following options");
@@ -94,20 +92,20 @@ public class LatencyBenchmark {
     System.out.printf("Clients: %d\n", clients);
     System.out.printf("Operations: %d\n", operations);
     System.out.printf("Transactions: %d\n", transactions);
-    System.out.printf("Queries in transaction: %d\n", queriesInTransaction);
-    System.out.printf("Updates in transaction: %d\n", updatesInTransaction);
     System.out.printf("Delay begin transaction: %s\n", delayBeginTransaction);
 
     String jdbcQuery = "select col_varchar from latency_test where col_bigint=?";
-    String jdbcUpdate = "update latency_test set col_varchar=? where col_bigint=?";
 
-    //    System.out.println();
-    //    System.out.println("Running benchmark for PostgreSQL JDBC driver");
-    //    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, delayBeginTransaction);
-    //    List<Duration> pgJdbcResults = pgJdbcRunner.execute(jdbcQuery, clients, operations);
-    //    List<Duration> pgJdbcTransactionResults = pgJdbcRunner.executeTransaction(jdbcQuery,
-    // jdbcUpdate, clients, transactions, queriesInTransaction, updatesInTransaction);
-    //    pgJdbcRunner.shutdown();
+    if (!skipPg) {
+      System.out.println();
+      System.out.println("Running benchmark for PostgreSQL JDBC driver");
+    }
+    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, delayBeginTransaction);
+    List<Duration> pgJdbcResults =
+        pgJdbcRunner.execute(jdbcQuery, clients, skipPg ? 0 : operations);
+    List<Duration> pgJdbcTransactionResults =
+        pgJdbcRunner.executeTransaction(jdbcQuery, clients, skipPg ? 0 : transactions);
+    pgJdbcRunner.shutdown();
 
     System.out.println();
     System.out.println("Running benchmark for Cloud Spanner JDBC driver");
@@ -116,51 +114,41 @@ public class LatencyBenchmark {
         jdbcRunner.execute(
             "select col_varchar from latency_test where col_bigint=?", clients, operations);
     List<Duration> jdbcTransactionResults =
-        jdbcRunner.executeTransaction(
-            jdbcQuery,
-            jdbcUpdate,
-            clients,
-            transactions,
-            queriesInTransaction,
-            updatesInTransaction);
+        jdbcRunner.executeTransaction(jdbcQuery, clients, transactions);
     jdbcRunner.shutdown();
 
-    //    System.out.println();
-    //    System.out.println("Running benchmark for Java Client Library");
-    //    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
-    //    List<Duration> javaClientResults =
-    //        javaClientRunner.execute(
-    //            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
-    //    javaClientRunner.shutdown();
+    System.out.println();
+    System.out.println("Running benchmark for Java Client Library");
+    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
+    List<Duration> javaClientResults =
+        javaClientRunner.execute(
+            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
+    javaClientRunner.shutdown();
 
-    //    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
+    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
-    //    printResults("Java Client Library", javaClientResults);
+    printResults("Java Client Library", javaClientResults);
 
-    //    printTransactionResults("PostgreSQL JDBC Driver - Transactions", pgJdbcTransactionResults,
-    // queriesInTransaction, updatesInTransaction);
-    printTransactionResults(
-        "Cloud Spanner JDBC Driver - Transactions",
-        jdbcTransactionResults,
-        queriesInTransaction,
-        updatesInTransaction);
+    printTransactionResults("PostgreSQL JDBC Driver - Transactions", pgJdbcTransactionResults);
+    printTransactionResults("Cloud Spanner JDBC Driver - Transactions", jdbcTransactionResults);
   }
 
   public void printResults(String header, List<Duration> results) {
-    System.out.println();
-    System.out.println(header);
-    System.out.printf("Total number of queries: %d\n", results.size());
-    printDurations(results);
+    if (results != null && !results.isEmpty()) {
+      System.out.println();
+      System.out.println(header);
+      System.out.printf("Total number of queries: %d\n", results.size());
+      printDurations(results);
+    }
   }
 
-  public void printTransactionResults(
-      String header, List<Duration> results, int queriesInTransaction, int updatesInTransaction) {
-    System.out.println();
-    System.out.println(header);
-    System.out.printf("Total number of transactions: %d\n", results.size());
-    System.out.printf("Reads per transaction: %d\n", queriesInTransaction);
-    System.out.printf("Writes per transaction: %d\n", updatesInTransaction);
-    printDurations(results);
+  public void printTransactionResults(String header, List<Duration> results) {
+    if (results != null && !results.isEmpty()) {
+      System.out.println();
+      System.out.println(header);
+      System.out.printf("Total number of transactions: %d\n", results.size());
+      printDurations(results);
+    }
   }
 
   private void printDurations(List<Duration> results) {

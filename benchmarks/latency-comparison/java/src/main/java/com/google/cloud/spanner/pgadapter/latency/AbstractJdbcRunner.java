@@ -21,7 +21,6 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.jdbc.JdbcSqlExceptionFactory.JdbcAbortedDueToConcurrentModificationException;
 import com.google.common.base.Stopwatch;
-import com.google.common.base.Strings;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -31,6 +30,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +57,10 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
 
   @Override
   public List<Duration> execute(String sql, int numClients, int numOperations) {
+    if (numOperations == 0) {
+      return Collections.emptyList();
+    }
+
     System.out.println();
     System.out.println("Running query benchmark");
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -89,19 +93,11 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
       executeQuery(connection, sql);
 
       for (int i = 0; i < numOperations; i++) {
-        int percentage = (i + 1) * 100 / numOperations;
-        String dashes =
-            "["
-                + Strings.repeat("#", percentage / 5)
-                + Strings.repeat(" ", 20 - percentage / 5)
-                + "]";
-        //        System.out.printf("\r%s %d%%", dashes, percentage);
         results.add(executeQuery(connection, sql));
       }
     } catch (SQLException exception) {
       throw SpannerExceptionFactory.newSpannerException(exception);
     }
-    //    System.out.println();
     return results;
   }
 
@@ -124,26 +120,12 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
     return watch.elapsed();
   }
 
-  protected Duration executeUpdate(Connection connection, String sql) throws SQLException {
-    byte[] bytes = new byte[ThreadLocalRandom.current().nextInt(50) + 50];
-    ThreadLocalRandom.current().nextBytes(bytes);
-    Stopwatch watch = Stopwatch.createStarted();
-    try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      statement.setString(1, new String(bytes));
-      statement.setInt(2, ThreadLocalRandom.current().nextInt(100000));
-      statement.executeUpdate();
-    }
-    return watch.elapsed();
-  }
-
   @Override
-  public List<Duration> executeTransaction(
-      String query,
-      String update,
-      int numClients,
-      int numTransactions,
-      int numQueriesInTransaction,
-      int numUpdatesInTransaction) {
+  public List<Duration> executeTransaction(String query, int numClients, int numTransactions) {
+    if (numTransactions == 0) {
+      return Collections.emptyList();
+    }
+
     System.out.println();
     System.out.println("Running transactions benchmark");
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -160,15 +142,7 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
       ExecutorService service = Executors.newFixedThreadPool(numClients);
       for (int client = 0; client < numClients; client++) {
         results.add(
-            service.submit(
-                () ->
-                    runTransactionBenchmark(
-                        createUrl(),
-                        query,
-                        update,
-                        numTransactions,
-                        numQueriesInTransaction,
-                        numUpdatesInTransaction)));
+            service.submit(() -> runTransactionBenchmark(createUrl(), query, numTransactions)));
       }
       return collectResults(service, results, numClients, numTransactions);
     } catch (Throwable t) {
@@ -176,13 +150,7 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
     }
   }
 
-  private List<Duration> runTransactionBenchmark(
-      String url,
-      String query,
-      String update,
-      int numTransactions,
-      int numQueriesInTransaction,
-      int numUpdatesInTransaction) {
+  private List<Duration> runTransactionBenchmark(String url, String query, int numTransactions) {
     List<Duration> results = new ArrayList<>(numTransactions);
     try (Connection connection = DriverManager.getConnection(url)) {
       // Execute one query to make sure everything has been warmed up.
@@ -190,13 +158,6 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
 
       connection.setAutoCommit(false);
       for (int i = 0; i < numTransactions; i++) {
-        int percentage = (i + 1) * 100 / numTransactions;
-        String dashes =
-            "["
-                + Strings.repeat("#", percentage / 5)
-                + Strings.repeat(" ", 20 - percentage / 5)
-                + "]";
-        //        System.out.printf("\r%s %d%%", dashes, percentage);
         Stopwatch watch = Stopwatch.createStarted();
         while (true) {
           try {
@@ -243,7 +204,6 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
       exception.printStackTrace();
       throw SpannerExceptionFactory.newSpannerException(exception);
     }
-    //    System.out.println();
     return results;
   }
 

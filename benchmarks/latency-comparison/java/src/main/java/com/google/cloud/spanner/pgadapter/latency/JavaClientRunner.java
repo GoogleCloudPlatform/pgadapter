@@ -24,6 +24,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.common.base.Stopwatch;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +42,10 @@ public class JavaClientRunner extends AbstractRunner {
 
   @Override
   public List<Duration> execute(String sql, int numClients, int numOperations) {
+    if (numOperations == 0) {
+      return Collections.emptyList();
+    }
+
     SpannerOptions options =
         SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject()).build();
     try (Spanner spanner = options.getService()) {
@@ -58,14 +63,8 @@ public class JavaClientRunner extends AbstractRunner {
   }
 
   @Override
-  public List<Duration> executeTransaction(
-      String query,
-      String update,
-      int numClients,
-      int numTransactions,
-      int numQueriesInTransaction,
-      int numUpdatesInTransaction) {
-    return null;
+  public List<Duration> executeTransaction(String query, int numClients, int numTransactions) {
+    return Collections.emptyList();
   }
 
   private List<Duration> runBenchmark(

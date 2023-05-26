@@ -23,11 +23,5 @@ public interface BenchmarkRunner {
 
   List<Duration> execute(String sql, int numClients, int numOperations);
 
-  List<Duration> executeTransaction(
-      String query,
-      String update,
-      int numClients,
-      int numTransactions,
-      int numQueriesInTransaction,
-      int numUpdatesInTransaction);
+  List<Duration> executeTransaction(String query, int numClients, int numTransactions);
 }
