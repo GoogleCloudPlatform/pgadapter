@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.20.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.19.1...v0.20.0) (2023-05-26)
+
+
+### Features
+
+* add support for Ruby ActiveRecord ([#749](https://github.com/GoogleCloudPlatform/pgadapter/issues/749)) ([442e45c](https://github.com/GoogleCloudPlatform/pgadapter/commit/442e45ceef9e8ac9d834126a3f90d03b75b6821a))
+* detect relation not found errors ([#834](https://github.com/GoogleCloudPlatform/pgadapter/issues/834)) ([8d21df7](https://github.com/GoogleCloudPlatform/pgadapter/commit/8d21df7e427fbbbff75ab71cac04adb339eba49e))
+
+
+### Bug Fixes
+
+* latency benchmark should use random local port ([#843](https://github.com/GoogleCloudPlatform/pgadapter/issues/843)) ([e15711f](https://github.com/GoogleCloudPlatform/pgadapter/commit/e15711f4ef0c80c391b4df70abb349029e6c80cc))
+
 ## [0.19.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.19.0...v0.19.1) (2023-05-17)
 
 
