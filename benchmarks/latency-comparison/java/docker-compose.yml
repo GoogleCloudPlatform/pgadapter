@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  pgadapter:
+    image: "gcr.io/cloud-spanner-pg-adapter/pgadapter"
+    pull_policy: always
+    container_name: pgadapter
+    volumes:
+      - "${GOOGLE_APPLICATION_CREDENTIALS}:/credentials.json:ro"
+    command:
+      - "-p ${GOOGLE_CLOUD_PROJECT}"
+      - "-i ${SPANNER_INSTANCE}"
+      - "-d ${SPANNER_DATABASE}"
+      - "-c /credentials.json"
+      - "-x"
+  postgres:
+    image: "postgres"
+    container_name: postgres
+    volumes:
+      - "./create_transaction_tables.sql:/create_transaction_tables.sql:ro"
+    environment:
+      POSTGRES_PASSWORD: mysecret
