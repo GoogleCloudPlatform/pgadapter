@@ -1,5 +1,22 @@
 # Google Cloud Spanner PGAdapter - Frequently Asked Questions
 
+## Performance
+
+### What latency does PGAdapter add?
+PGAdapter adds very little latency if it is set up correctly. Make sure to follow these guidelines:
+1. Run PGAdapter on the same host as your main application, for example as a side-car proxy.
+2. When running PGAdapter in a Docker container separate from your main application, make sure that they are on the same Docker network.
+3. If your application is written in Java: Run PGAdapter in-process with your application. See [this sample](../samples/java/jdbc/README.md) for an example.
+
+You can run [these latency comparison benchmarks](../benchmarks/latency-comparison/README.md) to measure
+the difference between using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers
+and client libraries.
+
+### How can I test the latency that is added by PGAdapter?
+You can run [these latency comparison benchmarks](../benchmarks/latency-comparison/README.md) to measure
+the difference between using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers
+and client libraries.
+
 ## Connection Options
 
 ### How can I specify the credentials that should be used for a connection?
