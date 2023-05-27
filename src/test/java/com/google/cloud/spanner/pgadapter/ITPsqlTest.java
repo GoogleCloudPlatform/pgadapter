@@ -443,6 +443,7 @@ public class ITPsqlTest implements IntegrationTest {
   public void testCopyBetweenPostgreSQLAndCloudSpanner() throws Exception {
     int numRows = 100;
 
+    truncatePostgreSQLAllTypesTable();
     logger.info("Copying initial data to PG");
     // Generate 99 random rows.
     copyRandomRowsToPostgreSQL(numRows - 1);
@@ -917,6 +918,13 @@ public class ITPsqlTest implements IntegrationTest {
     }
   }
 
+  private void truncatePostgreSQLAllTypesTable() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      connection.createStatement().executeUpdate("truncate table all_types");
+    }
+  }
+
   private void copyRandomRowsToPostgreSQL(int numRows) throws Exception {
     // Generate random rows and copy these into the all_types table in a local PostgreSQL database.
     ProcessBuilder builder = new ProcessBuilder();
@@ -1056,6 +1064,7 @@ public class ITPsqlTest implements IntegrationTest {
     int res = process.waitFor();
     assertEquals(0, res);
 
+    truncatePostgreSQLAllTypesTable();
     // Generate 250 random rows.
     int numRows = 250;
     copyRandomRowsToPostgreSQL(numRows - 1);
