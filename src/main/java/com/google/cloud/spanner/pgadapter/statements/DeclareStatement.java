@@ -27,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.DeclareStatement.ParsedDeclareStatement.Builder;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -125,7 +126,20 @@ public class DeclareStatement extends IntermediatePortalStatement {
       this.executed = true;
       try {
         if (declareStatement.scroll == Scroll.SCROLL) {
-          throw PGExceptionFactory.newPGException("scrollable cursors are not supported");
+          throw PGExceptionFactory.newPGException(
+              "scrollable cursors are not supported", SQLState.FeatureNotSupported);
+        }
+        if (declareStatement.holdability == Holdability.HOLD) {
+          throw PGExceptionFactory.newPGException(
+              "holdable cursors are not supported", SQLState.FeatureNotSupported);
+        }
+        if (backendConnection.getConnectionState() == ConnectionState.IDLE) {
+          throw PGExceptionFactory.newPGException(
+              "DECLARE CURSOR can only be used in transaction blocks",
+              SQLState.NoActiveSqlTransaction);
+        }
+        if (backendConnection.getConnectionState() == ConnectionState.ABORTED) {
+          throw PGExceptionFactory.newTransactionAbortedException();
         }
         new ParseMessage(
                 connectionHandler,
@@ -187,12 +201,28 @@ public class DeclareStatement extends IntermediatePortalStatement {
       if (parser.eatKeyword("binary")) {
         builder.binary = true;
       } else if (parser.eatKeyword("asensitive")) {
+        if (builder.sensitivity == Sensitivity.INSENSITIVE) {
+          throw PGExceptionFactory.newPGException(
+              "cannot specify both INSENSITIVE and ASENSITIVE", SQLState.SyntaxError);
+        }
         builder.sensitivity = Sensitivity.ASENSITIVE;
       } else if (parser.eatKeyword("insensitive")) {
+        if (builder.sensitivity == Sensitivity.ASENSITIVE) {
+          throw PGExceptionFactory.newPGException(
+              "cannot specify both INSENSITIVE and ASENSITIVE", SQLState.SyntaxError);
+        }
         builder.sensitivity = Sensitivity.INSENSITIVE;
       } else if (parser.eatKeyword("scroll")) {
+        if (builder.scroll == Scroll.NO_SCROLL) {
+          throw PGExceptionFactory.newPGException(
+              "cannot specify both SCROLL and NO SCROLL", SQLState.SyntaxError);
+        }
         builder.scroll = Scroll.SCROLL;
       } else if (parser.eatKeyword("no", "scroll")) {
+        if (builder.scroll == Scroll.SCROLL) {
+          throw PGExceptionFactory.newPGException(
+              "cannot specify both SCROLL and NO SCROLL", SQLState.SyntaxError);
+        }
         builder.scroll = Scroll.NO_SCROLL;
       } else {
         throw PGExceptionFactory.newPGException("syntax error: " + sql, SQLState.SyntaxError);

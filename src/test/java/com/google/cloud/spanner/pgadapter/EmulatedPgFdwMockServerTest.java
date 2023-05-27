@@ -16,11 +16,13 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.RandomResultSetGenerator;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -35,6 +37,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.PGProperty;
+import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class EmulatedPgFdwMockServerTest extends AbstractMockServerTest {
@@ -116,7 +119,7 @@ public class EmulatedPgFdwMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testSelectRandom() throws SQLException {
-    int numRows = new Random().nextInt(2000);
+    int numRows = new Random().nextInt(2000) + 1;
     int totalRows = 0;
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -141,5 +144,61 @@ public class EmulatedPgFdwMockServerTest extends AbstractMockServerTest {
       connection.createStatement().execute("close c1");
     }
     assertEquals(numRows, totalRows);
+  }
+
+  @Test
+  public void testOnlyInTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .execute("declare c1 cursor for select * from random"));
+      assertEquals(SQLState.NoActiveSqlTransaction.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testNotInAbortedTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      assertThrows(PSQLException.class, () -> connection.createStatement().execute("select foo"));
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .execute("declare c1 cursor for select * from random"));
+      assertEquals(SQLState.InFailedSqlTransaction.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testCommitAndRollbackClosesCursor() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from random"), new RandomResultSetGenerator(10).generate()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      for (boolean commit : new boolean[] {true, false}) {
+        connection.createStatement().execute("declare c1 cursor for select * from random");
+        try (ResultSet resultSet = connection.createStatement().executeQuery("fetch 1 c1")) {
+          assertTrue(resultSet.next());
+          assertFalse(resultSet.next());
+        }
+        if (commit) {
+          connection.commit();
+        } else {
+          connection.rollback();
+        }
+        assertThrows(
+            PSQLException.class, () -> connection.createStatement().executeQuery("fetch 1 c1"));
+      }
+    }
   }
 }

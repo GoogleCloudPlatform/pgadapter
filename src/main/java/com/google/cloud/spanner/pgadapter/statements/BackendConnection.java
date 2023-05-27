@@ -684,6 +684,7 @@ public class BackendConnection {
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
+  private final Runnable closeAllPortals;
   private final SessionState sessionState;
   private final Supplier<PgCatalog> pgCatalog;
   private final Supplier<ImmutableMap<String, LocalStatement>> localStatements;
@@ -697,11 +698,13 @@ public class BackendConnection {
 
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
+      Runnable closeAllPortals,
       DatabaseId databaseId,
       Connection spannerConnection,
       Supplier<WellKnownClient> wellKnownClient,
       OptionsMetadata optionsMetadata,
       Supplier<ImmutableList<LocalStatement>> localStatements) {
+    this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
     this.pgCatalog =
         Suppliers.memoize(
@@ -936,6 +939,7 @@ public class BackendConnection {
             } else {
               sessionState.rollback();
             }
+            closeAllPortals.run();
             transactionMode = TransactionMode.IMPLICIT;
             connectionState = ConnectionState.IDLE;
           }
@@ -944,6 +948,7 @@ public class BackendConnection {
       }
     } catch (Exception exception) {
       connectionState = ConnectionState.ABORTED;
+      closeAllPortals.run();
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
         if (spannerConnection.isDmlBatchActive()) {

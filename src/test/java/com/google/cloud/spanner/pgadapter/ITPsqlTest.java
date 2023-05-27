@@ -18,6 +18,8 @@ import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.DEFAULT_DATA_M
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
@@ -200,7 +202,7 @@ public class ITPsqlTest implements IntegrationTest {
           "-d",
           POSTGRES_DATABASE,
           "-c",
-          "drop table if exists all_types; drop table if exists numbers;"
+          "drop table if exists all_types; drop table if exists numbers; drop foreign table if exists f_all_types; drop foreign table if exists f_numbers;"
         };
     ProcessBuilder builder = new ProcessBuilder().command(dropTablesCommand);
     setPgPassword(builder);
@@ -974,5 +976,158 @@ public class ITPsqlTest implements IntegrationTest {
     assertEquals("COPY " + numRows + "\n", output.toString());
     int res = process.waitFor();
     assertEquals(errors.toString(), 0, res);
+  }
+
+  @Test
+  public void testForeignDataWrapper() throws Exception {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          "-h",
+          POSTGRES_HOST,
+          "-p",
+          POSTGRES_PORT,
+          "-U",
+          POSTGRES_USER,
+          "-d",
+          POSTGRES_DATABASE
+        };
+    builder.command(psqlCommand);
+    setPgPassword(builder);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    String createForeignTablesCommand =
+        DEFAULT_DATA_MODEL.stream()
+            .map(s -> s.replace("create table ", "create foreign table f_"))
+            .map(s -> s.replace("primary key", ""))
+            .map(s -> s.replace("col_int int", "col_int bigint"))
+            .map(s -> s.replace("col_array_int int[]", "col_array_int bigint[]"))
+            .map(
+                s ->
+                    s
+                        + String.format(
+                            " server pgadapter options (table_name '%s');",
+                            s.substring(
+                                "create foreign table f_".length(),
+                                s.indexOf(' ', "create foreign table f_".length()))))
+            .collect(Collectors.joining("\n"));
+
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write("DROP EXTENSION IF EXISTS postgres_fdw CASCADE;\n");
+      writer.write("CREATE EXTENSION IF NOT EXISTS postgres_fdw;\n");
+      writer.write(
+          String.format(
+              "CREATE SERVER IF NOT EXISTS pgadapter FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s');\n",
+              (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost()),
+              testEnv.getPGAdapterPort(),
+              database.getId().getDatabase()));
+      writer.write(
+          String.format(
+              "CREATE USER MAPPING IF NOT EXISTS FOR %s SERVER pgadapter OPTIONS (user '%s', password_required 'false');\n",
+              POSTGRES_USER, POSTGRES_USER));
+      writer.write(
+          String.format("GRANT USAGE ON FOREIGN SERVER pgadapter TO %s;\n", POSTGRES_USER));
+      writer.write(createForeignTablesCommand);
+      writer.write("truncate table all_types;\n");
+      writer.write("\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertTrue(errors, "".equals(errors) || !errors.contains("ERROR:"));
+    assertEquals(
+        "DROP EXTENSION\n"
+            + "CREATE EXTENSION\n"
+            + "CREATE SERVER\n"
+            + "CREATE USER MAPPING\n"
+            + "GRANT\n"
+            + "CREATE FOREIGN TABLE\n"
+            + "CREATE FOREIGN TABLE\n"
+            + "TRUNCATE TABLE",
+        output);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    // Generate 250 random rows.
+    int numRows = 250;
+    copyRandomRowsToPostgreSQL(numRows - 1);
+    // Also add one row with all nulls to ensure that nulls are also copied correctly.
+    long nullRowId = random.nextLong();
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("insert into all_types (col_bigint) values (?)")) {
+        preparedStatement.setLong(1, nullRowId);
+        assertEquals(1, preparedStatement.executeUpdate());
+      }
+    }
+
+    // Make sure the all_types table on Cloud Spanner is empty.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+    // COPY the rows to Cloud Spanner.
+    builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy all_types to stdout (format binary) \" "
+            + "  | psql "
+            + " -h "
+            + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+            + " -p "
+            + testEnv.getPGAdapterPort()
+            + " -d "
+            + database.getId().getDatabase()
+            + " -c \"copy all_types from stdin (format binary)"
+            + ";\"\n");
+    setPgPassword(builder);
+    process = builder.start();
+    res = process.waitFor();
+    assertEquals(0, res);
+
+    // Make sure we can access the data in Cloud Spanner through the foreign data wrapper.
+    int foundRows = 0;
+    int foundNullRows = 0;
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      connection
+          .createStatement()
+          .execute("set session characteristics as transaction isolation level serializable");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from f_all_types")) {
+        while (resultSet.next()) {
+          foundRows++;
+          if (resultSet.getLong(1) == nullRowId) {
+            foundNullRows++;
+          }
+          for (int col = 2; col <= resultSet.getMetaData().getColumnCount(); col++) {
+            if (resultSet.getLong(1) == nullRowId) {
+              assertNull(resultSet.getObject(col));
+            } else {
+              assertNotNull(resultSet.getObject(col));
+            }
+          }
+        }
+      }
+      assertEquals(numRows, foundRows);
+      assertEquals(1, foundNullRows);
+    }
   }
 }

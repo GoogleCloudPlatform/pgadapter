@@ -222,7 +222,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<String, String> getDefaultParameters() {
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
         return ImmutableMap.of("spanner.emulate_pg_class_tables", "true");
       }
 

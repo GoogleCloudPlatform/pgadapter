@@ -1105,8 +1105,6 @@ public class ProtocolTest {
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
-        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.IDLE);
@@ -1142,8 +1140,6 @@ public class ProtocolTest {
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
-        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.TRANSACTION);

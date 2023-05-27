@@ -67,10 +67,24 @@ public class DeclareStatementTest {
     assertEquals(
         Holdability.NO_HOLD, parse("declare foo cursor without hold for select 1").holdability);
 
+    statement = parse("declare foo scroll binary cursor for select 1");
+    assertEquals(Scroll.SCROLL, statement.scroll);
+    assertTrue(statement.binary);
+    statement = parse("declare foo no scroll insensitive cursor for select 1");
+    assertEquals(Scroll.NO_SCROLL, statement.scroll);
+    assertEquals(Sensitivity.INSENSITIVE, statement.sensitivity);
+    statement = parse("declare foo no scroll no scroll insensitive cursor for select 1");
+    assertEquals(Scroll.NO_SCROLL, statement.scroll);
+    assertEquals(Sensitivity.INSENSITIVE, statement.sensitivity);
+
     assertThrows(PGException.class, () -> parse("foo"));
     assertThrows(PGException.class, () -> parse("declare foo cursor for "));
     assertThrows(PGException.class, () -> parse("declare foo cursor select 1"));
     assertThrows(PGException.class, () -> parse("declare foo for select 1"));
     assertThrows(PGException.class, () -> parse("declare cursor for select 1"));
+    assertThrows(
+        PGException.class, () -> parse("declare foo insensitive asensitive cursor for select 1"));
+    assertThrows(
+        PGException.class, () -> parse("declare foo scroll no scroll cursor for select 1"));
   }
 }

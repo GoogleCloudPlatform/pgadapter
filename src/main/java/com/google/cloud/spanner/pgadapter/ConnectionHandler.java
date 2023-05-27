@@ -448,6 +448,7 @@ public class ConnectionHandler extends Thread {
   public void handleTerminate() {
     synchronized (this) {
       closeAllPortals();
+      closeAllStatements();
       if (this.spannerConnection != null) {
         this.spannerConnection.close();
       }
@@ -520,7 +521,6 @@ public class ConnectionHandler extends Thread {
       }
     }
     this.portalsMap.clear();
-    this.statementsMap.clear();
   }
 
   public IntermediatePortalStatement getPortal(String portalName) {
@@ -538,7 +538,7 @@ public class ConnectionHandler extends Thread {
     if (!hasPortal(portalName)) {
       throw new IllegalStateException("Unregistered portal: " + portalName);
     }
-    IntermediatePortalStatement portal = this.portalsMap.get(portalName);
+    IntermediatePortalStatement portal = this.portalsMap.remove(portalName);
     portal.close();
   }
 
