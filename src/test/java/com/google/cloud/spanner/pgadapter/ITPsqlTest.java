@@ -1129,5 +1129,44 @@ public class ITPsqlTest implements IntegrationTest {
       assertEquals(numRows, foundRows);
       assertEquals(1, foundNullRows);
     }
+
+    // Create a user-defined function and use it on the data in Cloud Spanner.
+    builder = new ProcessBuilder();
+    builder.command(psqlCommand);
+    setPgPassword(builder);
+    process = builder.start();
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write("set session characteristics as transaction isolation level serializable;");
+      writer.write("DROP FUNCTION IF EXISTS date_timestamp_year_diff;\n");
+      writer.write(
+          "CREATE FUNCTION date_timestamp_year_diff(ts timestamptz, dt date) RETURNS integer AS $$\n"
+              + "    SELECT extract(year from ts) - extract(year from dt);\n"
+              + "$$ LANGUAGE SQL;\n");
+      writer.write(
+          "select date_timestamp_year_diff(col_timestamptz, col_date) as year_diff\n"
+              + "from f_all_types\n"
+              + "order by year_diff asc nulls first;\n");
+      writer.write("\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+    assertTrue(errors, "".equals(errors) || !errors.contains("ERROR:"));
+    assertTrue(
+        output,
+        output.startsWith(
+            "SET\n"
+                + "DROP FUNCTION\n"
+                + "CREATE FUNCTION\n"
+                + " year_diff \n"
+                + "-----------\n"
+                + "          \n"));
+    assertTrue(output, output.endsWith("(250 rows)\n"));
+    res = process.waitFor();
+    assertEquals(0, res);
   }
 }
