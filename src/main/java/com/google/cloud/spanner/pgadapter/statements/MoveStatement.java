@@ -23,7 +23,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.Futures;
 
 /**
  * MOVE is the same as FETCH, except it just skips the results instead of actually sending the rows
@@ -58,23 +57,15 @@ public class MoveStatement extends AbstractFetchOrMoveStatement {
   }
 
   @Override
-  public void executeAsync(BackendConnection backendConnection) {
-    if (!this.executed) {
-      try {
-        new ExecuteMessage(
-                connectionHandler,
-                fetchOrMoveStatement.name,
-                fetchOrMoveStatement.count == null ? 1 : fetchOrMoveStatement.count,
-                "MOVE",
-                false,
-                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-            .send();
-        // Set a null result to indicate that this statement should not return any result.
-        setFutureStatementResult(Futures.immediateFuture(null));
-      } catch (Exception exception) {
-        setFutureStatementResult(Futures.immediateFailedFuture(exception));
-      }
-    }
+  protected void execute(BackendConnection backendConnection, int maxRows) throws Exception {
+    new ExecuteMessage(
+            connectionHandler,
+            fetchOrMoveStatement.name,
+            maxRows,
+            "MOVE",
+            false,
+            ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
+        .send();
   }
 
   @Override

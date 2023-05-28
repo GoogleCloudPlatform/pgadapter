@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.unquote
 
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -29,17 +30,62 @@ import java.util.concurrent.Future;
 
 abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement {
   enum Direction {
-    FORWARD_ALL,
-    BACKWARD_ALL,
+    FORWARD_ALL {
+      @Override
+      public int getDefaultCount() {
+        return 0;
+      }
+    },
+    BACKWARD_ALL {
+      @Override
+      boolean isSupported() {
+        return false;
+      }
+    },
     NEXT,
-    PRIOR,
-    FIRST,
-    LAST,
-    ABSOLUTE(true),
-    RELATIVE(true),
-    ALL,
+    PRIOR {
+      @Override
+      boolean isSupported() {
+        return false;
+      }
+    },
+    FIRST {
+      @Override
+      boolean isSupported() {
+        return false;
+      }
+    },
+    LAST {
+      @Override
+      boolean isSupported() {
+        return false;
+      }
+    },
+    ABSOLUTE(true) {
+      @Override
+      boolean isSupported() {
+        return false;
+      }
+    },
+    RELATIVE(true) {
+      @Override
+      boolean isSupported() {
+        return false;
+      }
+    },
+    ALL {
+      @Override
+      public int getDefaultCount() {
+        return 0;
+      }
+    },
     FORWARD(true),
-    BACKWARD(true);
+    BACKWARD(true) {
+      @Override
+      boolean isSupported() {
+        return false;
+      }
+    };
 
     final boolean supportsCount;
 
@@ -49,6 +95,19 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
 
     Direction(boolean supportsCount) {
       this.supportsCount = supportsCount;
+    }
+
+    boolean isSupported() {
+      return true;
+    }
+
+    public int getDefaultCount() {
+      return 1;
+    }
+
+    @Override
+    public String toString() {
+      return name().toLowerCase().replace('_', ' ');
     }
   }
 
@@ -76,6 +135,42 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
     super(name, preparedStatement, parameters, parameterFormatCodes, resultFormatCodes);
     this.fetchOrMoveStatement = fetchOrMoveStatement;
   }
+
+  @Override
+  public void executeAsync(BackendConnection backendConnection) {
+    if (!this.executed) {
+      try {
+        checkSupported();
+        int count;
+        if (fetchOrMoveStatement.count == null) {
+          count =
+              fetchOrMoveStatement.direction == null
+                  ? 1
+                  : fetchOrMoveStatement.direction.getDefaultCount();
+        } else {
+          count = fetchOrMoveStatement.count;
+        }
+        execute(backendConnection, count);
+        // Set a null result to indicate that this statement should not return any result.
+        setFutureStatementResult(Futures.immediateFuture(null));
+      } catch (Exception exception) {
+        setFutureStatementResult(Futures.immediateFailedFuture(exception));
+      }
+    }
+  }
+
+  protected void checkSupported() throws PGException {
+    if (fetchOrMoveStatement.count != null && fetchOrMoveStatement.count <= 0) {
+      throw PGExceptionFactory.newPGException(
+          "only positive count is supported", SQLState.FeatureNotSupported);
+    }
+    if (fetchOrMoveStatement.direction != null && !fetchOrMoveStatement.direction.isSupported()) {
+      throw PGExceptionFactory.newPGException(
+          fetchOrMoveStatement.direction + " is not supported", SQLState.FeatureNotSupported);
+    }
+  }
+
+  protected abstract void execute(BackendConnection backendConnection, int count) throws Exception;
 
   @Override
   public StatementType getStatementType() {

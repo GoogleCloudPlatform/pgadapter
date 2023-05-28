@@ -23,7 +23,6 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.Futures;
 
 public class FetchStatement extends AbstractFetchOrMoveStatement {
 
@@ -54,29 +53,21 @@ public class FetchStatement extends AbstractFetchOrMoveStatement {
   }
 
   @Override
-  public void executeAsync(BackendConnection backendConnection) {
-    if (!this.executed) {
-      try {
-        new DescribeMessage(
-                connectionHandler,
-                PreparedType.Portal,
-                fetchOrMoveStatement.name,
-                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-            .send();
-        new ExecuteMessage(
-                connectionHandler,
-                fetchOrMoveStatement.name,
-                fetchOrMoveStatement.count == null ? 1 : fetchOrMoveStatement.count,
-                "FETCH",
-                false,
-                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-            .send();
-        // Set a null result to indicate that this statement should not return any result.
-        setFutureStatementResult(Futures.immediateFuture(null));
-      } catch (Exception exception) {
-        setFutureStatementResult(Futures.immediateFailedFuture(exception));
-      }
-    }
+  protected void execute(BackendConnection backendConnection, int count) throws Exception {
+    new DescribeMessage(
+            connectionHandler,
+            PreparedType.Portal,
+            fetchOrMoveStatement.name,
+            ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
+        .send();
+    new ExecuteMessage(
+            connectionHandler,
+            fetchOrMoveStatement.name,
+            count,
+            "FETCH",
+            false,
+            ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
+        .send();
   }
 
   static class ParsedFetchStatement extends ParsedFetchOrMoveStatement {

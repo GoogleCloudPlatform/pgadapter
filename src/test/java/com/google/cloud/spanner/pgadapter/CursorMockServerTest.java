@@ -40,7 +40,7 @@ import org.postgresql.PGProperty;
 import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
-public class EmulatedPgFdwMockServerTest extends AbstractMockServerTest {
+public class CursorMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -183,6 +183,128 @@ public class EmulatedPgFdwMockServerTest extends AbstractMockServerTest {
       connection.createStatement().execute("close c1");
     }
     assertEquals(numRows, totalRows);
+  }
+
+  @Test
+  public void testUnsupportedFetchAndMove() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (String operation : new String[] {"move", "fetch"}) {
+        for (String dir :
+            new String[] {
+              "backward",
+              "backward 1",
+              "backward all",
+              "prior",
+              "first",
+              "last",
+              "absolute 1",
+              "relative 1",
+              "0",
+              "forward 0",
+              "-1",
+              "forward -1"
+            }) {
+          connection.createStatement().execute("begin transaction");
+          connection.createStatement().execute("declare c1 cursor for " + SELECT1.getSql());
+          PSQLException exception =
+              assertThrows(
+                  PSQLException.class,
+                  () -> connection.createStatement().execute(operation + " " + dir + " from c1"));
+          assertEquals(SQLState.FeatureNotSupported.toString(), exception.getSQLState());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testFetchAll() throws SQLException {
+    for (String command : new String[] {"all", "forward all"}) {
+      int numRows = new Random().nextInt(10) + 5;
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("select * from random"),
+              new RandomResultSetGenerator(numRows).generate()));
+
+      int foundRows = 0;
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        connection.createStatement().execute("begin transaction");
+        connection.createStatement().execute("declare c1 cursor for select * from random");
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery(String.format("fetch %s from c1", command))) {
+          while (resultSet.next()) {
+            foundRows++;
+          }
+        }
+        connection.createStatement().execute("close c1");
+      }
+      assertEquals(numRows, foundRows);
+    }
+  }
+
+  @Test
+  public void testNext() throws SQLException {
+    int numRows = new Random().nextInt(10) + 5;
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from random"),
+            new RandomResultSetGenerator(numRows).generate()));
+
+    int foundRows = 0;
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("begin transaction");
+      connection.createStatement().execute("declare c1 cursor for select * from random");
+      while (true) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("fetch next from c1")) {
+          if (foundRows == numRows) {
+            assertFalse(resultSet.next());
+            break;
+          } else {
+            assertTrue(resultSet.next());
+            assertFalse(resultSet.next());
+            foundRows++;
+          }
+        }
+      }
+      connection.createStatement().execute("close c1");
+    }
+    assertEquals(numRows, foundRows);
+  }
+
+  @Test
+  public void testForward() throws SQLException {
+    Random random = new Random();
+    for (String command : new String[] {"", "forward"}) {
+      int numRows = random.nextInt(20) + 5;
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("select * from random"),
+              new RandomResultSetGenerator(numRows).generate()));
+
+      int foundRows = 0;
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        connection.createStatement().execute("begin transaction");
+        connection.createStatement().execute("declare c1 cursor for select * from random");
+        while (true) {
+          int count = random.nextInt(numRows) + 1;
+          try (ResultSet resultSet =
+              connection
+                  .createStatement()
+                  .executeQuery(String.format("fetch %s %d from c1", command, count))) {
+            if (foundRows == numRows) {
+              assertFalse(resultSet.next());
+              break;
+            } else {
+              while (resultSet.next()) {
+                foundRows++;
+              }
+            }
+          }
+        }
+        connection.createStatement().execute("close c1");
+      }
+      assertEquals(numRows, foundRows);
+    }
   }
 
   @Test
