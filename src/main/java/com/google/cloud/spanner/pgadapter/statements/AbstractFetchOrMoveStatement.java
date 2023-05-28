@@ -21,10 +21,6 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
-import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import java.util.Arrays;
@@ -68,7 +64,7 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
     }
   }
 
-  private final ParsedFetchOrMoveStatement fetchOrMoveStatement;
+  protected final ParsedFetchOrMoveStatement fetchOrMoveStatement;
 
   public AbstractFetchOrMoveStatement(
       String name,
@@ -84,32 +80,6 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
   @Override
   public StatementType getStatementType() {
     return StatementType.CLIENT_SIDE;
-  }
-
-  @Override
-  public void executeAsync(BackendConnection backendConnection) {
-    if (!this.executed) {
-      try {
-        new DescribeMessage(
-                connectionHandler,
-                PreparedType.Portal,
-                fetchOrMoveStatement.name,
-                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-            .send();
-        new ExecuteMessage(
-                connectionHandler,
-                fetchOrMoveStatement.name,
-                fetchOrMoveStatement.count == null ? 1 : fetchOrMoveStatement.count,
-                "FETCH",
-                false,
-                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-            .send();
-        // Set a null result to indicate that this statement should not return any result.
-        setFutureStatementResult(Futures.immediateFuture(null));
-      } catch (Exception exception) {
-        setFutureStatementResult(Futures.immediateFailedFuture(exception));
-      }
-    }
   }
 
   @Override

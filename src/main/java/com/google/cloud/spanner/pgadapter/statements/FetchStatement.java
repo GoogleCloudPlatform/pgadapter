@@ -18,7 +18,12 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
+import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Futures;
 
 public class FetchStatement extends AbstractFetchOrMoveStatement {
 
@@ -46,6 +51,32 @@ public class FetchStatement extends AbstractFetchOrMoveStatement {
   @Override
   public String getCommandTag() {
     return "FETCH";
+  }
+
+  @Override
+  public void executeAsync(BackendConnection backendConnection) {
+    if (!this.executed) {
+      try {
+        new DescribeMessage(
+                connectionHandler,
+                PreparedType.Portal,
+                fetchOrMoveStatement.name,
+                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
+            .send();
+        new ExecuteMessage(
+                connectionHandler,
+                fetchOrMoveStatement.name,
+                fetchOrMoveStatement.count == null ? 1 : fetchOrMoveStatement.count,
+                "FETCH",
+                false,
+                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
+            .send();
+        // Set a null result to indicate that this statement should not return any result.
+        setFutureStatementResult(Futures.immediateFuture(null));
+      } catch (Exception exception) {
+        setFutureStatementResult(Futures.immediateFailedFuture(exception));
+      }
+    }
   }
 
   static class ParsedFetchStatement extends ParsedFetchOrMoveStatement {

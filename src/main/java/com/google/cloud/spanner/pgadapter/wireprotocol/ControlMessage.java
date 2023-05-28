@@ -503,13 +503,15 @@ public abstract class ControlMessage extends WireMessage {
         long rows = 0L;
         while (hasData) {
           WireOutput wireOutput = describedResult.createDataRowResponse(converter);
-          if (!converter.isIncludeBinaryCopyHeaderInFirstRow()) {
-            binaryCopyHeaderSentLatch.await();
+          if (wireOutput != null) {
+            if (!converter.isIncludeBinaryCopyHeaderInFirstRow()) {
+              binaryCopyHeaderSentLatch.await();
+            }
+            synchronized (describedResult) {
+              wireOutput.send(false);
+            }
+            binaryCopyHeaderSentLatch.countDown();
           }
-          synchronized (describedResult) {
-            wireOutput.send(false);
-          }
-          binaryCopyHeaderSentLatch.countDown();
           if (Thread.interrupted()) {
             throw PGExceptionFactory.newQueryCancelledException();
           }

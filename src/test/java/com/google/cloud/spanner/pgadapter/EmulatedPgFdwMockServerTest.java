@@ -147,6 +147,60 @@ public class EmulatedPgFdwMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testRandomFetchAndMove() throws SQLException {
+    Random random = new Random();
+    int numRows = random.nextInt(750) + 50;
+    int totalRows = 0;
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from random"),
+            new RandomResultSetGenerator(numRows).generate()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("begin transaction");
+      connection.createStatement().execute("declare c1 cursor for select * from random");
+      while (true) {
+        boolean fetch = random.nextBoolean();
+        int fetchSize = random.nextInt(200) + 1;
+        String sql = (fetch ? "fetch " : "move ") + fetchSize + " c1";
+        boolean foundRows = false;
+        if (fetch) {
+          try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+            while (resultSet.next()) {
+              foundRows = true;
+              totalRows++;
+            }
+          }
+        } else {
+          int count = connection.createStatement().executeUpdate(sql);
+          foundRows = count > 0;
+          totalRows += count;
+        }
+        if (!foundRows) {
+          break;
+        }
+      }
+      connection.createStatement().execute("close c1");
+    }
+    assertEquals(numRows, totalRows);
+  }
+
+  @Test
+  public void testDeclareCursorForNonQuery() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("begin transaction");
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .execute("declare c1 cursor for update foo set bar=1 where true"));
+      assertEquals(SQLState.FeatureNotSupported.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
   public void testOnlyInTransaction() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       PSQLException exception =

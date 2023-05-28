@@ -125,6 +125,10 @@ public class DeclareStatement extends IntermediatePortalStatement {
     if (!this.executed) {
       this.executed = true;
       try {
+        if (!declareStatement.parsedPreparedStatement.isQuery()) {
+          throw PGExceptionFactory.newPGException(
+              "cursors can only be defined for queries", SQLState.FeatureNotSupported);
+        }
         if (declareStatement.scroll == Scroll.SCROLL) {
           throw PGExceptionFactory.newPGException(
               "scrollable cursors are not supported", SQLState.FeatureNotSupported);
