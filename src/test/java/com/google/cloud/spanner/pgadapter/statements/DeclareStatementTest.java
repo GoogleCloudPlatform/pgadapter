@@ -20,12 +20,23 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.DeclareStatement.Holdability;
 import com.google.cloud.spanner.pgadapter.statements.DeclareStatement.ParsedDeclareStatement;
 import com.google.cloud.spanner.pgadapter.statements.DeclareStatement.Scroll;
 import com.google.cloud.spanner.pgadapter.statements.DeclareStatement.Sensitivity;
+import java.util.concurrent.Future;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -81,10 +92,31 @@ public class DeclareStatementTest {
     assertThrows(PGException.class, () -> parse("declare foo cursor for "));
     assertThrows(PGException.class, () -> parse("declare foo cursor select 1"));
     assertThrows(PGException.class, () -> parse("declare foo for select 1"));
+    assertThrows(PGException.class, () -> parse("declare foo for select 1"));
     assertThrows(PGException.class, () -> parse("declare cursor for select 1"));
     assertThrows(
         PGException.class, () -> parse("declare foo insensitive asensitive cursor for select 1"));
     assertThrows(
+        PGException.class, () -> parse("declare foo asensitive insensitive cursor for select 1"));
+    assertThrows(
         PGException.class, () -> parse("declare foo scroll no scroll cursor for select 1"));
+    assertThrows(
+        PGException.class, () -> parse("declare foo no scroll scroll cursor for select 1"));
+    assertThrows(PGException.class, () -> parse("declare foo.bar cursor for select 1"));
+    assertThrows(PGException.class, () -> parse("declare $1 cursor for select 1"));
+  }
+
+  @Test
+  public void testDescribeIsNoOp() throws Exception {
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(mock(ConnectionMetadata.class));
+    Statement statement = Statement.of("declare foo cursor for select 1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    DeclareStatement declareStatement =
+        new DeclareStatement(connectionHandler, optionsMetadata, "", parsedStatement, statement);
+    Future<StatementResult> result = declareStatement.describeAsync(mock(BackendConnection.class));
+    assertNull(result.get());
   }
 }

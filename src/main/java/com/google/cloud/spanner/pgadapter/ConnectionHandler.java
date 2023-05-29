@@ -525,7 +525,8 @@ public class ConnectionHandler extends Thread {
 
   public IntermediatePortalStatement getPortal(String portalName) {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered portal: " + portalName);
+      throw PGExceptionFactory.newPGException(
+          "unrecognized portal name: " + portalName, SQLState.InvalidCursorName);
     }
     return this.portalsMap.get(portalName);
   }
@@ -536,7 +537,8 @@ public class ConnectionHandler extends Thread {
 
   public void closePortal(String portalName) throws Exception {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered portal: " + portalName);
+      throw PGExceptionFactory.newPGException(
+          "unrecognized portal name: " + portalName, SQLState.InvalidCursorName);
     }
     IntermediatePortalStatement portal = this.portalsMap.remove(portalName);
     portal.close();

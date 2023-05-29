@@ -20,6 +20,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
+import com.google.cloud.spanner.pgadapter.statements.local.AbortTransaction;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
@@ -27,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogS
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.StartTransactionIsolationLevelRepeatableRead;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
@@ -95,15 +97,15 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
-        if (!(parameters.containsKey("application_name")
-            && parameters
-                .get("application_name")
-                .toLowerCase(Locale.ENGLISH)
-                .contains("readonly=false"))) {
-          return ImmutableMap.of("options", "-c spanner.readonly=true");
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(StartTransactionIsolationLevelRepeatableRead.INSTANCE)
+              .add(AbortTransaction.INSTANCE)
+              .build();
         }
-        return super.getDefaultParameters(parameters);
+        return ImmutableList.of(StartTransactionIsolationLevelRepeatableRead.INSTANCE);
       }
     },
     PGBENCH {

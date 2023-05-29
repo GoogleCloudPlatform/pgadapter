@@ -230,6 +230,10 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
       if (count == null) {
         throw PGExceptionFactory.newPGException("syntax error: " + sql, SQLState.SyntaxError);
       }
+      if (count > Integer.MAX_VALUE || count < Integer.MIN_VALUE) {
+        throw PGExceptionFactory.newPGException(
+            "count out of range: " + count, SQLState.NumericValueOutOfRange);
+      }
     }
     if (count != null && direction != null && !direction.supportsCount) {
       throw PGExceptionFactory.newPGException(

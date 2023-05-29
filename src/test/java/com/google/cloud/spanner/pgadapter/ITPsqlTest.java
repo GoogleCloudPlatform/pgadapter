@@ -1032,7 +1032,7 @@ public class ITPsqlTest implements IntegrationTest {
       writer.write("CREATE EXTENSION IF NOT EXISTS postgres_fdw;\n");
       writer.write(
           String.format(
-              "CREATE SERVER IF NOT EXISTS pgadapter FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s');\n",
+              "CREATE SERVER IF NOT EXISTS pgadapter FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s', options '-c spanner.read_only=true');\n",
               (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost()),
               testEnv.getPGAdapterPort(),
               database.getId().getDatabase()));
@@ -1137,6 +1137,21 @@ public class ITPsqlTest implements IntegrationTest {
       }
       assertEquals(numRows, foundRows);
       assertEquals(1, foundNullRows);
+
+      // Also verify that we can use parameterized queries with the foreign table.
+      // These parameters are however converted to literals by the PostgreSQL Foreign Data Wrapper.
+      // That means that the queries that are executed on Cloud Spanner are always unparameterized.
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("select * from f_all_types where col_bigint=?")) {
+        preparedStatement.setLong(1, nullRowId);
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          for (int col = 2; col <= resultSet.getMetaData().getColumnCount(); col++) {
+            assertNull(resultSet.getObject(col));
+          }
+          assertFalse(resultSet.next());
+        }
+      }
     }
 
     // Create a user-defined function and use it on the data in Cloud Spanner.

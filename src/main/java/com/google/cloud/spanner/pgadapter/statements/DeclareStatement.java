@@ -201,7 +201,11 @@ public class DeclareStatement extends IntermediatePortalStatement {
       throw PGExceptionFactory.newPGException("invalid cursor name: " + sql, SQLState.SyntaxError);
     }
     builder.name = unquoteOrFoldIdentifier(name.name);
-    while (parser.hasMoreTokens() && !parser.peekKeyword("cursor")) {
+    while (parser.hasMoreTokens()
+        && !parser.peekKeyword("cursor")
+        && !parser.peekKeyword("for")
+        && !parser.peekKeyword("with")
+        && !parser.peekKeyword("without")) {
       if (parser.eatKeyword("binary")) {
         builder.binary = true;
       } else if (parser.eatKeyword("asensitive")) {

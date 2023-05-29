@@ -28,6 +28,7 @@ import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Random;
@@ -73,9 +74,37 @@ public class CursorMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testTransaction() throws SQLException {
+  public void testReadWriteTransaction() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertTrue(mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).hasTransaction());
+    assertTrue(
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getTransaction().hasBegin());
+    assertTrue(
+        mockSpanner
+            .getRequestsOfType(ExecuteSqlRequest.class)
+            .get(0)
+            .getTransaction()
+            .getBegin()
+            .hasReadWrite());
+  }
+
+  @Test
+  public void testReadOnlyTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      connection.setReadOnly(true);
+
       try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
         assertTrue(resultSet.next());
         assertEquals(1L, resultSet.getLong(1));
@@ -132,6 +161,56 @@ public class CursorMockServerTest extends AbstractMockServerTest {
       while (true) {
         boolean foundRows = false;
         try (ResultSet resultSet = connection.createStatement().executeQuery("fetch 100 c1")) {
+          while (resultSet.next()) {
+            foundRows = true;
+            totalRows++;
+          }
+        }
+        if (!foundRows) {
+          break;
+        }
+      }
+      connection.createStatement().execute("close c1");
+    }
+    assertEquals(numRows, totalRows);
+  }
+
+  @Test
+  public void testMove() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from random"),
+            new RandomResultSetGenerator(new Random().nextInt(10) + 2).generate()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("begin transaction");
+      connection.createStatement().execute("declare c1 cursor for select * from random");
+      // execute returns false if no rows were returned.
+      assertFalse(connection.createStatement().execute("move 3 c1"));
+      connection.createStatement().execute("close c1");
+    }
+  }
+
+  @Test
+  public void testSelectWithParameters() throws SQLException {
+    int numRows = new Random().nextInt(150) + 25;
+    int totalRows = 0;
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from random where some_col='some-value'"),
+            new RandomResultSetGenerator(numRows).generate()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("begin transaction");
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement(
+              "declare c1 cursor for select * from random where some_col=?")) {
+        preparedStatement.setString(1, "some-value");
+        preparedStatement.execute();
+      }
+      while (true) {
+        boolean foundRows = false;
+        try (ResultSet resultSet = connection.createStatement().executeQuery("fetch 100 from c1")) {
           while (resultSet.next()) {
             foundRows = true;
             totalRows++;
@@ -323,6 +402,31 @@ public class CursorMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testScrollableCursor() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("begin transaction");
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () -> connection.createStatement().execute("declare c1 scroll cursor for select 1"));
+      assertEquals(SQLState.FeatureNotSupported.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testHoldableCursor() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("begin transaction");
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection.createStatement().execute("declare c1 cursor with hold for select 1"));
+      assertEquals(SQLState.FeatureNotSupported.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
   public void testOnlyInTransaction() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       PSQLException exception =
@@ -375,6 +479,41 @@ public class CursorMockServerTest extends AbstractMockServerTest {
         assertThrows(
             PSQLException.class, () -> connection.createStatement().executeQuery("fetch 1 c1"));
       }
+    }
+  }
+
+  @Test
+  public void testClose() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from random"), new RandomResultSetGenerator(10).generate()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("declare c1 cursor for select * from random");
+      connection.createStatement().execute("declare c2 cursor for select * from random");
+      connection.createStatement().execute("declare c3 cursor for select * from random");
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("fetch 1 c1")) {
+        assertTrue(resultSet.next());
+        assertFalse(resultSet.next());
+      }
+      connection.createStatement().execute("close c1");
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class, () -> connection.createStatement().executeQuery("fetch 1 c1"));
+      assertEquals(SQLState.InvalidCursorName.toString(), exception.getSQLState());
+
+      connection.createStatement().execute("close all");
+      exception =
+          assertThrows(
+              PSQLException.class, () -> connection.createStatement().executeQuery("fetch 1 c2"));
+      assertEquals(SQLState.InvalidCursorName.toString(), exception.getSQLState());
+      exception =
+          assertThrows(
+              PSQLException.class, () -> connection.createStatement().executeQuery("fetch 1 c3"));
+      assertEquals(SQLState.InvalidCursorName.toString(), exception.getSQLState());
     }
   }
 }

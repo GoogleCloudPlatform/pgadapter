@@ -17,8 +17,19 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.AbstractFetchOrMoveStatement.Direction;
 import com.google.cloud.spanner.pgadapter.statements.AbstractFetchOrMoveStatement.ParsedFetchOrMoveStatement;
 import com.google.cloud.spanner.pgadapter.statements.FetchStatement.ParsedFetchStatement;
@@ -81,9 +92,51 @@ public class FetchAndMoveStatementTest {
       assertThrows(PGException.class, () -> parse(type, "%s next 1 foo"));
       assertThrows(PGException.class, () -> parse(type, "%s last 1 foo"));
       assertThrows(PGException.class, () -> parse(type, "%s prior 1 foo"));
+      assertThrows(PGException.class, () -> parse(type, "%s $1"));
+      assertThrows(PGException.class, () -> parse(type, "%s foo.bar"));
+      assertThrows(
+          PGException.class, () -> parse(type, "%s " + ((long) Integer.MAX_VALUE + 1L) + " foo"));
+      assertThrows(
+          PGException.class, () -> parse(type, "%s " + ((long) Integer.MIN_VALUE - 1L) + " foo"));
     }
     assertEquals(ParsedFetchStatement.class, parse("fetch", "%s foo").getClass());
     assertEquals(ParsedMoveStatement.class, parse("move", "%s foo").getClass());
+
+    assertThrows(PGException.class, () -> parse("fetch", "move foo"));
+    assertThrows(PGException.class, () -> parse("move", "fetch foo"));
+    assertThrows(PGException.class, () -> parse("fetch", "select foo"));
+  }
+
+  @Test
+  public void testFetchStatement() throws Exception {
+    Statement statement = Statement.of("fetch c1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ConnectionMetadata metadata = mock(ConnectionMetadata.class);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(metadata);
+    FetchStatement fetchStatement =
+        new FetchStatement(
+            connectionHandler, mock(OptionsMetadata.class), "", parsedStatement, statement);
+    assertEquals(StatementType.CLIENT_SIDE, fetchStatement.getStatementType());
+    assertNull(fetchStatement.describeAsync(mock(BackendConnection.class)).get());
+  }
+
+  private static class InvalidFetchOrMoveStatement extends ParsedFetchOrMoveStatement {
+    InvalidFetchOrMoveStatement() {
+      super(null, null, null);
+    }
+  }
+
+  @Test
+  public void testInvalidParseClass() {
+    PGException exception =
+        assertThrows(
+            PGException.class,
+            () ->
+                AbstractFetchOrMoveStatement.parse(
+                    "fetch foo", "fetch", InvalidFetchOrMoveStatement.class));
+    assertEquals(SQLState.InternalError, exception.getSQLState());
   }
 
   ParsedFetchOrMoveStatement parse(String type, String expression) {

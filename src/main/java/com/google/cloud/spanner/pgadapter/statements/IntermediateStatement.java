@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.MoveStatement.MOVE_COMMAND_TAG;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 
 import com.google.api.core.InternalApi;
@@ -339,7 +340,10 @@ public class IntermediateStatement {
   }
 
   public WireOutput createDataRowResponse(Converter converter) {
-    return new DataRowResponse(this.outputStream, converter);
+    // MOVE should not return any of the data.
+    return MOVE_COMMAND_TAG.equals(commandTag)
+        ? null
+        : new DataRowResponse(this.outputStream, converter);
   }
 
   public WireOutput[] createResultSuffix() {

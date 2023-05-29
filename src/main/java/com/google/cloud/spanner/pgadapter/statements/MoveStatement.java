@@ -18,8 +18,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.utils.Converter;
-import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.common.collect.ImmutableList;
@@ -29,6 +27,7 @@ import com.google.common.collect.ImmutableList;
  * back to the client.
  */
 public class MoveStatement extends AbstractFetchOrMoveStatement {
+  static final String MOVE_COMMAND_TAG = "MOVE";
 
   public MoveStatement(
       ConnectionHandler connectionHandler,
@@ -53,7 +52,7 @@ public class MoveStatement extends AbstractFetchOrMoveStatement {
 
   @Override
   public String getCommandTag() {
-    return "MOVE";
+    return MOVE_COMMAND_TAG;
   }
 
   @Override
@@ -62,16 +61,10 @@ public class MoveStatement extends AbstractFetchOrMoveStatement {
             connectionHandler,
             fetchOrMoveStatement.name,
             maxRows,
-            "MOVE",
+            MOVE_COMMAND_TAG,
             false,
             ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
         .send();
-  }
-
-  @Override
-  public WireOutput createDataRowResponse(Converter converter) {
-    // MOVE should not return any data, just skip it.
-    return null;
   }
 
   static class ParsedMoveStatement extends ParsedFetchOrMoveStatement {

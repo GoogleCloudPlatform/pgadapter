@@ -15,9 +15,11 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
+import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
 import com.google.cloud.spanner.BatchTransactionId;
@@ -141,6 +143,23 @@ public class BackendConnection {
     return pgException;
   }
 
+  boolean shouldReplaceStatement(Statement statement) {
+    if (!localStatements.get().isEmpty() && localStatements.get().containsKey(statement.getSql())) {
+      LocalStatement localStatement = localStatements.get().get(statement.getSql());
+      if (localStatement != null) {
+        return localStatement.hasReplacementStatement();
+      }
+    }
+    return false;
+  }
+
+  Tuple<Statement, ParsedStatement> replaceStatement(Statement statement) {
+    LocalStatement localStatement = localStatements.get().get(statement.getSql());
+    Statement replacement =
+        Objects.requireNonNull(localStatement).getReplacementStatement(statement);
+    return Tuple.of(replacement, Objects.requireNonNull(PARSER.parse(replacement)));
+  }
+
   /**
    * Buffered statements are kept in memory until a flush or sync message is received. This makes it
    * possible to batch multiple statements together when sending them to Cloud Spanner.
@@ -151,6 +170,11 @@ public class BackendConnection {
     final SettableFuture<T> result;
 
     BufferedStatement(ParsedStatement parsedStatement, Statement statement) {
+      if (shouldReplaceStatement(statement)) {
+        Tuple<Statement, ParsedStatement> replacement = replaceStatement(statement);
+        statement = replacement.x();
+        parsedStatement = replacement.y();
+      }
       this.parsedStatement = parsedStatement;
       this.statement = statement;
       this.result = SettableFuture.create();
@@ -216,10 +240,13 @@ public class BackendConnection {
         //  block.
         SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
         if (!localStatements.get().isEmpty()
-            && localStatements.get().containsKey(statement.getSql())) {
-          result.set(
-              Objects.requireNonNull(localStatements.get().get(statement.getSql()))
-                  .execute(BackendConnection.this));
+            && localStatements.get().containsKey(statement.getSql())
+            && localStatements.get().get(statement.getSql()) != null
+            && !Objects.requireNonNull(localStatements.get().get(statement.getSql()))
+                .hasReplacementStatement()) {
+          LocalStatement localStatement =
+              Objects.requireNonNull(localStatements.get().get(statement.getSql()));
+          result.set(localStatement.execute(BackendConnection.this));
         } else if (sessionStatement != null) {
           result.set(sessionStatement.execute(sessionState));
         } else if (connectionState == ConnectionState.ABORTED
