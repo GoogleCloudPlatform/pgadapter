@@ -92,11 +92,14 @@ docker run -it --rm \
       -- has been started with the command line argument that requires clients to authenticate.
       CREATE USER MAPPING IF NOT EXISTS FOR postgres SERVER pgadapter_read_only
           OPTIONS (user 'postgres', password_required 'false');" \
-  -c "-- Create a foreign table for a table in Cloud Spanner.
-      -- Note that the IMPORT FOREIGN SCHEMA command does not work with Cloud Spanner.
-      CREATE FOREIGN TABLE IF NOT EXISTS concerts (id bigint, name varchar, start_time timestamptz, end_time timestamptz)
-          server pgadapter_read_only
-          options (table_name 'concerts');" \
+  -c "-- Create a schema that we will use for the Cloud Spanner tables.
+      -- This makes it easier to just drop and re-create and re-import the schema if
+      -- the schema in Cloud Spanner has changed.
+      CREATE SCHEMA IF NOT EXISTS spanner;" \
+  -c "-- Switch to the spanner schema.
+      SET search_path TO spanner;" \
+  -c "-- Import the schema from Cloud Spanner.
+      IMPORT FOREIGN SCHEMA public from server pgadapter_read_only into spanner;" \
   -c "-- Create a user-defined function in PostgreSQL.
       CREATE FUNCTION timestamp_diff_minutes(earlier timestamptz, later timestamptz) RETURNS integer AS \$\$
           SELECT (extract(epoch from later) - extract(epoch from earlier)) / 60;
@@ -122,6 +125,8 @@ docker run -it --rm \
   --env PGPASSWORD=mysecret \
   postgres psql -h postgres -U postgres
 
+set search_path to spanner;
+
 create function to_char(ts timestamptz, format text) returns text as $$
   select pg_catalog.to_char(ts, format);
 $$ language sql;
@@ -129,10 +134,18 @@ $$ language sql;
 select to_char(start_time, 'HH12:MI:SS') from concerts;
 ```
 
-## Limitations
+### Re-importing the schema
+Changes to the schema in Cloud Spanner are not directly visible in the imported schema in PostgreSQL.
+You can re-import the schema in PostgreSQL by dropping, re-creating and re-importing the schema in
+PostgreSQL:
 
-### Import Foreign Schema
-The `IMPORT FOREIGN SCHEMA` statement is not supported for Cloud Spanner databases.
+```sql
+drop schema spanner cascade;
+create schema spanner;
+import foreign schema public from server pgadapter_read_only into spanner;
+```
+
+## Limitations
 
 ### Parameterized Queries for Foreign Tables
 You can use parameterized queries with Cloud Spanner foreign tables. The PostgreSQL Foreign Data

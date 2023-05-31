@@ -86,6 +86,15 @@ public class ClientAutoDetector {
       }
     },
     PG_FDW {
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("format_type\\s*\\(\\s*atttypid\\s*,\\s*atttypmod\\s*\\)"),
+                  "spanner_type as format_type"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("pg_get_expr\\s*\\(\\s*adbin\\s*,\\s*adrelid\\s*\\)"),
+                  "adbin as pg_get_expr"));
+
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // postgres_fdw by default sends its own name.
@@ -106,6 +115,11 @@ public class ClientAutoDetector {
               .build();
         }
         return ImmutableList.of(StartTransactionIsolationLevelRepeatableRead.INSTANCE);
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        return functionReplacements;
       }
     },
     PGBENCH {
