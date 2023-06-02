@@ -124,6 +124,104 @@ public class ClientAutoDetector {
         return errorHints;
       }
     },
+    RAILS {
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replaceAndStop(
+                  Pattern.compile(
+                      "SELECT\\s+a\\.attname\\s+"
+                          + "FROM\\s+\\(\\s+"
+                          + "SELECT\\s+indrelid\\s*,\\s*indkey\\s*,\\s*generate_subscripts\\s*\\(\\s*indkey\\s*,\\s*1\\)\\s*idx\\s+"
+                          + "FROM\\s+pg_index\\s+"
+                          + "WHERE indrelid\\s*=\\s*'\"?(.+?)\"?'::regclass\\s+"
+                          + "AND indisprimary\\s*"
+                          + "\\)\\s*i\\s+"
+                          + "JOIN\\s+pg_attribute\\s+a\\s+"
+                          + "ON\\s+a\\.attrelid\\s*=\\s*i\\.indrelid\\s+"
+                          + "AND\\s+a\\.attnum\\s*=\\s*i\\.indkey\\[i\\.idx]\\s*"
+                          + "ORDER\\s+BY\\s+i\\.idx"),
+                  "SELECT ic.column_name as attname\n"
+                      + "FROM information_schema.index_columns ic\n"
+                      + "INNER JOIN information_schema.indexes i using (table_catalog, table_schema, table_name, index_name)\n"
+                      + "WHERE ic.table_schema='public' and ic.table_name='$1'\n"
+                      + "AND i.index_type='PRIMARY_KEY'\n"
+                      + "ORDER BY ordinal_position"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "format_type\\s*\\(\\s*a\\.atttypid\\s*,\\s*a\\.atttypmod\\s*\\)"),
+                  "a.spanner_type as format_type"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("pg_get_expr\\s*\\(\\s*d\\.adbin\\s*,\\s*d\\.adrelid\\s*\\)"),
+                  "d.adbin as pg_get_expr"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("col_description\\s*\\(\\s*.+\\s*,\\s*.+\\s*\\)"), "''::varchar"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)\\s*AS\\s+"),
+                  "''::varchar AS "),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
+                  "''::varchar AS obj_description"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("pg_get_indexdef\\s*\\(.+\\)"),
+                  "'CREATE INDEX ON USING btree ( )'::varchar AS pg_get_indexdef"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("pg_get_constraintdef\\s*\\(.+\\)\\s*AS\\s+"), "conbin AS "),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("'\"(.+?)\"'::regclass"), "'''\"public\".\"$1\"'''"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "string_agg\\(enum\\.enumlabel, ',' ORDER BY enum\\.enumsortorder\\)"),
+                  "''::varchar"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("(\\s+.+?)\\.oid::regclass::text"),
+                  " substr($1.oid, 12, length($1.oid) - 13)"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "t\\.typinput\\s*=\\s*'array_in\\(\\s*cstring\\s*,\\s*oid,\\s*integer\\)'::regprocedure"),
+                  "t.typinput='array_in'"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("SELECT\\s+distinct\\s+i\\.relname\\s*,"), "SELECT i.relname,"));
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        return parameters.containsKey("application_name")
+            && (parameters.get("application_name").endsWith("rake")
+                || parameters.get("application_name").endsWith(".rb")
+                || parameters.get("application_name").contains("rails"));
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        return functionReplacements;
+      }
+
+      @Override
+      public ImmutableMap<String, String> getDefaultParameters() {
+        return ImmutableMap.of("spanner.emulate_pg_class_tables", "true");
+      }
+
+      @Override
+      public ImmutableList<String> getErrorHints(PGException exception) {
+        if (exception.getMessage() != null
+            && exception
+                .getMessage()
+                .contains("DDL statements are only allowed outside explicit transactions")) {
+          return ImmutableList.of(
+              "Using Ruby ActiveRecord migrations requires that the option 'spanner.ddl_transaction_mode=AutocommitExplicitTransaction' has been set. "
+                  + "Please add \"spanner.ddl_transaction_mode\": \"AutocommitExplicitTransaction\" to the \"variables\" section of your database.yml file.\n"
+                  + "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/samples/ruby/activerecord/README.md for more information.");
+        }
+        if (exception.getMessage() != null
+            && exception.getMessage().contains("SELECT pg_try_advisory_lock")) {
+          return ImmutableList.of(
+              "PGAdapter does not support advisory locks. Please 'add advisory_locks: false' to your database.yml file. "
+                  + "See https://edgeguides.rubyonrails.org/configuring.html#configuring-a-postgresql-database for more information.");
+        }
+        return super.getErrorHints(exception);
+      }
+    },
     JDBC {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
