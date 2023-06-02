@@ -28,6 +28,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
       - run: mvn -B test -Ptest-all
   windows:
     runs-on: windows-latest
@@ -74,4 +78,8 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
       - run: mvn -B test -Ptest-all

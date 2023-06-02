@@ -30,6 +30,7 @@ import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -62,6 +63,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.Oid;
 import org.postgresql.util.PGobject;
+import org.postgresql.util.PSQLException;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -712,6 +714,28 @@ public class ITJdbcTest implements IntegrationTest {
               .createStatement()
               .executeUpdate("update numbers set name='Two - updated' where num=2");
       assertEquals(0, noUpdateCount);
+    }
+  }
+
+  @Test
+  public void testRelationNotFoundError() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("select * from non_existing_table where id=?")) {
+        preparedStatement.setLong(1, 1L);
+        PSQLException exception =
+            assertThrows(PSQLException.class, preparedStatement::executeQuery);
+        if (preferQueryMode.equals("simple")) {
+          assertEquals(
+              "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=1'",
+              exception.getMessage());
+        } else {
+          assertEquals(
+              "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=$1'",
+              exception.getMessage());
+        }
+        assertEquals(SQLState.UndefinedTable.toString(), exception.getSQLState());
+      }
     }
   }
 

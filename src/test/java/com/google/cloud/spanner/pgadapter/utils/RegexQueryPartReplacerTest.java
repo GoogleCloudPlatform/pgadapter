@@ -85,4 +85,14 @@ public class RegexQueryPartReplacerTest {
       assertEquals(ReplacementStatus.CONTINUE, result.y());
     }
   }
+
+  @Test
+  public void testReplaceEntireStatement() {
+    QueryPartReplacer replacer =
+        RegexQueryPartReplacer.replaceAllAndStop(
+            Pattern.compile("select\\s+\\*\\s+from\\s+foo"), "select * from bar where active=true");
+    assertEquals(
+        "select * from bar where active=true",
+        replacer.replace("select * from foo where some_col='bar'").x());
+  }
 }
