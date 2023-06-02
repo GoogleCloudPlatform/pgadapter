@@ -1121,16 +1121,18 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.exception(
             Statement.newBuilder(pgSql).bind("p1").to(1L).build(),
-            Status.NOT_FOUND
-                .withDescription("Table non_existing_table not found")
+            Status.INVALID_ARGUMENT
+                .withDescription("relation \"non_existing_table\" does not exist")
                 .asRuntimeException()));
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         preparedStatement.setLong(1, 1L);
-        SQLException exception = assertThrows(SQLException.class, preparedStatement::executeQuery);
+        PSQLException exception =
+            assertThrows(PSQLException.class, preparedStatement::executeQuery);
         assertEquals(
-            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=$1'",
             exception.getMessage());
+        assertEquals(SQLState.UndefinedTable.toString(), exception.getSQLState());
       }
     }
 

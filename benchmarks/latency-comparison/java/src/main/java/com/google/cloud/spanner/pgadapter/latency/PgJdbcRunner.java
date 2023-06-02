@@ -20,6 +20,9 @@ import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.time.Duration;
 import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class PgJdbcRunner extends AbstractJdbcRunner {
   private ProxyServer proxyServer;
@@ -30,12 +33,19 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
 
   @Override
   public List<Duration> execute(String sql, int numClients, int numOperations) {
+    // Silence the PGAdapter logging.
+    Logger root = Logger.getLogger("");
+    root.setLevel(Level.WARNING);
+    for (Handler handler : root.getHandlers()) {
+      handler.setLevel(Level.WARNING);
+    }
     // Start PGAdapter in-process.
     OptionsMetadata options =
         new OptionsMetadata(
             new String[] {
               "-p", databaseId.getInstanceId().getProject(),
-              "-i", databaseId.getInstanceId().getInstance()
+              "-i", databaseId.getInstanceId().getInstance(),
+              "-dir=", "-s=0"
             });
     proxyServer = new ProxyServer(options);
     try {
