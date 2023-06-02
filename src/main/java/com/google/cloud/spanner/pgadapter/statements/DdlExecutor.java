@@ -14,27 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import com.google.cloud.spanner.AbstractLazyInitializer;
-import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
-import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.Spanner;
-import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
-import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
 /**
@@ -42,57 +30,6 @@ import java.util.function.Function;
  * features that are not (yet) supported by the backend.
  */
 class DdlExecutor {
-  /**
-   * This class checks whether the backend supports 'if [not] exists' style statements. This is used
-   * to determine whether PGAdapter should do the existence check itself, or whether it should send
-   * the DDL statement unmodified to the backend. The check is only executed once for each
-   * connection, and only if at least one 'if [not] exists' statement is executed.
-   */
-  static class BackendSupportsIfExists extends AbstractLazyInitializer<Boolean> {
-    private final DatabaseId databaseId;
-    private final Connection connection;
-
-    BackendSupportsIfExists(DatabaseId databaseId, Connection connection) {
-      this.databaseId = databaseId;
-      this.connection = connection;
-    }
-
-    @Override
-    protected Boolean initialize() {
-      Spanner spanner = ConnectionOptionsHelper.getSpanner(this.connection);
-      DatabaseAdminClient adminClient = spanner.getDatabaseAdminClient();
-      try {
-        // NOTE: This update will *NEVER* succeed. Either, the first statement fails to parse
-        // because the backend does not support 'if [not] exists'-style statements, or the second
-        // statement fails because it misses a data type for the `id` column. The error that is
-        // returned indicates whether the backend supports `if [not] exists`, as Spanner will parse
-        // the statements in order, and return an error for the first statement that fails.
-        adminClient
-            .updateDatabaseDdl(
-                this.databaseId.getInstanceId().getInstance(),
-                this.databaseId.getDatabase(),
-                ImmutableList.of(
-                    "create table if not exists test (id bigint primary key)",
-                    "create table invalid (id primary key)"),
-                null)
-            .get();
-        // This statement should not be reachable, as at least one of the statements should fail.
-        return Boolean.TRUE;
-      } catch (ExecutionException exception) {
-        SpannerException spannerException =
-            SpannerExceptionFactory.asSpannerException(exception.getCause());
-        if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
-            && spannerException
-                .getMessage()
-                .contains("<IF NOT EXISTS> clause is not supported in <CREATE TABLE> statement")) {
-          return Boolean.FALSE;
-        }
-        return Boolean.TRUE;
-      } catch (InterruptedException interruptedException) {
-        throw PGExceptionFactory.newQueryCancelledException();
-      }
-    }
-  }
 
   /**
    * {@link NotExecuted} is used to indicate that a statement was skipped because the 'if [not]
@@ -121,39 +58,13 @@ class DdlExecutor {
   }
 
   private static final NotExecuted NOT_EXECUTED = new NotExecuted();
-  private final AbstractLazyInitializer<Boolean> backendSupportsIfExists;
   private final BackendConnection backendConnection;
   private final Connection connection;
 
-  /**
-   * Constructor only intended for testing. This will create an executor that always assumes that
-   * the backend does not support 'if [not] exists'.
-   */
-  @VisibleForTesting
+  /** Constructor for a {@link DdlExecutor} for the given connection. */
   DdlExecutor(BackendConnection backendConnection) {
-    this(
-        new AbstractLazyInitializer<Boolean>() {
-          @Override
-          protected Boolean initialize() {
-            return Boolean.FALSE;
-          }
-        },
-        backendConnection);
-  }
-
-  /** Constructor for a {@link DdlExecutor} for the given database and connection. */
-  DdlExecutor(DatabaseId databaseId, BackendConnection backendConnection) {
-    this(
-        new BackendSupportsIfExists(databaseId, backendConnection.getSpannerConnection()),
-        backendConnection);
-  }
-
-  private DdlExecutor(
-      AbstractLazyInitializer<Boolean> backendSupportsIfExists,
-      BackendConnection backendConnection) {
     this.backendConnection = backendConnection;
     this.connection = backendConnection.getSpannerConnection();
-    this.backendSupportsIfExists = backendSupportsIfExists;
   }
 
   /**
@@ -338,11 +249,7 @@ class DdlExecutor {
    * {@link DdlExecutor} to send these statements unmodified to the backend.
    */
   boolean backendSupportsIfExists() {
-    try {
-      return backendSupportsIfExists.get();
-    } catch (Exception exception) {
-      throw SpannerExceptionFactory.asSpannerException(exception);
-    }
+    return true;
   }
 
   Statement maybeRemovePrimaryKeyConstraintName(Statement createTableStatement) {

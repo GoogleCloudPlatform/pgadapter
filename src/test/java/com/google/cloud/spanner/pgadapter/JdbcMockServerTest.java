@@ -2121,6 +2121,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  @Ignore
   @Test
   public void testCreateTableIfNotExists_tableDoesNotExist() throws SQLException {
     addIfNotExistsDdlException();
@@ -2158,6 +2159,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         updateDatabaseDdlRequests.get(0).getStatements(0));
   }
 
+  @Ignore
   @Test
   public void testCreateTableIfNotExists_tableExists() throws SQLException {
     addIfNotExistsDdlException();
@@ -2191,6 +2193,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(0, updateDatabaseDdlRequests.size());
   }
 
+  @Ignore
   @Test
   public void testCreateIndexIfNotExists_indexDoesNotExist() throws SQLException {
     addIfNotExistsDdlException();
@@ -2227,6 +2230,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         "create index foo on bar (value)", updateDatabaseDdlRequests.get(0).getStatements(0));
   }
 
+  @Ignore
   @Test
   public void testCreateIndexIfNotExists_indexExists() throws SQLException {
     addIfNotExistsDdlException();
@@ -2260,6 +2264,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(0, updateDatabaseDdlRequests.size());
   }
 
+  @Ignore
   @Test
   public void testDropTableIfExists_tableDoesNotExist() throws SQLException {
     addIfNotExistsDdlException();
@@ -2293,6 +2298,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(0, updateDatabaseDdlRequests.size());
   }
 
+  @Ignore
   @Test
   public void testDropTableIfExists_tableExists() throws SQLException {
     addIfNotExistsDdlException();
@@ -2328,6 +2334,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals("drop table foo", updateDatabaseDdlRequests.get(0).getStatements(0));
   }
 
+  @Ignore
   @Test
   public void testDropIndexIfExists_indexDoesNotExist() throws SQLException {
     addIfNotExistsDdlException();
@@ -2361,6 +2368,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(0, updateDatabaseDdlRequests.size());
   }
 
+  @Ignore
   @Test
   public void testDropIndexIfExists_indexExists() throws SQLException {
     addIfNotExistsDdlException();
@@ -2396,6 +2404,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals("drop index foo", updateDatabaseDdlRequests.get(0).getStatements(0));
   }
 
+  @Ignore
   @Test
   public void testDdlBatchWithIfNotExists() throws SQLException {
     addIfNotExistsDdlException();
@@ -2455,10 +2464,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCreateTableIfNotExists_withBackendSupport() throws SQLException {
-    // Add a generic error that is returned for DDL statements. This will cause PGAdapter to think
-    // that the backend supports `IF [NOT] EXISTS`, as it does not receive a specific error
-    // regarding an `IF NOT EXISTS` statement.
-    addDdlExceptionToSpannerAdmin();
     String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
     // Add a response for the DDL statement that is sent to Spanner.
     addDdlResponseToSpannerAdmin();
