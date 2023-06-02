@@ -39,6 +39,7 @@ import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -361,30 +362,33 @@ public class ClientAutoDetector {
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
       }
 
       @Override
       boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
       }
 
       @Override
       boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
       }
 
       @Override
       boolean isClient(PGSetting setting) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
       }
     };
+
+    /** Indicates whether UNSPECIFIED should be used as default (instead of <code>null</code>). */
+    @VisibleForTesting static final AtomicBoolean DEFAULT_UNSPECIFIED = new AtomicBoolean(true);
 
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
 
