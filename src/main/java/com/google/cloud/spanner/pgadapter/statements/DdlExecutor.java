@@ -33,7 +33,12 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
@@ -426,6 +431,7 @@ class DdlExecutor {
       }
       ImmutableList.Builder<Statement> builder = ImmutableList.builder();
       builder.addAll(getDropDependentIndexesStatements(tableName));
+      builder.addAll(getDropDependentForeignKeyConstraintsStatements(tableName));
       builder.add(statement);
       return builder.build();
     } else if (parser.eatKeyword("schema")) {
@@ -438,6 +444,7 @@ class DdlExecutor {
       }
       ImmutableList.Builder<Statement> builder = ImmutableList.builder();
       builder.addAll(getDropSchemaIndexesStatements(schemaName));
+      builder.addAll(getDropSchemaForeignKeysStatements(schemaName));
       builder.addAll(getDropSchemaTablesStatements(schemaName));
       return builder.build();
     }
@@ -477,6 +484,84 @@ class DdlExecutor {
     }
   }
 
+  ImmutableList<Statement> getDropDependentForeignKeyConstraintsStatements(
+      TableOrIndexName tableName) {
+    DatabaseClient client = connection.getDatabaseClient();
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(
+                Statement.newBuilder(
+                        "select child.table_schema, child.table_name, rc.constraint_name\n"
+                            + "from information_schema.referential_constraints rc\n"
+                            + "inner join information_schema.table_constraints parent\n"
+                            + "  on  rc.unique_constraint_catalog=parent.constraint_catalog\n"
+                            + "  and rc.unique_constraint_schema=parent.constraint_schema\n"
+                            + "  and rc.unique_constraint_name=parent.constraint_name\n"
+                            + "inner join information_schema.table_constraints child\n"
+                            + "  on  rc.constraint_catalog=child.constraint_catalog\n"
+                            + "  and rc.constraint_schema=child.constraint_schema\n"
+                            + "  and rc.constraint_name=child.constraint_name\n"
+                            + "where parent.table_schema=$1\n"
+                            + "and parent.table_name=$2")
+                    .bind("p1")
+                    .to(
+                        unquoteIdentifier(
+                            tableName.schema == null
+                                ? backendConnection.getCurrentSchema()
+                                : tableName.schema))
+                    .bind("p2")
+                    .to(unquoteIdentifier(tableName.name))
+                    .build())) {
+      ImmutableList.Builder<Statement> dropStatements = ImmutableList.builder();
+      while (resultSet.next()) {
+        dropStatements.add(
+            Statement.of(
+                String.format(
+                    "alter table \"%s\".\"%s\" drop constraint \"%s\"",
+                    resultSet.getString("table_schema"),
+                    resultSet.getString("table_name"),
+                    resultSet.getString("constraint_name"))));
+      }
+      return dropStatements.build();
+    }
+  }
+
+  ImmutableList<Statement> getDropSchemaForeignKeysStatements(TableOrIndexName schemaName) {
+    DatabaseClient client = connection.getDatabaseClient();
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(
+                Statement.newBuilder(
+                        "select child.table_schema, child.table_name, rc.constraint_name\n"
+                            + "from information_schema.referential_constraints rc\n"
+                            + "inner join information_schema.table_constraints parent\n"
+                            + "  on  rc.unique_constraint_catalog=parent.constraint_catalog\n"
+                            + "  and rc.unique_constraint_schema=parent.constraint_schema\n"
+                            + "  and rc.unique_constraint_name=parent.constraint_name\n"
+                            + "inner join information_schema.table_constraints child\n"
+                            + "  on  rc.constraint_catalog=child.constraint_catalog\n"
+                            + "  and rc.constraint_schema=child.constraint_schema\n"
+                            + "  and rc.constraint_name=child.constraint_name\n"
+                            + "where parent.table_schema=$1")
+                    .bind("p1")
+                    .to(unquoteIdentifier(schemaName.name))
+                    .build())) {
+      ImmutableList.Builder<Statement> dropStatements = ImmutableList.builder();
+      while (resultSet.next()) {
+        dropStatements.add(
+            Statement.of(
+                String.format(
+                    "alter table \"%s\".\"%s\" drop constraint \"%s\"",
+                    resultSet.getString("table_schema"),
+                    resultSet.getString("table_name"),
+                    resultSet.getString("constraint_name"))));
+      }
+      return dropStatements.build();
+    }
+  }
+
   ImmutableList<Statement> getDropSchemaIndexesStatements(TableOrIndexName schemaName) {
     DatabaseClient client = connection.getDatabaseClient();
     try (ResultSet resultSet =
@@ -504,6 +589,52 @@ class DdlExecutor {
     }
   }
 
+  private static final class Table implements Comparable<Table> {
+    private final String schema;
+    private final String name;
+    private final String parent;
+
+    Table(String schema, String name, String parent) {
+      this.schema = Preconditions.checkNotNull(schema);
+      this.name = Preconditions.checkNotNull(name);
+      this.parent = parent;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(this.schema, this.name);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof Table)) {
+        return false;
+      }
+      Table other = (Table) o;
+      return Objects.equals(this.schema, other.schema) && Objects.equals(this.name, other.name);
+    }
+
+    @Override
+    public int compareTo(Table o) {
+      if (o.parent != null && Objects.equals(this.name, o.parent)) {
+        return 1;
+      }
+      if (this.parent != null && Objects.equals(this.parent, o.name)) {
+        return -1;
+      }
+      if (o.parent != null && this.parent == null) {
+        return 1;
+      }
+      if (this.parent != null && o.parent == null) {
+        return -1;
+      }
+      if (!Objects.equals(this.schema, o.schema)) {
+        return this.schema.compareTo(o.schema);
+      }
+      return this.name.compareTo(o.name);
+    }
+  }
+
   ImmutableList<Statement> getDropSchemaTablesStatements(TableOrIndexName schemaName) {
     DatabaseClient client = connection.getDatabaseClient();
     try (ResultSet resultSet =
@@ -511,19 +642,28 @@ class DdlExecutor {
             .singleUse()
             .executeQuery(
                 Statement.newBuilder(
-                        "select table_schema, table_name "
+                        "select table_schema, table_name, parent_table_name "
                             + "from information_schema.tables "
-                            + "where table_schema=$1")
+                            + "where table_schema=$1 "
+                            + "and table_type='BASE TABLE'")
                     .bind("p1")
                     .to(unquoteIdentifier(schemaName.name))
                     .build())) {
-      ImmutableList.Builder<Statement> dropStatements = ImmutableList.builder();
+      List<Table> tables = new ArrayList<>();
       while (resultSet.next()) {
+        tables.add(
+            new Table(
+                resultSet.getString("table_schema"),
+                resultSet.getString("table_name"),
+                resultSet.isNull("parent_table_name")
+                    ? null
+                    : resultSet.getString("parent_table_name")));
+      }
+      Collections.sort(tables);
+      ImmutableList.Builder<Statement> dropStatements = ImmutableList.builder();
+      for (Table table : tables) {
         dropStatements.add(
-            Statement.of(
-                String.format(
-                    "drop table \"%s\".\"%s\"",
-                    resultSet.getString("table_schema"), resultSet.getString("table_name"))));
+            Statement.of(String.format("drop table \"%s\".\"%s\"", table.schema, table.name)));
       }
       return dropStatements.build();
     }
