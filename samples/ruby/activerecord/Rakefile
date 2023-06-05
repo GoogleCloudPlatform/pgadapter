@@ -1,0 +1,52 @@
+# frozen_string_literal: true
+
+# Copyright 2023 Google LLC
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT.
+
+require_relative 'config/environment'
+require 'sinatra/activerecord/rake'
+require "docker"
+
+Bundler.require
+
+desc 'Runs a simple ActiveRecord tutorial for Google Cloud Spanner PostgreSQL.'
+task :run do
+  credentials = ENV["GOOGLE_APPLICATION_CREDENTIALS"]
+  fail "You must set the environment variable GOOGLE_APPLICATION_CREDENTIALS before running the sample." if credentials.nil?
+
+  container = create_pgadapter_container(credentials)
+  begin
+    puts "Starting PGAdapter..."
+    container.start!
+    sleep(2)
+    sh 'rake db:migrate'
+    sh 'rake db:seed'
+    sh 'ruby application.rb'
+  ensure
+    container.stop!
+    container.remove
+  end
+end
+
+def create_pgadapter_container(credentials)
+  puts "Downloading PGAdapter image..."
+  Docker::Image.create "fromImage" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record"
+  puts "Creating PGAdapter container..."
+  Docker::Container.create(
+    "Image" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record",
+    "ExposedPorts" => { "5432/tcp" => {} },
+    "HostConfig" => {
+      "PortBindings" => {
+        "5432/tcp" => [{ "HostPort" => ENV["PGPORT"] || "5432" }]
+      },
+      "Binds" => ["#{credentials}:/credentials.json:ro"],
+    },
+    "Volumes" => { "/credentials.json" => {}},
+    # Start PGAdapter with the given credentials and no default project, instance or database.
+    # This means that the fully qualified database name must be used in the database.yml file.
+    "Cmd" => ["-c", "/credentials.json", "-x"]
+  )
+end

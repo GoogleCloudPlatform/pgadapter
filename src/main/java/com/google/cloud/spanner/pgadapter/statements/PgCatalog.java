@@ -136,7 +136,10 @@ public class PgCatalog {
           RegexQueryPartReplacer.replace(
               Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"), Suppliers.ofInstance("true")),
           RegexQueryPartReplacer.replace(
-              Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(true\\)\\)"),
+              Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*true\\s*\\)\\)"),
+              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*false\\s*\\)\\)"),
               Suppliers.ofInstance(" IN ('pg_catalog', 'public')")));
 
   private final ImmutableSet<String> checkPrefixes;
@@ -871,7 +874,7 @@ public class PgCatalog {
 
   @InternalApi
   public static class EmptyPgEnum implements PgCatalogTable {
-    private static final String PG_ENUM_CTE =
+    public static final String PG_ENUM_CTE =
         "pg_enum as (\n"
             + "select * from ("
             + "select 0::bigint as oid, 0::bigint as enumtypid, 0.0::float8 as enumsortorder, ''::varchar as enumlabel\n"

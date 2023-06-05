@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.error;
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import io.grpc.StatusRuntimeException;
 import java.util.regex.Pattern;
@@ -73,7 +74,8 @@ public class PGExceptionFactory {
 
   /** Converts the given {@link SpannerException} to a {@link PGException}. */
   public static PGException toPGException(SpannerException spannerException) {
-    if (RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
+    if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+        && RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.UndefinedTable)
           .build();
