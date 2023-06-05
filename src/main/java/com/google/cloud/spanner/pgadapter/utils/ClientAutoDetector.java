@@ -19,6 +19,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -38,8 +39,10 @@ import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.postgresql.core.Oid;
 
 /**
@@ -253,6 +256,10 @@ public class ClientAutoDetector {
         if (!parameters.get("client_encoding").equals("UTF8")) {
           return false;
         }
+        if (parameters.get("options") != null
+            && parameters.get("options").contains("spanner.well_known_client")) {
+          return false;
+        }
         return parameters.get("DateStyle").equals("ISO");
       }
 
@@ -355,25 +362,39 @@ public class ClientAutoDetector {
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
       }
 
       @Override
       boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
       }
 
       @Override
       boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
+      }
+
+      @Override
+      boolean isClient(PGSetting setting) {
+        // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
+        // defaults defined in this enum.
+        return DEFAULT_UNSPECIFIED.get();
       }
     };
 
+    /** Indicates whether UNSPECIFIED should be used as default (instead of <code>null</code>). */
+    @VisibleForTesting static final AtomicBoolean DEFAULT_UNSPECIFIED = new AtomicBoolean(true);
+
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
+
+    boolean isClient(PGSetting setting) {
+      return false;
+    }
 
     /** Resets any cached or temporary settings for the client. */
     @VisibleForTesting
@@ -465,6 +486,20 @@ public class ClientAutoDetector {
       List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
     for (WellKnownClient client : WellKnownClient.values()) {
       if (client.isClient(skippedParseMessages, parseMessage)) {
+        return client;
+      }
+    }
+    // The following line should never be reached.
+    throw new IllegalStateException("UNSPECIFIED.isClient() should have returned true");
+  }
+
+  /** Detect the client based on a session state setting. */
+  public static @Nonnull WellKnownClient detectClient(@Nullable PGSetting setting) {
+    if (setting == null || setting.getSetting() == null) {
+      return WellKnownClient.UNSPECIFIED;
+    }
+    for (WellKnownClient client : WellKnownClient.values()) {
+      if (client.name().equalsIgnoreCase(setting.getSetting()) || client.isClient(setting)) {
         return client;
       }
     }
