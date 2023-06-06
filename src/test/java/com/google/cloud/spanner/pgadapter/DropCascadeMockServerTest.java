@@ -118,8 +118,8 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testDropTableStatementWithForeignKey() throws SQLException {
-    String sql = "DROP TABLE foo";
+  public void testDropTableCascadeStatementWithForeignKey() throws SQLException {
+    String sql = "DROP TABLE foo cascade";
     addDdlResponseToSpannerAdmin();
 
     addTableIndexesResult(new TableName("public", "foo"), ImmutableList.of());
@@ -150,8 +150,8 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testDropTableStatementWithIndexAndForeignKey() throws SQLException {
-    String sql = "DROP TABLE foo";
+  public void testDropTableCascadeStatementWithIndexAndForeignKey() throws SQLException {
+    String sql = "DROP TABLE foo cascade";
     addDdlResponseToSpannerAdmin();
 
     addTableIndexesResult(
@@ -185,8 +185,78 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testDropTableStatementWithIndexAndForeignKeyInBatch() throws SQLException {
-    String sql = "DROP TABLE foo";
+  public void testDropTableStatementWithIndexAndForeignKey() throws SQLException {
+    // DROP TABLE <table> [RESTRICT] removes all indexes but not foreign key constraints.
+    for (String sql : new String[] {"DROP TABLE foo", "DROP TABLE foo RESTRICT"}) {
+      addDdlResponseToSpannerAdmin();
+
+      addTableIndexesResult(
+          new TableName("public", "foo"), ImmutableList.of(new IndexName("public", "idx_foo")));
+      addTableForeignKeysResult(
+          new TableName("public", "foo"),
+          ImmutableList.of(new ForeignKey(new TableName("public", "bar"), "fk_foo_bar")));
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (Statement statement = connection.createStatement()) {
+          assertFalse(statement.execute(sql));
+          assertEquals(0, statement.getUpdateCount());
+          assertFalse(statement.getMoreResults());
+          assertEquals(-1, statement.getUpdateCount());
+        }
+      }
+
+      List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+          mockDatabaseAdmin.getRequests().stream()
+              .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+              .map(UpdateDatabaseDdlRequest.class::cast)
+              .collect(Collectors.toList());
+      assertEquals(1, updateDatabaseDdlRequests.size());
+      assertEquals(2, updateDatabaseDdlRequests.get(0).getStatementsCount());
+      assertEquals(
+          "drop index \"public\".\"idx_foo\"", updateDatabaseDdlRequests.get(0).getStatements(0));
+      assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(1));
+      mockDatabaseAdmin.getRequests().clear();
+    }
+  }
+
+  @Test
+  public void testDropTableCascadeStatementWithSchemaAndIndexAndForeignKey() throws SQLException {
+    String sql = "DROP TABLE my_schema.foo cascade";
+    addDdlResponseToSpannerAdmin();
+
+    addTableIndexesResult(
+        new TableName("my_schema", "foo"), ImmutableList.of(new IndexName("my_schema", "idx_foo")));
+    addTableForeignKeysResult(
+        new TableName("my_schema", "foo"),
+        ImmutableList.of(new ForeignKey(new TableName("my_schema", "bar"), "fk_foo_bar")));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(3, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals(
+        "drop index \"my_schema\".\"idx_foo\"", updateDatabaseDdlRequests.get(0).getStatements(0));
+    assertEquals(
+        "alter table \"my_schema\".\"bar\" drop constraint \"fk_foo_bar\"",
+        updateDatabaseDdlRequests.get(0).getStatements(1));
+    assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(2));
+  }
+
+  @Test
+  public void testDropTableCascadeStatementWithIndexAndForeignKeyInBatch() throws SQLException {
+    String sql = "DROP TABLE foo cascade";
     addDdlResponseToSpannerAdmin();
 
     addTableIndexesResult(new TableName("public", "baz"), ImmutableList.of());
@@ -305,6 +375,58 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "drop table \"public\".\"venues\"",
         updateDatabaseDdlRequests.get(0).getStatements(++index));
+  }
+
+  @Test
+  public void testDropSchema() throws SQLException {
+    for (String sql : new String[] {"DROP SCHEMA public", "drop schema public restrict"}) {
+      addDdlResponseToSpannerAdmin();
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (Statement statement = connection.createStatement()) {
+          assertFalse(statement.execute(sql));
+          assertEquals(0, statement.getUpdateCount());
+          assertFalse(statement.getMoreResults());
+          assertEquals(-1, statement.getUpdateCount());
+        }
+      }
+
+      List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+          mockDatabaseAdmin.getRequests().stream()
+              .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+              .map(UpdateDatabaseDdlRequest.class::cast)
+              .collect(Collectors.toList());
+      assertEquals(1, updateDatabaseDdlRequests.size());
+      assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+      // DROP SCHEMA without a cascade should be a pass-through.
+      assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
+      mockDatabaseAdmin.getRequests().clear();
+    }
+  }
+
+  @Test
+  public void testDropSchemaRestrict() throws SQLException {
+    String sql = "DROP SCHEMA public restrict";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    // DROP SCHEMA ... RESTRICT should be a pass-through.
+    assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
   }
 
   private static final class Table {

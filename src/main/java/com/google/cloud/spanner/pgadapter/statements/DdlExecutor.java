@@ -426,12 +426,25 @@ class DdlExecutor {
     parser.eatKeyword("if", "exists");
     if (parser.eatKeyword("table")) {
       TableOrIndexName tableName = parser.readTableOrIndexName();
-      if (tableName == null || parser.hasMoreTokens()) {
+      if (tableName == null) {
+        return defaultResult;
+      }
+      boolean cascade = false;
+      if (parser.eatKeyword("cascade")) {
+        cascade = true;
+      } else {
+        // This is the default, so no need to register it specifically.
+        parser.eatKeyword("restrict");
+      }
+      if (parser.hasMoreTokens()) {
         return defaultResult;
       }
       ImmutableList.Builder<Statement> builder = ImmutableList.builder();
       builder.addAll(getDropDependentIndexesStatements(tableName));
-      builder.addAll(getDropDependentForeignKeyConstraintsStatements(tableName));
+      if (cascade) {
+        // We don't have any way to get the views that depend on this table.
+        builder.addAll(getDropDependentForeignKeyConstraintsStatements(tableName));
+      }
       builder.add(statement);
       return builder.build();
     } else if (parser.eatKeyword("schema")) {
