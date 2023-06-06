@@ -83,6 +83,25 @@ public class StartupMessage extends BootstrapMessage {
           .getBackendConnection()
           .initSessionSetting(parameter.getKey(), parameter.getValue());
     }
+    if (connection.getServer().getOptions().shouldAutoDetectClient()
+        && connection.getWellKnownClient() == WellKnownClient.UNSPECIFIED) {
+      WellKnownClient wellKnownClient =
+          ClientAutoDetector.detectClient(
+              connection
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState()
+                  .tryGet("spanner", "well_known_client"));
+      connection.setWellKnownClient(wellKnownClient);
+    }
+    if (connection.getWellKnownClient() != WellKnownClient.UNSPECIFIED) {
+      connection
+          .getExtendedQueryProtocolHandler()
+          .getBackendConnection()
+          .getSessionState()
+          .setConnectionStartupValue(
+              "spanner", "well_known_client", connection.getWellKnownClient().name());
+    }
     sendStartupMessage(
         connection.getConnectionMetadata().getOutputStream(),
         connection.getConnectionId(),

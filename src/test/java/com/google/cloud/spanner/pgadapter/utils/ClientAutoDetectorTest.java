@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.DEFAUL
 import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
@@ -433,5 +435,31 @@ public class ClientAutoDetectorTest {
     assertEquals(1, startupNotices.size());
     assertEquals("Detected connection from pgbench", startupNotices.get(0).getMessage());
     assertEquals(ClientAutoDetector.PGBENCH_USAGE_HINT + "\n", startupNotices.get(0).getHint());
+  }
+
+  @Test
+  public void testSetting() {
+    assertEquals(WellKnownClient.UNSPECIFIED, ClientAutoDetector.detectClient(null));
+    assertEquals(
+        WellKnownClient.UNSPECIFIED, ClientAutoDetector.detectClient(mock(PGSetting.class)));
+
+    PGSetting jdbc = mock(PGSetting.class);
+    when(jdbc.getSetting()).thenReturn("jdbc");
+    assertEquals(WellKnownClient.JDBC, ClientAutoDetector.detectClient(jdbc));
+
+    PGSetting unspecified = mock(PGSetting.class);
+    when(unspecified.getSetting()).thenReturn("unspecified");
+    assertEquals(WellKnownClient.UNSPECIFIED, ClientAutoDetector.detectClient(unspecified));
+
+    PGSetting foo = mock(PGSetting.class);
+    when(foo.getSetting()).thenReturn("foo");
+    assertEquals(WellKnownClient.UNSPECIFIED, ClientAutoDetector.detectClient(foo));
+
+    try {
+      WellKnownClient.DEFAULT_UNSPECIFIED.set(false);
+      assertThrows(IllegalStateException.class, () -> ClientAutoDetector.detectClient(foo));
+    } finally {
+      WellKnownClient.DEFAULT_UNSPECIFIED.set(true);
+    }
   }
 }
