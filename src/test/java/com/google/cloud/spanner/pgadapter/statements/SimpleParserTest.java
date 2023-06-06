@@ -725,5 +725,7 @@ public class SimpleParserTest {
 
     assertNull(new SimpleParser("foo").readIntegerLiteral());
     assertNull(new SimpleParser("").readIntegerLiteral());
+    assertNull(new SimpleParser("+-1").readIntegerLiteral());
+    assertNull(new SimpleParser("-+1").readIntegerLiteral());
   }
 }

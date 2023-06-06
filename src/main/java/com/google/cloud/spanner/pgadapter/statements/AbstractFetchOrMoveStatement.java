@@ -220,6 +220,9 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
     } else {
       direction =
           Arrays.stream(Direction.values())
+              // This ensures that the stream will return the first valid direction keyword that it
+              // finds, or null if no valid direction keyword is found. If no valid direction
+              // keyword is found, then the position of the parser will also not be moved.
               .filter(dir -> parser.eatKeyword(dir.name()))
               .findFirst()
               .orElse(null);

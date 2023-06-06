@@ -105,6 +105,7 @@ public class FetchAndMoveStatementTest {
     assertThrows(PGException.class, () -> parse("fetch", "move foo"));
     assertThrows(PGException.class, () -> parse("move", "fetch foo"));
     assertThrows(PGException.class, () -> parse("fetch", "select foo"));
+    assertThrows(PGException.class, () -> parse("fetch", "fetch invalid_direction foo"));
   }
 
   @Test
