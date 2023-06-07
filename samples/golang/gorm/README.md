@@ -78,8 +78,8 @@ The following limitations are currently known:
 | Large CreateInBatches  | PGAdapter can handle at most 50 parameters in a prepared statement. A large number of rows in a `CreateInBatches` call can exceed this limit. Limit the batch size to a smaller number to prevent `gorm` from generating a statement with more than 50 parameters. |
 
 ### Migrations
-Migrations are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect. It is recommended to
-create the schema manually. Note that PGAdapter does support `create table if not exists` / `drop table if exists`.
+Migrations are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect.
+It is recommended to create the schema manually.
 See [create_data_model.sql](create_data_model.sql) for the data model for this example.
 
 ### Generated Primary Keys
