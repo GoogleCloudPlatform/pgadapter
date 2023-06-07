@@ -133,6 +133,27 @@ PGAdapter supports `COPY table_name FROM STDIN [BINARY]` and `COPY table_name TO
 These commands can be used to copy data between different Cloud Spanner databases, or between a
 Cloud Spanner database and a PostgreSQL database. See [copy support](copy.md) for more information.
 
+## Can I use user-defined functions or stored procedures?
+PGAdapter and Cloud Spanner do not support user-defined functions or stored procedures. You can
+however add PGAdapter as a [foreign server](https://www.postgresql.org/docs/current/sql-createserver.html)
+to a normal PostgreSQL database and create user-defined functions and stored procedures in that
+database. Those functions can be used with data from Cloud Spanner, as all tables from Cloud Spanner
+can be [imported as foreign tables](https://www.postgresql.org/docs/current/sql-importforeignschema.html)
+into the PostgreSQL database.
+
+The local PostgreSQL database should be considered the same as your application. That means that it:
+1. Should only define code / logic. It should not store any actual data.
+2. Should be disposable. Dropping and re-creating it should always be possible.
+3. Should let Cloud Spanner do as much as possible of the data processing. It should only fetch the
+   rows from Cloud Spanner that it actually needs.
+
+__This feature can also be used as a workaround for built-in PostgreSQL functions that are not supported
+by Cloud Spanner.__
+
+See the [foreign data wrapper sample](../samples/foreign-data-wrapper) for a complete sample on how
+to set this up.
+
+
 ## How can I set a statement timeout?
 You can set the statement timeout that a connection should use by executing a
 `set statement_timeout=<timeout>` statement. The timeout is specified in milliseconds.

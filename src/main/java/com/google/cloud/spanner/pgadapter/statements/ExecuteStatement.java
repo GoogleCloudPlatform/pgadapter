@@ -91,6 +91,7 @@ public class ExecuteStatement extends IntermediatePortalStatement {
       new BindMessage(
               connectionHandler,
               executeStatement.name,
+              "",
               executeStatement.parameters,
               ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
           .send();

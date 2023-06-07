@@ -77,6 +77,7 @@ public class BackendConnectionTest {
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   private static final NotExecuted NOT_EXECUTED = new NotExecuted();
   private static final NoResult NO_RESULT = new NoResult();
+  private static final Runnable DO_NOTHING = () -> {};
 
   @Test
   public void testExtractDdlUpdateCounts() {
@@ -139,6 +140,7 @@ public class BackendConnectionTest {
     when(spannerConnection.runBatch()).thenThrow(expectedException);
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -174,6 +176,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -212,6 +215,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlyDmlStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -224,6 +228,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlyCopyStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -236,6 +241,7 @@ public class BackendConnectionTest {
 
     BackendConnection dmlAndCopyStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -249,6 +255,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlySelectStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -261,6 +268,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlyClientSideStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -275,6 +283,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlyUnknownStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -287,6 +296,7 @@ public class BackendConnectionTest {
 
     BackendConnection dmlAndSelectStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -299,6 +309,7 @@ public class BackendConnectionTest {
 
     BackendConnection copyAndSelectStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -312,6 +323,7 @@ public class BackendConnectionTest {
 
     BackendConnection copyAndUnknownStatements =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -341,6 +353,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -377,6 +390,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -412,6 +426,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -437,6 +452,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -475,6 +491,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -503,6 +520,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -529,6 +547,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -556,6 +575,7 @@ public class BackendConnectionTest {
 
       BackendConnection backendConnection =
           new BackendConnection(
+              DO_NOTHING,
               DatabaseId.of("p", "i", "d"),
               connection,
               () -> WellKnownClient.UNSPECIFIED,
@@ -579,6 +599,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -608,6 +629,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -635,6 +657,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -661,6 +684,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -697,6 +721,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -732,6 +757,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,

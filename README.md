@@ -16,6 +16,7 @@ PGAdapter can be used with the following drivers and clients:
 1. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 1. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
 1. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
+1. `postgres_fdw`: The PostgreSQL foreign data wrapper has experimental support. See [Foreign Data Wrapper sample](samples/foreign-data-wrapper) for more details.
 
 ## Frameworks and Tools
 PGAdapter can be used with the following frameworks and tools:

@@ -21,6 +21,7 @@ import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
+import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
 
@@ -133,10 +134,13 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     // DescribePortal message without a following Execute message is extremely rare, as that would
     // only happen if the client is ill-behaved, or if the client crashes between the
     // DescribePortal and Execute.
-    Future<StatementResult> statementResultFuture =
-        backendConnection.execute(this.parsedStatement, this.statement, this::bind);
-    setFutureStatementResult(statementResultFuture);
-    this.executed = true;
-    return statementResultFuture;
+    if (futureStatementResult == null && getStatementResult() == null) {
+      Future<StatementResult> statementResultFuture =
+          backendConnection.execute(this.parsedStatement, this.statement, this::bind);
+      setFutureStatementResult(statementResultFuture);
+      this.executed = true;
+      return statementResultFuture;
+    }
+    return Futures.immediateFuture(getStatementResult());
   }
 }
