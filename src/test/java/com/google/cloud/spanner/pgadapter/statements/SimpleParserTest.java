@@ -712,4 +712,20 @@ public class SimpleParserTest {
         Statement.of("select * from foo where id=$1 offset $2 limit 4611686018427387903"),
         addLimitIfParameterizedOffset(statement));
   }
+
+  @Test
+  public void testReadIntegerLiteral() {
+    assertEquals(1L, new SimpleParser("1").readIntegerLiteral().longValue());
+    assertEquals(-1L, new SimpleParser("-1").readIntegerLiteral().longValue());
+    assertEquals(100L, new SimpleParser("100").readIntegerLiteral().longValue());
+    assertEquals(1L, new SimpleParser(" 1").readIntegerLiteral().longValue());
+    assertEquals(1L, new SimpleParser("1 ").readIntegerLiteral().longValue());
+    assertEquals(1L, new SimpleParser("\n1\t").readIntegerLiteral().longValue());
+    assertEquals(1L, new SimpleParser("/* comment */1--foo").readIntegerLiteral().longValue());
+
+    assertNull(new SimpleParser("foo").readIntegerLiteral());
+    assertNull(new SimpleParser("").readIntegerLiteral());
+    assertNull(new SimpleParser("+-1").readIntegerLiteral());
+    assertNull(new SimpleParser("-+1").readIntegerLiteral());
+  }
 }

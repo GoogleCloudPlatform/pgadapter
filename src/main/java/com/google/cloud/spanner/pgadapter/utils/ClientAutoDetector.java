@@ -19,7 +19,9 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
+import com.google.cloud.spanner.pgadapter.statements.local.AbortTransaction;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
@@ -27,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogS
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.StartTransactionIsolationLevelRepeatableRead;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
@@ -37,9 +40,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.postgresql.core.Oid;
 
 /**
@@ -80,6 +86,43 @@ public class ClientAutoDetector {
               .build();
         }
         return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+    },
+    PG_FDW {
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("format_type\\s*\\(\\s*atttypid\\s*,\\s*atttypmod\\s*\\)"),
+                  "spanner_type as format_type"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("pg_get_expr\\s*\\(\\s*adbin\\s*,\\s*adrelid\\s*\\)"),
+                  "adbin as pg_get_expr"));
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // postgres_fdw by default sends its own name.
+        return parameters.containsKey("application_name")
+            && parameters
+                .get("application_name")
+                .toLowerCase(Locale.ENGLISH)
+                .contains("postgres_fdw");
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(StartTransactionIsolationLevelRepeatableRead.INSTANCE)
+              .add(AbortTransaction.INSTANCE)
+              .build();
+        }
+        return ImmutableList.of(StartTransactionIsolationLevelRepeatableRead.INSTANCE);
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        return functionReplacements;
       }
     },
     PGBENCH {
@@ -198,7 +241,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<String, String> getDefaultParameters() {
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
         return ImmutableMap.of("spanner.emulate_pg_class_tables", "true");
       }
 
@@ -253,11 +296,15 @@ public class ClientAutoDetector {
         if (!parameters.get("client_encoding").equals("UTF8")) {
           return false;
         }
+        if (parameters.get("options") != null
+            && parameters.get("options").contains("spanner.well_known_client")) {
+          return false;
+        }
         return parameters.get("DateStyle").equals("ISO");
       }
 
       @Override
-      public ImmutableMap<String, String> getDefaultParameters() {
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
         return ImmutableMap.of(
             "spanner.guess_types", String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE));
       }
@@ -355,25 +402,39 @@ public class ClientAutoDetector {
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
       }
 
       @Override
       boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
       }
 
       @Override
       boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
-        return true;
+        return DEFAULT_UNSPECIFIED.get();
+      }
+
+      @Override
+      boolean isClient(PGSetting setting) {
+        // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
+        // defaults defined in this enum.
+        return DEFAULT_UNSPECIFIED.get();
       }
     };
 
+    /** Indicates whether UNSPECIFIED should be used as default (instead of <code>null</code>). */
+    @VisibleForTesting static final AtomicBoolean DEFAULT_UNSPECIFIED = new AtomicBoolean(true);
+
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
+
+    boolean isClient(PGSetting setting) {
+      return false;
+    }
 
     /** Resets any cached or temporary settings for the client. */
     @VisibleForTesting
@@ -421,7 +482,7 @@ public class ClientAutoDetector {
       return ImmutableList.of();
     }
 
-    public ImmutableMap<String, String> getDefaultParameters() {
+    public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
       return ImmutableMap.of();
     }
   }
@@ -465,6 +526,20 @@ public class ClientAutoDetector {
       List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
     for (WellKnownClient client : WellKnownClient.values()) {
       if (client.isClient(skippedParseMessages, parseMessage)) {
+        return client;
+      }
+    }
+    // The following line should never be reached.
+    throw new IllegalStateException("UNSPECIFIED.isClient() should have returned true");
+  }
+
+  /** Detect the client based on a session state setting. */
+  public static @Nonnull WellKnownClient detectClient(@Nullable PGSetting setting) {
+    if (setting == null || setting.getSetting() == null) {
+      return WellKnownClient.UNSPECIFIED;
+    }
+    for (WellKnownClient client : WellKnownClient.values()) {
+      if (client.name().equalsIgnoreCase(setting.getSetting()) || client.isClient(setting)) {
         return client;
       }
     }

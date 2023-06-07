@@ -52,6 +52,7 @@ jobs:
           - 5432:5432
         volumes:
           - /pg:/var/run/postgresql
+          - /tmp:/tmp
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
