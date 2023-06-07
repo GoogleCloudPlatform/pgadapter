@@ -54,7 +54,6 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
-import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
@@ -1313,12 +1312,7 @@ public class BackendConnection {
     return index - fromIndex;
   }
 
-  /**
-   * Extracts the update count for a list of DDL statements. It could be that the DdlExecutor
-   * decided to skip some DDL statements. This is indicated by the executor returning a {@link
-   * NotExecuted} result for that statement. The result that we return to the client should still
-   * indicate that the statement was 'executed'.
-   */
+  /** Extracts the update count for a list of DDL statements. */
   static long[] extractDdlUpdateCounts(
       List<StatementResult> statementResults, long[] returnedUpdateCounts) {
     int index = 0;
@@ -1326,13 +1320,7 @@ public class BackendConnection {
     while (index < returnedUpdateCounts.length
         && returnedUpdateCounts[index] == 1
         && successfullyExecutedCount < statementResults.size()) {
-      if (!(statementResults.get(successfullyExecutedCount) instanceof NotExecuted)) {
-        index++;
-      }
-      successfullyExecutedCount++;
-    }
-    while (successfullyExecutedCount < statementResults.size()
-        && statementResults.get(successfullyExecutedCount) instanceof NotExecuted) {
+      index++;
       successfullyExecutedCount++;
     }
     long[] updateCounts = new long[successfullyExecutedCount];
