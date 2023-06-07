@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.21.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.20.0...v0.21.0) (2023-06-07)
+
+
+### Features
+
+* support cursors and foreign data wrapper ([#797](https://github.com/GoogleCloudPlatform/pgadapter/issues/797)) ([5ee2200](https://github.com/GoogleCloudPlatform/pgadapter/commit/5ee220070257f8abf1106caf1fde1bd779ed25ec))
+* support setting the well-known client ([#837](https://github.com/GoogleCloudPlatform/pgadapter/issues/837)) ([045156c](https://github.com/GoogleCloudPlatform/pgadapter/commit/045156cda729975f34c63a084c606470903850ef))
+
+
+### Documentation
+
+* document how to connect to IntelliJ ([#870](https://github.com/GoogleCloudPlatform/pgadapter/issues/870)) ([35ec68f](https://github.com/GoogleCloudPlatform/pgadapter/commit/35ec68f78598ce45246ffbaa9092caac58070bb3))
+
 ## [0.20.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.19.1...v0.20.0) (2023-05-26)
 
 
