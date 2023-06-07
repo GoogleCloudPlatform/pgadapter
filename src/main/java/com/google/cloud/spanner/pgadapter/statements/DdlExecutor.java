@@ -430,6 +430,7 @@ class DdlExecutor {
         return defaultResult;
       }
       boolean cascade = false;
+      String sqlWithoutCascade = parser.getSql().substring(0, parser.getPos());
       if (parser.eatKeyword("cascade")) {
         cascade = true;
       } else {
@@ -445,7 +446,7 @@ class DdlExecutor {
         // We don't have any way to get the views that depend on this table.
         builder.addAll(getDropDependentForeignKeyConstraintsStatements(tableName));
       }
-      builder.add(statement);
+      builder.add(cascade ? Statement.of(sqlWithoutCascade) : statement);
       return builder.build();
     } else if (parser.eatKeyword("schema")) {
       TableOrIndexName schemaName = parser.readTableOrIndexName();
@@ -458,6 +459,7 @@ class DdlExecutor {
       ImmutableList.Builder<Statement> builder = ImmutableList.builder();
       builder.addAll(getDropSchemaIndexesStatements(schemaName));
       builder.addAll(getDropSchemaForeignKeysStatements(schemaName));
+      builder.addAll(getDropSchemaViewsStatements(schemaName));
       builder.addAll(getDropSchemaTablesStatements(schemaName));
       return builder.build();
     }
@@ -645,6 +647,32 @@ class DdlExecutor {
         return this.schema.compareTo(o.schema);
       }
       return this.name.compareTo(o.name);
+    }
+  }
+
+  ImmutableList<Statement> getDropSchemaViewsStatements(TableOrIndexName schemaName) {
+    DatabaseClient client = connection.getDatabaseClient();
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(
+                Statement.newBuilder(
+                        "select table_schema, table_name "
+                            + "from information_schema.tables "
+                            + "where table_schema=$1 "
+                            + "and table_type='VIEW'")
+                    .bind("p1")
+                    .to(unquoteIdentifier(schemaName.name))
+                    .build())) {
+      ImmutableList.Builder<Statement> dropStatements = ImmutableList.builder();
+      while (resultSet.next()) {
+        dropStatements.add(
+            Statement.of(
+                String.format(
+                    "drop view \"%s\".\"%s\"",
+                    resultSet.getString("table_schema"), resultSet.getString("table_name"))));
+      }
+      return dropStatements.build();
     }
   }
 

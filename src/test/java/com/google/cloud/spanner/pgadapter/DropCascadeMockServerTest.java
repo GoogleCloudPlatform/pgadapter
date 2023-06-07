@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
@@ -38,6 +39,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class DropCascadeMockServerTest extends AbstractMockServerTest {
@@ -146,7 +148,7 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "alter table \"public\".\"bar\" drop constraint \"fk_foo_bar\"",
         updateDatabaseDdlRequests.get(0).getStatements(0));
-    assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(1));
+    assertEquals("DROP TABLE foo", updateDatabaseDdlRequests.get(0).getStatements(1));
   }
 
   @Test
@@ -181,7 +183,7 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "alter table \"public\".\"bar\" drop constraint \"fk_foo_bar\"",
         updateDatabaseDdlRequests.get(0).getStatements(1));
-    assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(2));
+    assertEquals("DROP TABLE foo", updateDatabaseDdlRequests.get(0).getStatements(2));
   }
 
   @Test
@@ -251,7 +253,7 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "alter table \"my_schema\".\"bar\" drop constraint \"fk_foo_bar\"",
         updateDatabaseDdlRequests.get(0).getStatements(1));
-    assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(2));
+    assertEquals("DROP TABLE my_schema.foo", updateDatabaseDdlRequests.get(0).getStatements(2));
   }
 
   @Test
@@ -289,92 +291,129 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "alter table \"public\".\"bar\" drop constraint \"fk_foo_bar\"",
         updateDatabaseDdlRequests.get(0).getStatements(2));
-    assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(3));
+    assertEquals("DROP TABLE foo", updateDatabaseDdlRequests.get(0).getStatements(3));
   }
 
   @Test
   public void testDropSchemaCascade() throws SQLException {
     String sql = "DROP SCHEMA public cascade ";
-    addDdlResponseToSpannerAdmin();
+    for (boolean fail : new boolean[] {true, false}) {
+      mockDatabaseAdmin.getRequests().clear();
+      if (fail) {
+        addDdlExceptionToSpannerAdmin();
+      } else {
+        addDdlResponseToSpannerAdmin();
+      }
 
-    addSchemaIndexesResult(
-        "public",
-        ImmutableList.of(
-            new IndexName("public", "idx_albums_title"),
-            new IndexName("public", "idx_concerts_start_time"),
-            new IndexName("public", "idx_singers_last_name")));
-    addSchemaForeignKeysResult(
-        "public",
-        ImmutableList.of(
-            new ForeignKey(new TableName("public", "albums"), "fk_albums_singers"),
-            new ForeignKey(new TableName("public", "concerts"), "fk_concerts_singers"),
-            new ForeignKey(new TableName("public", "concerts"), "fk_concerts_venues")));
+      addSchemaIndexesResult(
+          "public",
+          ImmutableList.of(
+              new IndexName("public", "idx_albums_title"),
+              new IndexName("public", "idx_concerts_start_time"),
+              new IndexName("public", "idx_singers_last_name")));
+      addSchemaForeignKeysResult(
+          "public",
+          ImmutableList.of(
+              new ForeignKey(new TableName("public", "albums"), "fk_albums_singers"),
+              new ForeignKey(new TableName("public", "concerts"), "fk_concerts_singers"),
+              new ForeignKey(new TableName("public", "concerts"), "fk_concerts_venues")));
+      addSchemaViewsResult(
+          "public",
+          ImmutableList.of(
+              new TableName("public", "v_albums"),
+              new TableName("public", "v_singers"),
+              new TableName("public", "v_tracks")));
 
-    Random random = new Random();
-    //noinspection ComparatorMethodParameterNotUsed
-    addSchemaTablesResult(
-        "public",
-        ImmutableList.copyOf(
-            ImmutableList.of(
-                    new Table(new TableName("public", "albums"), "singers"),
-                    new Table(new TableName("public", "concerts"), null),
-                    new Table(new TableName("public", "singers"), null),
-                    new Table(new TableName("public", "tracks"), "albums"),
-                    new Table(new TableName("public", "venues"), null))
-                .stream()
-                .sorted((t1, t2) -> (random.nextInt(3) - 1))
-                .collect(Collectors.toList())));
+      Random random = new Random();
+      //noinspection ComparatorMethodParameterNotUsed
+      addSchemaTablesResult(
+          "public",
+          ImmutableList.copyOf(
+              ImmutableList.of(
+                      new Table(new TableName("public", "albums"), "singers"),
+                      new Table(new TableName("public", "concerts"), null),
+                      new Table(new TableName("public", "singers"), null),
+                      new Table(new TableName("public", "tracks"), "albums"),
+                      new Table(new TableName("public", "venues"), null))
+                  .stream()
+                  .sorted((t1, t2) -> (random.nextInt(3) - 1))
+                  .collect(Collectors.toList())));
 
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (Statement statement = connection.createStatement()) {
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-        assertFalse(statement.getMoreResults());
-        assertEquals(-1, statement.getUpdateCount());
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (Statement statement = connection.createStatement()) {
+          if (fail) {
+            assertThrows(PSQLException.class, () -> statement.execute(sql));
+            // Verify that the connection is usable after this error.
+            try (ResultSet resultSet =
+                connection.createStatement().executeQuery(SELECT1.getSql())) {
+              assertTrue(resultSet.next());
+              assertEquals(1L, resultSet.getLong(1));
+              assertFalse(resultSet.next());
+            }
+          } else {
+            assertFalse(statement.execute(sql));
+            assertEquals(0, statement.getUpdateCount());
+            assertFalse(statement.getMoreResults());
+            assertEquals(-1, statement.getUpdateCount());
+          }
+        }
+      }
+
+      List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+          mockDatabaseAdmin.getRequests().stream()
+              .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+              .map(UpdateDatabaseDdlRequest.class::cast)
+              .collect(Collectors.toList());
+      if (fail) {
+        assertEquals(0, updateDatabaseDdlRequests.size());
+      } else {
+        assertEquals(1, updateDatabaseDdlRequests.size());
+        assertEquals(14, updateDatabaseDdlRequests.get(0).getStatementsCount());
+        int index = -1;
+        assertEquals(
+            "drop index \"public\".\"idx_albums_title\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop index \"public\".\"idx_concerts_start_time\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop index \"public\".\"idx_singers_last_name\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "alter table \"public\".\"albums\" drop constraint \"fk_albums_singers\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "alter table \"public\".\"concerts\" drop constraint \"fk_concerts_singers\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "alter table \"public\".\"concerts\" drop constraint \"fk_concerts_venues\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop view \"public\".\"v_albums\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop view \"public\".\"v_singers\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop view \"public\".\"v_tracks\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop table \"public\".\"tracks\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop table \"public\".\"albums\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop table \"public\".\"concerts\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop table \"public\".\"singers\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
+        assertEquals(
+            "drop table \"public\".\"venues\"",
+            updateDatabaseDdlRequests.get(0).getStatements(++index));
       }
     }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(1, updateDatabaseDdlRequests.size());
-    assertEquals(11, updateDatabaseDdlRequests.get(0).getStatementsCount());
-    int index = -1;
-    assertEquals(
-        "drop index \"public\".\"idx_albums_title\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "drop index \"public\".\"idx_concerts_start_time\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "drop index \"public\".\"idx_singers_last_name\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "alter table \"public\".\"albums\" drop constraint \"fk_albums_singers\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "alter table \"public\".\"concerts\" drop constraint \"fk_concerts_singers\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "alter table \"public\".\"concerts\" drop constraint \"fk_concerts_venues\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "drop table \"public\".\"tracks\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "drop table \"public\".\"albums\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "drop table \"public\".\"concerts\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "drop table \"public\".\"singers\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
-    assertEquals(
-        "drop table \"public\".\"venues\"",
-        updateDatabaseDdlRequests.get(0).getStatements(++index));
   }
 
   @Test
@@ -429,6 +468,31 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
     assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
   }
 
+  @Test
+  public void testCreateTable() throws SQLException {
+    String sql = "CREATE TABLE foo (id bigint primary key)";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    // CREATE TABLE should be a pass-through.
+    assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
   private static final class Table {
     final TableName tableName;
     final String parent_table_name;
@@ -467,6 +531,38 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
       this.tableName = tableName;
       this.constraint_name = constraint_name;
     }
+  }
+
+  private static void addSchemaViewsResult(String schemaName, ImmutableList<TableName> views) {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.newBuilder(
+                    "select table_schema, table_name "
+                        + "from information_schema.tables "
+                        + "where table_schema=$1 "
+                        + "and table_type='VIEW'")
+                .bind("p1")
+                .to(schemaName)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.STRING, TypeCode.STRING),
+                        ImmutableList.of("table_schema", "table_name")))
+                .addAllRows(
+                    views.stream()
+                        .map(
+                            view ->
+                                ListValue.newBuilder()
+                                    .addValues(
+                                        Value.newBuilder()
+                                            .setStringValue(view.table_schema)
+                                            .build())
+                                    .addValues(
+                                        Value.newBuilder().setStringValue(view.table_name).build())
+                                    .build())
+                        .collect(Collectors.toList()))
+                .build()));
   }
 
   private static void addSchemaTablesResult(String schemaName, ImmutableList<Table> tables) {
