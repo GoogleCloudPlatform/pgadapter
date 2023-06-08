@@ -1315,12 +1315,10 @@ public class BackendConnection {
   /** Extracts the update count for a list of DDL statements. */
   static long[] extractDdlUpdateCounts(
       List<StatementResult> statementResults, long[] returnedUpdateCounts) {
-    int index = 0;
     int successfullyExecutedCount = 0;
-    while (index < returnedUpdateCounts.length
-        && returnedUpdateCounts[index] == 1
+    while (successfullyExecutedCount < returnedUpdateCounts.length
+        && returnedUpdateCounts[successfullyExecutedCount] == 1
         && successfullyExecutedCount < statementResults.size()) {
-      index++;
       successfullyExecutedCount++;
     }
     long[] updateCounts = new long[successfullyExecutedCount];
