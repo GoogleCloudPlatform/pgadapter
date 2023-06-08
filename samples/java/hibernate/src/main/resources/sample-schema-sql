@@ -5,7 +5,9 @@ create table if not exists singers (
     id         varchar not null primary key,
     first_name varchar,
     last_name  varchar not null,
-    full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,
+    full_name  varchar generated always as (CASE WHEN first_name IS NULL THEN last_name
+                                                 WHEN last_name  IS NULL THEN first_name
+                                                 ELSE first_name || ' ' || last_name END) stored,
     active     boolean,
     created_at timestamptz,
     updated_at timestamptz

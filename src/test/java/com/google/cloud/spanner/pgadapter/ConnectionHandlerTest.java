@@ -214,7 +214,9 @@ public class ConnectionHandlerTest {
     when(socket.getInetAddress()).thenReturn(address);
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
-    assertThrows(IllegalStateException.class, () -> connection.getPortal("unknown portal"));
+    PGException exception =
+        assertThrows(PGException.class, () -> connection.getPortal("unknown portal"));
+    assertEquals(SQLState.InvalidCursorName, exception.getSQLState());
   }
 
   @Test
@@ -240,7 +242,9 @@ public class ConnectionHandlerTest {
     when(socket.getInetAddress()).thenReturn(address);
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
-    assertThrows(IllegalStateException.class, () -> connection.closePortal("unknown portal"));
+    PGException exception =
+        assertThrows(PGException.class, () -> connection.closePortal("unknown portal"));
+    assertEquals(SQLState.InvalidCursorName, exception.getSQLState());
   }
 
   @Test

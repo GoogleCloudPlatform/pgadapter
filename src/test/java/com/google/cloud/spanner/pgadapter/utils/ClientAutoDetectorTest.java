@@ -74,7 +74,8 @@ public class ClientAutoDetectorTest {
         ImmutableList.of(), WellKnownClient.UNSPECIFIED.createStartupNoticeResponses(connection));
     assertEquals(
         ImmutableList.of(), WellKnownClient.UNSPECIFIED.getErrorHints(mock(PGException.class)));
-    assertEquals(ImmutableMap.of(), WellKnownClient.UNSPECIFIED.getDefaultParameters());
+    assertEquals(
+        ImmutableMap.of(), WellKnownClient.UNSPECIFIED.getDefaultParameters(ImmutableMap.of()));
   }
 
   @Test

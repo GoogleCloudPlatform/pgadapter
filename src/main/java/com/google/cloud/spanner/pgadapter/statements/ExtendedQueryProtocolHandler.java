@@ -39,6 +39,7 @@ public class ExtendedQueryProtocolHandler {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
     this.backendConnection =
         new BackendConnection(
+            connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
             connectionHandler::getWellKnownClient,
