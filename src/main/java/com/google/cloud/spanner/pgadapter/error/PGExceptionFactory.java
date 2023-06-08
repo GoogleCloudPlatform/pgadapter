@@ -27,6 +27,10 @@ import java.util.regex.Pattern;
 public class PGExceptionFactory {
   private static final Pattern RELATION_NOT_FOUND_PATTERN =
       Pattern.compile("relation .+ does not exist");
+  private static final Pattern CANNOT_DROP_TABLE_WITH_INDICES_PATTERN =
+      Pattern.compile("Cannot drop table test with indices");
+  private static final Pattern ONLY_RESTRICT_BEHAVIOR =
+      Pattern.compile("Only <RESTRICT> behavior is supported by <DROP> statement\\.");
 
   private PGExceptionFactory() {}
 
@@ -78,6 +82,20 @@ public class PGExceptionFactory {
         && RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.UndefinedTable)
+          .build();
+    } else if (spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+        && CANNOT_DROP_TABLE_WITH_INDICES_PATTERN.matcher(spannerException.getMessage()).find()) {
+      return PGException.newBuilder(extractMessage(spannerException))
+          .setSQLState(SQLState.FeatureNotSupported)
+          .setHints(
+              "Execute 'set spanner.support_drop_cascade=true' to enable dropping tables with indices")
+          .build();
+    } else if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+        && ONLY_RESTRICT_BEHAVIOR.matcher(spannerException.getMessage()).find()) {
+      return PGException.newBuilder(extractMessage(spannerException))
+          .setSQLState(SQLState.FeatureNotSupported)
+          .setHints(
+              "Execute 'set spanner.support_drop_cascade=true' to enable 'drop {table|schema} cascade' statements.")
           .build();
     }
     return newPGException(extractMessage(spannerException));
