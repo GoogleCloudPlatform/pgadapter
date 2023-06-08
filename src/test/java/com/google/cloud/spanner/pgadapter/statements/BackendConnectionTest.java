@@ -55,7 +55,6 @@ import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
-import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
@@ -75,7 +74,6 @@ import org.junit.runners.JUnit4;
 public class BackendConnectionTest {
   private final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
-  private static final NotExecuted NOT_EXECUTED = new NotExecuted();
   private static final NoResult NO_RESULT = new NoResult();
   private static final Runnable DO_NOTHING = () -> {};
 
@@ -86,48 +84,22 @@ public class BackendConnectionTest {
         new long[] {1L}, extractDdlUpdateCounts(ImmutableList.of(NO_RESULT), new long[] {1L}));
     assertArrayEquals(
         new long[] {1L, 1L},
-        extractDdlUpdateCounts(ImmutableList.of(NO_RESULT, NOT_EXECUTED), new long[] {1L}));
-    assertArrayEquals(
-        new long[] {1L, 1L},
-        extractDdlUpdateCounts(ImmutableList.of(NOT_EXECUTED, NO_RESULT), new long[] {1L}));
-    assertArrayEquals(
-        new long[] {1L, 1L},
-        extractDdlUpdateCounts(
-            ImmutableList.of(NOT_EXECUTED, NO_RESULT, NO_RESULT), new long[] {1L}));
+        extractDdlUpdateCounts(ImmutableList.of(NO_RESULT, NO_RESULT), new long[] {1L, 1L}));
     assertArrayEquals(
         new long[] {1L, 1L, 1L},
         extractDdlUpdateCounts(
-            ImmutableList.of(NOT_EXECUTED, NO_RESULT, NOT_EXECUTED), new long[] {1L}));
+            ImmutableList.of(NO_RESULT, NO_RESULT, NO_RESULT), new long[] {1L, 1L, 1L}));
     assertArrayEquals(
         new long[] {1L, 1L, 1L, 1L},
         extractDdlUpdateCounts(
-            ImmutableList.of(NOT_EXECUTED, NOT_EXECUTED, NO_RESULT, NOT_EXECUTED),
-            new long[] {1L}));
-    assertArrayEquals(
-        new long[] {1L, 1L, 1L, 1L},
-        extractDdlUpdateCounts(
-            ImmutableList.of(NOT_EXECUTED, NOT_EXECUTED, NO_RESULT, NOT_EXECUTED, NO_RESULT),
-            new long[] {1L}));
-    assertArrayEquals(
-        new long[] {1L, 1L},
-        extractDdlUpdateCounts(
-            ImmutableList.of(NOT_EXECUTED, NO_RESULT, NO_RESULT, NOT_EXECUTED), new long[] {1L}));
+            ImmutableList.of(NO_RESULT, NO_RESULT, NO_RESULT, NO_RESULT),
+            new long[] {1L, 1L, 1L, 1L}));
     assertArrayEquals(
         new long[] {1L, 1L, 1L, 1L, 1L, 1L},
         extractDdlUpdateCounts(
             ImmutableList.of(
-                NOT_EXECUTED,
-                NO_RESULT,
-                NO_RESULT,
-                NOT_EXECUTED,
-                NOT_EXECUTED,
-                NO_RESULT,
-                NO_RESULT),
-            new long[] {1L, 1L, 1L}));
-    assertArrayEquals(
-        new long[] {1L, 1L, 1L},
-        extractDdlUpdateCounts(
-            ImmutableList.of(NOT_EXECUTED, NOT_EXECUTED, NOT_EXECUTED), new long[] {}));
+                NO_RESULT, NO_RESULT, NO_RESULT, NO_RESULT, NO_RESULT, NO_RESULT, NO_RESULT),
+            new long[] {1L, 1L, 1L, 1L, 1L, 1L}));
   }
 
   @Test
