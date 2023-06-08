@@ -448,6 +448,7 @@ public class ConnectionHandler extends Thread {
   public void handleTerminate() {
     synchronized (this) {
       closeAllPortals();
+      closeAllStatements();
       if (this.spannerConnection != null) {
         this.spannerConnection.close();
       }
@@ -510,7 +511,7 @@ public class ConnectionHandler extends Thread {
   }
 
   /** Closes all named and unnamed portals on this connection. */
-  private void closeAllPortals() {
+  public void closeAllPortals() {
     for (IntermediatePortalStatement statement : portalsMap.values()) {
       try {
         statement.close();
@@ -520,12 +521,12 @@ public class ConnectionHandler extends Thread {
       }
     }
     this.portalsMap.clear();
-    this.statementsMap.clear();
   }
 
   public IntermediatePortalStatement getPortal(String portalName) {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered portal: " + portalName);
+      throw PGExceptionFactory.newPGException(
+          "unrecognized portal name: " + portalName, SQLState.InvalidCursorName);
     }
     return this.portalsMap.get(portalName);
   }
@@ -536,9 +537,10 @@ public class ConnectionHandler extends Thread {
 
   public void closePortal(String portalName) throws Exception {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered portal: " + portalName);
+      throw PGExceptionFactory.newPGException(
+          "unrecognized portal name: " + portalName, SQLState.InvalidCursorName);
     }
-    IntermediatePortalStatement portal = this.portalsMap.get(portalName);
+    IntermediatePortalStatement portal = this.portalsMap.remove(portalName);
     portal.close();
   }
 

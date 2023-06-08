@@ -33,6 +33,10 @@ public class QueryMessage extends ControlMessage {
   public static final String SAVEPOINT = "SAVEPOINT";
   public static final String RELEASE = "RELEASE";
   public static final String ROLLBACK = "ROLLBACK";
+  public static final String DECLARE = "DECLARE";
+  public static final String FETCH = "FETCH";
+  public static final String MOVE = "MOVE";
+  public static final String CLOSE = "CLOSE";
   private final Statement originalStatement;
   private final SimpleQueryStatement simpleQueryStatement;
 

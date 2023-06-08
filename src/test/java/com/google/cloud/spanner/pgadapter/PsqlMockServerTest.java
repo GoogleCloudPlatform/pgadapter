@@ -248,6 +248,57 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testDeclareCursor() throws Exception {
+    assumeTrue("This test requires psql to be installed", isPsqlAvailable());
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          "-h",
+          "localhost",
+          "-p",
+          String.valueOf(pgServer.getLocalPort()),
+          "-c",
+          "begin",
+          "-c",
+          "declare foo cursor for select * from all_types",
+          "-c",
+          "fetch foo",
+          "-c",
+          "close foo",
+        };
+    builder.command(psqlCommand);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertEquals("", errors);
+    assertEquals(
+        "BEGIN\n"
+            + "DECLARE CURSOR\n"
+            + " col_bigint | col_bool | col_bytea  | col_float8 | col_int | col_numeric |        col_timestamptz        |  col_date  | col_varchar |    col_jsonb     | col_array_bigint | col_array_bool |              col_array_bytea               |  col_array_float8  |  col_array_int   | col_array_numeric  |                      col_array_timestamptz                      |          col_array_date          |     col_array_varchar      |                    col_array_jsonb                     \n"
+            + "------------+----------+------------+------------+---------+-------------+-------------------------------+------------+-------------+------------------+------------------+----------------+--------------------------------------------+--------------------+------------------+--------------------+-----------------------------------------------------------------+----------------------------------+----------------------------+--------------------------------------------------------\n"
+            + "          1 | t        | \\x74657374 |       3.14 |     100 |       6.626 | 2022-02-16 14:18:02.123456+01 | 2022-03-29 | test        | {\"key\": \"value\"} | {1,NULL,2}       | {t,NULL,f}     | {\"\\\\x627974657331\",NULL,\"\\\\x627974657332\"} | {3.14,NULL,-99.99} | {-100,NULL,-200} | {6.626,NULL,-3.14} | {\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"} | {\"2023-02-20\",NULL,\"2000-01-01\"} | {\"string1\",NULL,\"string2\"} | {\"{\\\"key\\\": \\\"value1\\\"}\",NULL,\"{\\\"key\\\": \\\"value2\\\"}\"}\n"
+            + "(1 row)\n"
+            + "\n"
+            + "CLOSE CURSOR",
+        output);
+    int res = process.waitFor();
+    assertEquals(0, res);
+  }
+
+  @Test
   public void testArrayParameter() throws Exception {
     assumeTrue("This test requires psql to be installed", isPsqlAvailable());
 
