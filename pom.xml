@@ -35,7 +35,7 @@
       com.google.cloud.spanner.pgadapter.ruby.RubyTest,
     </excludedTests>
 
-    <spanner.version>6.40.0</spanner.version>
+    <spanner.version>6.43.0</spanner.version>
     <junixsocket.version>2.6.2</junixsocket.version>
   </properties>
 
