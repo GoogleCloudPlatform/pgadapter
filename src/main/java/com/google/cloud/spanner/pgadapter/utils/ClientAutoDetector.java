@@ -424,7 +424,10 @@ public class ClientAutoDetector {
 
       @Override
       public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
-        return ImmutableMap.of("spanner.emulate_pg_class_tables", "true");
+        return ImmutableMap.of(
+            "spanner.emulate_pg_class_tables", "true",
+            "spanner.support_drop_cascade", "true",
+            "spanner.auto_add_limit_clause", "true");
       }
 
       @Override
@@ -505,8 +508,17 @@ public class ClientAutoDetector {
             RegexQueryPartReplacer.replace(
                 Pattern.compile("pg_get_constraintdef\\s*\\(.+\\)\\s*AS\\s+"), "conbin AS "),
             RegexQueryPartReplacer.replace(Pattern.compile("pg_get_functiondef\\s*\\(.+\\)"), "''"),
-            RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"), () -> "''"),
-            RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"), () -> "''"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile(
+                    "format_type\\(att\\.atttypid, att\\.atttypmod\\) as formatted_type"),
+                "att.spanner_type as formatted_type"),
+            //            RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"),
+            // () -> "''"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("pg_get_expr\\(attdef\\.adbin, attdef\\.adrelid\\) AS "),
+                Suppliers.ofInstance("attdef.adbin AS ")),
+            //            RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"),
+            // () -> "''"),
             RegexQueryPartReplacer.replace(
                 Pattern.compile("SELECT\\s+" + "tbl\\.relname\\s+AS\\s+table_name"),
                 "SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name"),

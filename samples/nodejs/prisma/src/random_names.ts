@@ -14,10 +14,120 @@
 
 import {randomUUID} from "crypto";
 
-const firstNames = ["First1", "First2", "First3"];
-const lastNames = ["Last1", "Last2", "Last3"];
-const nouns = ["car", "laptop", "sky", "potato", "glass"];
-const adjectives = ["loud", "soft", "silent", "calm", "noisy"];
+const firstNames: string[] = [
+  "Elijah",
+  "Sophia",
+  "Jackson",
+  "Olivia",
+  "Mason",
+  "Ava",
+  "Ethan",
+  "Emma",
+  "Aiden",
+  "Isabella",
+  "Lucas",
+  "Mia"
+];
+const lastNames: string[] = [
+  "Smith",
+  "Johnson",
+  "Williams",
+  "Jones",
+  "Brown",
+  "Davis",
+  "Miller",
+  "Wilson",
+  "Moore",
+  "Taylor",
+  "Anderson",
+  "Thomas"
+];
+const nouns: string[] = [
+  "elephant",
+  "fireplace",
+  "jazz",
+  "lighthouse",
+  "moonlight",
+  "paradise",
+  "quill",
+  "seashell",
+  "thunder",
+  "volcano",
+  "waterfall",
+  "zebra"
+];
+const adjectives: string[] = [
+  "brilliant",
+  "enchanting",
+  "magnificent",
+  "serene",
+  "vibrant",
+  "charismatic",
+  "exquisite",
+  "radiant",
+  "whimsical",
+  "majestic",
+  "captivating",
+  "phenomenal"
+];
+const verbs: string[] = [
+  "drive",
+  "fly",
+  "cook",
+  "clean",
+  "run",
+  "swim",
+  "cycle",
+  "sing",
+  "dance",
+  "write",
+  "read",
+  "sleep",
+  "eat",
+  "drink",
+  "talk",
+  "listen",
+  "play",
+  "study",
+  "work",
+  "code",
+  "paint",
+  "draw",
+  "climb",
+  "explore",
+  "travel"
+];
+const adverbs: string[] = [
+  "naturally",
+  "gracefully",
+  "vigorously",
+  "curiously",
+  "cheerfully",
+  "cautiously",
+  "enthusiastically",
+  "generously",
+  "politely",
+  "diligently",
+  "frequently",
+  "precisely",
+  "efficiently",
+  "passionately",
+  "quickly",
+  "slowly",
+  "happily",
+  "sadly",
+  "loudly",
+  "softly",
+  "carefully",
+  "eagerly",
+  "gently",
+  "quietly",
+  "kindly",
+  "boldly",
+  "patiently",
+  "bravely"
+];
+
 
 export const times = (n, f) => { while(n-- > 0) f(); }
 
@@ -35,6 +145,10 @@ export function randomLastName(): string {
 
 export function randomAlbumTitle(): string {
   return randomElement(adjectives) + " " + randomElement(nouns);
+}
+
+export function randomTrackTitle(): string {
+  return randomElement(adverbs) + " " + randomElement(verbs);
 }
 
 export function randomReleaseDate(): Date {

@@ -1,9 +1,6 @@
 # PGAdapter - Prisma Connection Options
 
-PGAdapter has experimental support for the [Prisma](https://www.prisma.io/) __data__ client
-version 4.8.1 and higher.
-
-__NOTE: PGAdapter currently does not support Prisma Migrations__
+PGAdapter has experimental support for the [Prisma](https://www.prisma.io/) version 4.8.1 and higher.
 
 ## Usage
 
@@ -14,19 +11,21 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
   -d -p 5432:5432 \
-  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance \
+  -c /credentials.json \
   -x
 ```
 
-Then connect to PGAdapter as if it was PostgreSQL:
+Then connect to PGAdapter as if it was PostgreSQL. Include an additional connection option that
+tells PGAdapter that you are using Prisma to connect. This will allow PGAdapter to apply specific
+translations that are beneficial to Prisma:
 
 ```typescript
 import { PrismaClient } from '@prisma/client'
 
-process.env.DATABASE_URL = 'postgresql://localhost:5432/my-database';
+process.env.DATABASE_URL = 'postgresql://localhost:5432/my-database?options=-c%20spanner.well_known_client=prisma';
 const prisma = new PrismaClient();
 
 helloWorld(prisma)
@@ -55,10 +54,10 @@ docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
   -d -p 5432:5432 \
   -v /tmp:/tmp
-  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance \
+  -c /credentials.json \
   -x
 ```
 
@@ -67,7 +66,7 @@ import { PrismaClient } from '@prisma/client'
 
 // Note: The connection string must contain a network host (e.g. 'localhost').
 // This network host is ignored when a 'host' option is added to the connection string.
-process.env.DATABASE_URL = 'postgresql://localhost:5432/my-database?host=/tmp';
+process.env.DATABASE_URL = 'postgresql://localhost:5432/my-database?host=/tmp&options=-c%20spanner.well_known_client=prisma';
 const prisma = new PrismaClient();
 
 helloWorld(prisma)
@@ -105,7 +104,7 @@ for more information on connection options for node-postgres.
 ### Read-only Transactions
 You can use [read-only transactions](https://cloud.google.com/spanner/docs/transactions#read-only_transactions)
 with Prisma for Google Cloud Spanner. Using a read-only transaction instead of a read/write
-transaction when your workload only executes read operations is much more efficient.
+transaction when your workload only executes read operations is more efficient.
 This example shows how to execute a read-only transaction with Prisma:
 
 ```typescript
@@ -131,14 +130,18 @@ const normalClient = new PrismaClient();
 const staleReadClient = new PrismaClient({
   datasources: {
     db: {
-      url: `postgresql://localhost:5432/my-database?options=-c spanner.read_only_staleness='MAX_STALENESS 10s'`,
+      url: `postgresql://localhost:5432/my-database?options=-c spanner.read_only_staleness='MAX_STALENESS 10s' -c spanner.well_known_client=prisma'`,
     },
   },
 });
 ```
 
 ## Limitations
-- [Prisma Migrations](https://www.prisma.io/migrate) are not supported by PGAdapter.
+- [Prisma Migrations](https://www.prisma.io/migrate) use a shadow database. This shadow database must
+  be a real PostgreSQL database, and not a Cloud Spanner database. See https://www.prisma.io/docs/concepts/components/prisma-migrate/shadow-database#cloud-hosted-shadow-databases-must-be-created-manually
+  for more information.
+- Prisma Migrations rely heavily on `pg_catalog` tables and functions. Not all of these are supported
+  in Cloud Spanner. Some migration operations are likely to not work or require manual intervention.
 - Server-side auto-generated primary keys are not supported by Cloud Spanner. Use a client-side
   generated random UUID instead.
 - [Upsert operations](https://www.prisma.io/docs/reference/api-reference/prisma-client-reference#upsert)

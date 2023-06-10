@@ -5,7 +5,9 @@ CREATE TABLE "Singer" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
-    "fullName" TEXT,
+    "fullName" TEXT generated always as (CASE WHEN "firstName" IS NULL THEN "lastName"
+                                              WHEN "lastName"  IS NULL THEN "firstName"
+                                              ELSE "firstName" || ' ' || "lastName" END) stored,
     "active" BOOLEAN NOT NULL,
 
     CONSTRAINT "Singer_pkey" PRIMARY KEY ("id")
@@ -26,6 +28,8 @@ CREATE TABLE "Album" (
 );
 
 -- CreateTable
+-- Note that the definition of this table has been manually modified so it is interleaved in the
+-- table Album. This is a Cloud Spanner-specific extension to open source PostgreSQL.
 CREATE TABLE "Track" (
     "id" TEXT NOT NULL,
     "trackNumber" BIGINT NOT NULL,
@@ -35,7 +39,7 @@ CREATE TABLE "Track" (
     "sampleRate" DOUBLE PRECISION,
 
     CONSTRAINT "Track_pkey" PRIMARY KEY ("id","trackNumber")
-);
+) INTERLEAVE IN PARENT "Album" ON DELETE CASCADE;
 
 -- CreateTable
 CREATE TABLE "Venue" (
@@ -59,14 +63,24 @@ CREATE TABLE "Concert" (
     "startTime" TIMESTAMPTZ NOT NULL,
     "endTime" TIMESTAMPTZ NOT NULL,
 
-    CONSTRAINT "Concert_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Concert_pkey" PRIMARY KEY ("id"),
+    constraint chk_end_time_after_start_time check ("endTime" > "startTime")
 );
+
+-- CreateIndex
+CREATE INDEX "Singer_lastName_idx" ON "Singer"("lastName");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Album_id_title_idx" ON "Track"("id", "title");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Track_id_title_idx" ON "Track"("id", "title");
+
+-- CreateIndex
+CREATE INDEX "Concert_startTime_idx" ON "Concert"("startTime" DESC);
 
 -- AddForeignKey
 ALTER TABLE "Album" ADD CONSTRAINT "Album_singerId_fkey" FOREIGN KEY ("singerId") REFERENCES "Singer"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Track" ADD CONSTRAINT "Track_id_fkey" FOREIGN KEY ("id") REFERENCES "Album"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Concert" ADD CONSTRAINT "Concert_venueId_fkey" FOREIGN KEY ("venueId") REFERENCES "Venue"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

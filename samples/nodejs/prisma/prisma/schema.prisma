@@ -19,6 +19,8 @@ model Singer {
   active    Boolean
   albums    Album[]
   Concert   Concert[]
+
+  @@index(lastName)
 }
 
 model Album {
@@ -32,6 +34,8 @@ model Album {
   singer          Singer    @relation(fields: [singerId], references: [id])
   singerId        String
   tracks          Track[]
+
+  @@unique([id, title])
 }
 
 model Track {
@@ -44,6 +48,7 @@ model Track {
   album       Album    @relation(fields: [id], references: [id])
 
   @@id([id, trackNumber])
+  @@unique([id, title])
 }
 
 model Venue {
@@ -66,4 +71,6 @@ model Concert {
   singerId  String
   startTime DateTime @db.Timestamptz
   endTime   DateTime @db.Timestamptz
+
+  @@index([startTime(sort: Desc)])
 }

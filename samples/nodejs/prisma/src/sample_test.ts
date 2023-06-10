@@ -13,8 +13,7 @@
 // limitations under the License.
 
 import {
-  createDataModel,
-  createRandomSingersAndAlbums,
+  createRandomSingersAndAlbumsAndTracks,
   printSingersAndAlbums,
   prisma
 } from "./sample";
@@ -38,16 +37,10 @@ async function runTestWithClient(test: () => Promise<void>) {
 require('yargs')
 .demand(4)
 .command(
-    'testCreateDataModel <host> <port> <database>',
-    'Creates the sample data model',
-    {},
-    opts => runTest(opts.host, opts.port, opts.database, createDataModel)
-)
-.command(
     'testCreateRandomSingersAndAlbums <host> <port> <database>',
-    'Creates a random range of singers and albums',
+    'Creates a random set of singers and albums',
     {},
-    opts => runTest(opts.host, opts.port, opts.database, createRandomSingersAndAlbums)
+    opts => runTest(opts.host, opts.port, opts.database, createRandomSingersAndAlbumsAndTracks)
 )
 .command(
     'testPrintSingersAndAlbums <host> <port> <database>',

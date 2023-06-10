@@ -13,13 +13,21 @@
 // limitations under the License.
 
 import {PrismaClient} from '@prisma/client'
-import {createDataModel} from "./sample";
+import {
+  createRandomSingersAndAlbumsAndTracks,
+  createVenueAndConcertInTransaction,
+  deleteExistingData, printAlbumsReleasedBefore1900,
+  printSingersAndAlbums, staleRead, updateVenueDescription
+} from "./sample";
 
 export const prisma = new PrismaClient();
 export const staleReadClient = new PrismaClient({
   datasources: {
     db: {
-      url: `${process.env.DATABASE_URL}?options=-c spanner.read_only_staleness='MAX_STALENESS 10s'`,
+      // This environment variable is also defined in the .env file.
+      // It sets an option in the connection string to instruct PGAdapter to use a maximum staleness
+      // of 10 seconds for read operations.
+      url: `${process.env.STALE_READ_DATABASE_URL}`,
     },
   },
 });
@@ -39,5 +47,11 @@ runSample()
   });
 
 async function runSample() {
-  await createDataModel();
+  await deleteExistingData();
+  await createRandomSingersAndAlbumsAndTracks();
+  await printSingersAndAlbums();
+  await createVenueAndConcertInTransaction();
+  await printAlbumsReleasedBefore1900();
+  await updateVenueDescription();
+  await staleRead();
 }
