@@ -322,6 +322,18 @@ public class SimpleParser {
     return new SimpleParser(query).peekKeyword(command);
   }
 
+  public static boolean isCommand(ImmutableList<String> commands, String query) {
+    Preconditions.checkNotNull(commands);
+    Preconditions.checkNotNull(query);
+    SimpleParser parser = new SimpleParser(query);
+    for (String command : commands) {
+      if (!parser.eatKeyword(command)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   public static List<String> readArrayLiteral(String expression, boolean returnRawHexValue) {
     List<String> result = new ArrayList<>();
     SimpleParser parser = new SimpleParser(expression);
