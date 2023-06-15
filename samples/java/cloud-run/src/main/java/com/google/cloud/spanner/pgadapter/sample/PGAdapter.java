@@ -30,9 +30,9 @@ public class PGAdapter {
     }
   }
 
-  final SpannerProperties spannerProperties;
+  private final SpannerProperties spannerProperties;
 
-  final ProxyServer server;
+  private final ProxyServer server;
 
   public PGAdapter(SpannerProperties spannerProperties) {
     this.spannerProperties = spannerProperties;
@@ -43,6 +43,7 @@ public class PGAdapter {
             spannerProperties.getCredentials());
   }
 
+  /** Returns a JDBC connection URL that can be used to connect to this PGAdapter instance. */
   public String getConnectionUrl() {
     return String.format(
         "jdbc:postgresql://localhost/%s?"
