@@ -35,10 +35,6 @@ COPY . ./
 # Build the binary.
 RUN go build -v -o server
 
-## Create the application image based on the PGAdapter Docker image.
-## This will include PGAdapter and all its dependencies in the Docker image.
-#FROM gcr.io/cloud-spanner-pg-adapter/pgadapter
-
 # Use the official Debian slim image for a lean production container.
 # https://hub.docker.com/_/debian
 # https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
