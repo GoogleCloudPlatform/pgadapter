@@ -15,6 +15,7 @@ client.connect().then(() => {
 });
 
 app.get('/', async (req, res) => {
+  // Execute a query on Cloud Spanner that returns a greeting and return that to the user.
   const greeting = await client.query("select 'Hello world! from Cloud Spanner PostgreSQL' as hello");
   res.send(greeting.rows[0].hello + '\n');
 });
