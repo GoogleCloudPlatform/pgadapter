@@ -31,6 +31,8 @@ services:
     volumes:
       - "./copy-schema.sh:/docker-entrypoint-initdb.d/copy-schema.sh:ro"
       - "./import-foreign-schema.sh:/docker-entrypoint-initdb.d/import-foreign-schema.sh:ro"
+      - "./copy-schema.sh:/copy-schema.sh:ro"
+      - "./import-foreign-schema.sh:/import-foreign-schema.sh:ro"
       - "./copy-data.sh:/copy-data.sh:ro"
       - "./run-pg-dump.sh:/run-pg-dump.sh:ro"
       - "./run-pg-restore.sh:/run-pg-restore.sh:ro"

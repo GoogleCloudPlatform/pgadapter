@@ -27,6 +27,13 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
   -- Now import all tables as foreign tables to the read-only schema.
   IMPORT FOREIGN SCHEMA public from server pgadapter_read_only into _public_read_only;
 
+  -- Create a schema for the information_schema.
+  drop schema if exists _information_schema cascade;
+  create schema _information_schema;
+  SET search_path TO _information_schema;
+  -- Now import all information_schema tables as foreign tables to the local schema.
+  IMPORT FOREIGN SCHEMA information_schema from server pgadapter_read_only into _information_schema;
+
   ---------------------------------------------------------------------------------------------------
 
   -- Create a schema for read/write foreign tables.

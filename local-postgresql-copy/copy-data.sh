@@ -30,11 +30,7 @@ psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -qAtX \
 
   echo ""
   echo "Copying data for $table_name"
-  PGOPTIONS="--spanner.read_only_staleness='read_timestamp $READ_TIMESTAMP'" \
-    psql -v ON_ERROR_STOP=1 -h "$PGADAPTER_CONTAINER_NAME" \
-       -d "$SPANNER_DATABASE" \
-       -c "show spanner.read_only_staleness"
-  PGOPTIONS="--spanner.read_only_staleness='read_timestamp $READ_TIMESTAMP'" \
+  PGOPTIONS="-c spanner.read_only_staleness='read_timestamp $READ_TIMESTAMP'" \
     psql -v ON_ERROR_STOP=1 -h "$PGADAPTER_CONTAINER_NAME" \
        -d "$SPANNER_DATABASE" \
        -c "copy $table_name ($column_names) to stdout binary" \

@@ -133,6 +133,11 @@ CREATE TABLE test2 (
   value character varying,
   PRIMARY KEY(id)
 );
+CREATE TABLE text_test (
+  id bigint NOT NULL,
+  value character varying,
+  PRIMARY KEY(id)
+);
 CREATE TABLE track_history (
   id bigint NOT NULL,
   foo character varying,
