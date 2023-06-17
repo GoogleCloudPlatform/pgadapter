@@ -38,6 +38,12 @@ import java.util.List;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
+/**
+ * SHOW DATABASE DDL [FOR POSTGRESQL] returns a result set with the DDL statements that are needed
+ * to (re-)create the schema of the current database. The FOR POSTGRESQL clause will instruct
+ * PGAdapter to only return DDL statements that are compatible with PostgreSQL. Cloud Spanner
+ * specific clauses will be commented out in the returned DDL.
+ */
 public class ShowDatabaseDdlStatement extends IntermediatePortalStatement {
   static class ParsedShowDatabaseDdlStatement {
     final boolean forPostgreSQL;
@@ -78,10 +84,16 @@ public class ShowDatabaseDdlStatement extends IntermediatePortalStatement {
     if (!parser.eatKeyword("show", "database", "ddl")) {
       throw PGExceptionFactory.newPGException("not a valid SHOW DATABASE DDL statement: " + sql);
     }
-    boolean compatible = parser.eatKeyword("for", "postgresql");
+    boolean forPostgres = false;
+    if (parser.eatKeyword("for")) {
+      if (!parser.hasMoreTokens()) {
+        throw PGExceptionFactory.newPGException("missing 'POSTGRESQL' keyword: " + sql);
+      }
+      forPostgres = parser.eatKeyword("postgresql");
+    }
     parser.throwIfHasMoreTokens();
 
-    return new ParsedShowDatabaseDdlStatement(compatible);
+    return new ParsedShowDatabaseDdlStatement(forPostgres);
   }
 
   @Override
