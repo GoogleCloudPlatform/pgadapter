@@ -5,11 +5,16 @@ a local PostgreSQL database in a Docker container with the same schema as a Clou
 
 The folder also contains these scripts:
 
-| Script              | Description                                                                                                                                                                                                                                                                                   |
-|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `copy-data.sh`      | Copies all data from the Cloud Spanner database to the local PostgreSQL database. This script can be used to create a local copy of the Cloud Spanner database.                                                                                                                               |
-| `run-pg-dump.sh`    | Copies all data from the Cloud Spanner database to the local PostgreSQL database, exports the schema of the Cloud Spanner database to a `schema.sql` file, and runs `pg_dump` on the local PostgreSQL database. This can be used to reconstruct the Cloud Spanner database at a later moment. |
-| `run-pg-restore.sh` | Runs `pg_restore` on the local PostgreSQL database using a previously generated dump, executes the `schema.sql` file on the Cloud Spanner database to re-create the schema, and copies all data from the local PostgreSQL database to Cloud Spanner.                                          |
+| Script                     | Description                                                                                                                                                                                                                                                                                                                                                                  |
+|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `copy-schema.sh`           | Copies the schema of a Cloud Spanner database to a PostgreSQL database. This script can be used to create a copy of a Cloud Spanner database.                                                                                                                                                                                                                                |
+| `copy-data.sh`             | Copies all data from a Cloud Spanner database to a PostgreSQL database. This script can be used to create a copy of a Cloud Spanner database.                                                                                                                                                                                                                                |
+| `import-foreign-schema.sh` | Imports the schema of a Cloud Spanner database as a foreign schema in a PostgreSQL database. This can be used to query Cloud Spanner database directly in a PostgreSQL database. This allows the use of specific PostgreSQL features with Cloud Spanner data, such as user-defined functions, stored procedures or system functions that are not available in Cloud Spanner. |
+| `run-pg-dump.sh`           | Copies all data from the Cloud Spanner database to the local PostgreSQL database, exports the schema of the Cloud Spanner database to a `schema.sql` file, and runs `pg_dump` on the local PostgreSQL database. This can be used to reconstruct the Cloud Spanner database at a later moment.                                                                                |
+| `run-pg-restore.sh`        | Runs `pg_restore` on the local PostgreSQL database using a previously generated dump, executes the `schema.sql` file on the Cloud Spanner database to re-create the schema, and copies all data from the local PostgreSQL database to Cloud Spanner.                                                                                                                         |
+
+These scripts can also be used to copy a Cloud Spanner database to a PostgreSQL database running on
+an existing server or to a CloudSQL instance.
 
 ## Try it out
 
@@ -143,9 +148,9 @@ The `run-pg-dump.sh` script can be used to create a dump of your Cloud Spanner d
 execute the following steps:
 1. Copy all data from your Cloud Spanner database to the local PostgreSQL database.
 2. Generate the DDL statements that are needed to re-create your Cloud Spanner database
-   and save these to the file `/backup/schema.sql` in the `postgres` Docker container.
+   and save these to the file `./backup/schema.sql` in the `postgres` Docker container.
 3. Execute `pg_dump` on the local PostgreSQL database and store the data in `directory`
-   format in the `/backup/data` folder on the `postgres` Docker container.
+   format in the `./backup/data` folder on the `postgres` Docker container.
    See https://www.postgresql.org/docs/current/app-pgdump.html for more information on `pg_dump`.
 
 The output from this script can be used to re-create the Cloud Spanner database, or to copy the
@@ -154,8 +159,10 @@ Cloud Spanner database to another PostgreSQL-compatible database system.
 The script must be executed using the `postgres` Docker container:
 
 ```shell
-docker exec -it postgres /run-pg-dump.sh 
+docker exec -it postgres /run-pg-dump.sh
 ```
+
+The backup data can be found in 
 
 ### pg_restore
 
@@ -168,9 +175,9 @@ create the schema of the Cloud Spanner database.
 The `run-pg-restore.sh` script executes the following steps:
 1. Run `pg_restore` on the local PostgreSQL database. This will replace the existing
    local PostgreSQL database. The `pg_dump` files are expected to be in the folder
-   `/backup/data` in the `postgres` Docker container.
+   `./backup/data` in the `postgres` Docker container.
 2. Create the schema of the Cloud Spanner database by running the SQL statements in the
-   file `/backup/schema.sql` in the `postgres` container.
+   file `./backup/schema.sql` in the `postgres` container.
 3. (Temporarily) drop all foreign key constraints in the Cloud Spanner database.
 4. Copy all data from the local PostgreSQL database that was restored to the Cloud Spanner
    database.
@@ -192,3 +199,111 @@ Follow these steps to try a full `pg_dump` and `pg_restore` cycle:
 8. Run `docker exec -it postgres /run-pg-restore.sh`. This will restore the Cloud Spanner database
    that was dumped into the new Cloud Spanner database. This is done by first running `pg_restore` on
    the local PostgreSQL database, and then copying the data to the Cloud Spanner database.
+
+__TIP__: You can also run the restore script to a new database without bringing down the Docker containers
+and modifying the `.env` file by setting the Cloud Spanner database name in the `spanner_restore_database`
+variable like this:
+
+```shell
+docker exec -it postgres /bin/bash -c "spanner_restore_database=new-database /run-pg-restore.sh"
+```
+
+## CloudSQL / Other PostgreSQL Databases
+
+The scripts in this directory can also be used to copy Cloud Spanner databases to/from CloudSQL
+PostgreSQL databases or any other PostgreSQL database. For this, you do not need to start the
+Docker containers in this directory with `docker compose`. Instead, the examples in this section
+assumes that you have PostgreSQL client tools installed on your local host.
+
+Follow these steps to copy a Cloud Spanner database to a CloudSQL PostgreSQL database:
+
+1. Set these environment variables to point to your CloudSQL database and Cloud Spanner database.
+
+```shell
+export PGADAPTER_HOST=localhost
+export PGADAPTER_PORT=9001
+
+export GOOGLE_APPLICATION_CREDENTIALS=/local/path/to/credentials.json
+export GOOGLE_CLOUD_PROJECT=my-project
+export SPANNER_INSTANCE=my-instance
+export SPANNER_DATABASE=my-database
+
+export POSTGRES_HOST=/cloudsql/my-project:my-cloudsql-zone:my-cloudsql-instance
+export POSTGRES_PORT=5432
+
+export POSTGRES_USER=postgres
+export POSTGRES_PASSWORD=secret
+export POSTGRES_DB=my-database
+```
+
+2. Start PGAdapter.
+
+```shell
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
+docker run \
+  --rm -d -p 9001:5432 \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:/credentials.json:ro \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
+  -p ${GOOGLE_CLOUD_PROJECT} -i ${SPANNER_INSTANCE} \
+  -c /credentials.json \
+  -x
+```
+
+3. Copy the schema and data of the Cloud Spanner database to CloudSQL.
+
+```shell
+./copy-schema.sh
+./copy-data.sh
+```
+
+__NOTE__: The PostgreSQL user must have the `REPLICATION` privilege to run this script. If you get an
+error saying `permission denied to set parameter "session_replication_role"`, you need to run the
+following command to grant the privilege:
+
+```
+PGPASSWORD=$POSTGRES_PASSWORD psql \
+  -U $POSTGRES_USER \
+  -h $POSTGRES_HOST \
+  -d $POSTGRES_DB \
+  -c "alter role $POSTGRES_USER with replication"
+```
+
+### pg_dump
+
+You can also run `pg_dump` via any PostgreSQL database. This will first copy the schema and all data
+from your Cloud Spanner database to the PostgreSQL database that you have specified in the environment
+variables, and then run `pg_dump` on the PostgreSQL database. It will also export a `schema.sql` file
+for your Cloud Spanner database. The combination of the `pg_dump` files and the `schema.sql` file can
+be used to re-create the Cloud Spanner database.
+
+This will create the `pg_dump` files and `schema.sql` file in the `./backup` folder:
+
+```shell
+./run-pg-dump.sh
+```
+
+
+### pg_restore
+
+__NOTE__: The `run-pg-restore.sh` script is not supported with CloudSQL and other hosted
+PostgreSQL solutions, as the script adds PGAdapter as a foreign server. CloudSQL cannot
+access PGAdapter as a foreign server. Instead, you should use a local PostgreSQL server
+to execute this script.
+
+You can also run `pg_restore` via any PostgreSQL database that __runs on the same network
+as PGAdapter__. This will first restore the dump into the PostgreSQL database, and then copy
+the data from the PostgreSQL database into the Cloud Spanner database. The schema in the
+Cloud Spanner database is created from the`./backup/schema.sql` file. This ensures that
+all Cloud Spanner specific extensions to the PostgreSQL dialect are preserved, such as 
+`INTERLEAVE IN` clauses.
+
+This will restore the dump in the `./backup/data` directory to the PostgreSQL database,
+create the schema in the Cloud Spanner database named `new-database`, and copy all data
+from the PostgreSQL database to Cloud Spanner:
+
+```shell
+gcloud spanner databases create new-database \
+  --instance="$SPANNER_INSTANCE" \
+  --database-dialect=POSTGRESQL
+spanner_restore_database="new-database" ./run-pg-restore.sh
+```

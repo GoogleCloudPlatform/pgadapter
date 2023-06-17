@@ -9,7 +9,6 @@ output.txt
 __pycache__
 venv
 .DS_Store
-.env.local
 
 src/test/golang/**/*.h
 src/test/golang/**/*.so

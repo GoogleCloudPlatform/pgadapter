@@ -19,15 +19,18 @@ services:
       pgadapter:
         condition: service_started
     image: "postgres"
+    container_name: ${POSTGRES_CONTAINER_NAME}
     environment:
+      POSTGRES_HOST: ""
+      POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      PGADAPTER_CONTAINER_NAME: ${PGADAPTER_CONTAINER_NAME}
+      PGADAPTER_HOST: ${PGADAPTER_CONTAINER_NAME}
+      PGADAPTER_PORT: 5432
       GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}
       SPANNER_INSTANCE: ${SPANNER_INSTANCE}
       SPANNER_DATABASE: ${SPANNER_DATABASE}
-    container_name: ${POSTGRES_CONTAINER_NAME}
     volumes:
       - "./copy-schema.sh:/docker-entrypoint-initdb.d/copy-schema.sh:ro"
       - "./import-foreign-schema.sh:/docker-entrypoint-initdb.d/import-foreign-schema.sh:ro"
