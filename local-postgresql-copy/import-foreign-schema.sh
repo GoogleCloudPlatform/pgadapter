@@ -38,10 +38,8 @@ PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 --username "$POSTGRES_US
           options '-c spanner.readonly=true');
 
   -- We must create a user mapping for the local server. The user is ignored by PGAdapter.
---  CREATE USER MAPPING IF NOT EXISTS FOR public SERVER pgadapter_read_only
---      OPTIONS (user 'not_used', password_required 'false');
   CREATE USER MAPPING IF NOT EXISTS FOR public SERVER pgadapter_read_only
-      OPTIONS (user 'not_used', password 'not_used');
+      OPTIONS (user 'not_used', password_required 'false');
 
   -- Now import all tables as foreign tables to the read-only schema.
   IMPORT FOREIGN SCHEMA public from server pgadapter_read_only into _public_read_only;
@@ -67,10 +65,8 @@ PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 --username "$POSTGRES_US
       OPTIONS (host '$PGADAPTER_HOST', port '$PGADAPTER_PORT', dbname '$SPANNER_DATABASE');
 
   -- We must create a user mapping for the local server. The user is ignored by PGAdapter.
---  CREATE USER MAPPING IF NOT EXISTS FOR public SERVER pgadapter_read_write
---      OPTIONS (user 'not_used', password_required 'false');
-  CREATE USER MAPPING IF NOT EXISTS FOR public SERVER pgadapter_read_only
-      OPTIONS (user 'not_used', password 'not_used');
+  CREATE USER MAPPING IF NOT EXISTS FOR public SERVER pgadapter_read_write
+      OPTIONS (user 'not_used', password_required 'false');
 
   -- Now import all tables as foreign tables to the read/write schema.
   IMPORT FOREIGN SCHEMA public from server pgadapter_read_write into _public_read_write;
