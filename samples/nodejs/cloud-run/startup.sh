@@ -12,6 +12,8 @@
 
 # Start PGAdapter in the background.
 java -jar /pgadapter/pgadapter.jar -dir= &
+# Give PGAdapter a second to start up.
+sleep 1
 
-# Start the app server as the main application of the Docker container.
-exec "/app/server"
+# Run the web service on container startup.
+node index.js
