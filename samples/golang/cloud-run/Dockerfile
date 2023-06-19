@@ -16,16 +16,12 @@
 FROM eclipse-temurin:17-jre AS jre
 
 # Use the offical golang image to create a binary.
-# This is based on Debian and sets the GOPATH to /go.
-# https://hub.docker.com/_/golang
 FROM golang:1.19-buster as builder
 
 # Create and change to the app directory.
 WORKDIR /app
 
 # Retrieve application dependencies.
-# This allows the container build to reuse cached dependencies.
-# Expecting to copy go.mod and if present go.sum.
 COPY go.* ./
 RUN go mod download
 
@@ -36,11 +32,9 @@ COPY . ./
 RUN go build -v -o server
 
 # Use the official Debian slim image for a lean production container.
-# https://hub.docker.com/_/debian
-# https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
 FROM debian:buster-slim
 
-# Copy the JRE into the Node.js image.
+# Copy the JRE into the production image.
 ENV JAVA_HOME=/opt/java/openjdk
 COPY --from=jre $JAVA_HOME $JAVA_HOME
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
@@ -57,6 +51,4 @@ RUN tar -xzf /pgadapter.tar.gz -C /pgadapter
 COPY ./startup.sh /startup.sh
 RUN chmod +x /startup.sh
 
-# Override the ENTRYPOINT from the base PGAdapter Docker image.
-# The `startup.sh` file will start both PGAdapter and the app-server.
 ENTRYPOINT ["/bin/bash", "/startup.sh"]
