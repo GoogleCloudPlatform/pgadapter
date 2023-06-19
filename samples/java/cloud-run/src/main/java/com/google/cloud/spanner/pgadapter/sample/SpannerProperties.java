@@ -21,18 +21,9 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties("spanner")
 public class SpannerProperties {
 
-  private String credentials;
   private String project;
   private String instance;
   private String database;
-
-  public String getCredentials() {
-    return credentials;
-  }
-
-  public void setCredentials(String credentials) {
-    this.credentials = credentials;
-  }
 
   public String getProject() {
     return project;

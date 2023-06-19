@@ -16,7 +16,6 @@
 FROM eclipse-temurin:17-jre AS jre
 
 # Use the official lightweight Python image.
-# https://hub.docker.com/_/python
 FROM python:3.11-slim
 
 # Copy the JRE into the Pyton image.
@@ -44,6 +43,4 @@ RUN tar -xzf /pgadapter.tar.gz -C /pgadapter
 COPY ./startup.sh /startup.sh
 RUN chmod +x /startup.sh
 
-# Set an ENTRYPOINT for the container.
-# The `startup.sh` file will start both PGAdapter and the web service.
 ENTRYPOINT ["/bin/bash", "/startup.sh"]

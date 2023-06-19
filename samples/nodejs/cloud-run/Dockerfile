@@ -16,7 +16,6 @@
 FROM eclipse-temurin:17-jre AS jre
 
 # Use the official lightweight Node.js image.
-# https://hub.docker.com/_/node
 FROM node:18-slim
 
 # Copy the JRE into the Node.js image.
@@ -28,13 +27,9 @@ ENV PATH="${JAVA_HOME}/bin:${PATH}"
 WORKDIR /usr/src/app
 
 # Copy application dependency manifests to the container image.
-# A wildcard is used to ensure copying both package.json AND package-lock.json (when available).
-# Copying this first prevents re-running npm install on every code change.
 COPY package*.json ./
 
 # Install production dependencies.
-# If you add a package-lock.json, speed your build by switching to 'npm ci'.
-# RUN npm ci --only=production
 RUN npm install --only=production
 
 # Copy local code to the container image.
@@ -49,6 +44,4 @@ RUN tar -xzf /pgadapter.tar.gz -C /pgadapter
 COPY ./startup.sh /startup.sh
 RUN chmod +x /startup.sh
 
-# Set an ENTRYPOINT for the container.
-# The `startup.sh` file will start both PGAdapter and the web service.
 ENTRYPOINT ["/bin/bash", "/startup.sh"]
