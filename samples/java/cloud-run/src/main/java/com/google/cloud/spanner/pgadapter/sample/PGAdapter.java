@@ -48,8 +48,9 @@ public class PGAdapter {
   }
 
   /**
-   * Starts PGAdapter in-process and returns a reference to the server. Use this reference to
-   * gracefully shut down the server when your application shuts down.
+   * Starts PGAdapter in-process and returns a reference to the server. Use this reference to get
+   * the port number that was dynamically assigned to PGAdapter, and to gracefully shut down the
+   * server when your application shuts down.
    *
    * @param project the Google Cloud project that PGAdapter should connect to
    * @param instance the Cloud Spanner instance that PGAdapter should connect to
