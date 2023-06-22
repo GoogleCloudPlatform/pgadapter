@@ -24,7 +24,7 @@ import java.time.LocalDate;
 
 @Table(name = "albums")
 @Entity
-public class Album extends AbstractBaseEntity {
+public class Album extends AbstractUuidEntity {
   
   @Basic(optional = false)
   @Column(length = 200)

@@ -20,7 +20,7 @@ import jakarta.persistence.Table;
 
 @Table(name = "singers")
 @Entity
-public class Singer extends AbstractBaseEntity {
+public class Singer extends AbstractUuidEntity {
   
   @Column(length = 100)
   private String firstName;

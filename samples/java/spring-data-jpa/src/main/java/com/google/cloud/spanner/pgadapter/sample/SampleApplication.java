@@ -14,22 +14,38 @@
 
 package com.google.cloud.spanner.pgadapter.sample;
 
+import com.google.cloud.spanner.pgadapter.sample.model.Singer;
+import com.google.cloud.spanner.pgadapter.sample.repository.SingerRepository;
+import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
+import java.util.List;
 import javax.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class SampleApplication implements CommandLineRunner {
+  private static final Logger log = LoggerFactory.getLogger(SampleApplication.class);
+  
   private static final PGAdapter pgAdapter = new PGAdapter();
   
   public static void main(String[] args) {
     SpringApplication.run(SampleApplication.class, args);
   }
-
+  
+  private final SingerService singerService;
+  
+  public SampleApplication(SingerService singerService) {
+    this.singerService = singerService;
+  }
+  
   @Override
   public void run(String... args) throws Exception {
-    System.out.println("Started");
+    // Generate some random data.
+    List<Singer> singers = singerService.generateRandomSingers(10);
+    log.info("Created 10 singers");
   }
 
   @PreDestroy

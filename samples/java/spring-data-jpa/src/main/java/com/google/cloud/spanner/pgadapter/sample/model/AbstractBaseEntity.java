@@ -30,11 +30,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 @MappedSuperclass
 public class AbstractBaseEntity {
 
-  @Id
-  @Column(columnDefinition = "varchar(36)")
-  @GeneratedValue(strategy = GenerationType.UUID)
-  private String id;
-
   /** PostgreSQL by default maps ZonedDateTime to 'timestamptz(6). Type modifiers are not supported for timestamptz in Cloud Spanner, so we override the default. */
   @Column(columnDefinition = "timestamptz")
   @CreationTimestamp
