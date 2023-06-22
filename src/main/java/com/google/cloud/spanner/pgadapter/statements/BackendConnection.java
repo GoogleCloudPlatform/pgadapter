@@ -737,7 +737,8 @@ public class BackendConnection {
             () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
-    this.ddlExecutor = new DdlExecutor(this);
+    this.ddlExecutor =
+        new DdlExecutor(this, Suppliers.memoize(() -> wellKnownClient.get().getDdlReplacements()));
     this.localStatements =
         Suppliers.memoize(
             () -> {

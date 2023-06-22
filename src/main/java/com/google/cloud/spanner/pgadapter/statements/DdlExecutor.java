@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
@@ -21,7 +22,10 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
 import com.google.common.collect.ImmutableList;
+import java.util.function.Supplier;
 
 /**
  * {@link DdlExecutor} inspects DDL statements before executing these to support commonly used DDL
@@ -31,11 +35,15 @@ class DdlExecutor {
 
   private final BackendConnection backendConnection;
   private final Connection connection;
+  private final Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements;
 
   /** Constructor for a {@link DdlExecutor} for the given connection. */
-  DdlExecutor(BackendConnection backendConnection) {
+  DdlExecutor(
+      BackendConnection backendConnection,
+      Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements) {
     this.backendConnection = backendConnection;
     this.connection = backendConnection.getSpannerConnection();
+    this.ddlStatementReplacements = ddlStatementReplacements;
   }
 
   /**
@@ -57,7 +65,25 @@ class DdlExecutor {
    * make the statement compatible with Cloud Spanner.
    */
   StatementResult execute(ParsedStatement parsedStatement, Statement statement) {
+    if (!ddlStatementReplacements.get().isEmpty()) {
+      String replaced = applyReplacers(statement.getSql());
+      if (!replaced.equals(statement.getSql())) {
+        statement = Statement.of(replaced);
+        parsedStatement = AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+      }
+    }
     return connection.execute(translate(parsedStatement, statement));
+  }
+
+  private String applyReplacers(String sql) {
+    for (QueryPartReplacer functionReplacement : ddlStatementReplacements.get()) {
+      Tuple<String, ReplacementStatus> result = functionReplacement.replace(sql);
+      if (result.y() == ReplacementStatus.STOP) {
+        return result.x();
+      }
+      sql = result.x();
+    }
+    return sql;
   }
 
   /**
@@ -76,78 +102,8 @@ class DdlExecutor {
   Statement translateCreate(SimpleParser parser, Statement statement) {
     if (parser.eatKeyword("table")) {
       statement = maybeRemovePrimaryKeyConstraintName(statement);
-      statement = replaceTimestampWithTimestamptz(statement);
     }
     return statement;
-  }
-
-  static Statement replaceTimestampWithTimestamptz(Statement statement) {
-    SimpleParser parser = new SimpleParser(statement.getSql());
-    if (!(parser.eatKeyword("create") && parser.eatKeyword("table"))) {
-      return statement;
-    }
-    if (parser.readTableOrIndexName() == null) {
-      return statement;
-    }
-    if (!parser.eatToken("(")) {
-      return statement;
-    }
-    boolean replaced = false;
-    while (!parser.eatToken(")") && parser.hasMoreTokens()) {
-      if (parser.peekKeyword("constraint")
-          || parser.peekKeyword("check")
-          || parser.peekKeyword("foreign")
-          || parser.peekKeyword("primary")) {
-        // Skip constraint definition.
-        skipColumnOrConstraintExpression(parser);
-        continue;
-      }
-      TableOrIndexName name = parser.readTableOrIndexName();
-      if (name == null) {
-        // Skip expression.
-        skipColumnOrConstraintExpression(parser);
-        continue;
-      }
-      int startPos = parser.getPos();
-      if (parser.eatKeyword("timestamp")) {
-        if (parser.eatKeyword("with")) {
-          skipColumnOrConstraintExpression(parser);
-          continue;
-        }
-        if (parser.eatKeyword("without")) {
-          if (!(parser.eatKeyword("time") && parser.eatKeyword("zone"))) {
-            skipColumnOrConstraintExpression(parser);
-            continue;
-          }
-          replaced = true;
-          int length = parser.getPos() - startPos;
-          parser.setSql(
-              parser.getSql().substring(0, startPos)
-                  + " timestamp with time zone "
-                  + parser.getSql().substring(parser.getPos()));
-          parser.setPos(parser.getPos() + " timestamp with time zone ".length() - length);
-        } else {
-          replaced = true;
-          int length = parser.getPos() - startPos;
-          parser.setSql(
-              parser.getSql().substring(0, startPos)
-                  + " timestamptz "
-                  + parser.getSql().substring(parser.getPos()));
-          parser.setPos(parser.getPos() + " timestamptz ".length() - length);
-        }
-      }
-      // Skip the rest of the expression.
-      skipColumnOrConstraintExpression(parser);
-    }
-    if (replaced) {
-      return Statement.of(parser.getSql());
-    }
-    return statement;
-  }
-
-  static void skipColumnOrConstraintExpression(SimpleParser parser) {
-    parser.parseExpressionUntilKeyword(ImmutableList.of(), true, true);
-    parser.eatToken(",");
   }
 
   Statement maybeRemovePrimaryKeyConstraintName(Statement createTableStatement) {
@@ -173,12 +129,11 @@ class DdlExecutor {
         String constraintName = unquoteIdentifier(parser.readIdentifierPart());
         int positionAfterConstraintName = parser.getPos();
         if (parser.eatKeyword("primary", "key")) {
-          if (!(
-              constraintName.equalsIgnoreCase("pk_" + unquoteIdentifier(tableName.name))
-          || (
-                  // Well-known primary key that name is used by Liquibase.
-              tableName.getUnquotedName().equals("databasechangeloglock") &&
-              constraintName.equalsIgnoreCase("databasechangeloglock_pkey")))) {
+          if (!(constraintName.equalsIgnoreCase("pk_" + unquoteIdentifier(tableName.name))
+              || (
+              // Well-known primary key that name is used by Liquibase.
+              tableName.getUnquotedName().equals("databasechangeloglock")
+                  && constraintName.equalsIgnoreCase("databasechangeloglock_pkey")))) {
             return createTableStatement;
           }
           return Statement.of(

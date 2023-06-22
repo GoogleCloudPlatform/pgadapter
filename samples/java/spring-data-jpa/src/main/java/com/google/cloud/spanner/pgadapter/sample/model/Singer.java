@@ -16,7 +16,9 @@ package com.google.cloud.spanner.pgadapter.sample.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
+@Table(name = "singers")
 @Entity
 public class Singer extends AbstractBaseEntity {
   

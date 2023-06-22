@@ -16,10 +16,14 @@ package com.google.cloud.spanner.pgadapter.sample.model;
 
 import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Table(name = "albums")
+@Entity
 public class Album extends AbstractBaseEntity {
   
   @Basic(optional = false)
@@ -31,9 +35,8 @@ public class Album extends AbstractBaseEntity {
   private LocalDate releaseDate;
   
   private byte[] coverPicture;
-
-  @Basic(optional = false)
-  @ManyToOne
+  
+  @ManyToOne(optional = false)
   private Singer singer;
 
   public String getTitle() {
