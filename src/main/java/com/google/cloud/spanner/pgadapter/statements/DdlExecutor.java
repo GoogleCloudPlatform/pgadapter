@@ -37,9 +37,10 @@ class DdlExecutor {
   private final Connection connection;
   private final Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements;
 
-
   /** Constructor for a {@link DdlExecutor} for the given connection. */
-  DdlExecutor(BackendConnection backendConnection, Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements) {
+  DdlExecutor(
+      BackendConnection backendConnection,
+      Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements) {
     this.backendConnection = backendConnection;
     this.connection = backendConnection.getSpannerConnection();
     this.ddlStatementReplacements = ddlStatementReplacements;
@@ -73,7 +74,7 @@ class DdlExecutor {
     }
     return connection.execute(translate(parsedStatement, statement));
   }
-  
+
   private String applyReplacers(String sql) {
     for (QueryPartReplacer functionReplacement : ddlStatementReplacements.get()) {
       Tuple<String, ReplacementStatus> result = functionReplacement.replace(sql);
@@ -84,7 +85,7 @@ class DdlExecutor {
     }
     return sql;
   }
-  
+
   /**
    * Translates a DDL statement that can contain 'create table' statement with a named primary key
    * into one that is supported by the backend.

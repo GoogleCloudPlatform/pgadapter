@@ -21,6 +21,8 @@ import static org.mockito.Mockito.mock;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -52,7 +54,8 @@ public class DdlExecutorTest {
 
   @Test
   public void testMaybeRemovePrimaryKeyConstraintName() {
-    DdlExecutor ddlExecutor = new DdlExecutor(mock(BackendConnection.class));
+    DdlExecutor ddlExecutor =
+        new DdlExecutor(mock(BackendConnection.class), Suppliers.ofInstance(ImmutableList.of()));
 
     assertEquals(
         Statement.of("create table foo (id bigint primary key, value text)"),

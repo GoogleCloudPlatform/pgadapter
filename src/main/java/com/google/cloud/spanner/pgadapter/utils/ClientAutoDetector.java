@@ -527,11 +527,11 @@ public class ClientAutoDetector {
     public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
       return ImmutableList.of();
     }
-    
+
     public ImmutableList<QueryPartReplacer> getDdlReplacements() {
       return ImmutableList.of();
     }
-    
+
     /** Creates specific notice messages for a client after startup. */
     public ImmutableList<NoticeResponse> createStartupNoticeResponses(
         ConnectionHandler connection) {
