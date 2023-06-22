@@ -318,10 +318,10 @@ public class ClientAutoDetector {
                     "CREATE\\s+TABLE\\s+(?:.*\\.)?databasechangeloglock\\s*\\(\\s*"
                         + "ID\\s+INTEGER\\s+NOT\\s+NULL\\s*,\\s*"
                         + "LOCKED\\s+BOOLEAN\\s+NOT\\s+NULL\\s*,\\s*"
-                        + "LOCKGRANTED\\s+TIMESTAMP\\s*,\\s*"
+                        + "LOCKGRANTED\\s+TIMESTAMP\\s+WITHOUT\\s+TIME\\s+ZONE\\s*,\\s*"
                         + "LOCKEDBY\\s+VARCHAR\\s*\\(255\\)\\s*,\\s*"
-                        + "PRIMARY\\s+KEY\\s*\\(ID\\)\\s*"
-                        + "\\s*\\)\\s*",
+                        + "CONSTRAINT\\s*databasechangeloglock_pkey\\s*PRIMARY\\s+KEY\\s*\\(ID\\)\\s*\\s*"
+                        + "\\)\\s*",
                     Pattern.CASE_INSENSITIVE),
                 "CREATE TABLE databasechangeloglock (\n"
                     + "    ID INTEGER NOT NULL,\n"
