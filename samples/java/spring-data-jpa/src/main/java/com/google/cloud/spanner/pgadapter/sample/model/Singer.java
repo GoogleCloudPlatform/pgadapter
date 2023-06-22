@@ -1,0 +1,73 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package com.google.cloud.spanner.pgadapter.sample.model;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+
+@Entity
+public class Singer extends AbstractBaseEntity {
+  
+  @Column(length = 100)
+  private String firstName;
+  
+  @Column(length = 200)
+  private String lastName;
+
+  @Column(
+      columnDefinition = """
+              varchar(300) generated always as (
+              CASE WHEN first_name IS NULL THEN last_name
+                WHEN last_name IS NULL THEN first_name
+                ELSE first_name || ' ' || last_name
+              END) stored""",
+      insertable = false,
+      updatable = false)
+  private String fullName;
+  
+  private boolean active;
+
+  public String getFirstName() {
+    return firstName;
+  }
+
+  public void setFirstName(String firstName) {
+    this.firstName = firstName;
+  }
+
+  public String getLastName() {
+    return lastName;
+  }
+
+  public void setLastName(String lastName) {
+    this.lastName = lastName;
+  }
+
+  public String getFullName() {
+    return fullName;
+  }
+
+  public void setFullName(String fullName) {
+    this.fullName = fullName;
+  }
+
+  public boolean isActive() {
+    return active;
+  }
+
+  public void setActive(boolean active) {
+    this.active = active;
+  }
+}

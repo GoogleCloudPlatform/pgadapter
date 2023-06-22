@@ -14,8 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.DdlExecutor.replaceTimestampWithTimestamptz;
 import static com.google.cloud.spanner.pgadapter.statements.DdlExecutor.unquoteIdentifier;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.Dialect;
@@ -106,5 +108,111 @@ public class DdlExecutorTest {
         ddlExecutor.maybeRemovePrimaryKeyConstraintName(
             Statement.of(
                 "CREATE TABLE \"user\" (\"id\" integer NOT NULL, \"firstName\" character varying NOT NULL, \"lastName\" character varying NOT NULL, \"age\" integer NOT NULL, CONSTRAINT \"PK_user\" PRIMARY KEY (\"id\"))")));
+  }
+
+  @Test
+  public void testReplaceTimestampWithTimestamptz() {
+    assertSameAfterReplace(Statement.of("create index foo on bar (col1, col2)"));
+    assertSameAfterReplace(Statement.of("create table foo (col1 bigint, col2 varchar)"));
+    assertSameAfterReplace(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 varchar)"));
+    assertSameAfterReplace(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamptz)"));
+    assertSameAfterReplace(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamp with time zone)"));
+    assertSameAfterReplace(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamptz not null)"));
+    assertSameAfterReplace(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamp with time zone not null)"));
+
+    assertEquals(
+        Statement.of("create table foo (id bigint, value timestamptz)"),
+        replaceTimestampWithTimestamptz(
+            Statement.of("create table foo (id bigint, value timestamptz)")));
+    assertEquals(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamptz )"),
+        replaceTimestampWithTimestamptz(
+            Statement.of(
+                "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamp)")));
+    assertEquals(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamp with time zone )"),
+        replaceTimestampWithTimestamptz(
+            Statement.of(
+                "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamp without time zone)")));
+    assertEquals(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamptz not null)"),
+        replaceTimestampWithTimestamptz(
+            Statement.of(
+                "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamp not null)")));
+    assertEquals(
+        Statement.of(
+            "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamp with time zone  not null)"),
+        replaceTimestampWithTimestamptz(
+            Statement.of(
+                "create table foo (col1 bigint, constraint chk_col1 check (col1 < 100), col2 timestamp without time zone not null)")));
+    assertEquals(
+        Statement.of(
+            "create table foo (\n"
+                + "  col1 bigint,\n"
+                + "  constraint chk_col1 check (col1 < 100),\n"
+                + "  col2 timestamp with time zone  not null\n"
+                + ")"),
+        replaceTimestampWithTimestamptz(
+            Statement.of(
+                "create table foo (\n"
+                    + "  col1 bigint,\n"
+                    + "  constraint chk_col1 check (col1 < 100),\n"
+                    + "  col2 timestamp without time zone not null\n"
+                    + ")")));
+    assertEquals(
+        Statement.of(
+            "create table foo (\n"
+                + "  col1 bigint,\n"
+                + "  constraint chk_col1 check (col1 < 100),\n"
+                + "  col2 timestamp with time zone  not null\n"
+                + ")"),
+        replaceTimestampWithTimestamptz(
+            Statement.of(
+                "create table foo (\n"
+                    + "  col1 bigint,\n"
+                    + "  constraint chk_col1 check (col1 < 100),\n"
+                    + "  col2 timestamp /* we don't want a time zone */ without time zone not null\n"
+                    + ")")));
+    assertEquals(
+        Statement.of(
+            "create table foo (\n"
+                + "  col1 bigint,\n"
+                + "  primary key (col1),\n"
+                + "  constraint chk_col1 check (col1 < 100),\n"
+                + "  col2 timestamp with time zone  not null,\n"
+                + "  col3 timestamptz default null,\n"
+                + "  col4 varchar(100) not null,\n"
+                + "  col5 timestamp with time zone ,\n"
+                + "  col6 timestamp with time zone \n"
+                + ")"),
+        replaceTimestampWithTimestamptz(
+            Statement.of(
+                "create table foo (\n"
+                    + "  col1 bigint,\n"
+                    + "  primary key (col1),\n"
+                    + "  constraint chk_col1 check (col1 < 100),\n"
+                    + "  col2 timestamp without time zone not null,\n"
+                    + "  col3 timestamp default null,\n"
+                    + "  col4 varchar(100) not null,\n"
+                    + "  col5 timestamp without    time zone,\n"
+                    + "  col6       timestamp     without    time  zone\n"
+                    + ")")));
+  }
+
+  private void assertSameAfterReplace(Statement statement) {
+    assertSame(statement, replaceTimestampWithTimestamptz(statement));
   }
 }
