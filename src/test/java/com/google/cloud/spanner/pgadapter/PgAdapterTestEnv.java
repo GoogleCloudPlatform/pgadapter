@@ -133,6 +133,10 @@ public class PgAdapterTestEnv {
               + "col_array_varchar varchar(100)[], "
               + "col_array_jsonb jsonb[])");
 
+  public static ImmutableList<String> getOnlyAllTypesDdl() {
+    return DEFAULT_DATA_MODEL.subList(1, 2);
+  }
+
   // The project Id. This can be overwritten.
   private String projectId;
 

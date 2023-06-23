@@ -1,6 +1,12 @@
 # PGAdapter - psycopg3 Connection Options
 
-PGAdapter has experimental support for the [Python psycopg3 driver](https://www.psycopg.org/psycopg3/docs/index.html).
+PGAdapter supports the [Python psycopg3 driver](https://www.psycopg.org/psycopg3/docs/index.html).
+
+## Sample Application
+
+See this [sample application using psycopg3](../samples/python/psycopg3) for a Python sample
+application that embeds and starts PGAdapter automatically, and then connects to PGAdapter using
+`psycopg3`.
 
 ## Usage
 
@@ -69,13 +75,9 @@ psycopg.errors.RaiseException: Unknown statement: DECLARE "my_cursor" CURSOR FOR
 
 ### Nested Transactions
 `psycopg3` implements [nested transactions](https://www.psycopg.org/psycopg3/docs/basic/transactions.html#nested-transactions)
-using `SAVEPOINT`. This feature is currently not supported with PGAdapter.
-
-Creating a nested transaction in `psycopg3` with PGAdapter will cause an error like the following:
-
-```
-psycopg.errors.RaiseException: Unknown statement: SAVEPOINT "_pg3_2"
-```
+using `SAVEPOINT`. Rolling back to a `SAVEPOINT` can fail if the transaction contained at least one
+query that called a volatile function or if the underlying data that has been accessed by the
+transaction has been modified by another transaction.
 
 ## Performance Considerations
 

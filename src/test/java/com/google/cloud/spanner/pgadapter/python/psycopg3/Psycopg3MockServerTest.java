@@ -287,7 +287,17 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
         result);
 
     List<ExecuteSqlRequest> requests =
@@ -320,7 +330,17 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
         result);
 
     // psycopg3 does include the type of the parameter when it is an int, so PGAdapter does not
@@ -366,7 +386,17 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
         result);
 
     List<ExecuteSqlRequest> requests =
@@ -762,7 +792,17 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
         result);
 
     List<ExecuteSqlRequest> requests =
@@ -1010,6 +1050,16 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
             + "col_bigint: None\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
@@ -1019,7 +1069,17 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
-            + "col_jsonb: None\n",
+            + "col_jsonb: None\n"
+            + "col_array_bigint: None\n"
+            + "col_array_bool: None\n"
+            + "col_array_bytea: None\n"
+            + "col_array_float8: None\n"
+            + "col_array_int: None\n"
+            + "col_array_numeric: None\n"
+            + "col_array_timestamptz: None\n"
+            + "col_array_date: None\n"
+            + "col_array_string: None\n"
+            + "col_array_jsonb: None\n",
         result);
   }
 
@@ -1028,7 +1088,12 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
+                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, "
+                    + "col_timestamptz, col_date, col_varchar, col_jsonb, "
+                    + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, "
+                    + "col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, "
+                    + "col_array_varchar, col_array_jsonb "
+                    + "from all_types"),
             ALL_TYPES_RESULTSET
                 .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
@@ -1049,6 +1114,16 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
             + "col_bigint: None\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
@@ -1058,7 +1133,17 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
-            + "col_jsonb: None\n",
+            + "col_jsonb: None\n"
+            + "col_array_bigint: None\n"
+            + "col_array_bool: None\n"
+            + "col_array_bytea: None\n"
+            + "col_array_float8: None\n"
+            + "col_array_int: None\n"
+            + "col_array_numeric: None\n"
+            + "col_array_timestamptz: None\n"
+            + "col_array_date: None\n"
+            + "col_array_string: None\n"
+            + "col_array_jsonb: None\n",
         result);
   }
 
@@ -1084,6 +1169,16 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
             + "col_bigint: None\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
@@ -1093,7 +1188,17 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
-            + "col_jsonb: None\n",
+            + "col_jsonb: None\n"
+            + "col_array_bigint: None\n"
+            + "col_array_bool: None\n"
+            + "col_array_bytea: None\n"
+            + "col_array_float8: None\n"
+            + "col_array_int: None\n"
+            + "col_array_numeric: None\n"
+            + "col_array_timestamptz: None\n"
+            + "col_array_date: None\n"
+            + "col_array_string: None\n"
+            + "col_array_jsonb: None\n",
         result);
 
     List<ParseMessage> parseMessages =
@@ -1263,7 +1368,6 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  @Ignore("Nested transactions are not yet supported")
   public void testNestedTransaction() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(
@@ -1284,7 +1388,34 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
+        result);
+  }
+
+  @Test
+  public void testRollbackNestedTransaction() throws Exception {
+    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql), ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
+
+    String result = execute("rollback_nested_transaction");
+    assertEquals(
+        "Nested transaction failed with error: Test rollback of savepoint\n"
+            + "Rolling back to a savepoint succeeded\n",
         result);
   }
 

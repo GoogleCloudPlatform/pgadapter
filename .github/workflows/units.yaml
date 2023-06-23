@@ -17,7 +17,7 @@ jobs:
           distribution: zulu
           java-version: ${{matrix.java}}
       - run: java -version
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: '^1.17.7'
       - run: go version
@@ -28,6 +28,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
       - run: mvn -B test -Ptest-all
   windows:
     runs-on: windows-latest
@@ -60,7 +64,7 @@ jobs:
           distribution: zulu
           java-version: ${{matrix.java}}
       - run: java -version
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: '^1.17.7'
       - run: go version
@@ -74,4 +78,8 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
       - run: mvn -B test -Ptest-all

@@ -1,8 +1,13 @@
-# PGAdapter and SQLAlchemy
+# PGAdapter and SQLAlchemy 1.4
 
 PGAdapter has experimental support for [SQLAlchemy 1.4](https://docs.sqlalchemy.org/en/14/index.html)
 with the `psycopg2` driver. This document shows how to use this sample application, and lists the
 limitations when working with `SQLAlchemy` with PGAdapter.
+
+It is __recommended to use SQLAlchemy 2.x in combination with psycopg 3.x__ instead of SQLAlchemy 1.4
+with psycopg2. Psycopg2 never uses server-side query parameters. This will increase the latency of all
+queries that are executed by SQLAlchemy. See [SQLAlchemy 2.x sample](../sqlalchemy2-sample/README.md)
+for more information on how to use SQLAlchemy 2.x.
 
 The [sample.py](sample.py) file contains a sample application using `SQLAlchemy` with PGAdapter. Use
 this as a reference for features of `SQLAlchemy` that are supported with PGAdapter. This sample
@@ -72,12 +77,13 @@ The following limitations are currently known:
 
 | Limitation                   | Workaround                                                                                                                                                                                                                                                          |
 |------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Query Latency                | `psycopg2` never uses server-side query parameters. This increases the latency of all queries that are executed by SQLAlchemy. It is recommended to use SQLAlchemy 2.x instead if your application requires the lowest possible query latency.                      |
 | Creating and Dropping Tables | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated creation of tables using `SQLAlchemy` is therefore not supported.                                                                                                                         |
 | metadata.reflect()           | Cloud Spanner does not support all PostgreSQL `pg_catalog` tables. Using `metadata.reflect()` to get the current objects in the database is therefore not supported.                                                                                                |
 | DDL Transactions             | Cloud Spanner does not support DDL statements in a transaction. Add `?options=-c spanner.ddl_transaction_mode=AutocommitExplicitTransaction` to your connection string to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). |
 | Generated primary keys       | Manually assign a value to the primary key column in your code. The recommended primary key type is a random UUID. Sequences / SERIAL / IDENTITY columns are currently not supported.                                                                               |
 | INSERT ... ON CONFLICT       | `INSERT ... ON CONFLICT` is not supported.                                                                                                                                                                                                                          |
-| SAVEPOINT                    | Nested transactions and savepoints are not supported.                                                                                                                                                                                                               |
+| SAVEPOINT                    | Rolling back to a `SAVEPOINT` can fail if the transaction contained at least one query that called a volatile function.                                                                                                                                             |
 | SELECT ... FOR UPDATE        | `SELECT ... FOR UPDATE` is not supported.                                                                                                                                                                                                                           |
 | Server side cursors          | Server side cursors are currently not supported.                                                                                                                                                                                                                    |
 | Transaction isolation level  | Only SERIALIZABLE and AUTOCOMMIT are supported. `postgresql_readonly=True` is also supported. It is recommended to use either autocommit or read-only for workloads that only read data and/or that do not need to be atomic to get the best possible performance.  |
@@ -110,9 +116,9 @@ or https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialect
 will fail.
 
 ### SAVEPOINT - Nested transactions
-`SAVEPOINT`s are not supported by Cloud Spanner. Nested transactions in SQLAlchemy are translated to
-savepoints and are therefore not supported. Trying to use `Session.begin_nested()`
-(https://docs.sqlalchemy.org/en/14/orm/session_api.html#sqlalchemy.orm.Session.begin_nested) will fail.
+Rolling back to a `SAVEPOINT` can fail if the transaction contained at least one query that called a
+volatile function or if the underlying data that has been accessed by the transaction has been
+modified by another transaction.
 
 ### Locking - SELECT ... FOR UPDATE
 Locking clauses, like `SELECT ... FOR UPDATE`, are not supported (see also https://docs.sqlalchemy.org/en/20/orm/queryguide/query.html#sqlalchemy.orm.Query.with_for_update).
@@ -127,6 +133,10 @@ Instead, `psycopg2` will replace query parameters with literals in the SQL strin
 these to PGAdapter. This means that each query must be parsed and planned separately. This will add
 latency to queries that are executed multiple times compared to if the queries were executed using
 actual query parameters.
+
+It is therefore recommended to use `SQLAlchemy 2.x` in combination with `pscyopg 3.x` for applications
+that require the lowest possible query latency. See [SQLAlchemy 2.x sample](../sqlalchemy2-sample)
+for more information.
 
 ### Read-only Transactions
 SQLAlchemy will by default use read/write transactions for all database operations, including for

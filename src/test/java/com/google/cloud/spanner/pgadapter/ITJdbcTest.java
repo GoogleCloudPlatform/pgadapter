@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -29,6 +30,7 @@ import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -61,6 +63,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.Oid;
 import org.postgresql.util.PGobject;
+import org.postgresql.util.PSQLException;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -195,6 +198,28 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testSelectParameterizedOffsetWithoutLimit() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      connection.createStatement().execute("set spanner.auto_add_limit_clause=true");
+      try (PreparedStatement statement =
+          connection.prepareStatement("select * from numbers offset ?")) {
+        for (long offset : new long[] {0L, 1L}) {
+          statement.setLong(1, offset);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            if (offset == 0L) {
+              assertTrue(resultSet.next());
+              assertEquals(1L, resultSet.getLong(1));
+              assertFalse(resultSet.next());
+            } else {
+              assertFalse(resultSet.next());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   public void testSelectCurrentSchema() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (ResultSet resultSet =
@@ -202,6 +227,38 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(resultSet.next());
         assertEquals("public", resultSet.getString(1));
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testPgCatalogViews() throws SQLException {
+    for (String view : new String[] {"pg_sequence", "pg_sequences"}) {
+      for (String prefix : new String[] {"", "pg_catalog."}) {
+        try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+          try (ResultSet resultSet =
+              connection.createStatement().executeQuery("SELECT * FROM " + prefix + view)) {
+            while (resultSet.next()) {
+              assertNotNull(resultSet.getMetaData());
+              assertNotEquals(0, resultSet.getMetaData().getColumnCount());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testInformationSchemaViews() throws SQLException {
+    for (String view : new String[] {"sequences"}) {
+      try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("SELECT * FROM INFORMATION_SCHEMA." + view)) {
+          while (resultSet.next()) {
+            assertNotNull(resultSet.getMetaData());
+            assertNotEquals(0, resultSet.getMetaData().getColumnCount());
+          }
+        }
       }
     }
   }
@@ -657,6 +714,28 @@ public class ITJdbcTest implements IntegrationTest {
               .createStatement()
               .executeUpdate("update numbers set name='Two - updated' where num=2");
       assertEquals(0, noUpdateCount);
+    }
+  }
+
+  @Test
+  public void testRelationNotFoundError() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("select * from non_existing_table where id=?")) {
+        preparedStatement.setLong(1, 1L);
+        PSQLException exception =
+            assertThrows(PSQLException.class, preparedStatement::executeQuery);
+        if (preferQueryMode.equals("simple")) {
+          assertEquals(
+              "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=1'",
+              exception.getMessage());
+        } else {
+          assertEquals(
+              "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=$1'",
+              exception.getMessage());
+        }
+        assertEquals(SQLState.UndefinedTable.toString(), exception.getSQLState());
+      }
     }
   }
 

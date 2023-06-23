@@ -1,5 +1,117 @@
 # Changelog
 
+## [0.21.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.20.0...v0.21.0) (2023-06-07)
+
+
+### Features
+
+* support cursors and foreign data wrapper ([#797](https://github.com/GoogleCloudPlatform/pgadapter/issues/797)) ([5ee2200](https://github.com/GoogleCloudPlatform/pgadapter/commit/5ee220070257f8abf1106caf1fde1bd779ed25ec))
+* support setting the well-known client ([#837](https://github.com/GoogleCloudPlatform/pgadapter/issues/837)) ([045156c](https://github.com/GoogleCloudPlatform/pgadapter/commit/045156cda729975f34c63a084c606470903850ef))
+
+
+### Documentation
+
+* document how to connect to IntelliJ ([#870](https://github.com/GoogleCloudPlatform/pgadapter/issues/870)) ([35ec68f](https://github.com/GoogleCloudPlatform/pgadapter/commit/35ec68f78598ce45246ffbaa9092caac58070bb3))
+
+## [0.20.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.19.1...v0.20.0) (2023-05-26)
+
+
+### Features
+
+* add support for Ruby ActiveRecord ([#749](https://github.com/GoogleCloudPlatform/pgadapter/issues/749)) ([442e45c](https://github.com/GoogleCloudPlatform/pgadapter/commit/442e45ceef9e8ac9d834126a3f90d03b75b6821a))
+* detect relation not found errors ([#834](https://github.com/GoogleCloudPlatform/pgadapter/issues/834)) ([8d21df7](https://github.com/GoogleCloudPlatform/pgadapter/commit/8d21df7e427fbbbff75ab71cac04adb339eba49e))
+
+
+### Bug Fixes
+
+* latency benchmark should use random local port ([#843](https://github.com/GoogleCloudPlatform/pgadapter/issues/843)) ([e15711f](https://github.com/GoogleCloudPlatform/pgadapter/commit/e15711f4ef0c80c391b4df70abb349029e6c80cc))
+
+## [0.19.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.19.0...v0.19.1) (2023-05-17)
+
+
+### Performance Improvements
+
+* add latency comparision test ([#790](https://github.com/GoogleCloudPlatform/pgadapter/issues/790)) ([9be6b09](https://github.com/GoogleCloudPlatform/pgadapter/commit/9be6b09d5e156d7f916d25467ca679e028aa19d1))
+* bundle Ready response with the rest ([#806](https://github.com/GoogleCloudPlatform/pgadapter/issues/806)) ([af98023](https://github.com/GoogleCloudPlatform/pgadapter/commit/af98023a7363d6a2bb2bfb356b747f3ed8499e0e))
+
+## [0.19.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.4...v0.19.0) (2023-05-05)
+
+
+### Features
+
+* automatically add LIMIT clause ([#792](https://github.com/GoogleCloudPlatform/pgadapter/issues/792)) ([c382392](https://github.com/GoogleCloudPlatform/pgadapter/commit/c38239213dabab0c17cd1b1ffedfe033607cbcbc))
+* emulate pg_class and related tables ([#766](https://github.com/GoogleCloudPlatform/pgadapter/issues/766)) ([e602750](https://github.com/GoogleCloudPlatform/pgadapter/commit/e60275074ca7de8e88d63c6aa7465d90780b9a59))
+* support savepoints ([#796](https://github.com/GoogleCloudPlatform/pgadapter/issues/796)) ([570fb96](https://github.com/GoogleCloudPlatform/pgadapter/commit/570fb96b4b42e903000e4e5efd3428bfca90f57d))
+
+
+### Documentation
+
+* add sample for Cloud Run ([#770](https://github.com/GoogleCloudPlatform/pgadapter/issues/770)) ([751030d](https://github.com/GoogleCloudPlatform/pgadapter/commit/751030db44797ab5a006b6b0ffadc34d66bb16c3))
+* document psycopg3 and SQLAlchemy 2.x support ([#801](https://github.com/GoogleCloudPlatform/pgadapter/issues/801)) ([fe73c63](https://github.com/GoogleCloudPlatform/pgadapter/commit/fe73c6353cfa539e5f73945fa74e0d9df5d5b02e))
+
+## [0.18.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.3...v0.18.4) (2023-04-15)
+
+
+### Documentation
+
+* recommend psycopg3 over psycopg2 ([#742](https://github.com/GoogleCloudPlatform/pgadapter/issues/742)) ([8aec410](https://github.com/GoogleCloudPlatform/pgadapter/commit/8aec410c4ff14df6b3787d0988bb868665cdf1b7))
+
+
+### Dependencies
+
+* bump JDBC driver to 42.6.0 ([#747](https://github.com/GoogleCloudPlatform/pgadapter/issues/747)) ([9bdb5f4](https://github.com/GoogleCloudPlatform/pgadapter/commit/9bdb5f477ffcfd3861e43305bcf8c229a437b7e8))
+* bump Spanner client lib version to 6.40.0 ([#781](https://github.com/GoogleCloudPlatform/pgadapter/issues/781)) ([419c833](https://github.com/GoogleCloudPlatform/pgadapter/commit/419c8336eed28115520e4cc03d28b2ff60415138))
+* pin the SQLAlchemy 2.x version used for tests ([#759](https://github.com/GoogleCloudPlatform/pgadapter/issues/759)) ([2a78f4c](https://github.com/GoogleCloudPlatform/pgadapter/commit/2a78f4cd0b72f0f7432081816a3b6173ed65c613))
+
+## [0.18.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.2...v0.18.3) (2023-03-20)
+
+
+### Bug Fixes
+
+* close SpannerPool at shutdown ([#734](https://github.com/GoogleCloudPlatform/pgadapter/issues/734)) ([d67a75f](https://github.com/GoogleCloudPlatform/pgadapter/commit/d67a75f4be16db958cfb268277649a62d5e99e7c))
+
+
+### Documentation
+
+* add psycopg3 sample with embedded PGAdapter ([#733](https://github.com/GoogleCloudPlatform/pgadapter/issues/733)) ([0250b21](https://github.com/GoogleCloudPlatform/pgadapter/commit/0250b2165247bbc5ee8a48874822c11f264a9a86))
+* add sample application for JDBC ([#592](https://github.com/GoogleCloudPlatform/pgadapter/issues/592)) ([c1a5635](https://github.com/GoogleCloudPlatform/pgadapter/commit/c1a56358030c97b20d6ff3d774be26b755f837bf))
+* document SQLAlchemy 2.x experimental support ([#728](https://github.com/GoogleCloudPlatform/pgadapter/issues/728)) ([6a40e9e](https://github.com/GoogleCloudPlatform/pgadapter/commit/6a40e9e5a54d161dc44280c4c6a6a7d09cbb2490))
+* pgx sample using embedded PGAdapter ([#732](https://github.com/GoogleCloudPlatform/pgadapter/issues/732)) ([7c95781](https://github.com/GoogleCloudPlatform/pgadapter/commit/7c9578165aebade978054aedd440db4349080d23))
+
+## [0.18.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.1...v0.18.2) (2023-03-17)
+
+
+### Bug Fixes
+
+* add support for getting arrays using npgsql ([#722](https://github.com/GoogleCloudPlatform/pgadapter/issues/722)) ([6988ad1](https://github.com/GoogleCloudPlatform/pgadapter/commit/6988ad17c06a9e9197fd71922492ff76eafb280b))
+
+
+### Documentation
+
+* add documentation and sample for GKE sidecar proxy ([#718](https://github.com/GoogleCloudPlatform/pgadapter/issues/718)) ([f4246bd](https://github.com/GoogleCloudPlatform/pgadapter/commit/f4246bd81e66ffe7f20c9f78f5e59302635de5ed)), closes [#701](https://github.com/GoogleCloudPlatform/pgadapter/issues/701)
+
+## [0.18.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.0...v0.18.1) (2023-03-09)
+
+
+### Bug Fixes
+
+* the JDBC reWriteBatchedInserts=true option could cause errors in DML batches ([#713](https://github.com/GoogleCloudPlatform/pgadapter/issues/713)) ([36bff88](https://github.com/GoogleCloudPlatform/pgadapter/commit/36bff88c6476d4e0f3b8f20797182eab56646143))
+
+## [0.18.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.17.0...v0.18.0) (2023-03-06)
+
+
+### Features
+
+* support arrays in copy operations ([#690](https://github.com/GoogleCloudPlatform/pgadapter/issues/690)) ([ac624e5](https://github.com/GoogleCloudPlatform/pgadapter/commit/ac624e51e7949362f85b11e5f79199f13d5e140c))
+
+
+### Bug Fixes
+
+* add pg_sequence and pg_sequences views ([#700](https://github.com/GoogleCloudPlatform/pgadapter/issues/700)) ([2ad990a](https://github.com/GoogleCloudPlatform/pgadapter/commit/2ad990a86def4b01aaf97475d5325e0f6c3266c9))
+* allow unquoted text values in arrays ([#706](https://github.com/GoogleCloudPlatform/pgadapter/issues/706)) ([b09f540](https://github.com/GoogleCloudPlatform/pgadapter/commit/b09f540eff12e76d9d2059537d27a335efb77c65))
+* support information_schema.sequences ([#708](https://github.com/GoogleCloudPlatform/pgadapter/issues/708)) ([c043c46](https://github.com/GoogleCloudPlatform/pgadapter/commit/c043c46f811a68bc537c13ff35840d413b0d786b)), closes [#705](https://github.com/GoogleCloudPlatform/pgadapter/issues/705)
+* timestamp arrays should use timestamptz_array OID ([#691](https://github.com/GoogleCloudPlatform/pgadapter/issues/691)) ([52cac8c](https://github.com/GoogleCloudPlatform/pgadapter/commit/52cac8ceb00af6d5b88476146c24beb2a3b6b34d))
+
 ## [0.17.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.16.0...v0.17.0) (2023-02-24)
 
 

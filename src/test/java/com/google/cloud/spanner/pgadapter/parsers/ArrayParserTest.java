@@ -189,6 +189,19 @@ public class ArrayParserTest {
                 Type.timestamp(),
                 Oid.TIMESTAMPTZ)
             .item);
+    assertEquals(
+        Arrays.asList(
+            Timestamp.parseTimestamp("2023-02-13T19:15:00.123456Z"),
+            null,
+            Timestamp.parseTimestamp("2000-01-01T00:00:00Z")),
+        new ArrayParser(
+                "{2023-02-13T19:15:00.123456+00:00,null,2000-01-01T00:00:00+00}"
+                    .getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT,
+                mock(SessionState.class),
+                Type.timestamp(),
+                Oid.TIMESTAMPTZ)
+            .item);
   }
 
   @Test
@@ -197,6 +210,15 @@ public class ArrayParserTest {
         Arrays.asList(Date.parseDate("2023-02-13"), null, Date.parseDate("2000-01-01")),
         new ArrayParser(
                 "{\"2023-02-13\",null,\"2000-01-01\"}".getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT,
+                mock(SessionState.class),
+                Type.date(),
+                Oid.DATE)
+            .item);
+    assertEquals(
+        Arrays.asList(Date.parseDate("2023-02-13"), null, Date.parseDate("2000-01-01")),
+        new ArrayParser(
+                "{2023-02-13,null,2000-01-01}".getBytes(StandardCharsets.UTF_8),
                 FormatCode.TEXT,
                 mock(SessionState.class),
                 Type.date(),
@@ -451,16 +473,13 @@ public class ArrayParserTest {
   @Test
   public void testNullTextArray() {
     assertNull(
-        ArrayParser.stringArrayToList(
-            null, Oid.UNSPECIFIED, false, mock(SessionState.class), false));
+        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), false));
     assertNull(
-        ArrayParser.stringArrayToList(
-            null, Oid.UNSPECIFIED, false, mock(SessionState.class), true));
+        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), true));
     assertNull(
-        ArrayParser.stringArrayToList(
-            null, Oid.UNSPECIFIED, true, mock(SessionState.class), false));
+        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), false));
     assertNull(
-        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, true, mock(SessionState.class), true));
+        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), true));
   }
 
   static ResultSet createArrayResultSet(Type arrayElementType, Value value) {

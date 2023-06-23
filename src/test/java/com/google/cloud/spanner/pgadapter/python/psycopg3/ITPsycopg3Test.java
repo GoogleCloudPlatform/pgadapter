@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.python.psycopg3;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.getOnlyAllTypesDdl;
 import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.DIRECTORY_NAME;
 import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.execute;
 import static org.junit.Assert.assertArrayEquals;
@@ -39,11 +40,13 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -82,18 +85,7 @@ public class ITPsycopg3Test {
   }
 
   private static Iterable<String> getDdlStatements() {
-    return Collections.singletonList(
-        "create table all_types ("
-            + "col_bigint bigint not null primary key, "
-            + "col_bool bool, "
-            + "col_bytea bytea, "
-            + "col_float8 float8, "
-            + "col_int int, "
-            + "col_numeric numeric, "
-            + "col_timestamptz timestamptz, "
-            + "col_date date, "
-            + "col_varchar varchar(100),"
-            + "col_jsonb jsonb)");
+    return getOnlyAllTypesDdl();
   }
 
   private String createConnectionString() {
@@ -128,6 +120,33 @@ public class ITPsycopg3Test {
                 .to("test")
                 .set("col_jsonb")
                 .to("{\"key\": \"value\"}")
+                .set("col_array_bigint")
+                .toInt64Array(Arrays.asList(1L, null, 2L))
+                .set("col_array_bool")
+                .toBoolArray(Arrays.asList(true, null, false))
+                .set("col_array_bytea")
+                .toBytesArray(
+                    Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float8")
+                .toFloat64Array(Arrays.asList(3.14d, null, -99.99))
+                .set("col_array_int")
+                .toInt64Array(Arrays.asList(-100L, null, -200L))
+                .set("col_array_numeric")
+                .toPgNumericArray(Arrays.asList("6.626", null, "-3.14"))
+                .set("col_array_timestamptz")
+                .toTimestampArray(
+                    Arrays.asList(
+                        Timestamp.parseTimestamp("2022-02-16T16:18:02.123456Z"),
+                        null,
+                        Timestamp.parseTimestamp("2000-01-01T00:00:00Z")))
+                .set("col_array_date")
+                .toDateArray(
+                    Arrays.asList(Date.parseDate("2023-02-20"), null, Date.parseDate("2000-01-01")))
+                .set("col_array_varchar")
+                .toStringArray(Arrays.asList("string1", null, "string2"))
+                .set("col_array_jsonb")
+                .toPgJsonbArray(
+                    Arrays.asList("{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"))
                 .build()));
   }
 
@@ -176,7 +195,17 @@ public class ITPsycopg3Test {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
         result);
   }
 
@@ -193,7 +222,17 @@ public class ITPsycopg3Test {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
         result);
   }
 
@@ -221,7 +260,17 @@ public class ITPsycopg3Test {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
         result);
   }
 
@@ -292,7 +341,17 @@ public class ITPsycopg3Test {
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: None\n"
+            + "col_array_bool: None\n"
+            + "col_array_bytea: None\n"
+            + "col_array_float8: None\n"
+            + "col_array_int: None\n"
+            + "col_array_numeric: None\n"
+            + "col_array_timestamptz: None\n"
+            + "col_array_date: None\n"
+            + "col_array_string: None\n"
+            + "col_array_jsonb: None\n",
         result);
   }
 
@@ -392,11 +451,15 @@ public class ITPsycopg3Test {
     assertTrue(result, result.contains("Row [101] in table all_types already exists"));
   }
 
+  // TODO: Enable once the below PR has been merged
+  @Ignore("https://github.com/GoogleCloudPlatform/pgadapter/pull/690")
   @Test
   public void testBinaryCopyIn() throws Exception {
     testCopyIn("binary_copy_in");
   }
 
+  // TODO: Enable once the below PR has been merged
+  @Ignore("https://github.com/GoogleCloudPlatform/pgadapter/pull/690")
   @Test
   public void testTextCopyIn() throws Exception {
     testCopyIn("text_copy_in");
@@ -461,6 +524,16 @@ public class ITPsycopg3Test {
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
             + "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
@@ -470,7 +543,17 @@ public class ITPsycopg3Test {
             + "col_timestamptz: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
-            + "col_jsonb: None\n",
+            + "col_jsonb: None\n"
+            + "col_array_bigint: None\n"
+            + "col_array_bool: None\n"
+            + "col_array_bytea: None\n"
+            + "col_array_float8: None\n"
+            + "col_array_int: None\n"
+            + "col_array_numeric: None\n"
+            + "col_array_timestamptz: None\n"
+            + "col_array_date: None\n"
+            + "col_array_string: None\n"
+            + "col_array_jsonb: None\n",
         result);
   }
 
@@ -491,6 +574,16 @@ public class ITPsycopg3Test {
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
             + "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
@@ -500,7 +593,17 @@ public class ITPsycopg3Test {
             + "col_timestamptz: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
-            + "col_jsonb: None\n",
+            + "col_jsonb: None\n"
+            + "col_array_bigint: None\n"
+            + "col_array_bool: None\n"
+            + "col_array_bytea: None\n"
+            + "col_array_float8: None\n"
+            + "col_array_int: None\n"
+            + "col_array_numeric: None\n"
+            + "col_array_timestamptz: None\n"
+            + "col_array_date: None\n"
+            + "col_array_string: None\n"
+            + "col_array_jsonb: None\n",
         result);
   }
 
@@ -521,6 +624,16 @@ public class ITPsycopg3Test {
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
             + "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
@@ -530,7 +643,17 @@ public class ITPsycopg3Test {
             + "col_timestamptz: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
-            + "col_jsonb: None\n",
+            + "col_jsonb: None\n"
+            + "col_array_bigint: None\n"
+            + "col_array_bool: None\n"
+            + "col_array_bytea: None\n"
+            + "col_array_float8: None\n"
+            + "col_array_int: None\n"
+            + "col_array_numeric: None\n"
+            + "col_array_timestamptz: None\n"
+            + "col_array_date: None\n"
+            + "col_array_string: None\n"
+            + "col_array_jsonb: None\n",
         result);
   }
 
@@ -580,6 +703,26 @@ public class ITPsycopg3Test {
                 .to((String) null)
                 .set("col_jsonb")
                 .to(Value.pgJsonb(null))
+                .set("col_array_bigint")
+                .toInt64Array((long[]) null)
+                .set("col_array_bool")
+                .toBoolArray((boolean[]) null)
+                .set("col_array_bytea")
+                .toBytesArray(null)
+                .set("col_array_float8")
+                .toFloat64Array((double[]) null)
+                .set("col_array_int")
+                .toInt64Array((long[]) null)
+                .set("col_array_numeric")
+                .toPgNumericArray(null)
+                .set("col_array_timestamptz")
+                .toTimestampArray(null)
+                .set("col_array_date")
+                .toDateArray(null)
+                .set("col_array_varchar")
+                .toStringArray(null)
+                .set("col_array_jsonb")
+                .toPgJsonbArray(null)
                 .build()));
   }
 }

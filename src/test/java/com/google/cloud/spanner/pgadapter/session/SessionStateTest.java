@@ -161,7 +161,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(358, allSettings.size());
+    assertEquals(360, allSettings.size());
   }
 
   @Test
@@ -199,7 +199,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(360, allSettings.size());
+    assertEquals(362, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -714,6 +714,76 @@ public class SessionStateTest {
     state.set("spanner", "replace_pg_catalog_tables", null);
 
     assertFalse(state.isReplacePgCatalogTables());
+  }
+
+  @Test
+  public void testIsEmulatePgClassTables_resetVal() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    PGSetting setting =
+        new PGSetting(
+            "spanner",
+            "emulate_pg_class_tables",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            /* resetVal = */ "off",
+            null,
+            null,
+            false);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of("spanner.emulate_pg_class_tables", setting), optionsMetadata);
+    state.set("spanner", "emulate_pg_class_tables", null);
+
+    assertFalse(state.isEmulatePgClassTables());
+  }
+
+  @Test
+  public void testIsEmulatePgClassTables_bootVal() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    PGSetting setting =
+        new PGSetting(
+            "spanner",
+            "emulate_pg_class_tables",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            /* bootVal = */ "off",
+            null,
+            null,
+            null,
+            false);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of("spanner.emulate_pg_class_tables", setting), optionsMetadata);
+    state.set("spanner", "emulate_pg_class_tables", null);
+
+    assertFalse(state.isEmulatePgClassTables());
+  }
+
+  @Test
+  public void testIsEmulatePgClassTables_NoValue() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+    state.getSettings().clear();
+    assertFalse(state.isEmulatePgClassTables());
   }
 
   @Test

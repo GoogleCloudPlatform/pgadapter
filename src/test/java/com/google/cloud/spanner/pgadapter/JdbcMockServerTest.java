@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -39,6 +40,13 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCollation;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgConstraint;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgExtension;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgIndex;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -65,6 +73,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ParameterMetaData;
@@ -72,9 +81,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -175,6 +186,28 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("jsonb").build())
                         .build())
                 .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(3807L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .build())
+                .build()));
 
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -246,6 +279,54 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("_jsonb").build())
                         .build())
                 .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .bind("p1")
+                .to(3807L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .addValues(Value.newBuilder().setStringValue("3807").build())
+                        .build())
+                .build()));
   }
 
   /**
@@ -301,6 +382,44 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         // Otherwise, the JDBC driver includes its own name, and that is not overwritten by
         // PGAdapter.
         assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSetWellKnownClient() throws SQLException {
+    for (String client : new String[] {"pgx", "npgsql", "sqlalchemy2"}) {
+      try (Connection connection =
+          DriverManager.getConnection(
+              String.format(
+                  "jdbc:postgresql://localhost:%d/?options=-c%%20spanner.well_known_client=%s",
+                  pgServer.getLocalPort(), client))) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("show spanner.well_known_client")) {
+          assertTrue(resultSet.next());
+          assertEquals(client.toUpperCase(), resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        PSQLException exception =
+            assertThrows(
+                PSQLException.class,
+                () -> connection.createStatement().execute("set spanner.well_known_client='foo'"));
+        assertNotNull(exception.getServerErrorMessage());
+        assertEquals(
+            "parameter \"spanner.well_known_client\" cannot be set after connection start",
+            exception.getServerErrorMessage().getMessage());
+      }
+    }
+    try (Connection connection =
+        DriverManager.getConnection(
+            String.format(
+                "jdbc:postgresql://localhost:%d/?options=-c%%20spanner.well_known_client=%s",
+                pgServer.getLocalPort(), "foo"))) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.well_known_client")) {
+        assertTrue(resultSet.next());
+        assertEquals("foo", resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -477,7 +596,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         new String[] {"SELECT version()", "select version()", "select * from version()"}) {
 
       try (Connection connection = DriverManager.getConnection(createUrl())) {
-        String version = null;
+        String version;
         try (ResultSet resultSet =
             connection.createStatement().executeQuery("show server_version")) {
           assertTrue(resultSet.next());
@@ -1040,16 +1159,18 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.exception(
             Statement.newBuilder(pgSql).bind("p1").to(1L).build(),
-            Status.NOT_FOUND
-                .withDescription("Table non_existing_table not found")
+            Status.INVALID_ARGUMENT
+                .withDescription("relation \"non_existing_table\" does not exist")
                 .asRuntimeException()));
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         preparedStatement.setLong(1, 1L);
-        SQLException exception = assertThrows(SQLException.class, preparedStatement::executeQuery);
+        PSQLException exception =
+            assertThrows(PSQLException.class, preparedStatement::executeQuery);
         assertEquals(
-            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=$1'",
             exception.getMessage());
+        assertEquals(SQLState.UndefinedTable.toString(), exception.getSQLState());
       }
     }
 
@@ -1420,6 +1541,540 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testJdbcPreparedStatementBatch() throws SQLException {
+    String pgRewrittenInsertSql = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String pgInsertSql = "insert into my_table (id, value) values ($1, $2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgInsertSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgRewrittenInsertSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.STRING, TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgInsertSql).bind("p1").to(1L).bind("p2").to("One").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgInsertSql).bind("p1").to(2L).bind("p2").to("Two").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgRewrittenInsertSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to("One")
+                .bind("p3")
+                .to(2L)
+                .bind("p4")
+                .to("Two")
+                .build(),
+            2L));
+    String selectSql = "select value from my_table where id=?";
+    String pgSelectSql = "select value from my_table where id=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSelectSql).bind("p1").to(1L).build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("One").build())
+                        .build())
+                .build()));
+    String updateSql = "update my_table set value=? where id=?";
+    String pgUpdateSql = "update my_table set value=$1 where id=$2";
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgUpdateSql).bind("p1").to("One").bind("p2").to(1L).build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgUpdateSql).bind("p1").to("Two").bind("p2").to(2L).build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgUpdateSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      for (int i = 0; i < 10; i++) {
+        try (PreparedStatement insertStatement = connection.prepareStatement(insertSql);
+            PreparedStatement updateStatement = connection.prepareStatement(updateSql)) {
+          insertStatement.setLong(1, 1L);
+          insertStatement.setString(2, "One");
+          insertStatement.addBatch();
+
+          updateStatement.setString(1, "One");
+          updateStatement.setLong(2, 1L);
+          updateStatement.addBatch();
+          updateStatement.setString(1, "Two");
+          updateStatement.setLong(2, 2L);
+          updateStatement.addBatch();
+
+          try (PreparedStatement selectStatement = connection.prepareStatement(selectSql)) {
+            selectStatement.setLong(1, 1L);
+            try (ResultSet resultSet = selectStatement.executeQuery()) {
+              assertTrue(resultSet.next());
+              assertEquals("One", resultSet.getString(1));
+              assertFalse(resultSet.next());
+            }
+          }
+
+          insertStatement.setLong(1, 2L);
+          insertStatement.setString(2, "Two");
+          insertStatement.addBatch();
+
+          int[] updateCounts = insertStatement.executeBatch();
+          assertEquals(2, updateCounts.length);
+
+          updateCounts = updateStatement.executeBatch();
+          assertEquals(2, updateCounts.length);
+
+          connection.commit();
+        }
+      }
+    }
+
+    assertEquals(10, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    // We receive 21 ExecuteSql requests, because the update statement is described.
+    assertEquals(21, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBatchedAutoDescribedPreparedStatement() throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String pgInsertSql = "insert into my_table (id, value) values ($1, $2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgInsertSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgInsertSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgInsertSql)
+                .bind("p1")
+                .to(2L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:11:00Z"))
+                .build(),
+            1L));
+    String updateSql = "update my_table set value=? where id=?";
+    String pgUpdateSql = "update my_table set value=$1 where id=$2";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgUpdateSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(TypeCode.TIMESTAMP, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgUpdateSql)
+                .bind("p1")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:11:00Z"))
+                .bind("p2")
+                .to(1L)
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgUpdateSql)
+                .bind("p1")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p2")
+                .to(2L)
+                .build(),
+            1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql);
+          PreparedStatement updateStatement = connection.prepareStatement(updateSql)) {
+        insertStatement.setLong(1, 1L);
+        insertStatement.setTimestamp(
+            2, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+        insertStatement.addBatch();
+        insertStatement.setLong(1, 2L);
+        insertStatement.setTimestamp(
+            2, Timestamp.parseTimestamp("2023-03-08T18:11:00Z").toSqlTimestamp());
+        insertStatement.addBatch();
+
+        updateStatement.setTimestamp(
+            1, Timestamp.parseTimestamp("2023-03-08T18:11:00Z").toSqlTimestamp());
+        updateStatement.setLong(2, 1L);
+        updateStatement.addBatch();
+        updateStatement.setTimestamp(
+            1, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+        updateStatement.setLong(2, 2L);
+        updateStatement.addBatch();
+
+        int[] updateCounts = insertStatement.executeBatch();
+        assertEquals(2, updateCounts.length);
+
+        updateCounts = updateStatement.executeBatch();
+        assertEquals(2, updateCounts.length);
+
+        connection.commit();
+      }
+    }
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    // Both statements are auto-described.
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBatchedRewrittenPreparedStatement() throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String rewrittenInsertSql1 =
+        "insert into my_table (id, value) values ($1, $2),($3, $4),($5, $6),($7, $8),($9, $10),($11, $12),($13, $14),($15, $16)";
+    String rewrittenInsertSql2 = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql1),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql2),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql1)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(2L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p5")
+                .to(3L)
+                .bind("p6")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p7")
+                .to(4L)
+                .bind("p8")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p9")
+                .to(5L)
+                .bind("p10")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p11")
+                .to(6L)
+                .bind("p12")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p13")
+                .to(7L)
+                .bind("p14")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p15")
+                .to(8L)
+                .bind("p16")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            8L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql2)
+                .bind("p1")
+                .to(9L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(10L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            2L));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
+        for (int i = 1; i <= 10; i++) {
+          insertStatement.setLong(1, i);
+          insertStatement.setTimestamp(
+              2, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+          insertStatement.addBatch();
+        }
+
+        int[] updateCounts = insertStatement.executeBatch();
+        assertEquals(10, updateCounts.length);
+
+        connection.commit();
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    // Both statements are auto-described.
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBatchedRewrittenPreparedStatementWithErrorInBind() throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String rewrittenInsertSql1 =
+        "insert into my_table (id, value) values ($1, $2),($3, $4),($5, $6),($7, $8),($9, $10),($11, $12),($13, $14),($15, $16)";
+    String rewrittenInsertSql2 = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql1),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql2),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql1)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(2L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p5")
+                .to(3L)
+                .bind("p6")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p7")
+                .to(4L)
+                .bind("p8")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p9")
+                .to(5L)
+                .bind("p10")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p11")
+                .to(6L)
+                .bind("p12")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p13")
+                .to(7L)
+                .bind("p14")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p15")
+                .to(8L)
+                .bind("p16")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            8L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql2)
+                .bind("p1")
+                .to(9L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(10L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            2L));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
+        for (int i = 1; i <= 10; i++) {
+          insertStatement.setLong(1, i);
+          insertStatement.setTimestamp(2, new java.sql.Timestamp(Long.MIN_VALUE));
+          insertStatement.addBatch();
+        }
+
+        BatchUpdateException exception =
+            assertThrows(BatchUpdateException.class, insertStatement::executeBatch);
+        assertTrue(
+            exception.getMessage(), exception.getMessage().contains("Invalid timestamp value"));
+
+        connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  public void testBatchedRewrittenPreparedStatementWithGenericBatchExecutionError()
+      throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String rewrittenInsertSql1 =
+        "insert into my_table (id, value) values ($1, $2),($3, $4),($5, $6),($7, $8),($9, $10),($11, $12),($13, $14),($15, $16)";
+    String rewrittenInsertSql2 = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql1),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql2),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.setExecuteBatchDmlExecutionTime(
+        SimulatedExecutionTime.ofException(
+            Status.INVALID_ARGUMENT
+                .withDescription("Too many values in insert clause")
+                .asRuntimeException()));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
+        for (int i = 1; i <= 10; i++) {
+          insertStatement.setLong(1, i);
+          insertStatement.setTimestamp(
+              2, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+          insertStatement.addBatch();
+        }
+
+        BatchUpdateException exception =
+            assertThrows(BatchUpdateException.class, insertStatement::executeBatch);
+        assertTrue(
+            exception.getMessage(),
+            exception.getMessage().contains("Too many values in insert clause"));
+
+        connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  public void testParameterizedOffsetWithoutLimit() throws SQLException {
+    // Add a result for the non-limited query that contains one row.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from foo offset $1").bind("p1").to(0L).build(),
+            SELECT1_RESULTSET));
+    // Add a result for the limited query that is empty.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from foo offset $1 limit 4611686018427387903")
+                .bind("p1")
+                .to(0L)
+                .build(),
+            EMPTY_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (boolean addLimit : new boolean[] {true, false}) {
+        connection.createStatement().execute("set spanner.auto_add_limit_clause=" + addLimit);
+        try (PreparedStatement statement =
+            connection.prepareStatement("select * from foo offset ?")) {
+          statement.setLong(1, 0);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            // We should get the empty result set when the auto-limit feature is enabled.
+            if (addLimit) {
+              assertFalse(resultSet.next());
+            } else {
+              assertTrue(resultSet.next());
+              assertEquals(1L, resultSet.getLong(1));
+              assertFalse(resultSet.next());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   public void testTwoQueries() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
@@ -1505,343 +2160,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCreateTableIfNotExists_tableDoesNotExist() throws SQLException {
-    addIfNotExistsDdlException();
-    String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
-    addDdlResponseToSpannerAdmin();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("foo")
-                .build(),
-            EMPTY_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(1, updateDatabaseDdlRequests.size());
-    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
-    assertEquals(
-        "create table foo (id bigint primary key)",
-        updateDatabaseDdlRequests.get(0).getStatements(0));
-  }
-
-  @Test
-  public void testCreateTableIfNotExists_tableExists() throws SQLException {
-    addIfNotExistsDdlException();
-    String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
-    addDdlResponseToSpannerAdmin();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("foo")
-                .build(),
-            SELECT1_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(0, updateDatabaseDdlRequests.size());
-  }
-
-  @Test
-  public void testCreateIndexIfNotExists_indexDoesNotExist() throws SQLException {
-    addIfNotExistsDdlException();
-    String sql = "CREATE INDEX IF NOT EXISTS foo on bar (value)";
-    addDdlResponseToSpannerAdmin();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("foo")
-                .build(),
-            EMPTY_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(1, updateDatabaseDdlRequests.size());
-    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
-    assertEquals(
-        "create index foo on bar (value)", updateDatabaseDdlRequests.get(0).getStatements(0));
-  }
-
-  @Test
-  public void testCreateIndexIfNotExists_indexExists() throws SQLException {
-    addIfNotExistsDdlException();
-    String sql = "CREATE INDEX IF NOT EXISTS foo on bar (value)";
-    addDdlResponseToSpannerAdmin();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("foo")
-                .build(),
-            SELECT1_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(0, updateDatabaseDdlRequests.size());
-  }
-
-  @Test
-  public void testDropTableIfExists_tableDoesNotExist() throws SQLException {
-    addIfNotExistsDdlException();
-    String sql = "DROP TABLE IF EXISTS foo";
-    addDdlResponseToSpannerAdmin();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("foo")
-                .build(),
-            EMPTY_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(0, updateDatabaseDdlRequests.size());
-  }
-
-  @Test
-  public void testDropTableIfExists_tableExists() throws SQLException {
-    addIfNotExistsDdlException();
-    String sql = "DROP TABLE IF EXISTS foo";
-    addDdlResponseToSpannerAdmin();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("foo")
-                .build(),
-            SELECT1_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(1, updateDatabaseDdlRequests.size());
-    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
-    assertEquals("drop table foo", updateDatabaseDdlRequests.get(0).getStatements(0));
-  }
-
-  @Test
-  public void testDropIndexIfExists_indexDoesNotExist() throws SQLException {
-    addIfNotExistsDdlException();
-    String sql = "DROP INDEX IF EXISTS foo";
-    addDdlResponseToSpannerAdmin();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("foo")
-                .build(),
-            EMPTY_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(0, updateDatabaseDdlRequests.size());
-  }
-
-  @Test
-  public void testDropIndexIfExists_indexExists() throws SQLException {
-    addIfNotExistsDdlException();
-    String sql = "DROP INDEX IF EXISTS foo";
-    addDdlResponseToSpannerAdmin();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("foo")
-                .build(),
-            SELECT1_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(1, updateDatabaseDdlRequests.size());
-    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
-    assertEquals("drop index foo", updateDatabaseDdlRequests.get(0).getStatements(0));
-  }
-
-  @Test
-  public void testDdlBatchWithIfNotExists() throws SQLException {
-    addIfNotExistsDdlException();
-    ImmutableList<String> statements =
-        ImmutableList.of(
-            "CREATE TABLE IF NOT EXISTS \"Foo\" (id bigint primary key)",
-            "CREATE TABLE IF NOT EXISTS bar (id bigint primary key, value text)",
-            "CREATE INDEX IF NOT EXISTS idx_foo ON bar (text)");
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("Foo")
-                .build(),
-            SELECT1_RESULTSET));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("bar")
-                .build(),
-            SELECT1_RESULTSET));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(
-                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
-                .bind("p1")
-                .to("public")
-                .bind("p2")
-                .to("idx_foo")
-                .build(),
-            SELECT1_RESULTSET));
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        for (String sql : statements) {
-          statement.addBatch(sql);
-        }
-        int[] updateCounts = statement.executeBatch();
-        assertArrayEquals(new int[] {0, 0, 0}, updateCounts);
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(0, updateDatabaseDdlRequests.size());
-  }
-
-  @Test
   public void testCreateTableIfNotExists_withBackendSupport() throws SQLException {
-    // Add a generic error that is returned for DDL statements. This will cause PGAdapter to think
-    // that the backend supports `IF [NOT] EXISTS`, as it does not receive a specific error
-    // regarding an `IF NOT EXISTS` statement.
-    addDdlExceptionToSpannerAdmin();
     String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
     // Add a response for the DDL statement that is sent to Spanner.
     addDdlResponseToSpannerAdmin();
@@ -2182,19 +2501,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.OTHER, parameterMetaData.getParameterType(10));
 
         ResultSetMetaData metadata = statement.getMetaData();
-        assertEquals(10, metadata.getColumnCount());
-        assertEquals(Types.BIGINT, metadata.getColumnType(1));
-        assertEquals(Types.BIT, metadata.getColumnType(2));
-        assertEquals(Types.BINARY, metadata.getColumnType(3));
-        assertEquals(Types.DOUBLE, metadata.getColumnType(4));
-        assertEquals(Types.BIGINT, metadata.getColumnType(5));
-        assertEquals(Types.NUMERIC, metadata.getColumnType(6));
-        assertEquals(Types.TIMESTAMP, metadata.getColumnType(7));
-        assertEquals(Types.DATE, metadata.getColumnType(8));
-        assertEquals(Types.VARCHAR, metadata.getColumnType(9));
-        assertEquals(Types.OTHER, metadata.getColumnType(10));
-
+        assertEquals(20, metadata.getColumnCount());
         int index = 0;
+        assertEquals(Types.BIGINT, metadata.getColumnType(++index));
+        assertEquals(Types.BIT, metadata.getColumnType(++index));
+        assertEquals(Types.BINARY, metadata.getColumnType(++index));
+        assertEquals(Types.DOUBLE, metadata.getColumnType(++index));
+        assertEquals(Types.BIGINT, metadata.getColumnType(++index));
+        assertEquals(Types.NUMERIC, metadata.getColumnType(++index));
+        assertEquals(Types.TIMESTAMP, metadata.getColumnType(++index));
+        assertEquals(Types.DATE, metadata.getColumnType(++index));
+        assertEquals(Types.VARCHAR, metadata.getColumnType(++index));
+        assertEquals(Types.OTHER, metadata.getColumnType(++index));
+
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+
+        index = 0;
         statement.setLong(++index, 1L);
         statement.setBoolean(++index, true);
         statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
@@ -2333,6 +2664,42 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testJulianDate() throws SQLException {
+    String sql = "select d from foo";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("d")
+                                        .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("0300-02-20").build())
+                        .build())
+                .build()));
+    String binaryTransferEnable = "&binaryTransferEnable=" + Oid.DATE;
+
+    try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
+      connection.createStatement().execute("set time zone 'utc'");
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(LocalDate.of(300, 2, 20), resultSet.getDate(1).toLocalDate());
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testRandomResults() throws SQLException {
     for (boolean binary : new boolean[] {false, true}) {
       // Also get the random results using the normal Spanner client to compare the results with
@@ -2386,7 +2753,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   resultSet.getObject(col + 1);
                 }
               }
-              assertEqual(spannerResult, resultSet, binary);
+              assertEqual(spannerResult, resultSet);
               rowCount++;
             }
             assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
@@ -2450,8 +2817,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  private void assertEqual(
-      com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult, boolean binary)
+  private void assertEqual(com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult)
       throws SQLException {
     assertEquals(spannerResult.getColumnCount(), pgResult.getMetaData().getColumnCount());
     for (int col = 0; col < spannerResult.getColumnCount(); col++) {
@@ -2463,11 +2829,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       switch (spannerResult.getColumnType(col).getCode()) {
         case BOOL:
-          if (!binary) {
-            // Skip for binary for now, as there is a bug in the PG JDBC driver for decoding binary
-            // bool values.
-            assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
-          }
+          assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
           break;
         case INT64:
           assertEquals(spannerResult.getLong(col), pgResult.getLong(col + 1));
@@ -2490,12 +2852,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               pgResult.getTimestamp(col + 1).getTime());
           break;
         case DATE:
-          assertEquals(
+          LocalDate expected =
               LocalDate.of(
                   spannerResult.getDate(col).getYear(),
                   spannerResult.getDate(col).getMonth(),
-                  spannerResult.getDate(col).getDayOfMonth()),
-              pgResult.getDate(col + 1).toLocalDate());
+                  spannerResult.getDate(col).getDayOfMonth());
+          if ((expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER)
+              || (expected.getYear() <= 1582
+                  && expected.getMonth() == Month.FEBRUARY
+                  && expected.getDayOfMonth() > 20)) {
+            // Just assert that we can get the value. Dates in the Julian/Gregorian cutover period
+            // are weird, as are potential intercalaris values.
+            assertNotNull(pgResult.getDate(col + 1).toLocalDate());
+          } else {
+            assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());
+          }
           break;
         case PG_JSONB:
           assertEquals(spannerResult.getPgJsonb(col), pgResult.getString(col + 1));
@@ -2721,13 +3092,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testInformationSchemaQueryInTransactionWithReplacedPgCatalogTables()
       throws SQLException {
     String sql = "SELECT 1 FROM pg_namespace";
-    String replacedSql =
-        "with pg_namespace as (\n"
-            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-            + "  from information_schema.schemata\n"
-            + ")\n"
-            + "SELECT 1 FROM pg_namespace";
+    String replacedSql = "with " + PG_NAMESPACE_CTE + "\nSELECT 1 FROM pg_namespace";
     // Register a result for the query. Note that we don't really care what the result is, just that
     // there is a result.
     mockSpanner.putStatementResult(
@@ -2791,6 +3156,28 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
     assertEquals(commitRequest.getTransactionId(), requests.get(1).getTransaction().getId());
     assertEquals(commitRequest.getTransactionId(), requests.get(3).getTransaction().getId());
+  }
+
+  @Test
+  public void testPgEnum() throws SQLException {
+    for (String sql :
+        new String[] {
+          "select * from pg_enum",
+          "select * from pg_catalog.pg_enum",
+          "select * from PG_CATALOG.PG_ENUM"
+        }) {
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("with " + new EmptyPgEnum().getTableExpression() + "\n" + sql),
+              SELECT1_RESULTSET));
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
   }
 
   @Test
@@ -3188,7 +3575,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(359, count);
+        assertEquals(361, count);
       }
     }
   }
@@ -3471,13 +3858,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       mockSpanner.putStatementResult(
           StatementResult.query(
-              Statement.of(
-                  "with pg_namespace as (\n"
-                      + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                      + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                      + "  from information_schema.schemata\n"
-                      + ")\n"
-                      + "select * from pg_namespace"),
+              Statement.of("with " + PG_NAMESPACE_CTE + "\n" + "select * from pg_namespace"),
               SELECT1_RESULTSET));
       // Just verify that this works, we don't care about the result.
       try (ResultSet resultSet =
@@ -4034,6 +4415,45 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testUnnamedSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      Savepoint savepoint = connection.setSavepoint();
+      assertNotNull(savepoint);
+      assertEquals(0, savepoint.getSavepointId());
+
+      Savepoint savepoint2 = connection.setSavepoint();
+      assertEquals(1, savepoint2.getSavepointId());
+    }
+  }
+
+  @Test
+  public void testNamedSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      assertEquals("my_savepoint", connection.setSavepoint("my_savepoint").getSavepointName());
+    }
+  }
+
+  @Test
+  public void testReleaseSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      Savepoint savepoint = connection.setSavepoint("my_savepoint");
+      connection.releaseSavepoint(savepoint);
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      Savepoint savepoint = connection.setSavepoint("my_savepoint");
+      connection.rollback(savepoint);
+    }
+  }
+
+  @Test
   public void testDescribeAndExecute() throws SQLException {
     String sql = "delete from foo";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
@@ -4052,6 +4472,133 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().hasBegin());
     assertEquals(1, request.getStatementsCount());
     assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testEmulatePgClass() throws SQLException {
+    String withEmulation = "with " + EMULATED_PG_CLASS_PREFIX + "\nselect 1 from pg_class";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(withEmulation), SELECT1_RESULTSET));
+    String withoutEmulation = "with " + PG_CLASS_PREFIX + "\nselect 1 from pg_class";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(withoutEmulation), EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgCollation.PG_COLLATION_CTE + "\nselect 1 from pg_collation"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgExtension.PG_EXTENSION_CTE + "\nselect 1 from pg_extension"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgAttribute.EMPTY_PG_ATTRIBUTE_CTE + "\nselect 1 from pg_attribute"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + EMULATED_PG_ATTRIBUTE_PREFIX + "\nselect 1 from pg_attribute"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgAttrdef.EMPTY_PG_ATTRDEF_CTE + "\nselect 1 from pg_attrdef"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgAttrdef.PG_ATTRDEF_CTE + "\nselect 1 from pg_attrdef"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgConstraint.EMPTY_PG_CONSTRAINT_CTE + "\nselect 1 from pg_constraint"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgConstraint.PG_CONSTRAINT_CTE + "\nselect 1 from pg_constraint"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgIndex.EMPTY_PG_INDEX_CTE + "\nselect 1 from pg_index"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgIndex.PG_INDEX_CTE + "\nselect 1 from pg_index"),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (boolean emulate : new boolean[] {true, false}) {
+        connection.createStatement().execute("set spanner.emulate_pg_class_tables=" + emulate);
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_class")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_collation")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_extension")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_attribute")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_attrdef")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_constraint")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_index")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(withEmulation))
+            .count());
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(withoutEmulation))
+            .count());
   }
 
   @Ignore("Only used for manual performance testing")

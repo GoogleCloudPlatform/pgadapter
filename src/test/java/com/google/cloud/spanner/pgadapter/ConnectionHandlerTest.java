@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -38,7 +39,9 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -211,7 +214,9 @@ public class ConnectionHandlerTest {
     when(socket.getInetAddress()).thenReturn(address);
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
-    assertThrows(IllegalStateException.class, () -> connection.getPortal("unknown portal"));
+    PGException exception =
+        assertThrows(PGException.class, () -> connection.getPortal("unknown portal"));
+    assertEquals(SQLState.InvalidCursorName, exception.getSQLState());
   }
 
   @Test
@@ -237,7 +242,9 @@ public class ConnectionHandlerTest {
     when(socket.getInetAddress()).thenReturn(address);
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
-    assertThrows(IllegalStateException.class, () -> connection.closePortal("unknown portal"));
+    PGException exception =
+        assertThrows(PGException.class, () -> connection.closePortal("unknown portal"));
+    assertEquals(SQLState.InvalidCursorName, exception.getSQLState());
   }
 
   @Test
@@ -591,5 +598,65 @@ public class ConnectionHandlerTest {
                 + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"));
 
     assertEquals(WellKnownClient.UNSPECIFIED, connectionHandler.getWellKnownClient());
+  }
+
+  @Test
+  public void testMaybeDetermineWellKnownClient_skipsClientSideStatements() {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
+
+    when(options.shouldAutoDetectClient()).thenReturn(true);
+    connectionHandler.setWellKnownClient(WellKnownClient.UNSPECIFIED);
+
+    ParseMessage parseMessage = mock(ParseMessage.class);
+    IntermediatePreparedStatement statement = mock(IntermediatePreparedStatement.class);
+    when(statement.getStatementType()).thenReturn(StatementType.CLIENT_SIDE);
+    when(parseMessage.getStatement()).thenReturn(statement);
+
+    connectionHandler.maybeDetermineWellKnownClient(parseMessage);
+
+    assertEquals(WellKnownClient.UNSPECIFIED, connectionHandler.getWellKnownClient());
+    assertFalse(connectionHandler.isHasDeterminedClientUsingQuery());
+    assertEquals(
+        ImmutableList.of(parseMessage), connectionHandler.getSkippedAutoDetectParseMessages());
+  }
+
+  @Test
+  public void testMaybeDetermineWellKnownClient_stopsSkippingParseMessagesAfter10Messages() {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
+
+    when(options.shouldAutoDetectClient()).thenReturn(true);
+    connectionHandler.setWellKnownClient(WellKnownClient.UNSPECIFIED);
+
+    ParseMessage parseMessage = mock(ParseMessage.class);
+    IntermediatePreparedStatement statement = mock(IntermediatePreparedStatement.class);
+    when(statement.getStatementType()).thenReturn(StatementType.CLIENT_SIDE);
+    when(parseMessage.getStatement()).thenReturn(statement);
+
+    for (int i = 0; i < 10; i++) {
+      connectionHandler.maybeDetermineWellKnownClient(parseMessage);
+    }
+
+    assertEquals(WellKnownClient.UNSPECIFIED, connectionHandler.getWellKnownClient());
+    assertFalse(connectionHandler.isHasDeterminedClientUsingQuery());
+    assertEquals(10, connectionHandler.getSkippedAutoDetectParseMessages().size());
+
+    // This should cause the connection to stop buffering Parse messages and just set the client to
+    // UNSPECIFIED.
+    connectionHandler.maybeDetermineWellKnownClient(parseMessage);
+
+    assertTrue(connectionHandler.isHasDeterminedClientUsingQuery());
+    assertTrue(connectionHandler.getSkippedAutoDetectParseMessages().isEmpty());
   }
 }

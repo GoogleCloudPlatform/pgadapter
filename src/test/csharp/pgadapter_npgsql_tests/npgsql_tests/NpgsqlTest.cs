@@ -115,6 +115,29 @@ public class NpgsqlTest
         Console.WriteLine("Success");
     }
 
+    public void TestSelectArray()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        using var cmd = new NpgsqlCommand("SELECT '{1,2}'::bigint[] as c", connection);
+        using (var reader = cmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var got = reader.GetFieldValue<long?[]>(0);
+                if (got.Length == 2 && got[0] == 1L && got[1] == 2L)
+                {
+                    continue;
+                }
+                
+                Console.WriteLine($"Value mismatch: Got {got}, Want: (1,2)");
+                return;
+            }
+        }
+        Console.WriteLine("Success");
+    }
+
     public void TestQueryWithParameter()
     {
         using var connection = new NpgsqlConnection(ConnectionString);
@@ -807,7 +830,6 @@ public class NpgsqlTest
         
         using (var reader =
                connection.BeginBinaryExport("COPY all_types " +
-                                            "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
                                             "TO STDOUT (FORMAT BINARY)"))
         {
             while (reader.StartRow() > -1)
@@ -911,6 +933,112 @@ public class NpgsqlTest
                 {
                     Console.Write(reader.Read<string>(NpgsqlDbType.Jsonb));
                 }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<long?[]>(NpgsqlDbType.Array | NpgsqlDbType.Bigint)) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<bool?[]>(NpgsqlDbType.Array | NpgsqlDbType.Boolean)) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var bytes = reader.Read<List<byte[]?>>(NpgsqlDbType.Array | NpgsqlDbType.Bytea);
+                    Console.Write("[" + string.Join(", ", bytes.Select(b => b == null ? null : Convert.ToBase64String(b))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var doubles = reader.Read<List<Double?>>(NpgsqlDbType.Array | NpgsqlDbType.Double);
+                    Console.Write("[" + string.Join(", ", doubles.Select(d => d?.ToString(nfi))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<long?[]>(NpgsqlDbType.Array | NpgsqlDbType.Bigint)) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var decimals = reader.Read<Decimal?[]>(NpgsqlDbType.Array | NpgsqlDbType.Numeric);
+                    Console.Write("[" + string.Join(", ", decimals.Select(d => d?.ToString(nfi))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var timestamps = reader.Read<List<DateTime?>>(NpgsqlDbType.Array | NpgsqlDbType.TimestampTz);
+                    Console.Write("[" + string.Join(", ",
+                        timestamps.Select(t => t?.ToUniversalTime().ToString("yyyyMMddTHHmmssFFFFFFF"))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var dates = reader.Read<List<DateTime?>>(NpgsqlDbType.Array | NpgsqlDbType.Date);
+                    Console.Write("[" + string.Join(", ", dates.Select(d => d?.ToString("yyyyMMdd"))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<string?[]>(NpgsqlDbType.Array | NpgsqlDbType.Varchar)) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<string?[]>(NpgsqlDbType.Array | NpgsqlDbType.Jsonb)) + "]");
+                }
                 Console.Write("\n");
             }
         }
@@ -924,7 +1052,6 @@ public class NpgsqlTest
         
         using (var reader =
                connection.BeginTextExport("COPY all_types " +
-                                            "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
                                             "TO STDOUT"))
         {
             while (true)

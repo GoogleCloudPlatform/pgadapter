@@ -1,5 +1,22 @@
 # Google Cloud Spanner PGAdapter - Frequently Asked Questions
 
+## Performance
+
+### What latency does PGAdapter add?
+PGAdapter adds very little latency if it is set up correctly. Make sure to follow these guidelines:
+1. Run PGAdapter on the same host as your main application, for example as a side-car proxy.
+2. When running PGAdapter in a Docker container separate from your main application, make sure that they are on the same Docker network.
+3. If your application is written in Java: Run PGAdapter in-process with your application. See [this sample](../samples/java/jdbc/README.md) for an example.
+
+You can run [these latency comparison benchmarks](../benchmarks/latency-comparison/README.md) to measure
+the difference between using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers
+and client libraries.
+
+### How can I test the latency that is added by PGAdapter?
+You can run [these latency comparison benchmarks](../benchmarks/latency-comparison/README.md) to measure
+the difference between using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers
+and client libraries.
+
 ## Connection Options
 
 ### How can I specify the credentials that should be used for a connection?
@@ -115,6 +132,27 @@ You can solve this problem by either:
 PGAdapter supports `COPY table_name FROM STDIN [BINARY]` and `COPY table_name TO STDOUT [BINARY]`.
 These commands can be used to copy data between different Cloud Spanner databases, or between a
 Cloud Spanner database and a PostgreSQL database. See [copy support](copy.md) for more information.
+
+## Can I use user-defined functions or stored procedures?
+PGAdapter and Cloud Spanner do not support user-defined functions or stored procedures. You can
+however add PGAdapter as a [foreign server](https://www.postgresql.org/docs/current/sql-createserver.html)
+to a normal PostgreSQL database and create user-defined functions and stored procedures in that
+database. Those functions can be used with data from Cloud Spanner, as all tables from Cloud Spanner
+can be [imported as foreign tables](https://www.postgresql.org/docs/current/sql-importforeignschema.html)
+into the PostgreSQL database.
+
+The local PostgreSQL database should be considered the same as your application. That means that it:
+1. Should only define code / logic. It should not store any actual data.
+2. Should be disposable. Dropping and re-creating it should always be possible.
+3. Should let Cloud Spanner do as much as possible of the data processing. It should only fetch the
+   rows from Cloud Spanner that it actually needs.
+
+__This feature can also be used as a workaround for built-in PostgreSQL functions that are not supported
+by Cloud Spanner.__
+
+See the [foreign data wrapper sample](../samples/foreign-data-wrapper) for a complete sample on how
+to set this up.
+
 
 ## How can I set a statement timeout?
 You can set the statement timeout that a connection should use by executing a

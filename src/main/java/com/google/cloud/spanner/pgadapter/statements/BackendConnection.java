@@ -15,9 +15,11 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
+import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
 import com.google.cloud.spanner.BatchTransactionId;
@@ -52,7 +54,6 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
-import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
@@ -141,6 +142,23 @@ public class BackendConnection {
     return pgException;
   }
 
+  boolean shouldReplaceStatement(Statement statement) {
+    if (!localStatements.get().isEmpty() && localStatements.get().containsKey(statement.getSql())) {
+      LocalStatement localStatement = localStatements.get().get(statement.getSql());
+      if (localStatement != null) {
+        return localStatement.hasReplacementStatement();
+      }
+    }
+    return false;
+  }
+
+  Tuple<Statement, ParsedStatement> replaceStatement(Statement statement) {
+    LocalStatement localStatement = localStatements.get().get(statement.getSql());
+    Statement replacement =
+        Objects.requireNonNull(localStatement).getReplacementStatement(statement);
+    return Tuple.of(replacement, Objects.requireNonNull(PARSER.parse(replacement)));
+  }
+
   /**
    * Buffered statements are kept in memory until a flush or sync message is received. This makes it
    * possible to batch multiple statements together when sending them to Cloud Spanner.
@@ -151,6 +169,11 @@ public class BackendConnection {
     final SettableFuture<T> result;
 
     BufferedStatement(ParsedStatement parsedStatement, Statement statement) {
+      if (shouldReplaceStatement(statement)) {
+        Tuple<Statement, ParsedStatement> replacement = replaceStatement(statement);
+        statement = replacement.x();
+        parsedStatement = replacement.y();
+      }
       this.parsedStatement = parsedStatement;
       this.statement = statement;
       this.result = SettableFuture.create();
@@ -216,10 +239,13 @@ public class BackendConnection {
         //  block.
         SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
         if (!localStatements.get().isEmpty()
-            && localStatements.get().containsKey(statement.getSql())) {
-          result.set(
-              Objects.requireNonNull(localStatements.get().get(statement.getSql()))
-                  .execute(BackendConnection.this));
+            && localStatements.get().containsKey(statement.getSql())
+            && localStatements.get().get(statement.getSql()) != null
+            && !Objects.requireNonNull(localStatements.get().get(statement.getSql()))
+                .hasReplacementStatement()) {
+          LocalStatement localStatement =
+              Objects.requireNonNull(localStatements.get().get(statement.getSql()));
+          result.set(localStatement.execute(BackendConnection.this));
         } else if (sessionStatement != null) {
           result.set(sessionStatement.execute(sessionState));
         } else if (connectionState == ConnectionState.ABORTED
@@ -260,7 +286,8 @@ public class BackendConnection {
         } else {
           // Potentially replace pg_catalog table references with common table expressions.
           updatedStatement =
-              sessionState.isReplacePgCatalogTables()
+              parsedStatement.getType() != StatementType.CLIENT_SIDE
+                      && sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.get().replacePgCatalogTables(statement)
                   : statement;
           updatedStatement = bindStatement(updatedStatement);
@@ -294,7 +321,13 @@ public class BackendConnection {
     }
 
     Statement bindStatement(Statement statement) {
-      return statementBinder.apply(statement);
+      Statement boundStatement = statementBinder.apply(statement);
+      // Add a LIMIT clause to the statement if it contains an OFFSET clause that uses a query
+      // parameter and there is no existing LIMIT clause in the query.
+      if (sessionState.isAutoAddLimitClause()) {
+        return SimpleParser.addLimitIfParameterizedOffset(boundStatement);
+      }
+      return boundStatement;
     }
 
     StatementResult analyzeOrExecute(Statement statement) {
@@ -588,12 +621,96 @@ public class BackendConnection {
     }
   }
 
+  private final class Savepoint extends BufferedStatement<StatementResult> {
+    private final SavepointStatement savepointStatement;
+
+    Savepoint(SavepointStatement savepointStatement) {
+      super(savepointStatement.parsedStatement, savepointStatement.originalStatement);
+      this.savepointStatement = savepointStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        spannerConnection.savepoint(savepointStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
+        result.setException(pgException);
+        throw pgException;
+      }
+    }
+  }
+
+  private final class Release extends BufferedStatement<StatementResult> {
+    private final ReleaseStatement releaseStatement;
+
+    Release(ReleaseStatement releaseStatement) {
+      super(releaseStatement.parsedStatement, releaseStatement.originalStatement);
+      this.releaseStatement = releaseStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        spannerConnection.releaseSavepoint(releaseStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
+        result.setException(pgException);
+        throw pgException;
+      }
+    }
+  }
+
+  private final class RollbackTo extends BufferedStatement<StatementResult> {
+    private final RollbackToStatement rollbackToStatement;
+
+    RollbackTo(RollbackToStatement rollbackToStatement) {
+      super(rollbackToStatement.parsedStatement, rollbackToStatement.originalStatement);
+      this.rollbackToStatement = rollbackToStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      try {
+        spannerConnection.rollbackToSavepoint(rollbackToStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
+        result.setException(pgException);
+        throw pgException;
+      }
+    }
+  }
+
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
   private static final StatementResult NO_RESULT = new NoResult();
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
+  private final Runnable closeAllPortals;
   private final SessionState sessionState;
   private final Supplier<PgCatalog> pgCatalog;
   private final Supplier<ImmutableMap<String, LocalStatement>> localStatements;
@@ -607,18 +724,20 @@ public class BackendConnection {
 
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
+      Runnable closeAllPortals,
       DatabaseId databaseId,
       Connection spannerConnection,
       Supplier<WellKnownClient> wellKnownClient,
       OptionsMetadata optionsMetadata,
       Supplier<ImmutableList<LocalStatement>> localStatements) {
+    this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
     this.pgCatalog =
         Suppliers.memoize(
             () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
-    this.ddlExecutor = new DdlExecutor(databaseId, this);
+    this.ddlExecutor = new DdlExecutor(this);
     this.localStatements =
         Suppliers.memoize(
             () -> {
@@ -695,6 +814,24 @@ public class BackendConnection {
     Truncate truncate = new Truncate(truncateStatement);
     bufferedStatements.add(truncate);
     return truncate.result;
+  }
+
+  public Future<StatementResult> execute(SavepointStatement savepointStatement) {
+    Savepoint savepoint = new Savepoint(savepointStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
+  }
+
+  public Future<StatementResult> execute(ReleaseStatement releaseStatement) {
+    Release savepoint = new Release(releaseStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
+  }
+
+  public Future<StatementResult> execute(RollbackToStatement rollbackToStatement) {
+    RollbackTo savepoint = new RollbackTo(rollbackToStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
   }
 
   /** Flushes the buffered statements to Spanner. */
@@ -828,6 +965,7 @@ public class BackendConnection {
             } else {
               sessionState.rollback();
             }
+            closeAllPortals.run();
             transactionMode = TransactionMode.IMPLICIT;
             connectionState = ConnectionState.IDLE;
           }
@@ -836,8 +974,12 @@ public class BackendConnection {
       }
     } catch (Exception exception) {
       connectionState = ConnectionState.ABORTED;
+      closeAllPortals.run();
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
+        if (spannerConnection.isDmlBatchActive()) {
+          spannerConnection.abortBatch();
+        }
         spannerConnection.setStatementTag(null);
         spannerConnection.execute(ROLLBACK);
       } else if (spannerConnection.isDdlBatchActive()) {
@@ -1115,6 +1257,9 @@ public class BackendConnection {
     int index = fromIndex;
     try {
       while (index < getStatementCount()) {
+        if (!bufferedStatements.get(index).isBatchingPossible()) {
+          break;
+        }
         StatementType statementType = getStatementType(index);
         if (canBeBatchedTogether(batchType, statementType)) {
           // Send DDL statements to the DdlExecutor instead of executing them directly on the
@@ -1160,30 +1305,20 @@ public class BackendConnection {
       Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
       failedExecute.result.setException(batchUpdateException);
       throw batchUpdateException;
+    } catch (Throwable exception) {
+      bufferedStatements.get(fromIndex).result.setException(exception);
+      throw exception;
     }
     return index - fromIndex;
   }
 
-  /**
-   * Extracts the update count for a list of DDL statements. It could be that the DdlExecutor
-   * decided to skip some DDL statements. This is indicated by the executor returning a {@link
-   * NotExecuted} result for that statement. The result that we return to the client should still
-   * indicate that the statement was 'executed'.
-   */
+  /** Extracts the update count for a list of DDL statements. */
   static long[] extractDdlUpdateCounts(
       List<StatementResult> statementResults, long[] returnedUpdateCounts) {
-    int index = 0;
     int successfullyExecutedCount = 0;
-    while (index < returnedUpdateCounts.length
-        && returnedUpdateCounts[index] == 1
+    while (successfullyExecutedCount < returnedUpdateCounts.length
+        && returnedUpdateCounts[successfullyExecutedCount] == 1
         && successfullyExecutedCount < statementResults.size()) {
-      if (!(statementResults.get(successfullyExecutedCount) instanceof NotExecuted)) {
-        index++;
-      }
-      successfullyExecutedCount++;
-    }
-    while (successfullyExecutedCount < statementResults.size()
-        && statementResults.get(successfullyExecutedCount) instanceof NotExecuted) {
       successfullyExecutedCount++;
     }
     long[] updateCounts = new long[successfullyExecutedCount];

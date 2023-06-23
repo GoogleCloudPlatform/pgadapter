@@ -64,83 +64,9 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + "select * from (select 0::bigint as rngtypid, 0::bigint as rngsubtype, 0::bigint as rngmultitypid, 0::bigint as rngcollation, 0::bigint as rngsubopc, ''::varchar as rngcanonical, ''::varchar as rngsubdiff\n"
               + ") range where false),\n"
               + PG_TYPE_PREFIX
-              + ",\npg_class as (\n"
-              + "  select\n"
-              + "  -1 as oid,\n"
-              + "  table_name as relname,\n"
-              + "  case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
-              + "  0 as reltype,\n"
-              + "  0 as reloftype,\n"
-              + "  0 as relowner,\n"
-              + "  1 as relam,\n"
-              + "  0 as relfilenode,\n"
-              + "  0 as reltablespace,\n"
-              + "  0 as relpages,\n"
-              + "  0.0::float8 as reltuples,\n"
-              + "  0 as relallvisible,\n"
-              + "  0 as reltoastrelid,\n"
-              + "  false as relhasindex,\n"
-              + "  false as relisshared,\n"
-              + "  'p' as relpersistence,\n"
-              + "  'r' as relkind,\n"
-              + "  count(*) as relnatts,\n"
-              + "  0 as relchecks,\n"
-              + "  false as relhasrules,\n"
-              + "  false as relhastriggers,\n"
-              + "  false as relhassubclass,\n"
-              + "  false as relrowsecurity,\n"
-              + "  false as relforcerowsecurity,\n"
-              + "  true as relispopulated,\n"
-              + "  'n' as relreplident,\n"
-              + "  false as relispartition,\n"
-              + "  0 as relrewrite,\n"
-              + "  0 as relfrozenxid,\n"
-              + "  0 as relminmxid,\n"
-              + "  '{}'::bigint[] as relacl,\n"
-              + "  '{}'::text[] as reloptions,\n"
-              + "  0 as relpartbound\n"
-              + "from information_schema.tables t\n"
-              + "inner join information_schema.columns using (table_catalog, table_schema, table_name)\n"
-              + "group by t.table_name, t.table_schema\n"
-              + "union all\n"
-              + "select\n"
-              + "    -1 as oid,\n"
-              + "    i.index_name as relname,\n"
-              + "    case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
-              + "    0 as reltype,\n"
-              + "    0 as reloftype,\n"
-              + "    0 as relowner,\n"
-              + "    1 as relam,\n"
-              + "    0 as relfilenode,\n"
-              + "    0 as reltablespace,\n"
-              + "    0 as relpages,\n"
-              + "    0.0::float8 as reltuples,\n"
-              + "    0 as relallvisible,\n"
-              + "    0 as reltoastrelid,\n"
-              + "    false as relhasindex,\n"
-              + "    false as relisshared,\n"
-              + "    'p' as relpersistence,\n"
-              + "    'r' as relkind,\n"
-              + "    count(*) as relnatts,\n"
-              + "    0 as relchecks,\n"
-              + "    false as relhasrules,\n"
-              + "    false as relhastriggers,\n"
-              + "    false as relhassubclass,\n"
-              + "    false as relrowsecurity,\n"
-              + "    false as relforcerowsecurity,\n"
-              + "    true as relispopulated,\n"
-              + "    'n' as relreplident,\n"
-              + "    false as relispartition,\n"
-              + "    0 as relrewrite,\n"
-              + "    0 as relfrozenxid,\n"
-              + "    0 as relminmxid,\n"
-              + "    '{}'::bigint[] as relacl,\n"
-              + "    '{}'::text[] as reloptions,\n"
-              + "    0 as relpartbound\n"
-              + "from information_schema.indexes i\n"
-              + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name)\n"
-              + "group by i.index_name, i.table_schema\n"
-              + "),\n"
+              + ",\n"
+              + EMULATED_PG_CLASS_PREFIX
+              + ",\n"
               + "pg_proc as (\n"
               + "select * from (select 0::bigint as oid, ''::varchar as proname, 0::bigint as pronamespace, 0::bigint as proowner, 0::bigint as prolang, 0.0::float8 as procost, 0.0::float8 as prorows, 0::bigint as provariadic, ''::varchar as prosupport, ''::varchar as prokind, false::bool as prosecdef, false::bool as proleakproof, false::bool as proisstrict, false::bool as proretset, ''::varchar as provolatile, ''::varchar as proparallel, 0::bigint as pronargs, 0::bigint as pronargdefaults, 0::bigint as prorettype, 0::bigint as proargtypes, '{}'::bigint[] as proallargtypes, '{}'::varchar[] as proargmodes, '{}'::text[] as proargnames, ''::varchar as proargdefaults, '{}'::bigint[] as protrftypes, ''::text as prosrc, ''::text as probin, ''::varchar as prosqlbody, '{}'::text[] as proconfig, '{}'::bigint[] as proacl\n"
               + ") proc where false)\n"
@@ -155,9 +81,9 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + "        CASE WHEN elemproc.proname='array_recv' THEN 'a' ELSE elemtyp.typtype END AS elemtyptype\n"
               + "    FROM (\n"
               + "        SELECT typ.oid, typnamespace, typname, typrelid, typnotnull, relkind, typelem AS elemoid,\n"
-              + "            CASE WHEN proc.proname='array_recv' THEN 'a' ELSE typ.typtype END AS typtype,\n"
+              + "            CASE WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype,\n"
               + "            CASE\n"
-              + "                WHEN proc.proname='array_recv' THEN typ.typelem\n"
+              + "                WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem\n"
               + "                WHEN typ.typtype='r' THEN rngsubtype\n"
               + "                WHEN typ.typtype='m' THEN (SELECT rngtypid FROM pg_range WHERE rngmultitypid = typ.oid)\n"
               + "                WHEN typ.typtype='d' THEN typ.typbasetype\n"
@@ -362,92 +288,153 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.INT2_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_int2").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT2)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.INT4_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_int4").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT4)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.INT8_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_int8").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT8_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_float8").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT8)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.NUMERIC_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_numeric").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.NUMERIC)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.TEXT_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_text").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.TEXT)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.VARCHAR_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_varchar").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.VARCHAR)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.JSONB_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.JSONB)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder()
+                          .setStringValue(String.valueOf(Oid.TIMESTAMP_ARRAY))
+                          .build())
+                  .addValues(Value.newBuilder().setStringValue("_timestamp").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.TIMESTAMP)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder()
+                          .setStringValue(String.valueOf(Oid.TIMESTAMPTZ_ARRAY))
+                          .build())
+                  .addValues(Value.newBuilder().setStringValue("_timestamptz").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.TIMESTAMPTZ)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.DATE_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_date").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.DATE)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.BOOL_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_bool").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BOOL)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.BYTEA_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_bytea").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BYTEA)).build())
+                  .build())
           .setMetadata(SELECT_TYPES_METADATA)
           .build();
   private static final Statement SELECT_ATTRIBUTES =
       Statement.of(
           "with "
               + PG_TYPE_PREFIX
-              + ",\npg_class as (\n"
-              + "  select\n"
-              + "  -1 as oid,\n"
-              + "  table_name as relname,\n"
-              + "  case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
-              + "  0 as reltype,\n"
-              + "  0 as reloftype,\n"
-              + "  0 as relowner,\n"
-              + "  1 as relam,\n"
-              + "  0 as relfilenode,\n"
-              + "  0 as reltablespace,\n"
-              + "  0 as relpages,\n"
-              + "  0.0::float8 as reltuples,\n"
-              + "  0 as relallvisible,\n"
-              + "  0 as reltoastrelid,\n"
-              + "  false as relhasindex,\n"
-              + "  false as relisshared,\n"
-              + "  'p' as relpersistence,\n"
-              + "  'r' as relkind,\n"
-              + "  count(*) as relnatts,\n"
-              + "  0 as relchecks,\n"
-              + "  false as relhasrules,\n"
-              + "  false as relhastriggers,\n"
-              + "  false as relhassubclass,\n"
-              + "  false as relrowsecurity,\n"
-              + "  false as relforcerowsecurity,\n"
-              + "  true as relispopulated,\n"
-              + "  'n' as relreplident,\n"
-              + "  false as relispartition,\n"
-              + "  0 as relrewrite,\n"
-              + "  0 as relfrozenxid,\n"
-              + "  0 as relminmxid,\n"
-              + "  '{}'::bigint[] as relacl,\n"
-              + "  '{}'::text[] as reloptions,\n"
-              + "  0 as relpartbound\n"
-              + "from information_schema.tables t\n"
-              + "inner join information_schema.columns using (table_catalog, table_schema, table_name)\n"
-              + "group by t.table_name, t.table_schema\n"
-              + "union all\n"
-              + "select\n"
-              + "    -1 as oid,\n"
-              + "    i.index_name as relname,\n"
-              + "    case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
-              + "    0 as reltype,\n"
-              + "    0 as reloftype,\n"
-              + "    0 as relowner,\n"
-              + "    1 as relam,\n"
-              + "    0 as relfilenode,\n"
-              + "    0 as reltablespace,\n"
-              + "    0 as relpages,\n"
-              + "    0.0::float8 as reltuples,\n"
-              + "    0 as relallvisible,\n"
-              + "    0 as reltoastrelid,\n"
-              + "    false as relhasindex,\n"
-              + "    false as relisshared,\n"
-              + "    'p' as relpersistence,\n"
-              + "    'r' as relkind,\n"
-              + "    count(*) as relnatts,\n"
-              + "    0 as relchecks,\n"
-              + "    false as relhasrules,\n"
-              + "    false as relhastriggers,\n"
-              + "    false as relhassubclass,\n"
-              + "    false as relrowsecurity,\n"
-              + "    false as relforcerowsecurity,\n"
-              + "    true as relispopulated,\n"
-              + "    'n' as relreplident,\n"
-              + "    false as relispartition,\n"
-              + "    0 as relrewrite,\n"
-              + "    0 as relfrozenxid,\n"
-              + "    0 as relminmxid,\n"
-              + "    '{}'::bigint[] as relacl,\n"
-              + "    '{}'::text[] as reloptions,\n"
-              + "    0 as relpartbound\n"
-              + "from information_schema.indexes i\n"
-              + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name)\n"
-              + "group by i.index_name, i.table_schema\n"
-              + "),\n"
-              + "pg_attribute as (\n"
-              + "select * from (select 0::bigint as attrelid, '' as attname, 0::bigint as atttypid, 0::bigint as attstattarget, 0::bigint as attlen, 0::bigint as attnum, 0::bigint as attndims, -1::bigint as attcacheoff, 0::bigint as atttypmod, true as attbyval, '' as attalign, '' as attstorage, '' as attcompression, false as attnotnull, true as atthasdef, false as atthasmissing, '' as attidentity, '' as attgenerated, false as attisdropped, true as attislocal, 0 as attinhcount, 0 as attcollation, '{}'::bigint[] as attacl, '{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval\n"
-              + ") a where false)\n"
+              + ",\n"
+              + EMULATED_PG_CLASS_PREFIX
+              + ",\n"
+              + EMULATED_PG_ATTRIBUTE_PREFIX
+              + "\n"
               + "-- Load field definitions for (free-standing) composite types\n"
               + "SELECT typ.oid, att.attname, att.atttypid\n"
               + "FROM pg_type AS typ\n"

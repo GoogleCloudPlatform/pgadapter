@@ -271,10 +271,12 @@ public abstract class ControlMessage extends WireMessage {
         if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
           SendResultSetState state = sendResultSet(statement, mode, maxRows);
           statement.setHasMoreData(state.hasMoreRows());
-          if (state.hasMoreRows()) {
+          if (state.hasMoreRows() && mode == QueryMode.EXTENDED) {
             new PortalSuspendedResponse(this.outputStream).send(false);
           } else {
-            statement.close();
+            if (!state.hasMoreRows() && mode == QueryMode.EXTENDED) {
+              statement.close();
+            }
             new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
                 .send(false);
           }
@@ -501,13 +503,15 @@ public abstract class ControlMessage extends WireMessage {
         long rows = 0L;
         while (hasData) {
           WireOutput wireOutput = describedResult.createDataRowResponse(converter);
-          if (!converter.isIncludeBinaryCopyHeaderInFirstRow()) {
-            binaryCopyHeaderSentLatch.await();
+          if (wireOutput != null) {
+            if (!converter.isIncludeBinaryCopyHeaderInFirstRow()) {
+              binaryCopyHeaderSentLatch.await();
+            }
+            synchronized (describedResult) {
+              wireOutput.send(false);
+            }
+            binaryCopyHeaderSentLatch.countDown();
           }
-          synchronized (describedResult) {
-            wireOutput.send(false);
-          }
-          binaryCopyHeaderSentLatch.countDown();
           if (Thread.interrupted()) {
             throw PGExceptionFactory.newQueryCancelledException();
           }

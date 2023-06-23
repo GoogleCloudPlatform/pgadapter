@@ -19,7 +19,8 @@ from decimal import Decimal
 
 import pytz
 import psycopg
-from psycopg import Copy
+from psycopg import Copy, Rollback
+from psycopg.errors import InFailedSqlTransaction
 from psycopg.types.json import Jsonb
 
 
@@ -400,12 +401,18 @@ def binary_copy_out(conn_string: str):
     with conn.cursor() as cur:
       with cur.copy("COPY all_types (col_bigint, col_bool, col_bytea, "
                     "col_float8, col_int, col_numeric, col_timestamptz, "
-                    "col_date, col_varchar, col_jsonb) TO STDOUT (FORMAT "
-                    "BINARY)") as copy:
+                    "col_date, col_varchar, col_jsonb,"
+                    "col_array_bigint, col_array_bool, col_array_bytea, "
+                    "col_array_float8, col_array_int, col_array_numeric, "
+                    "col_array_timestamptz, col_array_date, col_array_varchar, "
+                    "col_array_jsonb) TO STDOUT (FORMAT BINARY)") as copy:
         # We must instruct psycopg3 exactly which types we are using when using
         # binary copy.
         copy.set_types(["bigint", "boolean", "bytea", "float8", "bigint",
-                        "numeric", "timestamptz", "date", "varchar", "jsonb"])
+                        "numeric", "timestamptz", "date", "varchar", "jsonb",
+                        "bigint[]", "boolean[]", "bytea[]", "float8[]",
+                        "bigint[]", "numeric[]", "timestamptz[]", "date[]",
+                        "varchar[]", "jsonb[]"])
         for row in copy.rows():
           print_all_types(row)
 
@@ -416,9 +423,16 @@ def text_copy_out(conn_string: str):
     with conn.cursor() as cur:
       with cur.copy("COPY all_types (col_bigint, col_bool, col_bytea, "
                     "col_float8, col_int, col_numeric, col_timestamptz, "
-                    "col_date, col_varchar, col_jsonb) TO STDOUT") as copy:
+                    "col_date, col_varchar, col_jsonb,"
+                    "col_array_bigint, col_array_bool, col_array_bytea, "
+                    "col_array_float8, col_array_int, col_array_numeric, "
+                    "col_array_timestamptz, col_array_date, col_array_varchar, "
+                    "col_array_jsonb) TO STDOUT") as copy:
         copy.set_types(["bigint", "boolean", "bytea", "float8", "bigint",
-                        "numeric", "timestamptz", "date", "varchar", "jsonb"])
+                        "numeric", "timestamptz", "date", "varchar", "jsonb",
+                        "bigint[]", "boolean[]", "bytea[]", "float8[]",
+                        "bigint[]", "numeric[]", "timestamptz[]", "date[]",
+                        "varchar[]", "jsonb[]"])
         for row in copy.rows():
           print_all_types(row)
 
@@ -483,8 +497,6 @@ def named_cursor(conn_string: str):
       print_all_types(row)
 
 
-# This method is currently not being used, as nested transactions are not yet
-# supported.
 def nested_transaction(conn_string: str):
   with psycopg.connect(conn_string) as conn:
     with conn.transaction() as tx1:
@@ -492,8 +504,27 @@ def nested_transaction(conn_string: str):
         row = conn.execute(
           "SELECT * FROM all_types WHERE col_bigint=%s", (1,)).fetchone()
         print_all_types(row)
-      #   tx2.commit()
-      # tx1.commit()
+
+
+def rollback_nested_transaction(conn_string: str):
+  with psycopg.connect(conn_string) as conn:
+    with conn.transaction():
+      try:
+        with conn.transaction():
+          conn.execute(
+            "SELECT * FROM all_types WHERE col_bigint=%s", (1,)).fetchone()
+          raise ValueError("Test rollback of savepoint")
+        print("Nested transaction succeeded")
+      except ValueError as e:
+        # We should come here, as the inner transaction always raises an error.
+        print("Nested transaction failed with error:", e)
+      try:
+        conn.execute(
+          "SELECT * FROM all_types WHERE col_bigint=%s", (1,)).fetchone()
+        print("Rolling back to a savepoint succeeded")
+      except InFailedSqlTransaction as e:
+        print("Outer transaction failed with error:", e)
+        raise Rollback()
 
 
 def create_batch_insert_values(batch_size: int):
@@ -521,6 +552,16 @@ def print_all_types(row):
   print("col_date:",        row[7])
   print("col_string:",      row[8])
   print("col_jsonb:",       row[9])
+  print("col_array_bigint:",      row[10])
+  print("col_array_bool:",        row[11])
+  print("col_array_bytea:",       None if row[12] is None else list(map(lambda x: None if x is None else bytes(x), row[12])))
+  print("col_array_float8:",      row[13])
+  print("col_array_int:",         row[14])
+  print("col_array_numeric:",     row[15])
+  print("col_array_timestamptz:", None if row[16] is None else list(map(lambda x: None if x is None else x.astimezone(pytz.UTC), row[16])))
+  print("col_array_date:",        row[17])
+  print("col_array_string:",      row[18])
+  print("col_array_jsonb:",       row[19])
 
 
 parser = argparse.ArgumentParser(description='Run psycopg3 test.')

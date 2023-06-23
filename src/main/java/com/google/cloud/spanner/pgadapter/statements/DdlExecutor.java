@@ -14,146 +14,27 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import com.google.cloud.spanner.AbstractLazyInitializer;
-import com.google.cloud.spanner.DatabaseAdminClient;
-import com.google.cloud.spanner.DatabaseClient;
-import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
-import com.google.cloud.spanner.ErrorCode;
-import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.Spanner;
-import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
-import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import java.util.concurrent.ExecutionException;
-import java.util.function.Function;
 
 /**
  * {@link DdlExecutor} inspects DDL statements before executing these to support commonly used DDL
  * features that are not (yet) supported by the backend.
  */
 class DdlExecutor {
-  /**
-   * This class checks whether the backend supports 'if [not] exists' style statements. This is used
-   * to determine whether PGAdapter should do the existence check itself, or whether it should send
-   * the DDL statement unmodified to the backend. The check is only executed once for each
-   * connection, and only if at least one 'if [not] exists' statement is executed.
-   */
-  static class BackendSupportsIfExists extends AbstractLazyInitializer<Boolean> {
-    private final DatabaseId databaseId;
-    private final Connection connection;
 
-    BackendSupportsIfExists(DatabaseId databaseId, Connection connection) {
-      this.databaseId = databaseId;
-      this.connection = connection;
-    }
-
-    @Override
-    protected Boolean initialize() {
-      Spanner spanner = ConnectionOptionsHelper.getSpanner(this.connection);
-      DatabaseAdminClient adminClient = spanner.getDatabaseAdminClient();
-      try {
-        // NOTE: This update will *NEVER* succeed. Either, the first statement fails to parse
-        // because the backend does not support 'if [not] exists'-style statements, or the second
-        // statement fails because it misses a data type for the `id` column. The error that is
-        // returned indicates whether the backend supports `if [not] exists`, as Spanner will parse
-        // the statements in order, and return an error for the first statement that fails.
-        adminClient
-            .updateDatabaseDdl(
-                this.databaseId.getInstanceId().getInstance(),
-                this.databaseId.getDatabase(),
-                ImmutableList.of(
-                    "create table if not exists test (id bigint primary key)",
-                    "create table invalid (id primary key)"),
-                null)
-            .get();
-        // This statement should not be reachable, as at least one of the statements should fail.
-        return Boolean.TRUE;
-      } catch (ExecutionException exception) {
-        SpannerException spannerException =
-            SpannerExceptionFactory.asSpannerException(exception.getCause());
-        if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
-            && spannerException
-                .getMessage()
-                .contains("<IF NOT EXISTS> clause is not supported in <CREATE TABLE> statement")) {
-          return Boolean.FALSE;
-        }
-        return Boolean.TRUE;
-      } catch (InterruptedException interruptedException) {
-        throw PGExceptionFactory.newQueryCancelledException();
-      }
-    }
-  }
-
-  /**
-   * {@link NotExecuted} is used to indicate that a statement was skipped because the 'if [not]
-   * exists' check indicated that the statement should be skipped.
-   */
-  static final class NotExecuted implements StatementResult {
-    @Override
-    public ResultType getResultType() {
-      return ResultType.NO_RESULT;
-    }
-
-    @Override
-    public ClientSideStatementType getClientSideStatementType() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public ResultSet getResultSet() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Long getUpdateCount() {
-      throw new UnsupportedOperationException();
-    }
-  }
-
-  private static final NotExecuted NOT_EXECUTED = new NotExecuted();
-  private final AbstractLazyInitializer<Boolean> backendSupportsIfExists;
   private final BackendConnection backendConnection;
   private final Connection connection;
 
-  /**
-   * Constructor only intended for testing. This will create an executor that always assumes that
-   * the backend does not support 'if [not] exists'.
-   */
-  @VisibleForTesting
+  /** Constructor for a {@link DdlExecutor} for the given connection. */
   DdlExecutor(BackendConnection backendConnection) {
-    this(
-        new AbstractLazyInitializer<Boolean>() {
-          @Override
-          protected Boolean initialize() {
-            return Boolean.FALSE;
-          }
-        },
-        backendConnection);
-  }
-
-  /** Constructor for a {@link DdlExecutor} for the given database and connection. */
-  DdlExecutor(DatabaseId databaseId, BackendConnection backendConnection) {
-    this(
-        new BackendSupportsIfExists(databaseId, backendConnection.getSpannerConnection()),
-        backendConnection);
-  }
-
-  private DdlExecutor(
-      AbstractLazyInitializer<Boolean> backendSupportsIfExists,
-      BackendConnection backendConnection) {
     this.backendConnection = backendConnection;
     this.connection = backendConnection.getSpannerConnection();
-    this.backendSupportsIfExists = backendSupportsIfExists;
   }
 
   /**
@@ -171,28 +52,21 @@ class DdlExecutor {
   }
 
   /**
-   * Executes the given DDL statement. This can include translating the statement into a check
-   * whether the to create/drop object exists, and skipping the actual execution of the DDL
-   * statement depending on the result of the `if [not] exists` check.
+   * Executes the given DDL statement. This can also include some translations that are needed to
+   * make the statement compatible with Cloud Spanner.
    */
   StatementResult execute(ParsedStatement parsedStatement, Statement statement) {
-    Statement translated = translate(parsedStatement, statement);
-    if (translated != null) {
-      return connection.execute(translated);
-    }
-    return NOT_EXECUTED;
+    return connection.execute(translate(parsedStatement, statement));
   }
 
   /**
-   * Translates a DDL statement that can contain an `if [not] exists` statement into one that is
-   * supported by the backend.
+   * Translates a DDL statement that can contain 'create table' statement with a named primary key
+   * into one that is supported by the backend.
    */
   Statement translate(ParsedStatement parsedStatement, Statement statement) {
     SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
     if (parser.eatKeyword("create")) {
       statement = translateCreate(parser, statement);
-    } else if (parser.eatKeyword("drop")) {
-      statement = translateDrop(parser, statement);
     }
 
     return statement;
@@ -200,149 +74,9 @@ class DdlExecutor {
 
   Statement translateCreate(SimpleParser parser, Statement statement) {
     if (parser.eatKeyword("table")) {
-      Statement createTableStatement = translateCreateTable(parser, statement);
-      if (createTableStatement == null) {
-        return null;
-      }
-      return maybeRemovePrimaryKeyConstraintName(createTableStatement);
-    }
-    boolean unique = parser.eatKeyword("unique");
-    if (parser.eatKeyword("index")) {
-      return translateCreateIndex(parser, statement, unique);
+      return maybeRemovePrimaryKeyConstraintName(statement);
     }
     return statement;
-  }
-
-  Statement translateDrop(SimpleParser parser, Statement statement) {
-    if (parser.eatKeyword("table")) {
-      return translateDropTable(parser, statement);
-    }
-    if (parser.eatKeyword("index")) {
-      return translateDropIndex(parser, statement);
-    }
-    return statement;
-  }
-
-  Statement translateCreateTable(SimpleParser parser, Statement statement) {
-    return translateCreateTableOrIndex(parser, statement, "table", this::tableExists);
-  }
-
-  Statement translateCreateIndex(SimpleParser parser, Statement statement, boolean unique) {
-    return translateCreateTableOrIndex(
-        parser, statement, unique ? "unique index" : "index", this::indexExists);
-  }
-
-  Statement translateDropTable(SimpleParser parser, Statement statement) {
-    return translateDropTableOrIndex(parser, statement, "table", this::tableExists);
-  }
-
-  Statement translateDropIndex(SimpleParser parser, Statement statement) {
-    return translateDropTableOrIndex(parser, statement, "index", this::indexExists);
-  }
-
-  private Statement translateCreateTableOrIndex(
-      SimpleParser parser,
-      Statement statement,
-      String type,
-      Function<TableOrIndexName, Boolean> existsFunction) {
-    if (!parser.eatKeyword("if", "not", "exists")) {
-      return statement;
-    }
-    return maybeExecuteStatement(
-        parser, statement, "create", type, name -> !existsFunction.apply(name));
-  }
-
-  private Statement translateDropTableOrIndex(
-      SimpleParser parser,
-      Statement statement,
-      String type,
-      Function<TableOrIndexName, Boolean> existsFunction) {
-    if (!parser.eatKeyword("if", "exists")) {
-      return statement;
-    }
-    return maybeExecuteStatement(parser, statement, "drop", type, existsFunction);
-  }
-
-  /** Executes the given DDL statement if the shouldExecuteFunction indicates so. */
-  Statement maybeExecuteStatement(
-      SimpleParser parser,
-      Statement statement,
-      String command,
-      String type,
-      Function<TableOrIndexName, Boolean> shouldExecuteFunction) {
-    if (backendSupportsIfExists()) {
-      return statement;
-    }
-    int identifierPosition = parser.getPos();
-    if (identifierPosition >= parser.getSql().length()) {
-      return statement;
-    }
-    TableOrIndexName name = parser.readTableOrIndexName();
-    if (name == null) {
-      return statement;
-    }
-    // Check if the table exists or not.
-    if (!shouldExecuteFunction.apply(name)) {
-      // Return null to indicate that the statement should be skipped.
-      return null;
-    }
-
-    // Return the DDL statement without the 'if [not] exists' clause.
-    return Statement.of(command + " " + type + parser.getSql().substring(identifierPosition));
-  }
-
-  boolean tableExists(TableOrIndexName tableName) {
-    DatabaseClient client = connection.getDatabaseClient();
-    try (ResultSet resultSet =
-        client
-            .singleUse()
-            .executeQuery(
-                Statement.newBuilder(
-                        "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
-                    .bind("p1")
-                    .to(
-                        unquoteIdentifier(
-                            tableName.schema == null
-                                ? backendConnection.getCurrentSchema()
-                                : tableName.schema))
-                    .bind("p2")
-                    .to(unquoteIdentifier(tableName.name))
-                    .build())) {
-      return resultSet.next();
-    }
-  }
-
-  boolean indexExists(TableOrIndexName indexName) {
-    DatabaseClient client = connection.getDatabaseClient();
-    try (ResultSet resultSet =
-        client
-            .singleUse()
-            .executeQuery(
-                Statement.newBuilder(
-                        "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
-                    .bind("p1")
-                    .to(
-                        unquoteIdentifier(
-                            indexName.schema == null
-                                ? backendConnection.getCurrentSchema()
-                                : indexName.schema))
-                    .bind("p2")
-                    .to(unquoteIdentifier(indexName.name))
-                    .build())) {
-      return resultSet.next();
-    }
-  }
-
-  /**
-   * Returns true if the backend supports `if [not] exists`-style statements. This will cause the
-   * {@link DdlExecutor} to send these statements unmodified to the backend.
-   */
-  boolean backendSupportsIfExists() {
-    try {
-      return backendSupportsIfExists.get();
-    } catch (Exception exception) {
-      throw SpannerExceptionFactory.asSpannerException(exception);
-    }
   }
 
   Statement maybeRemovePrimaryKeyConstraintName(Statement createTableStatement) {

@@ -52,6 +52,7 @@ jobs:
           - 5432:5432
         volumes:
           - /pg:/var/run/postgresql
+          - /tmp:/tmp
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -78,7 +79,7 @@ jobs:
           java-version: 11
       - run: java -version
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: '^1.17.7'
       - run: go version
@@ -88,6 +89,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
       - name: Setup psql
         run: |
           sudo apt-get update
@@ -127,4 +132,4 @@ jobs:
           ENDPOINT: ${{ env.GOOGLE_CLOUD_ENDPOINT }}
         with:
           filename: .github/integration-test-failed-template.md
-          assignees: pratickchokhani, gauravsnj, olavloite
+          assignees: pratickchokhani, olavloite

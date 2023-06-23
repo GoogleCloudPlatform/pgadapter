@@ -54,6 +54,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -819,9 +820,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testRandomResults() throws SQLException {
-    // TODO: Enable binary transfer for this test when binary transfer of date values prior
-    //       to the Julian/Gregorian switch has been fixed.
-    for (boolean binary : new boolean[] {false}) {
+    for (boolean binary : new boolean[] {true, false}) {
       // Also get the random results using the normal Spanner client to compare the results with
       // what is returned by PGAdapter.
       Spanner spanner =
@@ -873,7 +872,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
                   resultSet.getObject(col + 1);
                 }
               }
-              assertEqual(spannerResult, resultSet, binary);
+              assertEqual(spannerResult, resultSet);
               rowCount++;
             }
             assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
@@ -888,8 +887,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  private void assertEqual(
-      com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult, boolean binary)
+  private void assertEqual(com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult)
       throws SQLException {
     assertEquals(spannerResult.getColumnCount(), pgResult.getMetaData().getColumnCount());
     for (int col = 0; col < spannerResult.getColumnCount(); col++) {
@@ -901,11 +899,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
       switch (spannerResult.getColumnType(col).getCode()) {
         case BOOL:
-          if (!binary) {
-            // Skip for binary for now, as there is a bug in the PG JDBC driver for decoding binary
-            // bool values.
-            assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
-          }
+          assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
           break;
         case INT64:
           assertEquals(spannerResult.getLong(col), pgResult.getLong(col + 1));
@@ -928,12 +922,21 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
               pgResult.getTimestamp(col + 1).getTime());
           break;
         case DATE:
-          assertEquals(
+          LocalDate expected =
               LocalDate.of(
                   spannerResult.getDate(col).getYear(),
                   spannerResult.getDate(col).getMonth(),
-                  spannerResult.getDate(col).getDayOfMonth()),
-              pgResult.getDate(col + 1).toLocalDate());
+                  spannerResult.getDate(col).getDayOfMonth());
+          if ((expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER)
+              || (expected.getYear() <= 1582
+                  && expected.getMonth() == Month.FEBRUARY
+                  && expected.getDayOfMonth() > 20)) {
+            // Just assert that we can get the value. Dates in the Julian/Gregorian cutover period
+            // are weird, as are potential intercalaris values.
+            assertNotNull(pgResult.getDate(col + 1).toLocalDate());
+          } else {
+            assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());
+          }
           break;
         case PG_JSONB:
           assertEquals(spannerResult.getPgJsonb(col), pgResult.getString(col + 1));
@@ -1316,7 +1319,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(359, count);
+        assertEquals(361, count);
       }
     }
   }

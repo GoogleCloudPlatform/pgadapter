@@ -63,8 +63,6 @@ import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -72,7 +70,6 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -88,6 +85,7 @@ import org.postgresql.core.Oid;
 public class StatementTest {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+  private static final Runnable DO_NOTHING = () -> {};
 
   private static ParsedStatement parse(String sql) {
     return PARSER.parse(Statement.of(sql));
@@ -103,19 +101,6 @@ public class StatementTest {
   @Mock private StatementResult statementResult;
   @Mock private ResultSet resultSet;
   @Mock private DataOutputStream outputStream;
-
-  @AfterClass
-  public static void cleanup() {
-    deleteLogFile();
-  }
-
-  private static void deleteLogFile() {
-    // TODO: Make error log file configurable and turn off writing to a file during tests.
-    try {
-      Files.deleteIfExists(new File("output.txt").toPath());
-    } catch (IOException ignore) {
-    }
-  }
 
   @Test
   public void testBasicSelectStatement() throws Exception {
@@ -196,6 +181,7 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -286,6 +272,7 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -325,6 +312,7 @@ public class StatementTest {
             .build();
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -432,6 +420,7 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -498,6 +487,7 @@ public class StatementTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -570,6 +560,7 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -595,6 +586,7 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -648,6 +640,7 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
+            DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
             () -> WellKnownClient.UNSPECIFIED,
@@ -676,7 +669,6 @@ public class StatementTest {
               return mw;
             });
     executor.shutdown();
-    ;
 
     backendConnection.flush();
 
@@ -687,8 +679,6 @@ public class StatementTest {
         thrown.getMessage());
 
     copyStatement.close();
-
-    deleteLogFile();
   }
 
   private void setupQueryInformationSchemaResults() {
