@@ -112,7 +112,81 @@ public class ITPsqlTest implements IntegrationTest {
     createDataModel();
 
     testEnv.setUp();
-    database = testEnv.createDatabase(DEFAULT_DATA_MODEL);
+    database = testEnv.createDatabase(ImmutableList.<String>builder().addAll(DEFAULT_DATA_MODEL)
+            .add("create table if not exists singers (\n"
+                + "    id         varchar not null primary key,\n"
+                + "    first_name varchar,\n"
+                + "    last_name  varchar not null,\n"
+                + "    full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,\n"
+                + "    active     boolean,\n"
+                + "    created_at timestamptz,\n"
+                + "    updated_at timestamptz\n"
+                + ")")
+            .add("create table if not exists albums (\n"
+                + "    id               varchar not null primary key,\n"
+                + "    title            varchar not null,\n"
+                + "    marketing_budget numeric,\n"
+                + "    release_date     date,\n"
+                + "    cover_picture    bytea,\n"
+                + "    singer_id        varchar not null,\n"
+                + "    created_at       timestamptz,\n"
+                + "    updated_at       timestamptz,\n"
+                + "    constraint fk_albums_singers foreign key (singer_id) references singers (id)\n"
+                + ")")
+            .add("create table if not exists tracks (\n"
+                + "    id           varchar not null,\n"
+                + "    track_number bigint not null,\n"
+                + "    title        varchar not null,\n"
+                + "    sample_rate  float8 not null,\n"
+                + "    created_at   timestamptz,\n"
+                + "    updated_at   timestamptz,\n"
+                + "    primary key (id, track_number)\n"
+                + ") interleave in parent albums on delete cascade")
+            .add("create table if not exists track_recordings (\n"
+                + "    id               varchar not null,\n"
+                + "    track_number     bigint not null,\n"
+                + "    recording_number bigint not null,\n"
+                + "    sample_rate      float8 not null,\n"
+                + "    recorded_at      timestamptz not null,\n"
+                + "    primary key (id, track_number, recording_number)\n"
+                + ") interleave in parent tracks on delete cascade\n"
+                + "ttl interval '30 days' on recorded_at")
+            .add("create table if not exists venues (\n"
+                + "    id          varchar not null primary key,\n"
+                + "    name        varchar not null,\n"
+                + "    description varchar not null,\n"
+                + "    created_at  timestamptz,\n"
+                + "    updated_at  timestamptz\n"
+                + ")")
+            .add("create table if not exists concerts (\n"
+                + "    id          varchar not null primary key,\n"
+                + "    venue_id    varchar not null,\n"
+                + "    singer_id   varchar not null,\n"
+                + "    name        varchar not null,\n"
+                + "    start_time  timestamptz not null,\n"
+                + "    end_time    timestamptz not null,\n"
+                + "    created_at  timestamptz,\n"
+                + "    updated_at  timestamptz,\n"
+                + "    constraint fk_concerts_venues  foreign key (venue_id)  references venues  (id),\n"
+                + "    constraint fk_concerts_singers foreign key (singer_id) references singers (id),\n"
+                + "    constraint chk_end_time_after_start_time check (end_time > start_time)\n"
+                + ")")
+            .add("create or replace view v_singers\n"
+                + "sql security invoker\n"
+                + "as\n"
+                + "select id, full_name\n"
+                + "from singers\n"
+                + "order by last_name, id")
+            .add("create index idx_singers_last_name on singers (last_name)")
+            .add("create unique index idx_tracks_title on tracks (id, title) interleave in albums")
+            .add("create index idx_concerts_start_time on concerts (start_time) include (end_time)")
+            .add("create index idx_singers_albums_release_date on albums (singer_id, release_date desc) where release_date is not null")
+            .add("create change stream cs_singers for singers (first_name, last_name, active)\n"
+                + "with retention period = '2d',\n"
+                + "value_capture_type = 'OLD_AND_NEW_VALUES'")
+            .add("create role hr_manager")
+            .add("grant select on table singers to hr_manager")
+        .build());
     testEnv.startPGAdapterServer(Collections.emptyList());
   }
 
@@ -202,14 +276,41 @@ public class ITPsqlTest implements IntegrationTest {
           "-d",
           POSTGRES_DATABASE,
           "-c",
-          "drop table if exists all_types; drop table if exists numbers; drop foreign table if exists f_all_types; drop foreign table if exists f_numbers;"
+            "/* Dropping schema objects that are created by this test. */"
+                + "drop role if exists hr_manager cascade;\n"
+                + "drop view if exists v_singers;\n"
+                + "drop table if exists track_recordings;\n"
+                + "drop table if exists tracks;\n"
+                + "drop table if exists albums;\n"
+                + "drop table if exists concerts;\n"
+                + "drop table if exists venues;\n"
+                + "drop table if exists singers;\n"
+              + "drop table if exists all_types;\n"
+              + "drop table if exists numbers;\n"
+              + "drop foreign table if exists f_all_types;\n"
+              + "drop foreign table if exists f_numbers;"
         };
     ProcessBuilder builder = new ProcessBuilder().command(dropTablesCommand);
     setPgPassword(builder);
     Process process = builder.start();
+    String errors = readAll(process.getErrorStream());
 
     int res = process.waitFor();
-    assertEquals(0, res);
+    assertEquals(errors, 0, res);
+  }
+
+  static String readAll(InputStream inputStream) {
+    StringBuilder result = new StringBuilder();
+    try (Scanner scanner = new Scanner(new InputStreamReader(inputStream))) {
+      while (scanner.hasNextLine()) {
+        String line = scanner.nextLine();
+        // Skip lines that are generated by npm / node.
+        if (!line.startsWith(">")) {
+          result.append(line).append("\n");
+        }
+      }
+    }
+    return result.toString();
   }
 
   private String createJdbcUrlForLocalPg() {

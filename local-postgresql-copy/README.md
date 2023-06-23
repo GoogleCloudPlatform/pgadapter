@@ -142,6 +142,11 @@ The folder contains scripts that allow you to create a `pg_dump` of your Cloud S
 to restore this into the same or a different Cloud Spanner database. These scripts can also be used
 to copy your Cloud Spanner database to any other PostgreSQL-compatible database system.
 
+You can use the scripts as-is to create a `pg_dump` of your Cloud Spanner PostgreSQL database, and to
+restore it again, for example on a different Cloud Spanner instance. The scripts can also be modified
+to better fit your specific situation. The scripts only use standard PostgreSQL tools and standard
+features in PGAdapter.
+
 ### pg_dump
 
 The `run-pg-dump.sh` script can be used to create a dump of your Cloud Spanner database. This script will
@@ -288,7 +293,7 @@ This will create the `pg_dump` files and `schema.sql` file in the `./backup` fol
 __NOTE__: The `run-pg-restore.sh` script is not supported with CloudSQL and other hosted
 PostgreSQL solutions, as the script adds PGAdapter as a foreign server. CloudSQL cannot
 access PGAdapter as a foreign server. Instead, you should use a local PostgreSQL server
-to execute this script.
+to execute the `run-pg-restore.sh` script.
 
 You can also run `pg_restore` via any PostgreSQL database that __runs on the same network
 as PGAdapter__. This will first restore the dump into the PostgreSQL database, and then copy
