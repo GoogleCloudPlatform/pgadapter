@@ -294,7 +294,8 @@ public class BackendConnection {
                       && sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.get().replacePgCatalogTables(updatedStatement, sqlLowerCase)
                   : updatedStatement;
-          if (sessionState.isRemoveForUpdateClause()) {
+          if (sessionState.isRemoveForUpdateClause()
+              && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
             updatedStatement = removeForUpdate(updatedStatement, sqlLowerCase);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);

@@ -4501,6 +4501,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(2, resultSet.getInt(1));
         assertFalse(resultSet.next());
       }
+
+      // FOR UPDATE is not removed if 'delay transaction start' is enabled. This prevents unexpected
+      // behavior if the SELECT ... FOR UPDATE statement is executed without a transaction.
+      connection.createStatement().execute("set spanner.remove_for_update to on");
+      connection
+          .createStatement()
+          .execute("set spanner.delay_transaction_start_until_first_write=true");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select 2 from my_table where id=1 for update")) {
+        assertTrue(resultSet.next());
+        assertEquals(2, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
     }
   }
 
