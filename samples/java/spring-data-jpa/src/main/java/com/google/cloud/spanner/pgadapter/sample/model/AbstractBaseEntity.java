@@ -27,6 +27,11 @@ import org.hibernate.annotations.GenerationTime;
 import org.hibernate.annotations.GeneratorType;
 import org.hibernate.annotations.UpdateTimestamp;
 
+/**
+ * Base class for all entities that are used by this sample application.
+ * <p>
+ * This class defines the createdAt and updatedAt properties that are present in all entities.
+ */
 @MappedSuperclass
 public class AbstractBaseEntity {
 

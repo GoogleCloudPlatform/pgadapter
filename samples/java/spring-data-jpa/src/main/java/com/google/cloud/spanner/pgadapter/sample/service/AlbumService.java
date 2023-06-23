@@ -1,6 +1,7 @@
 package com.google.cloud.spanner.pgadapter.sample.service;
 
 import com.google.cloud.spanner.pgadapter.sample.model.Album;
+import com.google.cloud.spanner.pgadapter.sample.model.Singer;
 import com.google.cloud.spanner.pgadapter.sample.repository.AlbumRepository;
 import com.google.cloud.spanner.pgadapter.sample.repository.SingerRepository;
 import jakarta.transaction.Transactional;
@@ -9,6 +10,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -26,10 +31,17 @@ public class AlbumService {
   }
   
   @Transactional
+  public void deleteAllAlbums() {
+    albumRepository.deleteAll();
+  }
+  
+  @Transactional
   public List<Album> generateRandomAlbums(int count) {
     Random random = new Random();
     
-    List<Album> results = new ArrayList<>(count);
+    // Get the first 20 singers and link the albums to those.
+    List<Singer> singers = singerRepository.findAll(Pageable.ofSize(20)).toList();
+    List<Album> albums = new ArrayList<>(count);
     for (int i=0; i<count; i++) {
       Album album = new Album();
       album.setTitle(randomDataService.getRandomAlbumTitle());
@@ -38,8 +50,9 @@ public class AlbumService {
       album.setCoverPicture(picture);
       album.setMarketingBudget(BigDecimal.valueOf(random.nextDouble()));
       album.setReleaseDate(LocalDate.of(random.nextInt(100) + 1923, random.nextInt(12) + 1, random.nextInt(28) + 1));
-      results.add(albumRepository.save(album));
+      album.setSinger(singers.get(random.nextInt(singers.size())));
+      albums.add(album);
     }
-    return results;
+    return albumRepository.saveAll(albums);
   }
 }

@@ -16,7 +16,11 @@ package com.google.cloud.spanner.pgadapter.sample.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.util.List;
+import org.hibernate.annotations.BatchSize;
 
 @Table(name = "singers")
 @Entity
@@ -40,6 +44,10 @@ public class Singer extends AbstractUuidEntity {
   private String fullName;
   
   private boolean active;
+
+  @OneToMany
+  @JoinColumn(name = "singer_id")
+  private List<Album> albums;
 
   public String getFirstName() {
     return firstName;
@@ -72,4 +80,13 @@ public class Singer extends AbstractUuidEntity {
   public void setActive(boolean active) {
     this.active = active;
   }
+
+  public List<Album> getAlbums() {
+    return albums;
+  }
+
+  public void setAlbums(List<Album> albums) {
+    this.albums = albums;
+  }
+
 }

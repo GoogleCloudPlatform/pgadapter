@@ -14,10 +14,16 @@
 
 package com.google.cloud.spanner.pgadapter.sample;
 
+import com.google.cloud.spanner.pgadapter.sample.model.Album;
 import com.google.cloud.spanner.pgadapter.sample.model.Singer;
+import com.google.cloud.spanner.pgadapter.sample.model.Track;
 import com.google.cloud.spanner.pgadapter.sample.repository.SingerRepository;
+import com.google.cloud.spanner.pgadapter.sample.service.AlbumService;
 import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
+import com.google.cloud.spanner.pgadapter.sample.service.TrackService;
+import com.google.cloud.spanner.pgadapter.sample.service.VenueService;
 import java.util.List;
+import java.util.Random;
 import javax.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,15 +43,42 @@ public class SampleApplication implements CommandLineRunner {
   
   private final SingerService singerService;
   
-  public SampleApplication(SingerService singerService) {
+  private final AlbumService albumService;
+  
+  private final TrackService trackService;
+  
+  private final SingerRepository singerRepository;
+  
+  private final VenueService venueService;
+  
+  public SampleApplication(SingerService singerService, AlbumService albumService, TrackService trackService, VenueService venueService, SingerRepository singerRepository) {
     this.singerService = singerService;
+    this.albumService = albumService;
+    this.trackService = trackService;
+    this.venueService = venueService;
+    this.singerRepository = singerRepository;
   }
   
   @Override
   public void run(String... args) throws Exception {
+    // First clear the current tables.
+    albumService.deleteAllAlbums();
+    singerService.deleteAllSingers();
+    
     // Generate some random data.
-    List<Singer> singers = singerService.generateRandomSingers(10);
+    singerService.generateRandomSingers(10);
     log.info("Created 10 singers");
+    albumService.generateRandomAlbums(30);
+    log.info("Created 30 albums");
+    trackService.generateRandomTracks(30, 20);
+    log.info("Created 20 tracks each for 30 albums");
+    venueService.generateRandomVenues(20);
+    log.info("Created 20 venues");
+
+    Random random = new Random();
+    // Fetch and print some data using a read-only transaction.
+    char c = (char)(random.nextInt(26) + 'a');
+    singerService.printSingersWithLastNameStartingWith(String.valueOf(c).toUpperCase());
   }
 
   @PreDestroy

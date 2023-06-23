@@ -17,10 +17,14 @@ package com.google.cloud.spanner.pgadapter.sample.model;
 import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import org.hibernate.annotations.BatchSize;
 
 @Table(name = "albums")
 @Entity
@@ -38,6 +42,10 @@ public class Album extends AbstractUuidEntity {
   
   @ManyToOne(optional = false)
   private Singer singer;
+
+  @OneToMany
+  @JoinColumn(name = "id", referencedColumnName = "id", insertable = false, updatable = false)
+  private List<Track> tracks;
 
   public String getTitle() {
     return title;
@@ -78,4 +86,13 @@ public class Album extends AbstractUuidEntity {
   public void setSinger(Singer singer) {
     this.singer = singer;
   }
+
+  public List<Track> getTracks() {
+    return tracks;
+  }
+
+  public void setTracks(List<Track> tracks) {
+    this.tracks = tracks;
+  }
+
 }

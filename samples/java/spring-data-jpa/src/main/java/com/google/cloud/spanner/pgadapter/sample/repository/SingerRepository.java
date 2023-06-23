@@ -15,8 +15,15 @@
 package com.google.cloud.spanner.pgadapter.sample.repository;
 
 import com.google.cloud.spanner.pgadapter.sample.model.Singer;
-import org.springframework.data.repository.CrudRepository;
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-public interface SingerRepository extends CrudRepository<Singer, String> {
+public interface SingerRepository extends JpaRepository<Singer, String> {
+  
+  /** Get all singers that have a last name that starts with the given prefix. */
+  @Query("SELECT s FROM Singer s WHERE starts_with(s.lastName, :lastName)=true")
+  List<Singer> searchByLastNameStartsWith(@Param("lastName") String lastName);
   
 }

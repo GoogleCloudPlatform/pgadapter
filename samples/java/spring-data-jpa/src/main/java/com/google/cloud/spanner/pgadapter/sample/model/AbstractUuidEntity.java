@@ -6,6 +6,15 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 
+/**
+ * Abstract base class for entities that use a UUID as the primary key.
+ * 
+ * <p>
+ * UUID is the recommended primary key type for Cloud Spanner, as it does not require any additional round-trips to the database to generate a primary key value.
+ * 
+ * <p>
+ * See {@link Venue} for an example of how to set up an entity that uses a sequential integer value as a primary key.
+ */
 @MappedSuperclass
 public class AbstractUuidEntity extends AbstractBaseEntity {
 
