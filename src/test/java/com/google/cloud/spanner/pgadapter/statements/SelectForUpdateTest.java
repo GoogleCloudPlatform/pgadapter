@@ -14,15 +14,53 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.removeForUpdate;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 
+import com.google.cloud.spanner.Statement;
 import com.google.common.collect.ImmutableList;
+import java.util.Locale;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class SelectForUpdateTest {
+
+  @Test
+  public void testRemoveForUpdate() {
+    assertSameAfterRemoveForUpdate("select 1");
+    assertSameAfterRemoveForUpdate("select col1, col2 from my_table where bar=1");
+    assertSameAfterRemoveForUpdate("update my_table set bar=1 where foo=2");
+    assertSameAfterRemoveForUpdate("select col1 from my_table for share");
+    assertSameAfterRemoveForUpdate("select col1 from foo for update skip locked");
+    assertSameAfterRemoveForUpdate("select col1 from foo for no key update");
+
+    assertEquals(
+        Statement.of("select col1 from foo"),
+        internalRemoveForUpdate("select col1 from foo for update"));
+    assertEquals(
+        Statement.of("SELECT col1 FROM foo"),
+        internalRemoveForUpdate("SELECT col1 FROM foo for update"));
+    assertEquals(
+        Statement.of("select col1 from foo /* this is a comment */"),
+        internalRemoveForUpdate("select col1 from foo for update /* this is a comment */"));
+    assertEquals(
+        Statement.of("select col1 from foo /* this is a comment */ -- yet another comment\n"),
+        internalRemoveForUpdate(
+            "select col1 from foo for update /* this is a comment */ -- yet another comment\n"));
+  }
+
+  private void assertSameAfterRemoveForUpdate(String sql) {
+    Statement statement = Statement.of(sql);
+    assertSame(
+        statement, removeForUpdate(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+  }
+
+  private Statement internalRemoveForUpdate(String sql) {
+    return removeForUpdate(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH));
+  }
 
   @Test
   public void testDetectSelectForUpdate() {

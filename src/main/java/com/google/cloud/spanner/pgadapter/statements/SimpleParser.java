@@ -24,7 +24,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -227,13 +226,39 @@ public class SimpleParser {
   }
 
   /**
+   * Removes the 'for update' clause at the end of the SQL string. This method only removes that
+   * specific clause. Any other FOR clauses are not removed. The 'FOR UPDATE' clause is also not
+   * removed if the clause is not the last clause in the statement.
+   */
+  static Statement removeForUpdate(Statement statement, String lowerCaseSql) {
+    // If there is no 'for' clause, then we know that we don't have to analyze any further.
+    if (!lowerCaseSql.contains("for")) {
+      return statement;
+    }
+    SimpleParser parser = new SimpleParser(statement.getSql());
+    parser.parseExpressionUntilKeyword(ImmutableList.of("for"), true, false, false);
+    if (parser.pos >= parser.getSql().length()) {
+      return statement;
+    }
+    int startPos = parser.pos;
+    if (parser.eatKeyword("for") && parser.eatKeyword("update")) {
+      int endPos = parser.pos;
+      if (!parser.hasMoreTokens()) {
+        // The statement just ends with 'for update'. Skip that part.
+        return Statement.of(
+            statement.getSql().substring(0, startPos) + statement.getSql().substring(endPos));
+      }
+    }
+    return statement;
+  }
+
+  /**
    * Adds a LIMIT clause to the given statement if the statement contains a parameterized OFFSET
    * clause and no LIMIT clause.
    */
-  static Statement addLimitIfParameterizedOffset(Statement statement) {
-    String sqlLowerCase = statement.getSql().toLowerCase(Locale.ENGLISH);
+  static Statement addLimitIfParameterizedOffset(Statement statement, String lowerCaseSql) {
     // If there is no offset clause, then we know that we don't have to analyze any further.
-    if (!sqlLowerCase.contains("offset")) {
+    if (!lowerCaseSql.contains("offset")) {
       return statement;
     }
     SimpleParser parser = new SimpleParser(statement.getSql());
