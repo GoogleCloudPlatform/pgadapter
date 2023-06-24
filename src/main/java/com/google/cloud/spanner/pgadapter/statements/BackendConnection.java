@@ -17,7 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
-import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.removeForUpdate;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replaceForUpdate;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
@@ -294,9 +294,11 @@ public class BackendConnection {
                       && sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.get().replacePgCatalogTables(updatedStatement, sqlLowerCase)
                   : updatedStatement;
-          if (sessionState.isRemoveForUpdateClause()
+          // TODO: Remove the check for isDelayBeginTransactionStartUntilFirstWrite when that
+          //       feature is able to detect the LOCK_SCANNED_RANGES=exclusive hint as a write.
+          if (sessionState.isReplaceForUpdateClause()
               && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
-            updatedStatement = removeForUpdate(updatedStatement, sqlLowerCase);
+            updatedStatement = replaceForUpdate(updatedStatement, sqlLowerCase);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));

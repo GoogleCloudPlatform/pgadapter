@@ -4478,7 +4478,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testRemoveForUpdate() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of("select 1 from my_table where id=1"), SELECT1_RESULTSET));
+            Statement.of("/*@ LOCK_SCANNED_RANGES=exclusive */select 1 from my_table where id=1"),
+            SELECT1_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select 2 from my_table where id=1 for update"), SELECT2_RESULTSET));
@@ -4487,12 +4488,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet =
           connection
               .createStatement()
+              // This 'for update' clause will be replaced with a lock_scanned_ranges hint.
               .executeQuery("select 1 from my_table where id=1 for update")) {
         assertTrue(resultSet.next());
         assertEquals(1, resultSet.getInt(1));
         assertFalse(resultSet.next());
       }
-      connection.createStatement().execute("set spanner.remove_for_update to off");
+      connection.createStatement().execute("set spanner.replace_for_update to off");
       try (ResultSet resultSet =
           connection
               .createStatement()
@@ -4504,7 +4506,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       // FOR UPDATE is not removed if 'delay transaction start' is enabled. This prevents unexpected
       // behavior if the SELECT ... FOR UPDATE statement is executed without a transaction.
-      connection.createStatement().execute("set spanner.remove_for_update to on");
+      connection.createStatement().execute("set spanner.replace_for_update to on");
       connection
           .createStatement()
           .execute("set spanner.delay_transaction_start_until_first_write=true");

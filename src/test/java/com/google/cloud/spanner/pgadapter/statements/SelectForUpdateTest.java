@@ -14,7 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.removeForUpdate;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replaceForUpdate;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
@@ -35,31 +35,35 @@ public class SelectForUpdateTest {
     assertSameAfterRemoveForUpdate("update my_table set bar=1 where foo=2");
     assertSameAfterRemoveForUpdate("select col1 from my_table for share");
     assertSameAfterRemoveForUpdate("select col1 from foo for update skip locked");
+    assertSameAfterRemoveForUpdate("select col1 from foo for update nowait");
     assertSameAfterRemoveForUpdate("select col1 from foo for no key update");
+    assertSameAfterRemoveForUpdate("select col1 from my_table for update of my_other_table");
 
     assertEquals(
-        Statement.of("select col1 from foo"),
-        internalRemoveForUpdate("select col1 from foo for update"));
+        Statement.of("/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from foo"),
+        internalReplaceForUpdate("select col1 from foo for update"));
     assertEquals(
-        Statement.of("SELECT col1 FROM foo"),
-        internalRemoveForUpdate("SELECT col1 FROM foo for update"));
+        Statement.of("/*@ LOCK_SCANNED_RANGES=exclusive */SELECT col1 FROM foo"),
+        internalReplaceForUpdate("SELECT col1 FROM foo for update"));
     assertEquals(
-        Statement.of("select col1 from foo /* this is a comment */"),
-        internalRemoveForUpdate("select col1 from foo for update /* this is a comment */"));
+        Statement.of(
+            "/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from foo /* this is a comment */"),
+        internalReplaceForUpdate("select col1 from foo for update /* this is a comment */"));
     assertEquals(
-        Statement.of("select col1 from foo /* this is a comment */ -- yet another comment\n"),
-        internalRemoveForUpdate(
+        Statement.of(
+            "/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from foo /* this is a comment */ -- yet another comment\n"),
+        internalReplaceForUpdate(
             "select col1 from foo for update /* this is a comment */ -- yet another comment\n"));
   }
 
   private void assertSameAfterRemoveForUpdate(String sql) {
     Statement statement = Statement.of(sql);
     assertSame(
-        statement, removeForUpdate(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+        statement, replaceForUpdate(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
   }
 
-  private Statement internalRemoveForUpdate(String sql) {
-    return removeForUpdate(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH));
+  private Statement internalReplaceForUpdate(String sql) {
+    return replaceForUpdate(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH));
   }
 
   @Test

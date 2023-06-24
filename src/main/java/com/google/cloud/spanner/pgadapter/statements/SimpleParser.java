@@ -226,11 +226,17 @@ public class SimpleParser {
   }
 
   /**
-   * Removes the 'for update' clause at the end of the SQL string. This method only removes that
-   * specific clause. Any other FOR clauses are not removed. The 'FOR UPDATE' clause is also not
-   * removed if the clause is not the last clause in the statement.
+   * Replaces any 'for update' clause with a LOCK_SCANNED_RANGES=exclusive hint. This method only
+   * replaces the 'for update' clause if it fulfills these criteria:
+   *
+   * <ol>
+   *   <li>The 'for update' clause is on the outermost expression
+   *   <li>The clause does not include NOWAIT or SKIP LOCKED
+   *   <li>The clause does not use any other lock mode than 'UPDATE'
+   *   <li>The clause does not contain an 'OF table_name' clause
+   * </ol>
    */
-  static Statement removeForUpdate(Statement statement, String lowerCaseSql) {
+  static Statement replaceForUpdate(Statement statement, String lowerCaseSql) {
     // If there is no 'for' clause, then we know that we don't have to analyze any further.
     if (!lowerCaseSql.contains("for")) {
       return statement;
@@ -243,11 +249,16 @@ public class SimpleParser {
     int startPos = parser.pos;
     if (parser.eatKeyword("for") && parser.eatKeyword("update")) {
       int endPos = parser.pos;
-      if (!parser.hasMoreTokens()) {
-        // The statement just ends with 'for update'. Skip that part.
-        return Statement.of(
-            statement.getSql().substring(0, startPos) + statement.getSql().substring(endPos));
+      // 'OF table_name', 'nowait' and 'skip locked' clauses are not supported.
+      if (parser.eatKeyword("of") || parser.eatKeyword("nowait") || parser.eatKeyword("skip")) {
+        return statement;
       }
+      // This is a simple 'for update' clause. Replace it with a 'LOCK_SCANNED_RANGES=exclusive'
+      // hint.
+      return Statement.of(
+          "/*@ LOCK_SCANNED_RANGES=exclusive */"
+              + statement.getSql().substring(0, startPos)
+              + statement.getSql().substring(endPos));
     }
     return statement;
   }
