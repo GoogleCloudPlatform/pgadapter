@@ -253,6 +253,9 @@ public class SimpleParser {
       if (parser.eatKeyword("of") || parser.eatKeyword("nowait") || parser.eatKeyword("skip")) {
         return statement;
       }
+      if (parser.hasMoreTokens()) {
+        return statement;
+      }
       // This is a simple 'for update' clause. Replace it with a 'LOCK_SCANNED_RANGES=exclusive'
       // hint.
       return Statement.of(

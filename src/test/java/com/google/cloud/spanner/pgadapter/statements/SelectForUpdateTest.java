@@ -38,6 +38,7 @@ public class SelectForUpdateTest {
     assertSameAfterRemoveForUpdate("select col1 from foo for update nowait");
     assertSameAfterRemoveForUpdate("select col1 from foo for no key update");
     assertSameAfterRemoveForUpdate("select col1 from my_table for update of my_other_table");
+    assertSameAfterRemoveForUpdate("select col1 from foo for update limit 10");
 
     assertEquals(
         Statement.of("/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from foo"),
