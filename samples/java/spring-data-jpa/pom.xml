@@ -32,6 +32,11 @@
       <artifactId>postgresql</artifactId>
       <version>42.6.0</version>
     </dependency>
+    <!-- Add Jackson for json parsing. This is required for using JSONB columns with Spring Data JPA. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
     <!-- Add PGAdapter as a dependency, so we can start it in-process -->
     <dependency>
       <groupId>com.google.cloud</groupId>
