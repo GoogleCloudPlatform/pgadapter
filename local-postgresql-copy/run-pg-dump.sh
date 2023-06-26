@@ -9,6 +9,7 @@ set -e
 if [ -z "$schema_file" ]; then schema_file="./backup/schema.sql"; fi;
 if [ -z "$data_dir" ]; then data_dir="./backup/data"; fi;
 if [ -z "$copy_data" ]; then copy_data="true"; fi;
+if [ -z "$max_parallelism" ]; then max_parallelism=1; fi;
 
 echo
 echo "--- BACKING UP CLOUD SPANNER DATABASE ---"
@@ -21,6 +22,7 @@ then
 else
   echo "The script will use the existing data in the PostgreSQL database $POSTGRES_DB."
 fi;
+echo "Copying data with max_parallelism: $max_parallelism "
 
 echo
 read -p "Continue? [Yn]" -n 1 -r
@@ -43,9 +45,9 @@ psql -v ON_ERROR_STOP=1 \
 if [ "$copy_data" = "true" ];
 then
   echo "Copying schema from Cloud Spanner to the PostgreSQL database $POSTGRES_DB"
-  source ./copy-schema.sh
+  ./copy-schema.sh
   echo "Copying data from Cloud Spanner to the PostgreSQL database $POSTGRES_DB"
-  source ./copy-data.sh
+  ./copy-data.sh
 fi;
 
 # Dump the database in directory format.
