@@ -37,8 +37,9 @@ public class SelectForUpdateTest {
     assertSameAfterRemoveForUpdate("select col1 from foo for update skip locked");
     assertSameAfterRemoveForUpdate("select col1 from foo for update nowait");
     assertSameAfterRemoveForUpdate("select col1 from foo for no key update");
-    assertSameAfterRemoveForUpdate("select col1 from my_table for update of my_other_table");
     assertSameAfterRemoveForUpdate("select col1 from foo for update limit 10");
+    assertSameAfterRemoveForUpdate("select col1 from foo for update of foo limit 10");
+    assertSameAfterRemoveForUpdate("select col1 from foo for update of foo, bar limit 10");
 
     assertEquals(
         Statement.of("/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from foo"),
@@ -55,6 +56,13 @@ public class SelectForUpdateTest {
             "/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from foo /* this is a comment */ -- yet another comment\n"),
         internalReplaceForUpdate(
             "select col1 from foo for update /* this is a comment */ -- yet another comment\n"));
+    assertEquals(
+        Statement.of("/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from my_table"),
+        internalReplaceForUpdate("select col1 from my_table for update of my_other_table"));
+    assertEquals(
+        Statement.of("/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from my_table"),
+        internalReplaceForUpdate(
+            "select col1 from my_table for update of my_table, /*comment*/ my_other_table"));
   }
 
   private void assertSameAfterRemoveForUpdate(String sql) {
