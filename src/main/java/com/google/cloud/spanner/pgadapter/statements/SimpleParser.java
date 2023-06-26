@@ -233,8 +233,9 @@ public class SimpleParser {
    *   <li>The 'for update' clause is on the outermost expression
    *   <li>The clause does not include NOWAIT or SKIP LOCKED
    *   <li>The clause does not use any other lock mode than 'UPDATE'
-   *   <li>The clause does not contain an 'OF table_name' clause
    * </ol>
+   *
+   * Any 'OF table_name[, ...]' clauses in the expression are ignored.
    */
   static Statement replaceForUpdate(Statement statement, String lowerCaseSql) {
     // If there is no 'for' clause, then we know that we don't have to analyze any further.

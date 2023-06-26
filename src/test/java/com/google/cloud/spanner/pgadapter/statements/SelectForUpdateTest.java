@@ -29,7 +29,7 @@ import org.junit.runners.JUnit4;
 public class SelectForUpdateTest {
 
   @Test
-  public void testRemoveForUpdate() {
+  public void testReplaceForUpdate() {
     assertSameAfterRemoveForUpdate("select 1");
     assertSameAfterRemoveForUpdate("select col1, col2 from my_table where bar=1");
     assertSameAfterRemoveForUpdate("update my_table set bar=1 where foo=2");
