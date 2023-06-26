@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
@@ -21,6 +22,11 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import java.util.function.Supplier;
 
 /**
  * {@link DdlExecutor} inspects DDL statements before executing these to support commonly used DDL
@@ -30,11 +36,15 @@ class DdlExecutor {
 
   private final BackendConnection backendConnection;
   private final Connection connection;
+  private final Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements;
 
   /** Constructor for a {@link DdlExecutor} for the given connection. */
-  DdlExecutor(BackendConnection backendConnection) {
+  DdlExecutor(
+      BackendConnection backendConnection,
+      Supplier<ImmutableList<QueryPartReplacer>> ddlStatementReplacements) {
     this.backendConnection = backendConnection;
     this.connection = backendConnection.getSpannerConnection();
+    this.ddlStatementReplacements = ddlStatementReplacements;
   }
 
   /**
@@ -56,7 +66,26 @@ class DdlExecutor {
    * make the statement compatible with Cloud Spanner.
    */
   StatementResult execute(ParsedStatement parsedStatement, Statement statement) {
+    if (!ddlStatementReplacements.get().isEmpty()) {
+      String replaced = applyReplacers(statement.getSql());
+      if (!replaced.equals(statement.getSql())) {
+        statement = Statement.of(replaced);
+        parsedStatement = AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+      }
+    }
     return connection.execute(translate(parsedStatement, statement));
+  }
+
+  @VisibleForTesting
+  String applyReplacers(String sql) {
+    for (QueryPartReplacer functionReplacement : ddlStatementReplacements.get()) {
+      Tuple<String, ReplacementStatus> result = functionReplacement.replace(sql);
+      if (result.y() == ReplacementStatus.STOP) {
+        return result.x();
+      }
+      sql = result.x();
+    }
+    return sql;
   }
 
   /**
