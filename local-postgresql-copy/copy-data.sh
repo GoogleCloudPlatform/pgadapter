@@ -1,5 +1,18 @@
 #!/bin/bash
+shopt -s lastpipe
 set -e
+
+# Set this variable to a higher number to increase the amount of parallelism. That can increase the
+# speed of the COPY operation.
+if [ -z "$max_parallelism" ]; then max_parallelism=1; fi;
+
+function wait_for_copy() {
+  pid=${pids[${current_wait_index}]}
+  waiting_for_table=${table_names[${current_wait_index}]}
+  echo "Waiting for COPY of table $waiting_for_table (PID $pid)"
+  wait "$pid"
+  current_wait_index=$((current_wait_index+1))
+}
 
 echo "COPYING DATA FROM CLOUD SPANNER TO POSTGRESQL"
 
@@ -22,6 +35,16 @@ READ_TIMESTAMP="${READ_TIMESTAMP/ /T}"
 READ_TIMESTAMP="${READ_TIMESTAMP/+00/Z}"
 echo "Reading data from Cloud Spanner using timestamp $READ_TIMESTAMP"
 echo "set spanner.read_only_staleness='read_timestamp $READ_TIMESTAMP'"
+echo ""
+echo " --- COPYING DATA WITH MAX_PARALLELISM $max_parallelism. --- "
+echo "Set the 'max_parallelism' variable to increase the number of COPY operations that will run in parallel."
+echo ""
+
+# Keep track of the PIDs of the COPY processes that we start.
+pids=()
+table_names=()
+current_index=0
+current_wait_index=0
 
 PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -d "$POSTGRES_DB" -qAtX \
   -c "select table_name from information_schema.tables where table_type='BASE TABLE' and table_schema='public';" \
@@ -45,5 +68,19 @@ PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -h "
   | PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -a -U "$POSTGRES_USER" -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -d "$POSTGRES_DB" \
       -c "set session_replication_role='replica'" \
       -c "copy $table_name ($column_names) from stdin binary" \
-      -c "set session_replication_role='origin'"
+      -c "set session_replication_role='origin'" &
+  pids[${current_index}]=$!
+  table_names[${current_index}]="$table_name"
+  current_index=$((current_index+1))
+  echo "Current index: $current_index"
+  # Make sure we don't execute too many COPY operations in parallel.
+  if [ $current_index -ge $max_parallelism ]; then
+    wait_for_copy
+  fi
+done
+
+# Wait for the remaining COPY commands.
+while [ $current_wait_index -lt $current_index ]
+do
+  wait_for_copy
 done

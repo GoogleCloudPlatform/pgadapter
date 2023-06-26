@@ -79,7 +79,7 @@ PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 \
   -c "drop extension if exists postgres_fdw cascade;"
 temp_spanner_db="$SPANNER_DATABASE"
 SPANNER_DATABASE="$spanner_restore_database"
-source ./import-foreign-schema.sh
+./import-foreign-schema.sh
 SPANNER_DATABASE="$temp_spanner_db"
 
 # Generate a script to drop all foreign keys on Cloud Spanner.

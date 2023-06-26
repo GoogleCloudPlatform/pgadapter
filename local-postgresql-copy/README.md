@@ -33,6 +33,9 @@ SPANNER_INSTANCE=my-instance
 SPANNER_DATABASE=my-database
 ```
 
+Also ensure that the `PGADAPTER_HOST_PORT` (default 9001) and `POSTGRES_HOST_PORT` (default 9002)
+are not in use by any other services on your local machine, and change the values if necessary.
+
 2. Start the Docker containers.
 
 ```shell
@@ -312,3 +315,12 @@ gcloud spanner databases create new-database \
   --database-dialect=POSTGRESQL
 spanner_restore_database="new-database" ./run-pg-restore.sh
 ```
+
+## Troubleshooting
+
+### Port Conflicts
+
+If the `docker compose --env-file .env up -d` command seems to hang while starting the containers,
+it is possible that you have a port mapping conflict. The default port mapping is to map
+PGAdapter to port `9001` on the local machine and  PostgreSQL to port `9002`. Change these defaults
+in the `.env` file if you already have other services running on these port numbers.
