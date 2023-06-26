@@ -35,6 +35,7 @@ import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import org.junit.Test;
@@ -467,7 +468,8 @@ public class SessionStateTest {
     PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("select * from pg_settings");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         "with " + getDefaultSessionStateExpression() + "\n" + statement.getSql(),
@@ -484,7 +486,8 @@ public class SessionStateTest {
             .to("some-name")
             .build();
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         Statement.newBuilder(
@@ -501,7 +504,8 @@ public class SessionStateTest {
     PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("select * from some_table");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertSame(statement, withSessionState);
   }
@@ -512,7 +516,8 @@ public class SessionStateTest {
     PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("/* This comment is preserved */ select * from pg_settings");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         "with " + getDefaultSessionStateExpression() + "\n" + statement.getSql(),
@@ -527,7 +532,8 @@ public class SessionStateTest {
         Statement.of(
             "with my_cte as (select col1, col2 from foo) select * from pg_settings inner join my_cte on my_cte.col1=pg_settings.name");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         "with "
@@ -544,7 +550,8 @@ public class SessionStateTest {
         Statement.of(
             "/* This comment is preserved */ with foo as (select * from bar)\nselect * from pg_settings");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         "with "

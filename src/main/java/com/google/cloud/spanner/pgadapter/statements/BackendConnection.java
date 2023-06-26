@@ -16,6 +16,8 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replaceForUpdate;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
@@ -82,6 +84,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -284,13 +287,20 @@ public class BackendConnection {
             result.set(ddlExecutor.execute(parsedStatement, statement));
           }
         } else {
+          String sqlLowerCase = updatedStatement.getSql().toLowerCase(Locale.ENGLISH);
           // Potentially replace pg_catalog table references with common table expressions.
           updatedStatement =
               parsedStatement.getType() != StatementType.CLIENT_SIDE
                       && sessionState.isReplacePgCatalogTables()
-                  ? pgCatalog.get().replacePgCatalogTables(statement)
-                  : statement;
-          updatedStatement = bindStatement(updatedStatement);
+                  ? pgCatalog.get().replacePgCatalogTables(updatedStatement, sqlLowerCase)
+                  : updatedStatement;
+          // TODO: Remove the check for isDelayBeginTransactionStartUntilFirstWrite when that
+          //       feature is able to detect the LOCK_SCANNED_RANGES=exclusive hint as a write.
+          if (sessionState.isReplaceForUpdateClause()
+              && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
+            updatedStatement = replaceForUpdate(updatedStatement, sqlLowerCase);
+          }
+          updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
@@ -320,12 +330,12 @@ public class BackendConnection {
       }
     }
 
-    Statement bindStatement(Statement statement) {
+    Statement bindStatement(Statement statement, @Nullable String lowerCaseSql) {
       Statement boundStatement = statementBinder.apply(statement);
       // Add a LIMIT clause to the statement if it contains an OFFSET clause that uses a query
       // parameter and there is no existing LIMIT clause in the query.
-      if (sessionState.isAutoAddLimitClause()) {
-        return SimpleParser.addLimitIfParameterizedOffset(boundStatement);
+      if (lowerCaseSql != null && sessionState.isAutoAddLimitClause()) {
+        boundStatement = addLimitIfParameterizedOffset(boundStatement, lowerCaseSql);
       }
       return boundStatement;
     }
@@ -1273,7 +1283,7 @@ public class BackendConnection {
                     bufferedStatements.get(index).statement));
           } else {
             Execute execute = (Execute) bufferedStatements.get(index);
-            execute.analyzeOrExecute(execute.bindStatement(execute.statement));
+            execute.analyzeOrExecute(execute.bindStatement(execute.statement, null));
           }
           index++;
         } else {
