@@ -63,16 +63,18 @@ create table concerts (
     -- shard_id is not visible to Hibernate and is only here to prevent write-hotspots in Cloud Spanner.
     -- See https://cloud.google.com/spanner/docs/generated-column/how-to#primary-key-generated-column
     -- for more information.
-    shard_id    bigint generated always as (mod(id, '2048'::bigint)) stored not null,
-    id          bigint not null,
-    venue_id    bigint not null,
-    singer_id   varchar not null,
-    name        varchar not null,
-    start_time  timestamptz not null,
-    end_time    timestamptz not null,
-    created_at  timestamptz,
-    updated_at  timestamptz,
-    constraint fk_concerts_venues  foreign key (venue_id)  references venues  (id),
+    shard_id       bigint generated always as (mod(id, '2048'::bigint)) stored not null,
+    id             bigint not null,
+    -- venue_shard_id is not visible to Hibernate.
+    venue_shard_id bigint generated always as (mod(venue_id, '2048'::bigint)) stored not null,
+    venue_id       bigint not null,
+    singer_id      varchar not null,
+    name           varchar not null,
+    start_time     timestamptz not null,
+    end_time       timestamptz not null,
+    created_at     timestamptz,
+    updated_at     timestamptz,
+    constraint fk_concerts_venues  foreign key (venue_shard_id, venue_id)  references venues (shard_id, id),
     constraint fk_concerts_singers foreign key (singer_id) references singers (id),
     constraint chk_end_time_after_start_time check (end_time > start_time),
     primary key (shard_id, id)
