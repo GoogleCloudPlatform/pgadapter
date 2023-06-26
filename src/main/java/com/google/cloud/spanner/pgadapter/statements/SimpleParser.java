@@ -24,7 +24,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -227,13 +226,53 @@ public class SimpleParser {
   }
 
   /**
+   * Replaces any 'for update' clause with a LOCK_SCANNED_RANGES=exclusive hint. This method only
+   * replaces the 'for update' clause if it fulfills these criteria:
+   *
+   * <ol>
+   *   <li>The 'for update' clause is on the outermost expression
+   *   <li>The clause does not include NOWAIT or SKIP LOCKED
+   *   <li>The clause does not use any other lock mode than 'UPDATE'
+   *   <li>The clause does not contain an 'OF table_name' clause
+   * </ol>
+   */
+  static Statement replaceForUpdate(Statement statement, String lowerCaseSql) {
+    // If there is no 'for' clause, then we know that we don't have to analyze any further.
+    if (!lowerCaseSql.contains("for")) {
+      return statement;
+    }
+    SimpleParser parser = new SimpleParser(statement.getSql());
+    parser.parseExpressionUntilKeyword(ImmutableList.of("for"), true, false, false);
+    if (parser.pos >= parser.getSql().length()) {
+      return statement;
+    }
+    int startPos = parser.pos;
+    if (parser.eatKeyword("for") && parser.eatKeyword("update")) {
+      int endPos = parser.pos;
+      // 'OF table_name', 'nowait' and 'skip locked' clauses are not supported.
+      if (parser.eatKeyword("of") || parser.eatKeyword("nowait") || parser.eatKeyword("skip")) {
+        return statement;
+      }
+      if (parser.hasMoreTokens()) {
+        return statement;
+      }
+      // This is a simple 'for update' clause. Replace it with a 'LOCK_SCANNED_RANGES=exclusive'
+      // hint.
+      return Statement.of(
+          "/*@ LOCK_SCANNED_RANGES=exclusive */"
+              + statement.getSql().substring(0, startPos)
+              + statement.getSql().substring(endPos));
+    }
+    return statement;
+  }
+
+  /**
    * Adds a LIMIT clause to the given statement if the statement contains a parameterized OFFSET
    * clause and no LIMIT clause.
    */
-  static Statement addLimitIfParameterizedOffset(Statement statement) {
-    String sqlLowerCase = statement.getSql().toLowerCase(Locale.ENGLISH);
+  static Statement addLimitIfParameterizedOffset(Statement statement, String lowerCaseSql) {
     // If there is no offset clause, then we know that we don't have to analyze any further.
-    if (!sqlLowerCase.contains("offset")) {
+    if (!lowerCaseSql.contains("offset")) {
       return statement;
     }
     SimpleParser parser = new SimpleParser(statement.getSql());
