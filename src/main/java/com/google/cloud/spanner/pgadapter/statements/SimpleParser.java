@@ -249,8 +249,16 @@ public class SimpleParser {
     int startPos = parser.pos;
     if (parser.eatKeyword("for") && parser.eatKeyword("update")) {
       int endPos = parser.pos;
-      // 'OF table_name', 'nowait' and 'skip locked' clauses are not supported.
-      if (parser.eatKeyword("of") || parser.eatKeyword("nowait") || parser.eatKeyword("skip")) {
+      // Skip 'of table1[, table2[, ...]] clauses
+      if (parser.eatKeyword("of")) {
+        List<TableOrIndexName> tables = parser.readTableList();
+        if (tables.isEmpty()) {
+          return statement;
+        }
+        endPos = parser.pos;
+      }
+      // 'nowait' and 'skip locked' clauses are not supported.
+      if (parser.eatKeyword("nowait") || parser.eatKeyword("skip")) {
         return statement;
       }
       if (parser.hasMoreTokens()) {
@@ -535,6 +543,21 @@ public class SimpleParser {
       return null;
     }
     return sql.substring(start, pos).trim();
+  }
+
+  List<TableOrIndexName> readTableList() {
+    ImmutableList.Builder<TableOrIndexName> tables = ImmutableList.builder();
+    while (hasMoreTokens()) {
+      TableOrIndexName table = readTableOrIndexName();
+      if (table == null) {
+        break;
+      }
+      tables.add(table);
+      if (!eatToken(",")) {
+        break;
+      }
+    }
+    return tables.build();
   }
 
   List<TableOrIndexName> readColumnList(String name) {
