@@ -24,6 +24,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.function.Supplier;
 
@@ -75,7 +76,8 @@ class DdlExecutor {
     return connection.execute(translate(parsedStatement, statement));
   }
 
-  private String applyReplacers(String sql) {
+  @VisibleForTesting
+  String applyReplacers(String sql) {
     for (QueryPartReplacer functionReplacement : ddlStatementReplacements.get()) {
       Tuple<String, ReplacementStatus> result = functionReplacement.replace(sql);
       if (result.y() == ReplacementStatus.STOP) {
