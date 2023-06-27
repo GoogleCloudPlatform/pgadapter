@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.SimpleQueryStatement;
+import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
 
 /** Executes a simple statement. */
@@ -37,6 +38,8 @@ public class QueryMessage extends ControlMessage {
   public static final String FETCH = "FETCH";
   public static final String MOVE = "MOVE";
   public static final String CLOSE = "CLOSE";
+  public static final ImmutableList<String> SHOW_DATABASE_DDL =
+      ImmutableList.of("SHOW", "DATABASE", "DDL");
   private final Statement originalStatement;
   private final SimpleQueryStatement simpleQueryStatement;
 
