@@ -33,6 +33,7 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Locale;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -541,33 +542,49 @@ public class SimpleParserTest {
     Statement statement;
 
     statement = Statement.of("select * from foo");
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement = Statement.newBuilder("select * from foo where id=$1").bind("p1").to(1L).build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement = Statement.of("select * from foo limit 1");
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement = Statement.of("select * from foo limit 1 offset 1");
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement = Statement.of("select * from foo offset 1");
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from (select id from bar limit 1) where id=$1")
             .bind("p1")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from (select id from bar offset 1) where id=$1")
             .bind("p1")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from (select id from bar limit 1 offset 1) where id=$1")
             .bind("p1")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from (select id from bar limit $1 offset $2) where id=$3")
             .bind("p1")
@@ -577,7 +594,9 @@ public class SimpleParserTest {
             .bind("p3")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     // The replacement is only done in the outer main query and not in any sub queries.
     statement =
         Statement.newBuilder("select * from (select id from bar offset $1) where id=$2")
@@ -586,7 +605,9 @@ public class SimpleParserTest {
             .bind("p2")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from foo where id=$1 limit $2 offset $3")
             .bind("p1")
@@ -596,7 +617,9 @@ public class SimpleParserTest {
             .bind("p3")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from foo where id=$1 offset $2 limit $3")
             .bind("p1")
@@ -606,7 +629,9 @@ public class SimpleParserTest {
             .bind("p3")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from foo where id=$1 limit $2")
             .bind("p1")
@@ -614,7 +639,9 @@ public class SimpleParserTest {
             .bind("p2")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from foo where id=$1 offset $2")
             .bind("p1")
@@ -629,7 +656,7 @@ public class SimpleParserTest {
             .bind("p2")
             .to((Long) null)
             .build(),
-        addLimitIfParameterizedOffset(statement));
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
 
     statement =
         Statement.newBuilder("select * from foo where id=$1 offset $2")
@@ -645,7 +672,7 @@ public class SimpleParserTest {
             .bind("p2")
             .to(1L)
             .build(),
-        addLimitIfParameterizedOffset(statement));
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from foo where id=$1   offset   $2   ")
             .bind("p1")
@@ -661,7 +688,7 @@ public class SimpleParserTest {
             .bind("p2")
             .to(1L)
             .build(),
-        addLimitIfParameterizedOffset(statement));
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder("select * from foo where id=$1 offset $2 /* some comment */")
             .bind("p1")
@@ -677,7 +704,7 @@ public class SimpleParserTest {
             .bind("p2")
             .to(1L)
             .build(),
-        addLimitIfParameterizedOffset(statement));
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     statement =
         Statement.newBuilder(
                 "select * from foo where id=$1 offset -- Single line comment\n$2 /* some comment */")
@@ -694,7 +721,7 @@ public class SimpleParserTest {
             .bind("p2")
             .to(1L)
             .build(),
-        addLimitIfParameterizedOffset(statement));
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
     // This is an invalid query. That will be caught by the backend parser.
     statement =
         Statement.newBuilder("select * from foo where id=$1 offset $2 offset $3")
@@ -705,12 +732,14 @@ public class SimpleParserTest {
             .bind("p3")
             .to(1L)
             .build();
-    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
 
     statement = Statement.of("select * from foo where id=$1 offset $2");
     assertEquals(
         Statement.of("select * from foo where id=$1 offset $2 limit 4611686018427387903"),
-        addLimitIfParameterizedOffset(statement));
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
   }
 
   @Test
