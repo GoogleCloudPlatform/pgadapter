@@ -75,7 +75,7 @@ public class SampleApplication {
   public static void main(String[] args) {
     SpringApplication.run(SampleApplication.class, args);
   }
-  
+
   @PreDestroy
   public void onExit() {
     // Stop PGAdapter when the application is shut down.

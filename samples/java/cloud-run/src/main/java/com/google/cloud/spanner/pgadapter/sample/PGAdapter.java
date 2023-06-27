@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.sample;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.common.base.Strings;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -36,11 +35,7 @@ public class PGAdapter {
 
   public PGAdapter(SpannerProperties spannerProperties) {
     this.spannerProperties = spannerProperties;
-    this.server =
-        startPGAdapter(
-            spannerProperties.getProject(),
-            spannerProperties.getInstance(),
-            spannerProperties.getCredentials());
+    this.server = startPGAdapter(spannerProperties.getProject(), spannerProperties.getInstance());
   }
 
   /** Returns a JDBC connection URL that can be used to connect to this PGAdapter instance. */
@@ -53,31 +48,22 @@ public class PGAdapter {
   }
 
   /**
-   * Starts PGAdapter in-process and returns a reference to the server. Use this reference to
-   * gracefully shut down the server when your application shuts down.
+   * Starts PGAdapter in-process and returns a reference to the server. Use this reference to get
+   * the port number that was dynamically assigned to PGAdapter, and to gracefully shut down the
+   * server when your application shuts down.
    *
    * @param project the Google Cloud project that PGAdapter should connect to
    * @param instance the Cloud Spanner instance that PGAdapter should connect to
-   * @param credentials the full path of a credentials file that PGAdapter should use, or <code>null
-   *     </code> if PGAdapter should use the application default credentials
    */
-  static ProxyServer startPGAdapter(String project, String instance, String credentials) {
+  static ProxyServer startPGAdapter(String project, String instance) {
     OptionsMetadata options =
         new OptionsMetadata(
-            // Check whether we should start PGAdapter with the default credentials or a specific
-            // credentials file.
-            Strings.isNullOrEmpty(credentials)
-                ? new String[] {
-                  "-p", project,
-                  "-i", instance,
-                  "-s", "0" // Start PGAdapter on any available port.
-                }
-                : new String[] {
-                  "-p", project,
-                  "-i", instance,
-                  "-c", credentials,
-                  "-s", "0" // Start PGAdapter on any available port.
-                });
+            // Start PGAdapter using the default credentials in the environment.
+            new String[] {
+              "-p", project,
+              "-i", instance,
+              "-s", "0" // Start PGAdapter on any available port.
+            });
     ProxyServer server = new ProxyServer(options);
     server.startServer();
 
