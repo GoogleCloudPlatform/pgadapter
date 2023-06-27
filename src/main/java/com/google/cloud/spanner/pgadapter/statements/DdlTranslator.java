@@ -37,7 +37,7 @@ public class DdlTranslator {
     }
     if (parser.eatKeyword("table")) {
       return translateCreateTable(statement);
-    } else if (parser.eatKeyword("index")) {
+    } else if (parser.eatKeyword("index") || parser.eatKeyword("unique")) {
       return translateCreateIndex(statement);
     } else if (parser.eatKeyword("change", "stream")) {
       return translateCreateChangeStream(statement);

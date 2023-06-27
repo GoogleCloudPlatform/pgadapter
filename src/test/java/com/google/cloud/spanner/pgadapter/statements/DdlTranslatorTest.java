@@ -130,6 +130,9 @@ public class DdlTranslatorTest {
         "CREATE INDEX IF NOT EXISTS my_index ON my_table (value) include (foo) /* INTERLEAVE IN my_other_table */ WHERE foo=1",
         translate(
             "CREATE INDEX IF NOT EXISTS my_index ON my_table (value) include (foo) INTERLEAVE IN my_other_table WHERE foo=1"));
+    assertEquals(
+        "CREATE UNIQUE INDEX my_index ON my_table (value) /* INTERLEAVE IN my_other_table */",
+        translate("CREATE UNIQUE INDEX my_index ON my_table (value) INTERLEAVE IN my_other_table"));
   }
 
   @Test

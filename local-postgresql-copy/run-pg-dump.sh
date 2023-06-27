@@ -59,3 +59,5 @@ PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -v --format=directory \
   -h "$POSTGRES_HOST" \
   -p "$POSTGRES_PORT" \
   -d "$POSTGRES_DB"
+
+echo "Finished running pg_dump on the PostgreSQL database $POSTGRES_DB. The dump is in $data_dir"

@@ -113,6 +113,8 @@ public class ShowDatabaseDdlStatement extends IntermediatePortalStatement {
   }
 
   private StatementResult execute(BackendConnection backendConnection) {
+    // TODO: 'for postgresql' should also include Spanner-managed indexes for foreign key
+    //       constraints.
     Connection connection = backendConnection.getSpannerConnection();
     Spanner spanner = ConnectionOptionsHelper.getSpanner(connection);
     ResultSet resultSet =

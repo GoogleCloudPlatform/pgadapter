@@ -46,7 +46,7 @@ docker compose --env-file .env up -d
    that the `POSTGRES_CONTAINER_NAME` was left unmodified with its default value `postgres` in the `.env` file.
 
 ```shell
-docker exec -it postgres /bin/bash -c 'psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"'
+docker exec -it postgres /bin/sh -c 'psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"'
 ```
 
 You can now look around in the local database. The default `public` schema contains a copy of all

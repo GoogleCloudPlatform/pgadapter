@@ -1,5 +1,10 @@
 #!/bin/bash
-shopt -s lastpipe
+if ! shopt -s lastpipe; then
+  # Parallel copy requires support for shopt lastpipe. This is means bash version 4.2 or higher.
+  # MacOS by default uses an ancient version of bash, which means that this is by default not
+  # supported on MacOS.
+  max_parallelism=1
+fi
 set -e
 
 # Set this variable to a higher number to increase the amount of parallelism. That can increase the
@@ -69,18 +74,23 @@ PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -h "
       -c "set session_replication_role='replica'" \
       -c "copy $table_name ($column_names) from stdin binary" \
       -c "set session_replication_role='origin'" &
-  pids[${current_index}]=$!
-  table_names[${current_index}]="$table_name"
-  current_index=$((current_index+1))
-  echo "Current index: $current_index"
-  # Make sure we don't execute too many COPY operations in parallel.
-  if [ $current_index -ge $max_parallelism ]; then
-    wait_for_copy
+  if [ $max_parallelism -gt 1 ]; then
+    pids[${current_index}]=$!
+    table_names[${current_index}]="$table_name"
+    current_index=$((current_index+1))
+    # Make sure we don't execute too many COPY operations in parallel.
+    if [ $current_index -ge $max_parallelism ]; then
+      wait_for_copy
+    fi
+  else
+    wait $!
   fi
 done
 
-# Wait for the remaining COPY commands.
-while [ $current_wait_index -lt $current_index ]
-do
-  wait_for_copy
-done
+if [ $max_parallelism -gt 1 ]; then
+  # Wait for the remaining COPY commands.
+  while [ $current_wait_index -lt $current_index ]
+  do
+    wait_for_copy
+  done
+fi
