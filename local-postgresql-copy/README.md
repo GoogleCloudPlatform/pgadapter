@@ -33,7 +33,7 @@ SPANNER_INSTANCE=my-instance
 SPANNER_DATABASE=my-database
 ```
 
-Also ensure that the `PGADAPTER_HOST_PORT` (default 9001) and `POSTGRES_HOST_PORT` (default 9002)
+Also ensure that the `PGADAPTER_HOST_PORT` (default 9031) and `POSTGRES_HOST_PORT` (default 9032)
 are not in use by any other services on your local machine, and change the values if necessary.
 
 2. Start the Docker containers.
@@ -119,9 +119,10 @@ docker exec postgres /copy-data.sh
 
 ## Connecting to the containers
 
-The `docker compose` file starts two containers:
-1. `pgadapter`: This container by default exposes its PostgreSQL port on local port 9001.
-2. `postgres`: This container by default exposes its PostgreSQL port on local port 9002.
+The `docker compose` file starts two containers (you may need to change the container names in the
+docker-compose.yml file if you already have containers with conflicting names):
+1. `pgadapter`: This container by default exposes its PostgreSQL port on local port 9031.
+2. `postgres`: This container by default exposes its PostgreSQL port on local port 9032.
 
 You can change these ports in the `.env` file if they clash with anything you have running on your
 local machine. You can also remove the port mapping in the `docker-compose.yml` file if you do not
@@ -130,13 +131,13 @@ need to access the containers from your local machine.
 Connect to PGAdapter with `psql` with this command on your local machine:
 
 ```shell
-psql -h localhost -p 9001 -d my-database
+psql -h localhost -p 9031 -d my-database
 ```
 
 Connect to the local PostgreSQL database with `psql` with this command on your local machine:
 
 ```shell
-PGPASSWORD=secret psql -h localhost -p 9002 -d my-database -U postgres
+PGPASSWORD=secret psql -h localhost -p 9032 -d my-database -U postgres
 ```
 
 ## pg_dump and pg_restore
@@ -239,7 +240,7 @@ Follow these steps to copy a Cloud Spanner database to a CloudSQL PostgreSQL dat
 
 ```shell
 export PGADAPTER_HOST=localhost
-export PGADAPTER_PORT=9001
+export PGADAPTER_PORT=9031
 
 export GOOGLE_APPLICATION_CREDENTIALS=/local/path/to/credentials.json
 export GOOGLE_CLOUD_PROJECT=my-project
@@ -259,7 +260,7 @@ export POSTGRES_DB=my-database
 ```shell
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
-  --rm -d -p 9001:5432 \
+  --rm -d -p 9031:5432 \
   -v ${GOOGLE_APPLICATION_CREDENTIALS}:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p ${GOOGLE_CLOUD_PROJECT} -i ${SPANNER_INSTANCE} \
@@ -332,5 +333,5 @@ spanner_restore_database="new-database" ./run-pg-restore.sh
 
 If the `docker compose --env-file .env up -d` command seems to hang while starting the containers,
 it is possible that you have a port mapping conflict. The default port mapping is to map
-PGAdapter to port `9001` on the local machine and  PostgreSQL to port `9002`. Change these defaults
+PGAdapter to port `9031` on the local machine and  PostgreSQL to port `9032`. Change these defaults
 in the `.env` file if you already have other services running on these port numbers.
