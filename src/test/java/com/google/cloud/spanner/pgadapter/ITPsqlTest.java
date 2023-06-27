@@ -810,10 +810,11 @@ public class ITPsqlTest implements IntegrationTest {
           ZoneId.of("Asia/Amman"),
           // Iran observed DST in 1978. Not all databases agree on this.
           ZoneId.of("Asia/Tehran"),
-          // Rankin_Inlet and Resolute did not observer DST in 1970-1979, but not all databases
+          // Rankin_Inlet and Resolute did not observe DST in 1970-1979, but not all databases
           // agree.
           ZoneId.of("America/Rankin_Inlet"),
           ZoneId.of("America/Resolute"),
+          ZoneId.of("America/Iqaluit"),
           // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
           ZoneId.of("America/Pangnirtung"),
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
