@@ -32,6 +32,9 @@ then
     [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1
 fi
 
+# Create the output folder if it does not already exist.
+mkdir -p "$data_dir"
+
 # Export the current schema of the Cloud Spanner database.
 echo "Exporting schema of the Cloud Spanner database $SPANNER_DATABASE into $schema_file"
 psql -v ON_ERROR_STOP=1 \

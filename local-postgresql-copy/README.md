@@ -170,7 +170,17 @@ The script must be executed using the `postgres` Docker container:
 docker exec -it postgres /run-pg-dump.sh
 ```
 
-The backup data can be found in 
+The backup data can be found in the folder `./backup/data`.
+
+#### Parallel Data Copy
+
+The `run-pg-dump.sh` script by default copies the data from Cloud Spanner to the local PostgreSQL
+database sequentially. You can also speed up the data copy by specifying that the script should
+copy data in parallel by setting the `max_parallelism` variable:
+
+```shell
+docker exec -it postgres /bin/bash -c "max_parallelism=10 /run-pg-dump.sh"
+```
 
 ### pg_restore
 
