@@ -14,15 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.sample;
 
-import com.google.cloud.spanner.pgadapter.sample.model.Album;
-import com.google.cloud.spanner.pgadapter.sample.model.Singer;
-import com.google.cloud.spanner.pgadapter.sample.model.Track;
-import com.google.cloud.spanner.pgadapter.sample.repository.SingerRepository;
 import com.google.cloud.spanner.pgadapter.sample.service.AlbumService;
 import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
 import com.google.cloud.spanner.pgadapter.sample.service.TrackService;
 import com.google.cloud.spanner.pgadapter.sample.service.VenueService;
-import java.util.List;
 import java.util.Random;
 import javax.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -47,16 +42,13 @@ public class SampleApplication implements CommandLineRunner {
   
   private final TrackService trackService;
   
-  private final SingerRepository singerRepository;
-  
   private final VenueService venueService;
   
-  public SampleApplication(SingerService singerService, AlbumService albumService, TrackService trackService, VenueService venueService, SingerRepository singerRepository) {
+  public SampleApplication(SingerService singerService, AlbumService albumService, TrackService trackService, VenueService venueService) {
     this.singerService = singerService;
     this.albumService = albumService;
     this.trackService = trackService;
     this.venueService = venueService;
-    this.singerRepository = singerRepository;
   }
   
   @Override
