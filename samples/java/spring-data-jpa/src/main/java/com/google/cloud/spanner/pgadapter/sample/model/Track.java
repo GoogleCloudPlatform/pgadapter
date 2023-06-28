@@ -27,7 +27,6 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import java.io.Serializable;
 import java.util.Objects;
-import org.hibernate.annotations.BatchSize;
 import org.springframework.data.domain.Persistable;
 
 /** Track extends AbstractBaseEntity that does not define any primary key. This allows us to define a primary key in this entity, which again allows us to create a composite primary key. The latter is required for interleaved tables. */

@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.sample;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import org.springframework.stereotype.Component;
 
 class PGAdapter {
   private final ProxyServer server;
@@ -35,7 +34,7 @@ class PGAdapter {
     OptionsMetadata options =
         new OptionsMetadata(
             // Start PGAdapter using the default credentials in the environment on port 9432.
-            new String[] {"-s", "9432" });
+            new String[] {"-s", "9432"});
     ProxyServer server = new ProxyServer(options);
     server.startServer();
     server.awaitRunning();

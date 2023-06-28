@@ -11,19 +11,19 @@ import org.springframework.stereotype.Service;
 @Service
 public class VenueService {
   private final VenueRepository repository;
-  
+
   private final RandomDataService randomDataService;
-  
+
   public VenueService(VenueRepository repository, RandomDataService randomDataService) {
     this.repository = repository;
     this.randomDataService = randomDataService;
   }
-  
+
   public List<Venue> generateRandomVenues(int count) {
     Random random = new Random();
-    
+
     List<Venue> venues = new ArrayList<>(count);
-    for (int i=0; i<count; i++) {
+    for (int i = 0; i < count; i++) {
       Venue venue = new Venue();
       venue.setName(randomDataService.getRandomVenueName());
       VenueDescription description = new VenueDescription();
@@ -35,5 +35,4 @@ public class VenueService {
     }
     return repository.saveAll(venues);
   }
-  
 }

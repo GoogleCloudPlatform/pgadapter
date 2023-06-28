@@ -42,18 +42,23 @@ public class Venue extends AbstractBaseEntity {
       this.location = location;
     }
   }
-  
+
   @Id
   @GeneratedValue(strategy = GenerationType.TABLE, generator = "venue-generator")
-  @TableGenerator(name = "venue-generator",
+  // Note that we reuse the 'seq-ids' table for different entities, but use a different name for
+  // each entity. This ensures that there is a separate row in the table for each entity that uses
+  // a table-backed sequence generator.
+  @TableGenerator(
+      name = "venue-generator",
       table = "seq_ids",
       pkColumnName = "seq_id",
       valueColumnName = "seq_value",
-      initialValue = 1, allocationSize = 1000)
+      initialValue = 1,
+      allocationSize = 1000)
   private long id;
-  
+
   private String name;
-  
+
   @JdbcTypeCode(SqlTypes.JSON)
   private VenueDescription description;
 

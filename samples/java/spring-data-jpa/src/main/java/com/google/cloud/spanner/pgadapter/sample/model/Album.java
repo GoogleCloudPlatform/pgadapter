@@ -24,12 +24,11 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import org.hibernate.annotations.BatchSize;
 
 @Table(name = "albums")
 @Entity
 public class Album extends AbstractUuidEntity {
-  
+
   @Basic(optional = false)
   @Column(length = 200)
   private String title;
@@ -37,9 +36,9 @@ public class Album extends AbstractUuidEntity {
   private BigDecimal marketingBudget;
 
   private LocalDate releaseDate;
-  
+
   private byte[] coverPicture;
-  
+
   @ManyToOne(optional = false)
   private Singer singer;
 
@@ -94,5 +93,4 @@ public class Album extends AbstractUuidEntity {
   public void setTracks(List<Track> tracks) {
     this.tracks = tracks;
   }
-
 }

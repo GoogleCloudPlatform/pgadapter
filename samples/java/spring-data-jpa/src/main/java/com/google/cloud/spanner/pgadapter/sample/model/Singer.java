@@ -20,7 +20,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.List;
-import org.hibernate.annotations.BatchSize;
 
 @Table(name = "singers")
 @Entity
@@ -48,6 +47,10 @@ public class Singer extends AbstractUuidEntity {
   @OneToMany
   @JoinColumn(name = "singer_id")
   private List<Album> albums;
+
+  @OneToMany
+  @JoinColumn(name = "singer_id")
+  private List<Concert> concerts;
 
   public String getFirstName() {
     return firstName;
@@ -87,6 +90,15 @@ public class Singer extends AbstractUuidEntity {
 
   public void setAlbums(List<Album> albums) {
     this.albums = albums;
+  }
+
+
+  public List<Concert> getConcerts() {
+    return concerts;
+  }
+
+  public void setConcerts(List<Concert> concerts) {
+    this.concerts = concerts;
   }
 
 }

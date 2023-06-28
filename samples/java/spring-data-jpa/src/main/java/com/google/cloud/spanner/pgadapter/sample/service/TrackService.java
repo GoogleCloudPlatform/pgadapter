@@ -1,7 +1,6 @@
 package com.google.cloud.spanner.pgadapter.sample.service;
 
 import com.google.cloud.spanner.pgadapter.sample.model.Album;
-import com.google.cloud.spanner.pgadapter.sample.model.Singer;
 import com.google.cloud.spanner.pgadapter.sample.model.Track;
 import com.google.cloud.spanner.pgadapter.sample.repository.AlbumRepository;
 import com.google.cloud.spanner.pgadapter.sample.repository.TrackRepository;
@@ -17,10 +16,13 @@ public class TrackService {
   private final RandomDataService randomDataService;
 
   private final TrackRepository trackRepository;
-  
+
   private final AlbumRepository albumRepository;
 
-  public TrackService(RandomDataService randomDataService, TrackRepository trackRepository, AlbumRepository albumRepository) {
+  public TrackService(
+      RandomDataService randomDataService,
+      TrackRepository trackRepository,
+      AlbumRepository albumRepository) {
     this.randomDataService = randomDataService;
     this.trackRepository = trackRepository;
     this.albumRepository = albumRepository;
@@ -42,5 +44,4 @@ public class TrackService {
       trackRepository.saveAll(tracks);
     }
   }
-
 }

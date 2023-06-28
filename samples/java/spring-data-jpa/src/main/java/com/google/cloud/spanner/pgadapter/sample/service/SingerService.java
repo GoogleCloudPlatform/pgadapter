@@ -1,6 +1,7 @@
 package com.google.cloud.spanner.pgadapter.sample.service;
 
 import com.google.cloud.spanner.pgadapter.sample.model.Album;
+import com.google.cloud.spanner.pgadapter.sample.model.Concert;
 import com.google.cloud.spanner.pgadapter.sample.model.Singer;
 import com.google.cloud.spanner.pgadapter.sample.model.Track;
 import com.google.cloud.spanner.pgadapter.sample.repository.SingerRepository;
@@ -16,17 +17,20 @@ public class SingerService {
   private static final Logger log = LoggerFactory.getLogger(SingerService.class);
 
   private final RandomDataService randomDataService;
-  
+
   private final SingerRepository repository;
-  
+
   public SingerService(RandomDataService randomDataService, SingerRepository repository) {
     this.randomDataService = randomDataService;
     this.repository = repository;
   }
-  
-  /** Prints all singers whose last name start with the given prefix. Also prints the related albums and tracks.
-   * 
-   * This method uses a read-only transaction. It is highly recommended to use a read-only transaction for workloads that only read, as these do not take locks on Cloud Spanner.
+
+  /**
+   * Prints all singers whose last name start with the given prefix. Also prints the related albums
+   * and tracks.
+   *
+   * <p>This method uses a read-only transaction. It is highly recommended to use a read-only
+   * transaction for workloads that only read, as these do not take locks on Cloud Spanner.
    */
   @org.springframework.transaction.annotation.Transactional(readOnly = true)
   public void printSingersWithLastNameStartingWith(String prefix) {
@@ -41,14 +45,18 @@ public class SingerService {
           log.info("    Track #{}: {}", track.getTrackId().getTrackNumber(), track.getTitle());
         }
       }
+      log.info("# concerts: {}", singer.getConcerts().size());
+      for (Concert concert : singer.getConcerts()) {
+        log.info("  Concert: {} starts at {}", concert.getName(), concert.getStartTime());
+      }
     }
   }
-  
+
   @Transactional
   public void deleteAllSingers() {
     repository.deleteAll();
   }
-  
+
   @Transactional
   public List<Singer> generateRandomSingers(int count) {
     List<Singer> singers = new ArrayList<>(count);
