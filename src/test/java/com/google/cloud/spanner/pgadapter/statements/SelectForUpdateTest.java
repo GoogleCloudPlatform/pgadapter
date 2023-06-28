@@ -29,7 +29,7 @@ import org.junit.runners.JUnit4;
 public class SelectForUpdateTest {
 
   @Test
-  public void testRemoveForUpdate() {
+  public void testReplaceForUpdate() {
     assertSameAfterRemoveForUpdate("select 1");
     assertSameAfterRemoveForUpdate("select col1, col2 from my_table where bar=1");
     assertSameAfterRemoveForUpdate("update my_table set bar=1 where foo=2");
@@ -40,6 +40,8 @@ public class SelectForUpdateTest {
     assertSameAfterRemoveForUpdate("select col1 from foo for update limit 10");
     assertSameAfterRemoveForUpdate("select col1 from foo for update of foo limit 10");
     assertSameAfterRemoveForUpdate("select col1 from foo for update of foo, bar limit 10");
+    assertSameAfterRemoveForUpdate("select col1 from foo for update of /* empty table list */");
+    assertSameAfterRemoveForUpdate("select col1 from foo for update of 1 /* invalid table list */");
 
     assertEquals(
         Statement.of("/*@ LOCK_SCANNED_RANGES=exclusive */select col1 from foo"),

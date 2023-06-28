@@ -55,6 +55,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.GetDatabaseDdlResponse;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
@@ -4646,6 +4647,90 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(withoutEmulation))
             .count());
+  }
+
+  @Test
+  public void testShowDatabaseDdl() throws SQLException {
+    String ddl = "CREATE TABLE table1 (id bigint primary key, value varchar)";
+    mockDatabaseAdmin.addResponse(GetDatabaseDdlResponse.newBuilder().addStatements(ddl).build());
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show database ddl")) {
+        assertTrue(resultSet.next());
+        assertEquals(ddl + ";", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testShowDatabaseDdlForPostgreSQL() throws SQLException {
+    String createNormalTable = "CREATE TABLE table1 (id bigint primary key, value varchar)";
+    String createInterleavedTable =
+        "CREATE TABLE table2 (id bigint primary key, value varchar) INTERLEAVE IN PARENT table1";
+    String createSqlSecurityInvokerView =
+        "CREATE VIEW view1 SQL SECURITY INVOKER AS SELECT id from table1";
+    String createTtlTable =
+        "CREATE TABLE table2 (id bigint primary key, value varchar, ts timestamptz) TTL INTERVAL '3 days' ON ts";
+    String createInterleavedTtlTable =
+        "CREATE TABLE table2 (id bigint primary key, value varchar, ts timestamptz) INTERLEAVE IN PARENT table1 TTL INTERVAL '3 days' ON ts";
+    String createInterleavedCascadeTtlTable =
+        "CREATE TABLE table2 (id bigint primary key, value varchar, ts timestamptz) INTERLEAVE IN PARENT table1 ON DELETE CASCADE\nTTL INTERVAL '3 days' ON ts";
+    String createInterleavedNoActionTtlTable =
+        "CREATE TABLE table2 (id bigint primary key, value varchar, ts timestamptz) INTERLEAVE IN PARENT table1 ON DELETE NO ACTION\nTTL INTERVAL '3 days' ON ts";
+    String createChangeStream = "CREATE CHANGE STREAM my_stream FOR ALL";
+    String createInterleavedIndex = "CREATE INDEX my_index ON table2 (value) INTERLEAVE IN table1";
+    mockDatabaseAdmin.addResponse(
+        GetDatabaseDdlResponse.newBuilder()
+            .addStatements(createNormalTable)
+            .addStatements(createInterleavedTable)
+            .addStatements(createSqlSecurityInvokerView)
+            .addStatements(createTtlTable)
+            .addStatements(createInterleavedTtlTable)
+            .addStatements(createInterleavedCascadeTtlTable)
+            .addStatements(createInterleavedNoActionTtlTable)
+            .addStatements(createChangeStream)
+            .addStatements(createInterleavedIndex)
+            .build());
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show database ddl for postgresql")) {
+        assertTrue(resultSet.next());
+        assertEquals(createNormalTable + ";", resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals(
+            "CREATE TABLE table2 (id bigint primary key, value varchar) /* INTERLEAVE IN PARENT table1 */;",
+            resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals(
+            "CREATE VIEW view1 /* SQL SECURITY INVOKER */ AS SELECT id from table1;",
+            resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals(
+            "CREATE TABLE table2 (id bigint primary key, value varchar, ts timestamptz) /* TTL INTERVAL '3 days' ON ts */;",
+            resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals(
+            "CREATE TABLE table2 (id bigint primary key, value varchar, ts timestamptz) /* INTERLEAVE IN PARENT table1 TTL INTERVAL '3 days' ON ts */;",
+            resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals(
+            "CREATE TABLE table2 (id bigint primary key, value varchar, ts timestamptz) /* INTERLEAVE IN PARENT table1 ON DELETE CASCADE\nTTL INTERVAL '3 days' ON ts */;",
+            resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals(
+            "CREATE TABLE table2 (id bigint primary key, value varchar, ts timestamptz) /* INTERLEAVE IN PARENT table1 ON DELETE NO ACTION\nTTL INTERVAL '3 days' ON ts */;",
+            resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals("/* CREATE CHANGE STREAM my_stream FOR ALL */;", resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals(
+            "CREATE INDEX my_index ON table2 (value) /* INTERLEAVE IN table1 */;",
+            resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
   }
 
   @Ignore("Only used for manual performance testing")

@@ -38,7 +38,6 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Struct;
-import com.google.cloud.spanner.TimestampBound;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
@@ -447,7 +446,7 @@ public class BackendConnection {
           Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
           BatchClient batchClient = spanner.getBatchClient(databaseId);
           BatchReadOnlyTransaction batchReadOnlyTransaction =
-              batchClient.batchReadOnlyTransaction(TimestampBound.strong());
+              batchClient.batchReadOnlyTransaction(spannerConnection.getReadOnlyStaleness());
           try {
             List<Partition> partitions =
                 batchReadOnlyTransaction.partitionQuery(

@@ -1,0 +1,44 @@
+version: "3.9"
+services:
+  pgadapter:
+    image: "pgadapter-pg"
+#    image: "gcr.io/cloud-spanner-pg-adapter/pgadapter"
+#    pull_policy: always
+    container_name: ${PGADAPTER_CONTAINER_NAME}
+    volumes:
+      - "${GOOGLE_APPLICATION_CREDENTIALS}:/credentials.json:ro"
+    command:
+      - "-p ${GOOGLE_CLOUD_PROJECT}"
+      - "-i ${SPANNER_INSTANCE}"
+      - "-c /credentials.json"
+      - "-x"
+    ports:
+      - "${PGADAPTER_HOST_PORT}:5432"
+  postgres:
+    depends_on:
+      pgadapter:
+        condition: service_started
+    image: "postgres"
+    container_name: ${POSTGRES_CONTAINER_NAME}
+    environment:
+      POSTGRES_HOST: ""
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGADAPTER_HOST: ${PGADAPTER_CONTAINER_NAME}
+      PGADAPTER_PORT: 5432
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}
+      SPANNER_INSTANCE: ${SPANNER_INSTANCE}
+      SPANNER_DATABASE: ${SPANNER_DATABASE}
+    volumes:
+      - "./copy-schema.sh:/docker-entrypoint-initdb.d/copy-schema.sh:ro"
+      - "./import-foreign-schema.sh:/docker-entrypoint-initdb.d/import-foreign-schema.sh:ro"
+      - "./copy-schema.sh:/copy-schema.sh:ro"
+      - "./import-foreign-schema.sh:/import-foreign-schema.sh:ro"
+      - "./copy-data.sh:/copy-data.sh:ro"
+      - "./run-pg-dump.sh:/run-pg-dump.sh:ro"
+      - "./run-pg-restore.sh:/run-pg-restore.sh:ro"
+      - "./backup:/backup:rw"
+    ports:
+      - "${POSTGRES_HOST_PORT}:5432"
