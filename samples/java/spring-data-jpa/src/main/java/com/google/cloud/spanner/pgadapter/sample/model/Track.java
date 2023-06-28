@@ -38,10 +38,17 @@ import org.springframework.data.domain.Persistable;
 @Entity
 public class Track extends AbstractBaseEntity implements Persistable<TrackId> {
 
+  /**
+   * Track is interleaved in the Album entity. This requires the primary key of Track to include all
+   * the columns of the primary key of Album, in addition to its own primary key value. {@link
+   * TrackId} defines the composite primary key of the {@link Track} entity.
+   */
   @Embeddable
   public static class TrackId implements Serializable {
+    /** `id` is the primary key column that Track 'inherits' from Album. */
     private String id;
 
+    /** `trackNumber` is the additional primary key column that is used by Track. */
     private long trackNumber;
 
     protected TrackId() {}
@@ -74,17 +81,20 @@ public class Track extends AbstractBaseEntity implements Persistable<TrackId> {
     }
   }
 
+  /** Factory method for creating a new {@link Track} belonging to an {@link Album}. */
   public static Track createNew(Album album, long trackNumber) {
     return new Track(album, trackNumber, true);
   }
 
+  /** Hibernate requires a default constructor. */
   protected Track() {}
 
-  private Track(Album album, long trackNumber, boolean persisted) {
+  private Track(Album album, long trackNumber, boolean newRecord) {
     setTrackId(new TrackId(album.getId(), trackNumber));
-    this.persisted = persisted;
+    this.newRecord = newRecord;
   }
 
+  /** Use the @EmbeddedId annotation to define a composite primary key from an @Embeddable class. */
   @EmbeddedId private TrackId trackId;
 
   /** The "id" column is both part of the primary key, and a reference to the albums table. */
@@ -101,9 +111,12 @@ public class Track extends AbstractBaseEntity implements Persistable<TrackId> {
   /**
    * This field is only used to track whether the entity has been persisted or not. This prevents
    * Hibernate from doing a round-trip to the database to check whether the Track exists every time
-   * we call save(Track). t
+   * we call save(Track). The reason that we need this for this entity is that we manually assign
+   * the primary key value to {@link Track}. That again means that Hibernate cannot determine
+   * whether an instance of {@link Track} has already been persisted or not based on the existence
+   * of a primary key value.
    */
-  @Transient private boolean persisted;
+  @Transient private boolean newRecord;
 
   @Override
   public TrackId getId() {
@@ -112,12 +125,13 @@ public class Track extends AbstractBaseEntity implements Persistable<TrackId> {
 
   @Override
   public boolean isNew() {
-    return persisted;
+    return newRecord;
   }
 
+  /** This method resets the 'newRecord' field after it has been persisted to the database. */
   @PostPersist
   public void resetPersisted() {
-    persisted = false;
+    newRecord = false;
   }
 
   public TrackId getTrackId() {

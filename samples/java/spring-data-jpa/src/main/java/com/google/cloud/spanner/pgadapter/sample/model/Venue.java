@@ -27,6 +27,12 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "venues")
 @Entity
 public class Venue extends AbstractBaseEntity {
+
+  /**
+   * {@link VenueDescription} is a POJO that is used for the JSONB field 'description' of the {@link
+   * Venue} entity. It is automatically serialized and deserialized when an instance of the entity
+   * is loaded or persisted.
+   */
   public static class VenueDescription implements Serializable {
     private int capacity;
     private String type;
@@ -61,18 +67,26 @@ public class Venue extends AbstractBaseEntity {
   @GeneratedValue(strategy = GenerationType.TABLE, generator = "venue-generator")
   // Note that we reuse the 'seq-ids' table for different entities, but use a different name for
   // each entity. This ensures that there is a separate row in the table for each entity that uses
-  // a table-backed sequence generator.
+  // a table-backed sequence generator. This ensures that a single high-write entity does not cause
+  // lock contention for all other entities that also use this type of identifier generation.
   @TableGenerator(
       name = "venue-generator",
       table = "seq_ids",
       pkColumnName = "seq_id",
       valueColumnName = "seq_value",
       initialValue = 1,
+      // Use a sufficiently big allocation size to reduce the number of round-trips to the database
+      // for generating new identifiers. An allocation size of 1000 means that we need a round-trip
+      // to the database once for every 1000 records that we insert to generate identifiers.
       allocationSize = 1000)
   private long id;
 
   private String name;
 
+  /**
+   * This field maps to a JSONB column in the database. The value is automatically
+   * serialized/deserialized to a {@link VenueDescription} instance.
+   */
   @JdbcTypeCode(SqlTypes.JSON)
   private VenueDescription description;
 

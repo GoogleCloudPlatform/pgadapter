@@ -99,6 +99,7 @@ public class SampleApplication implements CommandLineRunner {
   @Override
   public void run(String... args) throws Exception {
     // First clear the current tables.
+    log.info("Deleting all existing data");
     concertService.deleteAllConcerts();
     albumService.deleteAllAlbums();
     singerService.deleteAllSingers();
@@ -136,13 +137,15 @@ public class SampleApplication implements CommandLineRunner {
     // Insert a new concert and then do a stale read. That concert should then not be included in
     // the result of the stale read.
     OffsetDateTime currentTime = staleReadService.getCurrentTimestamp();
+    log.info("Inserting a new concert");
     concertService.generateRandomConcerts(1);
     // List all concerts using a stale read. The read timestamp is before the insert of the latest
-    // concert, which means that it will not be included in the query result.
+    // concert, which means that it will not be included in the query result, and the number of
+    // concerts returned should be the same as the first query in this method.
     List<Concert> concerts =
         staleReadService.executeReadOnlyTransactionAtTimestamp(
             currentTime, concertRepository::findAll);
-    log.info("Found {} concerts using a stale read", concerts.size());
+    log.info("Found {} concerts using a stale read.", concerts.size());
   }
 
   @PreDestroy

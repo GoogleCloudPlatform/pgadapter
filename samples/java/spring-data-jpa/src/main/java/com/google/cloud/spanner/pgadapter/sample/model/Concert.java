@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.sample.model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -30,22 +31,26 @@ public class Concert extends AbstractBaseEntity {
   @GeneratedValue(strategy = GenerationType.TABLE, generator = "concert-generator")
   // Note that we reuse the 'seq-ids' table for different entities, but use a different name for
   // each entity. This ensures that there is a separate row in the table for each entity that uses
-  // a table-backed sequence generator.
+  // a table-backed sequence generator. This ensures that a single high-write entity does not cause
+  // lock contention for all other entities that also use this type of identifier generation.
   @TableGenerator(
       name = "concert-generator",
       table = "seq_ids",
       pkColumnName = "seq_id",
       valueColumnName = "seq_value",
       initialValue = 1,
+      // Use a sufficiently big allocation size to reduce the number of round-trips to the database
+      // for generating new identifiers. An allocation size of 1000 means that we need a round-trip
+      // to the database once for every 1000 records that we insert to generate identifiers.
       allocationSize = 1000)
   private long id;
 
   private String name;
 
-  @ManyToOne(optional = false)
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
   private Venue venue;
 
-  @ManyToOne(optional = false)
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
   private Singer singer;
 
   private OffsetDateTime startTime;
