@@ -3,6 +3,7 @@ package com.google.cloud.spanner.pgadapter.sample.service;
 import com.google.cloud.spanner.pgadapter.sample.model.Venue;
 import com.google.cloud.spanner.pgadapter.sample.model.Venue.VenueDescription;
 import com.google.cloud.spanner.pgadapter.sample.repository.VenueRepository;
+import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -19,6 +20,12 @@ public class VenueService {
     this.randomDataService = randomDataService;
   }
 
+  @Transactional
+  public void deleteAllVenues() {
+    repository.deleteAll();
+  }
+
+  @Transactional
   public List<Venue> generateRandomVenues(int count) {
     Random random = new Random();
 

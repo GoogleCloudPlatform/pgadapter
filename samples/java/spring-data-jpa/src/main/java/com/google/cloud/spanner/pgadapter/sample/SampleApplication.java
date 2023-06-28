@@ -14,11 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter.sample;
 
+import com.google.cloud.spanner.connection.SpannerPool;
+import com.google.cloud.spanner.pgadapter.sample.model.Concert;
 import com.google.cloud.spanner.pgadapter.sample.service.AlbumService;
 import com.google.cloud.spanner.pgadapter.sample.service.ConcertService;
 import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
+import com.google.cloud.spanner.pgadapter.sample.service.StaleReadService;
 import com.google.cloud.spanner.pgadapter.sample.service.TrackService;
 import com.google.cloud.spanner.pgadapter.sample.service.VenueService;
+import java.util.List;
 import java.util.Random;
 import javax.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -47,46 +51,58 @@ public class SampleApplication implements CommandLineRunner {
 
   private final ConcertService concertService;
 
+  private final StaleReadService staleReadService;
+
   public SampleApplication(
       SingerService singerService,
       AlbumService albumService,
       TrackService trackService,
       VenueService venueService,
-      ConcertService concertService) {
+      ConcertService concertService,
+      StaleReadService staleReadService) {
     this.singerService = singerService;
     this.albumService = albumService;
     this.trackService = trackService;
     this.venueService = venueService;
     this.concertService = concertService;
+    this.staleReadService = staleReadService;
   }
 
   @Override
   public void run(String... args) throws Exception {
     // First clear the current tables.
-    albumService.deleteAllAlbums();
-    singerService.deleteAllSingers();
+//    concertService.deleteAllConcerts();
+//    albumService.deleteAllAlbums();
+//    singerService.deleteAllSingers();
+//
+//    // Generate some random data.
+//    singerService.generateRandomSingers(10);
+//    log.info("Created 10 singers");
+//    albumService.generateRandomAlbums(30);
+//    log.info("Created 30 albums");
+//    trackService.generateRandomTracks(30, 15);
+//    log.info("Created 20 tracks each for 30 albums");
+//    venueService.generateRandomVenues(20);
+//    log.info("Created 20 venues");
+//    concertService.generateRandomConcerts(50);
+//    log.info("Created 50 concerts");
+//
+//    Random random = new Random();
+//    // Fetch and print some data using a read-only transaction.
+//    for (int n=0; n<3; n++) {
+//      char c = (char) (random.nextInt(26) + 'a');
+//      singerService.printSingersWithLastNameStartingWith(String.valueOf(c).toUpperCase());
+//    }
 
-    // Generate some random data.
-    singerService.generateRandomSingers(10);
-    log.info("Created 10 singers");
-    albumService.generateRandomAlbums(30);
-    log.info("Created 30 albums");
-    trackService.generateRandomTracks(30, 15);
-    log.info("Created 20 tracks each for 30 albums");
-    venueService.generateRandomVenues(20);
-    log.info("Created 20 venues");
-    concertService.generateRandomConcerts(50);
-    log.info("Created 50 concerts");
-
-    Random random = new Random();
-    // Fetch and print some data using a read-only transaction.
-    char c = (char) (random.nextInt(26) + 'a');
-    singerService.printSingersWithLastNameStartingWith(String.valueOf(c).toUpperCase());
+    // List all concerts using a stale read.
+    List<Concert> concerts = staleReadService.executeWithStaleness(concertService::findAll);
+    log.info("Found {} concerts using a stale read", concerts.size());
   }
 
   @PreDestroy
   public void onExit() {
     // Stop PGAdapter when the application is shut down.
     pgAdapter.stopPGAdapter();
+    SpannerPool.closeSpannerPool();
   }
 }

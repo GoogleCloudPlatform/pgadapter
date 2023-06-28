@@ -6,6 +6,8 @@ import com.google.cloud.spanner.pgadapter.sample.model.Venue;
 import com.google.cloud.spanner.pgadapter.sample.repository.ConcertRepository;
 import com.google.cloud.spanner.pgadapter.sample.repository.SingerRepository;
 import com.google.cloud.spanner.pgadapter.sample.repository.VenueRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -36,6 +38,16 @@ public class ConcertService {
     this.randomDataService = randomDataService;
   }
 
+  public List<Concert> findAll() {
+    return repository.findAll();
+  }
+
+  @Transactional
+  public void deleteAllConcerts() {
+    repository.deleteAll();
+  }
+
+  @Transactional
   public List<Concert> generateRandomConcerts(int count) {
     Random random = new Random();
 
