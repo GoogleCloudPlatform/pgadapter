@@ -24,24 +24,24 @@ import java.util.List;
 @Table(name = "singers")
 @Entity
 public class Singer extends AbstractUuidEntity {
-  
+
   @Column(length = 100)
   private String firstName;
-  
+
   @Column(length = 200)
   private String lastName;
 
   @Column(
-      columnDefinition = """
-              varchar(300) generated always as (
-              CASE WHEN first_name IS NULL THEN last_name
-                WHEN last_name IS NULL THEN first_name
-                ELSE first_name || ' ' || last_name
-              END) stored""",
+      columnDefinition =
+          "varchar(300) generated always as (\n"
+              + "CASE WHEN first_name IS NULL THEN last_name\n"
+              + "     WHEN last_name IS NULL THEN first_name\n"
+              + "     ELSE first_name || ' ' || last_name\n"
+              + "END) stored",
       insertable = false,
       updatable = false)
   private String fullName;
-  
+
   private boolean active;
 
   @OneToMany
@@ -92,7 +92,6 @@ public class Singer extends AbstractUuidEntity {
     this.albums = albums;
   }
 
-
   public List<Concert> getConcerts() {
     return concerts;
   }
@@ -100,5 +99,4 @@ public class Singer extends AbstractUuidEntity {
   public void setConcerts(List<Concert> concerts) {
     this.concerts = concerts;
   }
-
 }

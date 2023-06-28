@@ -29,7 +29,11 @@ import java.io.Serializable;
 import java.util.Objects;
 import org.springframework.data.domain.Persistable;
 
-/** Track extends AbstractBaseEntity that does not define any primary key. This allows us to define a primary key in this entity, which again allows us to create a composite primary key. The latter is required for interleaved tables. */
+/**
+ * Track extends AbstractBaseEntity that does not define any primary key. This allows us to define a
+ * primary key in this entity, which again allows us to create a composite primary key. The latter
+ * is required for interleaved tables.
+ */
 @Table(name = "tracks")
 @Entity
 public class Track extends AbstractBaseEntity implements Persistable<TrackId> {
@@ -39,64 +43,67 @@ public class Track extends AbstractBaseEntity implements Persistable<TrackId> {
     private String id;
 
     private long trackNumber;
-    
+
     protected TrackId() {}
 
     public TrackId(String id, long trackNumber) {
       this.id = id;
       this.trackNumber = trackNumber;
     }
-    
+
     public String getId() {
       return id;
     }
-    
+
     public long getTrackNumber() {
       return trackNumber;
     }
-    
+
     @Override
     public int hashCode() {
       return Objects.hash(id, trackNumber);
     }
-    
+
     @Override
     public boolean equals(Object o) {
-      if (!(o instanceof TrackId other)) {
+      if (!(o instanceof TrackId)) {
         return false;
       }
+      TrackId other = (TrackId) o;
       return Objects.equals(id, other.id) && Objects.equals(trackNumber, other.trackNumber);
     }
   }
-  
+
   public static Track createNew(Album album, long trackNumber) {
     return new Track(album, trackNumber, true);
   }
-  
+
   protected Track() {}
-  
+
   private Track(Album album, long trackNumber, boolean persisted) {
     setTrackId(new TrackId(album.getId(), trackNumber));
     this.persisted = persisted;
   }
-  
-  @EmbeddedId
-  private TrackId trackId;
+
+  @EmbeddedId private TrackId trackId;
 
   /** The "id" column is both part of the primary key, and a reference to the albums table. */
   @ManyToOne(optional = false)
   @JoinColumn(name = "id", updatable = false, insertable = false)
   private Album album;
-  
+
   @Basic(optional = false)
   @Column(length = 100)
   private String title;
-  
+
   private Double sampleRate;
-  
-  /** This field is only used to track whether the entity has been persisted or not. This prevents Hibernate from doing a round-trip to the database to check whether the Track exists every time we call save(Track). t*/
-  @Transient
-  private boolean persisted;
+
+  /**
+   * This field is only used to track whether the entity has been persisted or not. This prevents
+   * Hibernate from doing a round-trip to the database to check whether the Track exists every time
+   * we call save(Track). t
+   */
+  @Transient private boolean persisted;
 
   @Override
   public TrackId getId() {
@@ -107,7 +114,7 @@ public class Track extends AbstractBaseEntity implements Persistable<TrackId> {
   public boolean isNew() {
     return persisted;
   }
-  
+
   @PostPersist
   public void resetPersisted() {
     persisted = false;
