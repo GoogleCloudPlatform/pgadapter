@@ -39,7 +39,7 @@ The PGAdapter options in the `docker run` command that are used in the above exa
 
 We also publish a [distroless Docker image](https://github.com/GoogleContainerTools/distroless) for
 PGAdapter under the tag `gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless`. This Docker image
-also runs PGAdapter as a non-root user.
+runs PGAdapter as a non-root user.
 
 ```shell
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless
