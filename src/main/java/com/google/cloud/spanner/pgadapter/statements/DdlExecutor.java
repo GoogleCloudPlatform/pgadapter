@@ -103,7 +103,7 @@ class DdlExecutor {
 
   Statement translateCreate(SimpleParser parser, Statement statement) {
     if (parser.eatKeyword("table")) {
-      statement = maybeRemovePrimaryKeyConstraintName(statement);
+      return maybeRemovePrimaryKeyConstraintName(statement);
     }
     return statement;
   }
@@ -131,11 +131,7 @@ class DdlExecutor {
         String constraintName = unquoteIdentifier(parser.readIdentifierPart());
         int positionAfterConstraintName = parser.getPos();
         if (parser.eatKeyword("primary", "key")) {
-          if (!(constraintName.equalsIgnoreCase("pk_" + unquoteIdentifier(tableName.name))
-              || (
-              // Well-known primary key that name is used by Liquibase.
-              tableName.getUnquotedName().equals("databasechangeloglock")
-                  && constraintName.equalsIgnoreCase("databasechangeloglock_pkey")))) {
+          if (!constraintName.equalsIgnoreCase("pk_" + unquoteIdentifier(tableName.name))) {
             return createTableStatement;
           }
           return Statement.of(
