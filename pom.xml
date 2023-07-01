@@ -76,7 +76,7 @@
     <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
-      <version>1.10.1</version>
+      <version>1.10.2</version>
     </dependency>
     <dependency>
       <groupId>org.checkerframework</groupId>
@@ -127,7 +127,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.9.2</version>
+      <version>3.9.3</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
