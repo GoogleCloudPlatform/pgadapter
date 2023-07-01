@@ -1,9 +1,8 @@
 version: "3.9"
 services:
   pgadapter:
-    image: "pgadapter-pg"
-#    image: "gcr.io/cloud-spanner-pg-adapter/pgadapter"
-#    pull_policy: always
+    image: "gcr.io/cloud-spanner-pg-adapter/pgadapter"
+    pull_policy: always
     container_name: ${PGADAPTER_CONTAINER_NAME}
     volumes:
       - "${GOOGLE_APPLICATION_CREDENTIALS}:/credentials.json:ro"
