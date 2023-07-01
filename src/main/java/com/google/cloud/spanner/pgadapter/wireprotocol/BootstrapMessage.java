@@ -37,8 +37,6 @@ import java.util.Map;
  */
 @InternalApi
 public abstract class BootstrapMessage extends WireMessage {
-  private static final int MAX_BOOTSTRAP_MESSAGE_LENGTH = 1 << 8;
-
   public BootstrapMessage(ConnectionHandler connection, int length) {
     super(connection, length);
   }
@@ -53,9 +51,6 @@ public abstract class BootstrapMessage extends WireMessage {
    */
   public static BootstrapMessage create(ConnectionHandler connection) throws Exception {
     int length = connection.getConnectionMetadata().getInputStream().readInt();
-    if (length > MAX_BOOTSTRAP_MESSAGE_LENGTH) {
-      throw new IllegalArgumentException("Invalid bootstrap message length: " + length);
-    }
     int protocol = connection.getConnectionMetadata().getInputStream().readInt();
     switch (protocol) {
       case SSLMessage.IDENTIFIER:
