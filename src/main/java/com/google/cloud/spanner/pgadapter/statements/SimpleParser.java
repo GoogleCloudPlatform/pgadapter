@@ -24,7 +24,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -227,13 +226,62 @@ public class SimpleParser {
   }
 
   /**
+   * Replaces any 'for update' clause with a LOCK_SCANNED_RANGES=exclusive hint. This method only
+   * replaces the 'for update' clause if it fulfills these criteria:
+   *
+   * <ol>
+   *   <li>The 'for update' clause is on the outermost expression
+   *   <li>The clause does not include NOWAIT or SKIP LOCKED
+   *   <li>The clause does not use any other lock mode than 'UPDATE'
+   * </ol>
+   *
+   * Any 'OF table_name[, ...]' clauses in the expression are ignored.
+   */
+  static Statement replaceForUpdate(Statement statement, String lowerCaseSql) {
+    // If there is no 'for' clause, then we know that we don't have to analyze any further.
+    if (!lowerCaseSql.contains("for")) {
+      return statement;
+    }
+    SimpleParser parser = new SimpleParser(statement.getSql());
+    parser.parseExpressionUntilKeyword(ImmutableList.of("for"), true, false, false);
+    if (parser.pos >= parser.getSql().length()) {
+      return statement;
+    }
+    int startPos = parser.pos;
+    if (parser.eatKeyword("for") && parser.eatKeyword("update")) {
+      int endPos = parser.pos;
+      // Skip 'of table1[, table2[, ...]] clauses
+      if (parser.eatKeyword("of")) {
+        List<TableOrIndexName> tables = parser.readTableList();
+        if (tables.isEmpty()) {
+          return statement;
+        }
+        endPos = parser.pos;
+      }
+      // 'nowait' and 'skip locked' clauses are not supported.
+      if (parser.eatKeyword("nowait") || parser.eatKeyword("skip")) {
+        return statement;
+      }
+      if (parser.hasMoreTokens()) {
+        return statement;
+      }
+      // This is a simple 'for update' clause. Replace it with a 'LOCK_SCANNED_RANGES=exclusive'
+      // hint.
+      return Statement.of(
+          "/*@ LOCK_SCANNED_RANGES=exclusive */"
+              + statement.getSql().substring(0, startPos)
+              + statement.getSql().substring(endPos));
+    }
+    return statement;
+  }
+
+  /**
    * Adds a LIMIT clause to the given statement if the statement contains a parameterized OFFSET
    * clause and no LIMIT clause.
    */
-  static Statement addLimitIfParameterizedOffset(Statement statement) {
-    String sqlLowerCase = statement.getSql().toLowerCase(Locale.ENGLISH);
+  static Statement addLimitIfParameterizedOffset(Statement statement, String lowerCaseSql) {
     // If there is no offset clause, then we know that we don't have to analyze any further.
-    if (!sqlLowerCase.contains("offset")) {
+    if (!lowerCaseSql.contains("offset")) {
       return statement;
     }
     SimpleParser parser = new SimpleParser(statement.getSql());
@@ -320,6 +368,18 @@ public class SimpleParser {
     Preconditions.checkNotNull(command);
     Preconditions.checkNotNull(query);
     return new SimpleParser(query).peekKeyword(command);
+  }
+
+  public static boolean isCommand(ImmutableList<String> commands, String query) {
+    Preconditions.checkNotNull(commands);
+    Preconditions.checkNotNull(query);
+    SimpleParser parser = new SimpleParser(query);
+    for (String command : commands) {
+      if (!parser.eatKeyword(command)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   public static List<String> readArrayLiteral(String expression, boolean returnRawHexValue) {
@@ -496,6 +556,21 @@ public class SimpleParser {
       return null;
     }
     return sql.substring(start, pos).trim();
+  }
+
+  List<TableOrIndexName> readTableList() {
+    ImmutableList.Builder<TableOrIndexName> tables = ImmutableList.builder();
+    while (hasMoreTokens()) {
+      TableOrIndexName table = readTableOrIndexName();
+      if (table == null) {
+        break;
+      }
+      tables.add(table);
+      if (!eatToken(",")) {
+        break;
+      }
+    }
+    return tables.build();
   }
 
   List<TableOrIndexName> readColumnList(String name) {
@@ -834,6 +909,53 @@ public class SimpleParser {
     } else {
       return true;
     }
+  }
+
+  Long readIntegerLiteral() {
+    skipWhitespaces();
+    int startPos = pos;
+    if (skipNumericLiteral()) {
+      try {
+        return Long.valueOf(sql.substring(startPos, pos));
+      } catch (NumberFormatException ignore) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  boolean peekNumericLiteral() {
+    int originalPos = pos;
+    if (skipNumericLiteral()) {
+      pos = originalPos;
+      return true;
+    }
+    return false;
+  }
+
+  boolean skipNumericLiteral() {
+    skipWhitespaces();
+    int startPos = pos;
+    if (eatToken("+") || eatToken("-")) {
+      startPos++;
+    }
+    if (eatKeyword("inf")) {
+      return true;
+    }
+    boolean foundDecimalDot = false;
+    while (pos < sql.length()) {
+      if (!foundDecimalDot && sql.charAt(pos) == '.') {
+        foundDecimalDot = true;
+        pos++;
+      } else if (Character.isDigit(sql.charAt(pos))) {
+        pos++;
+      } else if (!isValidEndOfKeyword(pos)) {
+        return false;
+      } else {
+        break;
+      }
+    }
+    return pos > startPos;
   }
 
   QuotedString readSingleQuotedString() {

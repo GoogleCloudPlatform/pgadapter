@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.MoveStatement.MOVE_COMMAND_TAG;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 
 import com.google.api.core.InternalApi;
@@ -37,6 +38,7 @@ import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.DataOutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -322,6 +324,10 @@ public class IntermediateStatement {
     return this.command;
   }
 
+  public void setCommandTag(String commandTag) {
+    this.commandTag = Preconditions.checkNotNull(commandTag);
+  }
+
   /** @return the extracted command (first word) from the really executed SQL statement. */
   public String getCommandTag() {
     return this.commandTag;
@@ -334,7 +340,10 @@ public class IntermediateStatement {
   }
 
   public WireOutput createDataRowResponse(Converter converter) {
-    return new DataRowResponse(this.outputStream, converter);
+    // MOVE should not return any of the data.
+    return MOVE_COMMAND_TAG.equals(commandTag)
+        ? null
+        : new DataRowResponse(this.outputStream, converter);
   }
 
   public WireOutput[] createResultSuffix() {

@@ -21,6 +21,9 @@ src/test/csharp/**/obj
 src/test/nodejs/**/node_modules
 src/test/nodejs/**/package-lock.json
 src/test/nodejs/**/.DS_Store
+samples/nodejs/**/node_modules
+samples/nodejs/**/package-lock.json
+samples/nodejs/**/.DS_Store
 
 src/test/ruby/**/Gemfile.lock
 samples/ruby/**/Gemfile.lock

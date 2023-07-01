@@ -69,8 +69,8 @@ The following limitations are currently known:
 
 
 ### Schema Updates
-Schema updates are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect. It is recommended to
-create the schema manually. Note that PGAdapter does support `create table if not exists` / `drop table if exists`.
+Schema updates are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect.
+It is recommended to create the schema manually.
 See [sample-schema.sql](src/main/resources/sample-schema-sql) for the data model for this example.
 
 ### Generated Primary Keys

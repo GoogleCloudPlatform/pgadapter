@@ -35,13 +35,13 @@
       com.google.cloud.spanner.pgadapter.ruby.RubyTest,
     </excludedTests>
 
-    <spanner.version>6.40.0</spanner.version>
+    <spanner.version>6.43.0</spanner.version>
     <junixsocket.version>2.6.2</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.20.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.22.0</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -76,7 +76,7 @@
     <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
-      <version>1.10.1</version>
+      <version>1.10.2</version>
     </dependency>
     <dependency>
       <groupId>org.checkerframework</groupId>
@@ -127,7 +127,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.9.2</version>
+      <version>3.9.3</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>

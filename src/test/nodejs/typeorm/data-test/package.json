@@ -6,10 +6,10 @@
    "devDependencies": {
       "ts-node": "10.9.1",
       "@types/node": "^20.1.4",
-      "typescript": "5.1.3"
+      "typescript": "5.1.6"
    },
    "dependencies": {
-      "typeorm": "0.3.16",
+      "typeorm": "0.3.17",
       "reflect-metadata": "^0.1.13",
       "pg": "^8.9.0",
       "yargs": "^17.5.1"

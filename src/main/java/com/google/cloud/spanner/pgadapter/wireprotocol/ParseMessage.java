@@ -15,13 +15,18 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.CLOSE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DEALLOCATE;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DECLARE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.EXECUTE;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.FETCH;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.MOVE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.PREPARE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.RELEASE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.ROLLBACK;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SAVEPOINT;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW_DATABASE_DDL;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.TRUNCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.VACUUM;
 
@@ -33,15 +38,20 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.CloseStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.DeallocateStatement;
+import com.google.cloud.spanner.pgadapter.statements.DeclareStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExecuteStatement;
+import com.google.cloud.spanner.pgadapter.statements.FetchStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
+import com.google.cloud.spanner.pgadapter.statements.MoveStatement;
 import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
 import com.google.cloud.spanner.pgadapter.statements.ReleaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.RollbackToStatement;
 import com.google.cloud.spanner.pgadapter.statements.SavepointStatement;
+import com.google.cloud.spanner.pgadapter.statements.ShowDatabaseDdlStatement;
 import com.google.cloud.spanner.pgadapter.statements.TruncateStatement;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
@@ -134,6 +144,34 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
             name,
             parsedStatement,
             originalStatement);
+      } else if (isCommand(DECLARE, originalStatement.getSql())) {
+        return new DeclareStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(FETCH, originalStatement.getSql())) {
+        return new FetchStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(MOVE, originalStatement.getSql())) {
+        return new MoveStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(CLOSE, originalStatement.getSql())) {
+        return new CloseStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
       } else if (isCommand(VACUUM, originalStatement.getSql())) {
         return new VacuumStatement(
             connectionHandler,
@@ -167,6 +205,13 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
         // ROLLBACK [WORK | TRANSACTION] TO [SAVEPOINT] savepoint_name is not recognized by the
         // Connection API as any known statement.
         return new RollbackToStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(SHOW_DATABASE_DDL, originalStatement.getSql())) {
+        return new ShowDatabaseDdlStatement(
             connectionHandler,
             connectionHandler.getServer().getOptions(),
             name,
