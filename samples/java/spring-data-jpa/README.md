@@ -20,7 +20,7 @@ See [Troubleshooting](#troubleshooting) if you run into unexpected errors.
 
 ## Integration with IntelliJ
 
-It is highly recommended to [follow these instructions](../../../docs/intellij.md) to add your Cloud
+It is recommended to [follow these instructions](../../../docs/intellij.md) to add your Cloud
 Spanner database as a data source to IntelliJ, if you are using IntelliJ for the development of your
 application. This will give you handy features like code-completion and table and column name
 validation. It will also give you a PGAdapter instance that is always up and running while IntelliJ
@@ -32,17 +32,17 @@ The sample application contains entities with mappings for all supported data ty
 In addition, the sample application shows how to do the following when using Spring Boot Data JPA
 with Cloud Spanner PostgreSQL databases:
 
-| Feature                      | Description                                                                                                                                                                                                                                                                                                                                                                                          |
-|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Running PGAdapter in-process | PGAdapter is started in-process along with the main application. This eliminates the requirement of running PGAdapter as a separate process. The [PGAdapter](src/main/java/com/google/cloud/spanner/pgadapter/sample/PGAdapter.java) class shows how to start and stop PGAdapter with your application.                                                                                              |
-| Liquibase                    | The sample application uses Liquibase to create the database schema. It is highly recommended to use a higher-level schema management tool like Liquibase to manage your database schema. This also allows you to use Cloud Spanner-specific features like interleaved tables. The schema definition can be found in [db.changelog-v1.0.sql](src/main/resources/db/changelog/db.changelog-v1.0.sql). |
-| UUID Primary Keys            | All entities in this sample that extend from the [AbstractUuidEntity](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/AbstractUuidEntity.java) class use an automatically generated UUID as the primary key value. This is the recommended type of primary key.                                                                                                                        |
-| Sequential Primary Key       | Sequential primary key values can cause hotspots in Cloud Spanner. The [Venue](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Venue.java) and [Concert](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Concert.java) entities in this sample application show how you can safely use a sequential auto-generated primary key with Cloud Spanner and Spring Data JPA.   |
-| Interleaved Tables           | The [Track](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Track.java) entity is an interleaved table. The table definition is is in [db.changelog-v1.0.sql](src/main/resources/db/changelog/db.changelog-v1.0.sql). The relationship between Track (the child) and Album (the parent) is mapped in JPA as if it was a regular `@ManyToOne` relationship.                             |
-| JSONB Fields                 | The [Venue](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Venue.java) entity contains a JSONB property.                                                                                                                                                                                                                                                                              |
-| Read/write Transactions      | Execute read/write transactions on Cloud Spanner. See [SingerService.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/service/SingerService.java) for an example.                                                                                                                                                                                                                       |
-| Read-only Transactions       | Execute read-only transactions on Cloud Spanner. It is highly recommended to use read-only transactions instead of read/write transactions for workloads that only execute read operations. This will improve performance and reduce locking on your database. See [SingerService.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/service/SingerService.java) for an example.          |
-| Stale Reads                  | Execute stale reads on Cloud Spanner. Using stale reads can improve performance of your application. See the `staleRead()` method in [SampleApplication.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/SampleApplication.java) for an example.                                                                                                                                        |
+| Feature                      | Description                                                                                                                                                                                                                                                                                                                                                                                        |
+|------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Running PGAdapter in-process | PGAdapter is started in-process along with the main application. This eliminates the requirement of running PGAdapter as a separate process. The [PGAdapter](src/main/java/com/google/cloud/spanner/pgadapter/sample/PGAdapter.java) class shows how to start and stop PGAdapter with your application.                                                                                            |
+| Liquibase                    | The sample application uses Liquibase to create the database schema. It is recommended to use a higher-level schema management tool like Liquibase to manage your database schema. This also allows you to use Cloud Spanner-specific features like interleaved tables. The schema definition can be found in [db.changelog-v1.0.sql](src/main/resources/db/changelog/db.changelog-v1.0.sql).      |
+| UUID Primary Keys            | All entities in this sample that extend from the [AbstractUuidEntity](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/AbstractUuidEntity.java) class use an automatically generated UUID as the primary key value. This is the recommended type of primary key.                                                                                                                      |
+| Sequential Primary Key       | Sequential primary key values can cause hotspots in Cloud Spanner. The [Venue](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Venue.java) and [Concert](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Concert.java) entities in this sample application show how you can safely use a sequential auto-generated primary key with Cloud Spanner and Spring Data JPA. |
+| Interleaved Tables           | The [Track](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Track.java) entity is an interleaved table. The table definition is is in [db.changelog-v1.0.sql](src/main/resources/db/changelog/db.changelog-v1.0.sql). The relationship between Track (the child) and Album (the parent) is mapped in JPA as if it was a regular `@ManyToOne` relationship.                           |
+| JSONB Fields                 | The [Venue](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Venue.java) entity contains a JSONB property.                                                                                                                                                                                                                                                                            |
+| Read/write Transactions      | Execute read/write transactions on Cloud Spanner. See [SingerService.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/service/SingerService.java) for an example.                                                                                                                                                                                                                     |
+| Read-only Transactions       | Execute read-only transactions on Cloud Spanner. It is recommended to use read-only transactions instead of read/write transactions for workloads that only execute read operations. This will improve performance and reduce locking on your database. See [SingerService.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/service/SingerService.java) for an example.               |
+| Stale Reads                  | Execute stale reads on Cloud Spanner. Using stale reads can improve performance of your application. See the `staleRead()` method in [SampleApplication.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/SampleApplication.java) for an example.                                                                                                                                      |
 
 
 ### Running PGAdapter in-process
@@ -72,8 +72,8 @@ as you follow the recommendations in this section, and as is demonstrated in thi
 
 1. The sample uses the strategy that is explained here: https://cloud.google.com/spanner/docs/generated-column/how-to#primary-key-generated-column
 2. The primary key consists of two columns:
-2.1. A `shard_id` column that is automatically generated by the database.
-2.2. An `id` column that is a monotonically increasing integer. The value for this column is generated using a [table generator](https://jakarta.ee/specifications/persistence/3.1/apidocs/jakarta.persistence/jakarta/persistence/generationtype#TABLE).
+   1. A `shard_id` column that is automatically generated by the database. This column is not mapped to the JPA entities, and your application can safely ignore the fact that it exists.
+   2. An `id` column that is a monotonically increasing integer. The value for this column is generated using a [table generator](https://jakarta.ee/specifications/persistence/3.1/apidocs/jakarta.persistence/jakarta/persistence/generationtype#TABLE).
 3. Only the `id` column is mapped to the entity. This means that JPA thinks that the primary key only consists of the `id` column, and is therefore also the only value that you need to use in the application.
 
 The [Venue](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Venue.java) and
@@ -98,12 +98,12 @@ possible to use interleaved tables with JPA like this:
 ### JSONB Fields
 
 The [Venue](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Venue.java) entity has a
-JSONB column named `description`. This field is automatically serialized/deserialized to/from a
+JSONB column named `description`. This JSONB field is automatically serialized/deserialized to/from a
 plain old Java object.
 
 ### Read/Write Transactions
 
-Use the standard `@Transactional` annotation to mark a method as transactional. This will
+Use the standard JPA `@Transactional` annotation to mark a method as transactional. This will
 by default use a read/write transaction. You should try to only use read/write transactions for
 methods and workloads that actually write data. Using a read/write transaction for a workload that
 only reads data is possible, but will cause unnecessary locks to be taken on Cloud Spanner.
@@ -132,7 +132,7 @@ The [SampleApplication.java](src/main/java/com/google/cloud/spanner/pgadapter/sa
 contains a `staleRead()` method that shows how to use the `StaleReadService`.
 
 ## Liquibase
-The sample application uses Liquibase to manage the database schema. It is highly recommended to use
+The sample application uses Liquibase to manage the database schema. It is recommended to use
 a higher level schema management system like Liquibase to manage your database schema for multiple
 reasons:
 1. It gives you more control over the schema that is actually created. It also gives you a change log of any changes that are applied to your schema, and allows you to rollback changes that have been made.
@@ -158,7 +158,8 @@ mvn liquibase:rollback \
 ```
 
 The `spanner.ddl_transaction_mode=AutocommitExplicitTransaction` addition to the above JDBC connection
-URL ensures that PGAdapter will 
+URL ensures that PGAdapter will automatically commit any active transaction when it encounters a DDL
+statement, and then execute all following DDL statements as a single DDL batch.
 
 ## Troubleshooting
 
