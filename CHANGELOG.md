@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.22.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.21.0...v0.22.0) (2023-07-01)
+
+
+### Features
+
+* create local PostgreSQL copy and support pg_dump and pg_restore ([#878](https://github.com/GoogleCloudPlatform/pgadapter/issues/878)) ([ff0d5ea](https://github.com/GoogleCloudPlatform/pgadapter/commit/ff0d5ea6507408b8443395b82f2a8729e6c4cec0))
+* replace 'for update' clauses with LOCK_SCANNED_RANGES=exclusive hint ([#699](https://github.com/GoogleCloudPlatform/pgadapter/issues/699)) ([08b567c](https://github.com/GoogleCloudPlatform/pgadapter/commit/08b567c8c4163c8c72342c4ff2b1f92b5076a0fc))
+* support replacement of DDL statements ([#893](https://github.com/GoogleCloudPlatform/pgadapter/issues/893)) ([7880f1f](https://github.com/GoogleCloudPlatform/pgadapter/commit/7880f1fef8629c532a2726b70a755e1e753c712b))
+
+
+### Bug Fixes
+
+* remove invalid BootstrapMessage length check ([#910](https://github.com/GoogleCloudPlatform/pgadapter/issues/910)) ([be431a8](https://github.com/GoogleCloudPlatform/pgadapter/commit/be431a8b453f7731522d42e0b775ffbdba2f5346))
+
+
+### Dependencies
+
+* bump Spanner client to 6.43.0 ([#875](https://github.com/GoogleCloudPlatform/pgadapter/issues/875)) ([08fa0ad](https://github.com/GoogleCloudPlatform/pgadapter/commit/08fa0adff4fb0abffb383ea4602842ac044cee2f))
+
+
+### Documentation
+
+* add Cloud Run sample for Java ([#883](https://github.com/GoogleCloudPlatform/pgadapter/issues/883)) ([ddbba41](https://github.com/GoogleCloudPlatform/pgadapter/commit/ddbba4114aa84739106bda0b5f260b6ab32c55ce))
+* add Cloud Run sample for Python ([#884](https://github.com/GoogleCloudPlatform/pgadapter/issues/884)) ([576a56a](https://github.com/GoogleCloudPlatform/pgadapter/commit/576a56ae5113514a56681abaac2acb6a8f4f1c57))
+* add sample for Node.js with Cloud Run ([#885](https://github.com/GoogleCloudPlatform/pgadapter/issues/885)) ([7b03c4e](https://github.com/GoogleCloudPlatform/pgadapter/commit/7b03c4ed512e4ef173c3e4f6750d496f5d5e9c24))
+* Go sample equal to the other samples ([#886](https://github.com/GoogleCloudPlatform/pgadapter/issues/886)) ([f7ef506](https://github.com/GoogleCloudPlatform/pgadapter/commit/f7ef5060a6aebf0d1ede1d9da26b3ff036c3f45b))
+* update IntelliJ example to allow all databases ([#890](https://github.com/GoogleCloudPlatform/pgadapter/issues/890)) ([62afdf9](https://github.com/GoogleCloudPlatform/pgadapter/commit/62afdf9f479b08b12c2df528480995b6e088bfee))
+
 ## [0.21.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.20.0...v0.21.0) (2023-06-07)
 
 
