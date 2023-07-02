@@ -15,11 +15,12 @@ PGAdapter can be used with the following drivers and clients:
 1. `psycopg3`: Version 3.1.x and higher are supported. See [psycopg3 support](docs/psycopg3.md) for more details.
 1. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 1. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
-1. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
 1. `postgres_fdw`: The PostgreSQL foreign data wrapper has experimental support. See [Foreign Data Wrapper sample](samples/foreign-data-wrapper) for more details.
 
-## Frameworks and Tools
+## ORMs, Frameworks and Tools
 PGAdapter can be used with the following frameworks and tools:
+1. `Hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
+1. `Spring Data JPA`: Spring Data JPA in combination with Hibernate is also supported. See the [Spring Data JPA Sample Application](samples/java/spring-data-jpa) for a full example.
 1. `Liquibase`: Version 4.12.0 and higher are supported. See [Liquibase support](docs/liquibase.md)
    for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
 1. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
