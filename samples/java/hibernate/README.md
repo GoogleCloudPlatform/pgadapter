@@ -4,6 +4,9 @@ PGAdapter can be used in combination with Hibernate, but with a number of limita
 shows the command line arguments and configuration that is needed in order to use Hibernate with
 PGAdapter.
 
+> __Note__: This sample uses Hibernate directly. There is also a sample for using [Spring Data JPA
+with PGAdapter here](../spring-data-jpa).
+
 ## Start PGAdapter
 You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
 pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
