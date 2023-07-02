@@ -5,6 +5,10 @@ equivalent for Spanner databases [that use the PostgreSQL interface](https://clo
 It enables you to use standard PostgreSQL drivers and tools with Cloud Spanner and is designed for
 the [lowest possible latency](benchmarks/latency-comparison/README.md).
 
+__Note__: JVM-based applications can add PGAdapter as a compile-time dependency and run the proxy
+in the same process as the main application. See [samples/java/jdbc](samples/java/jdbc) for a
+small sample application that shows how to do this.
+
 ## Drivers and Clients
 PGAdapter can be used with the following drivers and clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
@@ -45,7 +49,7 @@ using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers a
 
 ## Usage
 PGAdapter can be started both as a Docker container, a standalone process as well as an
-in-process server (the latter is only supported for Java applications).
+in-process server (the latter is only supported for Java and other JVM-based applications).
 
 ### Docker
 
@@ -153,6 +157,9 @@ class PGProxyRunner {
     }
 }
 ```
+
+See [samples/java/jdbc](samples/java/jdbc) for a small sample application that adds
+PGAdapter as a compile-time dependency and runs it together with the main application.
 
 ### Options
 
