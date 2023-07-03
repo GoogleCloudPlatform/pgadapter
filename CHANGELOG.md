@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.22.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.22.0...v0.22.1) (2023-07-03)
+
+
+### Documentation
+
+* add sample for Spring Data JPA ([#892](https://github.com/GoogleCloudPlatform/pgadapter/issues/892)) ([abb7f12](https://github.com/GoogleCloudPlatform/pgadapter/commit/abb7f12e233c561a01af8ef075fcad699d279215))
+* document mysql import steps ([#872](https://github.com/GoogleCloudPlatform/pgadapter/issues/872)) ([5088c64](https://github.com/GoogleCloudPlatform/pgadapter/commit/5088c64e76027466493fa0f43be4d67495226292))
+* emphasize running PGAdapter in-process ([#913](https://github.com/GoogleCloudPlatform/pgadapter/issues/913)) ([fea8f3f](https://github.com/GoogleCloudPlatform/pgadapter/commit/fea8f3f3650fc1084201a0aecc6cc82b6b516d70))
+
 ## [0.22.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.21.0...v0.22.0) (2023-07-01)
 
 
