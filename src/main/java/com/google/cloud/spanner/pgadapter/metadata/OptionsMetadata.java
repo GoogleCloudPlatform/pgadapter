@@ -59,7 +59,7 @@ public class OptionsMetadata {
    *   <li>Accepts connections on a dynamically assigned port. You can get the port that was
    *       assigned to the server after the server has started by calling {@link
    *       ProxyServer#getLocalPort()}.
-   *   <li>Uses the default credentials in teh current runtime environment.
+   *   <li>Uses the default credentials in the current runtime environment.
    *   <li>Listens for Unix domain socket connections on '/tmp'.
    * </ol>
    */
@@ -711,12 +711,16 @@ public class OptionsMetadata {
   }
 
   /**
-   * Get credential file path from either command line or application default. If neither throw
-   * error.
+   * Get credential file path from either command line or application default. If neither are set,
+   * then throw an error.
    *
    * @return The absolute path of the credentials file.
    */
   public String buildCredentialsFile() {
+    // Skip if a com.google.auth.Credentials instance has been set.
+    if (credentials != null) {
+      return null;
+    }
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
       try {
         // This will throw an IOException if no default credentials are available.
