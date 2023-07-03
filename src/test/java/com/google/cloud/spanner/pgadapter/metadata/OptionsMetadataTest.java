@@ -395,8 +395,13 @@ public class OptionsMetadataTest {
             .setCredentials(NoCredentials.getInstance())
             .build()
             .getProxyPort());
+    boolean isWindows =
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .isWindows();
     assertEquals(
-        "/tmp/.s.PGSQL.9999",
+        isWindows ? "" : "/tmp/.s.PGSQL.9999",
         OptionsMetadata.newBuilder()
             .setCredentials(NoCredentials.getInstance())
             .build()
