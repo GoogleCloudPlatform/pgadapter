@@ -406,13 +406,15 @@ public class OptionsMetadataTest {
             .setCredentials(NoCredentials.getInstance())
             .build()
             .getSocketFile(9999));
-    assertEquals(
-        "/var/pg/.s.PGSQL.5432",
-        OptionsMetadata.newBuilder()
-            .setUnixDomainSocketDirectory("/var/pg")
-            .setCredentials(NoCredentials.getInstance())
-            .build()
-            .getSocketFile(5432));
+    if (!isWindows) {
+      assertEquals(
+          "/var/pg/.s.PGSQL.5432",
+          OptionsMetadata.newBuilder()
+              .setUnixDomainSocketDirectory("/var/pg")
+              .setCredentials(NoCredentials.getInstance())
+              .build()
+              .getSocketFile(5432));
+    }
     assertEquals(
         "",
         OptionsMetadata.newBuilder()
