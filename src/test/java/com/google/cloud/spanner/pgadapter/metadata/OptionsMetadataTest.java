@@ -286,12 +286,17 @@ public class OptionsMetadataTest {
   @Test
   public void testBuilder() {
     assertFalse(
-        OptionsMetadata.newBuilder().setProject("my-project").build().hasDefaultInstanceId());
+        OptionsMetadata.newBuilder()
+            .setProject("my-project")
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .hasDefaultInstanceId());
     assertEquals(
         InstanceId.of("my-project", "my-instance"),
         OptionsMetadata.newBuilder()
             .setProject("my-project")
             .setInstance("my-instance")
+            .setCredentials(NoCredentials.getInstance())
             .build()
             .getDefaultInstanceId());
     assertEquals(
@@ -300,6 +305,7 @@ public class OptionsMetadataTest {
             .setProject("my-project")
             .setInstance("my-instance")
             .setDatabase("my-database")
+            .setCredentials(NoCredentials.getInstance())
             .build()
             .getDefaultDatabaseId());
     assertEquals(
@@ -315,42 +321,99 @@ public class OptionsMetadataTest {
             .setCredentials(NoCredentials.getInstance())
             .build()
             .getCredentials());
-    assertNull(OptionsMetadata.newBuilder().build().getSessionPoolOptions());
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSessionPoolOptions());
     assertEquals(
         SessionPoolOptions.newBuilder().setMinSessions(500).setMaxSessions(1000).build(),
         OptionsMetadata.newBuilder()
             .setSessionPoolOptions(
                 SessionPoolOptions.newBuilder().setMinSessions(500).setMaxSessions(1000).build())
+            .setCredentials(NoCredentials.getInstance())
             .build()
             .getSessionPoolOptions());
     assertEquals(
-        DdlTransactionMode.Batch, OptionsMetadata.newBuilder().build().getDdlTransactionMode());
+        DdlTransactionMode.Batch,
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getDdlTransactionMode());
     assertEquals(
         DdlTransactionMode.AutocommitImplicitTransaction,
         OptionsMetadata.newBuilder()
             .setDdlTransactionMode(DdlTransactionMode.AutocommitImplicitTransaction)
+            .setCredentials(NoCredentials.getInstance())
             .build()
             .getDdlTransactionMode());
-    assertFalse(OptionsMetadata.newBuilder().build().shouldAuthenticate());
+    assertFalse(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .shouldAuthenticate());
     assertTrue(
-        OptionsMetadata.newBuilder().setRequireAuthentication().build().shouldAuthenticate());
-    assertFalse(OptionsMetadata.newBuilder().build().disableLocalhostCheck());
+        OptionsMetadata.newBuilder()
+            .setRequireAuthentication()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .shouldAuthenticate());
+    assertFalse(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .disableLocalhostCheck());
     assertTrue(
-        OptionsMetadata.newBuilder().setDisableLocalhostCheck().build().disableLocalhostCheck());
-    assertEquals(SslMode.Disable, OptionsMetadata.newBuilder().build().getSslMode());
+        OptionsMetadata.newBuilder()
+            .setDisableLocalhostCheck()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .disableLocalhostCheck());
+    assertEquals(
+        SslMode.Disable,
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSslMode());
     assertEquals(
         SslMode.Require,
-        OptionsMetadata.newBuilder().setSslMode(SslMode.Require).build().getSslMode());
-    assertEquals(0, OptionsMetadata.newBuilder().build().getProxyPort());
-    assertEquals(9999, OptionsMetadata.newBuilder().setPort(9999).build().getProxyPort());
-    assertEquals("/tmp/.s.PGSQL.9999", OptionsMetadata.newBuilder().build().getSocketFile(9999));
+        OptionsMetadata.newBuilder()
+            .setSslMode(SslMode.Require)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSslMode());
+    assertEquals(
+        0,
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getProxyPort());
+    assertEquals(
+        9999,
+        OptionsMetadata.newBuilder()
+            .setPort(9999)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getProxyPort());
+    assertEquals(
+        "/tmp/.s.PGSQL.9999",
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSocketFile(9999));
     assertEquals(
         "/var/pg/.s.PGSQL.5432",
         OptionsMetadata.newBuilder()
             .setUnixDomainSocketDirectory("/var/pg")
+            .setCredentials(NoCredentials.getInstance())
             .build()
             .getSocketFile(5432));
     assertEquals(
-        "", OptionsMetadata.newBuilder().disableUnixDomainSockets().build().getSocketFile(5432));
+        "",
+        OptionsMetadata.newBuilder()
+            .disableUnixDomainSockets()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSocketFile(5432));
   }
 }
