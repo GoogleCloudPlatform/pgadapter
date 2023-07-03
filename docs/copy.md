@@ -104,3 +104,14 @@ psql -h localhost -p 5433 -d my-spanner-db \
   | psql -h localhost -p 5432 -d my-local-db \
   -c "copy numbers from stdin binary"
 ```
+
+## Copy Data From MySQL
+`COPY` can also be used to copy data from for example a `MySQL` database. This requires a two-step
+process:
+1. Link the `MySQL` database that you want to copy to Cloud Spanner as a `FOREIGN SERVER` to a
+   real `PostgreSQL` database. Import the table(s) or schema that you want to copy as `FOREIGN TABLE`s
+   in the `PostgreSQL` database.
+2. Copy the data in the `FOREIGN TABLE`s to Cloud Spanner as if they were normal `PostgreSQL` tables.
+
+See [this example](import-mysql-data.md) for an elaborate example that imports the standard MySQL
+Employees database into Cloud Spanner using this technique.
