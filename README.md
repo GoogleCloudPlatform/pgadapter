@@ -61,21 +61,35 @@ Replace the project, instance and database names and the credentials file in the
 run PGAdapter from a pre-built Docker image.
 
 ```shell
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
   -d -p 5432:5432 \
-  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS \
+  -v /path/to/credentials.json:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
-  -x
+  -c /credentials.json -x
 ```
 
 The `-x` argument turns off the requirement that all TCP connections must come from localhost.
 This is required when running PGAdapter in a Docker container.
 
 See [Options](#Options) for an explanation of all further options.
+
+#### Distroless Docker Image
+
+We also publish a [distroless Docker image](https://github.com/GoogleContainerTools/distroless) for
+PGAdapter under the tag `gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless`. This Docker image
+runs PGAdapter as a non-root user.
+
+```shell
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless
+docker run \
+  -d -p 5432:5432 \
+  -v /path/to/credentials.json:/credentials.json:ro \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless \
+  -p my-project -i my-instance -d my-database \
+  -c /credentials.json -x
+```
 
 ### Standalone with pre-built jar
 
