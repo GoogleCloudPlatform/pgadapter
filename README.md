@@ -63,7 +63,7 @@ run PGAdapter from a pre-built Docker image.
 ```shell
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
-  -d --rm -p 5432:5432 \
+  -d -p 5432:5432 \
   -v /path/to/credentials.json:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
@@ -84,7 +84,7 @@ runs PGAdapter as a non-root user.
 ```shell
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless
 docker run \
-  -d --rm -p 5432:5432 \
+  -d -p 5432:5432 \
   -v /path/to/credentials.json:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless \
   -p my-project -i my-instance -d my-database \
