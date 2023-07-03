@@ -8,7 +8,7 @@ image without the need to build it yourself:
 ```shell
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
-  -d --rm -p 5432:5432 \
+  -d -p 5432:5432 \
   -v /path/to/credentials.json:/credentials.json:ro \
   -v /tmp:/tmp:rw \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
@@ -44,7 +44,7 @@ runs PGAdapter as a non-root user.
 ```shell
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless
 docker run \
-  -d --rm -p 5432:5432 \
+  -d -p 5432:5432 \
   -v /path/to/credentials.json:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless \
   -p my-project -i my-instance -d my-database \
@@ -59,7 +59,7 @@ different host port to forward to the Docker container:
 
 ```shell
 docker run \
-  -d --rm -p 5433:5432 \
+  -d -p 5433:5432 \
   -v /path/to/credentials.json:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
@@ -79,7 +79,7 @@ host to ensure that you can connect to the Unix Domain Socket.
 
 ```shell
 docker run \
-  -d --rm -p 5432:5432 \
+  -d -p 5432:5432 \
   -v /path/to/credentials.json:/credentials.json:ro \
   -v /var/pgadapter:/var/pgadapter:rw \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
@@ -98,7 +98,7 @@ use by setting the `JDK_JAVA_OPTIONS` environment variable when running the Dock
 
 ```shell
 docker run \
-  -d --rm -p 5432:5432 \
+  -d -p 5432:5432 \
   -v /path/to/credentials.json:/credentials.json:ro \
   -v /tmp:/tmp:rw \
   -e JDK_JAVA_OPTIONS='-Xmx384m -Xms384m -XshowSettings:vm' \
