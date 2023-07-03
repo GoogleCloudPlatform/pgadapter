@@ -20,8 +20,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
-import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -52,7 +52,7 @@ public class SSLMockServerTest extends AbstractMockServerTest {
     System.setProperty("javax.net.ssl.keyStorePassword", "password");
 
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), "d", ImmutableList.of("-ssl", "require"));
+        new MockSpannerServiceImpl(), "d", builder -> builder.setSslMode(SslMode.Require));
   }
 
   @AfterClass

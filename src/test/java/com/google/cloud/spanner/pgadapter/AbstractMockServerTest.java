@@ -19,6 +19,7 @@ import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespac
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
@@ -29,7 +30,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.admin.database.v1.MockDatabaseAdminImpl;
 import com.google.cloud.spanner.admin.instance.v1.MockInstanceAdminImpl;
 import com.google.cloud.spanner.connection.SpannerPool;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.TestOptionsMetadataBuilder;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgClass;
@@ -67,9 +68,9 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
@@ -916,14 +917,14 @@ public abstract class AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), "d", Collections.emptyList());
+    doStartMockSpannerAndPgAdapterServers(new MockSpannerServiceImpl(), "d", configurator -> {});
   }
 
   protected static void doStartMockSpannerAndPgAdapterServers(
-      String defaultDatabase, Iterable<String> extraPGAdapterOptions) throws Exception {
+      String defaultDatabase, Consumer<TestOptionsMetadataBuilder> optionsConfigurator)
+      throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), defaultDatabase, extraPGAdapterOptions);
+        new MockSpannerServiceImpl(), defaultDatabase, optionsConfigurator);
   }
 
   public static PGobject createJdbcPgJsonbObject(String value) throws SQLException {
@@ -936,7 +937,7 @@ public abstract class AbstractMockServerTest {
   protected static void doStartMockSpannerAndPgAdapterServers(
       MockSpannerServiceImpl mockSpannerService,
       String defaultDatabase,
-      Iterable<String> extraPGAdapterOptions)
+      Consumer<TestOptionsMetadataBuilder> optionsConfigurator)
       throws Exception {
     mockSpanner = mockSpannerService;
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
@@ -1004,25 +1005,18 @@ public abstract class AbstractMockServerTest {
             .build()
             .start();
 
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder().add("-p", "p", "-i", "i");
+    TestOptionsMetadataBuilder builder = new TestOptionsMetadataBuilder();
+    builder.setProject("p").setInstance("i");
     if (defaultDatabase != null) {
-      argsListBuilder.add("-d", defaultDatabase);
+      builder.setDatabase("d");
     }
-    argsListBuilder.add(
-        "-internal_debug",
-        "-skip_internal_debug_warning",
-        "-c",
-        "", // empty credentials file, as we are using a plain text connection.
-        "-s",
-        "0", // port 0 to let the OS pick an available port
-        "-e",
-        String.format("localhost:%d", spannerServer.getPort()),
-        "-r",
-        "usePlainText=true;");
-    argsListBuilder.addAll(extraPGAdapterOptions);
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    pgServer = new ProxyServer(new OptionsMetadata(args));
+    builder
+        .enableDebugMode()
+        .setUsePlainText()
+        .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
+        .setCredentials(NoCredentials.getInstance());
+    optionsConfigurator.accept(builder);
+    pgServer = new ProxyServer(builder.build());
     pgServer.startServer();
   }
 

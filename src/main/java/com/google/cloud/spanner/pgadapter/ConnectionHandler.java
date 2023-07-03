@@ -200,6 +200,14 @@ public class ConnectionHandler extends Thread {
     if (credentials != null) {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
+    } else if (options.getCredentials() != null) {
+      connectionOptionsBuilder =
+          ConnectionOptionsHelper.setCredentials(
+              connectionOptionsBuilder, options.getCredentials());
+    }
+    if (options.getSessionPoolOptions() != null) {
+      connectionOptionsBuilder =
+          connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
     }
     ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
     Connection spannerConnection = connectionOptions.getConnection();

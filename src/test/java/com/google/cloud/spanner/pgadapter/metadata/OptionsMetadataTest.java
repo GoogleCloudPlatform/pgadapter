@@ -18,11 +18,17 @@ import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.parseS
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.toServerVersionNum;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.InstanceId;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -275,5 +281,76 @@ public class OptionsMetadataTest {
     assertFalse(SslMode.Disable.isSslEnabled());
     assertTrue(SslMode.Enable.isSslEnabled());
     assertTrue(SslMode.Require.isSslEnabled());
+  }
+
+  @Test
+  public void testBuilder() {
+    assertFalse(
+        OptionsMetadata.newBuilder().setProject("my-project").build().hasDefaultInstanceId());
+    assertEquals(
+        InstanceId.of("my-project", "my-instance"),
+        OptionsMetadata.newBuilder()
+            .setProject("my-project")
+            .setInstance("my-instance")
+            .build()
+            .getDefaultInstanceId());
+    assertEquals(
+        DatabaseId.of("my-project", "my-instance", "my-database"),
+        OptionsMetadata.newBuilder()
+            .setProject("my-project")
+            .setInstance("my-instance")
+            .setDatabase("my-database")
+            .build()
+            .getDefaultDatabaseId());
+    assertEquals(
+        "/path/to/credentials.json",
+        OptionsMetadata.newBuilder()
+            .setCredentialsFile("/path/to/credentials.json")
+            .build()
+            .buildCredentialsFile());
+    assertNull(OptionsMetadata.newBuilder().build().getCredentials());
+    assertEquals(
+        NoCredentials.getInstance(),
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getCredentials());
+    assertNull(OptionsMetadata.newBuilder().build().getSessionPoolOptions());
+    assertEquals(
+        SessionPoolOptions.newBuilder().setMinSessions(500).setMaxSessions(1000).build(),
+        OptionsMetadata.newBuilder()
+            .setSessionPoolOptions(
+                SessionPoolOptions.newBuilder().setMinSessions(500).setMaxSessions(1000).build())
+            .build()
+            .getSessionPoolOptions());
+    assertEquals(
+        DdlTransactionMode.Batch, OptionsMetadata.newBuilder().build().getDdlTransactionMode());
+    assertEquals(
+        DdlTransactionMode.AutocommitImplicitTransaction,
+        OptionsMetadata.newBuilder()
+            .setDdlTransactionMode(DdlTransactionMode.AutocommitImplicitTransaction)
+            .build()
+            .getDdlTransactionMode());
+    assertFalse(OptionsMetadata.newBuilder().build().shouldAuthenticate());
+    assertTrue(
+        OptionsMetadata.newBuilder().setRequireAuthentication().build().shouldAuthenticate());
+    assertFalse(OptionsMetadata.newBuilder().build().disableLocalhostCheck());
+    assertTrue(
+        OptionsMetadata.newBuilder().setDisableLocalhostCheck().build().disableLocalhostCheck());
+    assertEquals(SslMode.Disable, OptionsMetadata.newBuilder().build().getSslMode());
+    assertEquals(
+        SslMode.Require,
+        OptionsMetadata.newBuilder().setSslMode(SslMode.Require).build().getSslMode());
+    assertEquals(0, OptionsMetadata.newBuilder().build().getProxyPort());
+    assertEquals(9999, OptionsMetadata.newBuilder().setPort(9999).build().getProxyPort());
+    assertEquals("/tmp/.s.PGSQL.9999", OptionsMetadata.newBuilder().build().getSocketFile(9999));
+    assertEquals(
+        "/var/pg/.s.PGSQL.5432",
+        OptionsMetadata.newBuilder()
+            .setUnixDomainSocketDirectory("/var/pg")
+            .build()
+            .getSocketFile(5432));
+    assertEquals(
+        "", OptionsMetadata.newBuilder().disableUnixDomainSockets().build().getSocketFile(5432));
   }
 }
