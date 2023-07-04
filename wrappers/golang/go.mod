@@ -1,4 +1,4 @@
-module pgadapter-go-wrapper
+module github.com/GoogleCloudPlatform/pgadapter/wrappers/golang
 
 go 1.20
 
