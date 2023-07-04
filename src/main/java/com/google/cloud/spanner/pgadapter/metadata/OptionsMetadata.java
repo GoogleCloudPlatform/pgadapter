@@ -59,7 +59,7 @@ public class OptionsMetadata {
    *   <li>Accepts connections on a dynamically assigned port. You can get the port that was
    *       assigned to the server after the server has started by calling {@link
    *       ProxyServer#getLocalPort()}.
-   *   <li>Uses the default credentials in teh current runtime environment.
+   *   <li>Uses the default credentials in the current runtime environment.
    *   <li>Listens for Unix domain socket connections on '/tmp'.
    * </ol>
    */
@@ -68,6 +68,8 @@ public class OptionsMetadata {
     private String instance;
     private String database;
     private SessionPoolOptions sessionPoolOptions;
+    private Integer numChannels;
+    private String databaseRole;
     private DdlTransactionMode ddlTransactionMode;
     private String credentialsFile;
     private Credentials credentials;
@@ -79,7 +81,6 @@ public class OptionsMetadata {
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
-    private String[] additionalArgs;
 
     Builder() {}
 
@@ -139,6 +140,18 @@ public class OptionsMetadata {
     /** (Optional) The {@link SessionPoolOptions} to use for connections to Cloud Spanner. */
     public Builder setSessionPoolOptions(SessionPoolOptions sessionPoolOptions) {
       this.sessionPoolOptions = Preconditions.checkNotNull(sessionPoolOptions);
+      return this;
+    }
+
+    /** (Optional) The number of gRPC channels to use for connections to Cloud Spanner. */
+    public Builder setNumChannels(int numChannels) {
+      this.numChannels = numChannels;
+      return this;
+    }
+
+    /** (Optional) The database role to use for connections to Cloud Spanner. */
+    public Builder setDatabaseRole(String databaseRole) {
+      this.databaseRole = databaseRole;
       return this;
     }
 
@@ -325,8 +338,18 @@ public class OptionsMetadata {
       if (endpoint != null) {
         addOption(args, OPTION_SPANNER_ENDPOINT, endpoint);
       }
-      if (usePlainText) {
-        addOption(args, OPTION_JDBC_PROPERTIES, "usePlainText=true");
+      if (usePlainText || numChannels != null || databaseRole != null) {
+        StringBuilder jdbcOptionBuilder = new StringBuilder();
+        if (usePlainText) {
+          jdbcOptionBuilder.append("usePlainText=true;");
+        }
+        if (numChannels != null) {
+          jdbcOptionBuilder.append("numChannels=").append(numChannels).append(";");
+        }
+        if (databaseRole != null) {
+          jdbcOptionBuilder.append("databaseRole=").append(databaseRole).append(";");
+        }
+        addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
       if (debugMode) {
         addOption(args, OPTION_INTERNAL_DEBUG_MODE);
@@ -711,12 +734,16 @@ public class OptionsMetadata {
   }
 
   /**
-   * Get credential file path from either command line or application default. If neither throw
-   * error.
+   * Get credential file path from either command line or application default. If neither are set,
+   * then throw an error.
    *
    * @return The absolute path of the credentials file.
    */
   public String buildCredentialsFile() {
+    // Skip if a com.google.auth.Credentials instance has been set.
+    if (credentials != null) {
+      return null;
+    }
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
       try {
         // This will throw an IOException if no default credentials are available.
