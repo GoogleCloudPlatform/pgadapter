@@ -134,7 +134,7 @@ func (pgadapter *PGAdapter) GetHostPort() (int, error) {
 	if pgadapter == nil {
 		return 0, fmt.Errorf("nil reference")
 	}
-	if pgadapter.container == nil || pgadapter.container.IsRunning() || pgadapter.port == 0 {
+	if pgadapter.container == nil || !pgadapter.container.IsRunning() || pgadapter.port == 0 {
 		return 0, fmt.Errorf("PGAdapter has not been started successfully")
 	}
 	return pgadapter.port, nil

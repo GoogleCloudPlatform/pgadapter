@@ -23,6 +23,13 @@ func TestStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start PGAdapter: %v", err)
 	}
+	port, err := pgadapter.GetHostPort()
+	if err != nil {
+		t.Fatalf("failed to get port from PGAdapter: %v", err)
+	}
+	if port == 0 {
+		t.Fatal("Port should be non-zero", err)
+	}
 	err = pgadapter.Stop()
 	if err != nil {
 		t.Fatalf("failed to stop PGAdapter: %v", err)
