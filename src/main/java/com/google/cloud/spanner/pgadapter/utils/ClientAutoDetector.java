@@ -377,7 +377,9 @@ public class ClientAutoDetector {
       boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // pgx uses a relatively unique naming scheme for prepared statements (and uses prepared
         // statements for everything by default).
-        return parseMessage.getName() != null && parseMessage.getName().startsWith("lrupsc_");
+        return parseMessage.getName() != null
+            && (parseMessage.getName().startsWith("lrupsc_")
+                || parseMessage.getName().startsWith("stmtcache_"));
       }
     },
     NPGSQL {
