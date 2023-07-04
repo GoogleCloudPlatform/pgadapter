@@ -22,6 +22,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.OAuth2Credentials;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
@@ -334,6 +336,56 @@ public class OptionsMetadataTest {
             .setCredentials(NoCredentials.getInstance())
             .build()
             .getSessionPoolOptions());
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("numChannels"));
+    assertEquals(
+        "4",
+        OptionsMetadata.newBuilder()
+            .setNumChannels(4)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("numChannels"));
+    assertEquals(
+        "16",
+        OptionsMetadata.newBuilder()
+            .setNumChannels(16)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("numChannels"));
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("databaseRole"));
+    assertEquals(
+        "my-role",
+        OptionsMetadata.newBuilder()
+            .setDatabaseRole("my-role")
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("databaseRole"));
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("usePlainText"));
+    assertEquals(
+        "true",
+        OptionsMetadata.newBuilder()
+            .setUsePlainText()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("usePlainText"));
     assertEquals(
         DdlTransactionMode.Batch,
         OptionsMetadata.newBuilder()
@@ -422,5 +474,26 @@ public class OptionsMetadataTest {
             .setCredentials(NoCredentials.getInstance())
             .build()
             .getSocketFile(5432));
+
+    assertThrows(
+        SpannerException.class,
+        () -> OptionsMetadata.newBuilder().setInstance("my-instance").build());
+    assertThrows(
+        SpannerException.class,
+        () -> OptionsMetadata.newBuilder().setDatabase("my-database").build());
+    assertThrows(
+        SpannerException.class,
+        () ->
+            OptionsMetadata.newBuilder()
+                .setCredentialsFile("/path/to/credentials.json")
+                .setRequireAuthentication()
+                .build());
+    assertThrows(
+        SpannerException.class,
+        () ->
+            OptionsMetadata.newBuilder()
+                .setCredentials(OAuth2Credentials.create(AccessToken.newBuilder().build()))
+                .setRequireAuthentication()
+                .build());
   }
 }
