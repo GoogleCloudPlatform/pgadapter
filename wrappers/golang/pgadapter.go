@@ -61,7 +61,12 @@ type ExecutionEnvironment interface {
 
 const dockerImage = "gcr.io/cloud-spanner-pg-adapter/pgadapter"
 
-// Docker contains the specific configuration for running PGAdapter in a Docker container.
+// Docker contains the specific configuration for running PGAdapter in a test Docker container.
+// This Docker execution environment can be used for tests and development. You should however
+// not use this Docker execution environment in production, as it uses a test container.
+// Instead, you should package both your application and PGAdapter in the same Docker container
+// if you want to use Docker in production, or set up PGAdapter as a side-car process in your
+// Kubernetes cluster.
 type Docker struct {
 	// Set AlwaysPullImage to true to ensure that the latest image of PGAdapter is
 	// pulled before it is started.
@@ -144,12 +149,14 @@ type Config struct {
 	// PGAdapter.
 	//
 	// Java starts PGAdapter on localhost as a Java application. This requires Java to be
-	// installed on the local system. See https://www.java.com/en/download/help/download_options.html
-	// for information on how to install Java on your system.
-	// This is the recommended setting for production environments, as it means that your
+	// installed on the local system. See for example https://adoptium.net/installation/
+	// for information on how to install an open-source Java distribution on your system.
+	//
+	// Java is the recommended setting for production environments, as it means that your
 	// application and PGAdapter are both running on the same host, and the network traffic
 	// does not need to pass over the host-to-Docker network bridge. Note that it is perfectly
 	// OK to run both your application and PGAdapter in the same Docker container.
+	//
 	// The Java process is automatically shut down when your application shuts down.
 	//
 	// Docker starts PGAdapter in a test container instance. This is recommended for testing
