@@ -24,6 +24,9 @@ src/test/nodejs/**/.DS_Store
 samples/nodejs/**/node_modules
 samples/nodejs/**/package-lock.json
 samples/nodejs/**/.DS_Store
+wrappers/nodejs/node_modules
+wrappers/nodejs/package-lock.json
+wrappers/nodejs/.DS_Store
 
 src/test/ruby/**/Gemfile.lock
 samples/ruby/**/Gemfile.lock

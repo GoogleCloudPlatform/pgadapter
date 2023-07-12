@@ -1,0 +1,24 @@
+{
+  "name": "pgadapter-wrapper",
+  "description": "Cloud Spanner PGAdapter wrapper for Node.js",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "author": "Google Inc.",
+  "engines": {
+    "node": ">=10"
+  },
+  "repository": "GoogleCloudPlatform/pgadapter/wrappers/nodejs",
+  "scripts": {
+    "lint": "gts check"
+  },
+  "dependencies": {
+    "@google-cloud/promisify": "^2.0.0",
+    "mocha": "^10.2.0"
+  },
+  "devDependencies": {
+    "@types/mocha": "^8.0.0",
+    "@types/node": "^20.4.1",
+    "gts": "^2.0.0",
+    "typescript": "^3.8.3"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "extends": "./node_modules/gts/tsconfig-google.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "module": "commonjs",
+    "target": "es5",
+    "sourceMap": true,
+    "outDir": "build"
+  },
+  "compileOnSave": true,
+  "exclude": [
+    "node_modules"
+  ],
+  "include": [
+    "src/*.ts",
+    "test/*.ts"
+  ],
+  "ts-node": {
+    "esm": true
+  }
+}
