@@ -27,5 +27,5 @@ gcloud beta run jobs create $PGADAPTER_YCSB_JOB \
     --cpu 8 \
     --memory 4Gi \
     --task-timeout 60m \
-    --binary-authorization=projects/$(gcloud config get project --quiet)/platforms/cloudRun/policies/bcidManagedPolicy
+    --binary-authorization=projects/bcid-cloud-run-policy/platforms/cloudRun/policies/bcidManagedPolicy
 gcloud beta run jobs execute $PGADAPTER_YCSB_JOB
