@@ -2,10 +2,13 @@
   "extends": "./node_modules/gts/tsconfig-google.json",
   "compilerOptions": {
     "rootDir": ".",
-    "module": "commonjs",
-    "target": "es5",
-    "sourceMap": true,
-    "outDir": "build"
+    "outDir": "build",
+    "noImplicitAny": false,
+    "resolveJsonModule": true,
+    "lib": [
+      "es2018",
+      "dom"
+    ],
   },
   "compileOnSave": true,
   "exclude": [

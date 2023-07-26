@@ -12,13 +12,19 @@
     "lint": "gts check"
   },
   "dependencies": {
-    "@google-cloud/promisify": "^2.0.0",
-    "mocha": "^10.2.0"
+    "@types/tar": "^6.1.5",
+    "env-paths": "^2.2.1",
+    "make-dir": "^4.0.0",
+    "mocha": "^10.2.0",
+    "tar": "^6.1.15",
+    "testcontainers": "^9.10.1"
   },
   "devDependencies": {
     "@types/mocha": "^8.0.0",
     "@types/node": "^20.4.1",
+    "@types/pg": "^8.10.2",
     "gts": "^2.0.0",
+    "pg": "^8.11.1",
     "typescript": "^3.8.3"
   }
 }

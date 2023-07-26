@@ -51,54 +51,36 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 exports.__esModule = true;
-var assert = require("assert");
 var mocha_1 = require("mocha");
 var src_1 = require("../src");
+var pg_1 = require("pg");
 (0, mocha_1.describe)('PGAdapter', function () {
-    (0, mocha_1.describe)('instantiation', function () {
-        (0, mocha_1.it)('should accept options', function () {
-            assert.deepStrictEqual(new src_1.PGAdapter({ project: "my-project" }).getOptions(), { project: "my-project" });
-            assert.deepStrictEqual(new src_1.PGAdapter({ instance: "my-instance" }).getOptions(), { instance: "my-instance" });
-            assert.deepStrictEqual(new src_1.PGAdapter({ database: "my-database" }).getOptions(), { database: "my-database" });
-        });
-    });
-    (0, mocha_1.describe)('command', function () {
-        (0, mocha_1.it)('should generate project, instance and database command line arguments', function () {
-            assert.strictEqual(new src_1.PGAdapter({ project: "my-project", instance: "my-instance" }).command(), "java -jar pgadapter.jar -p my-project -i my-instance");
-        });
-    });
-    (0, mocha_1.describe)('start', function () {
-        (0, mocha_1.it)('should start without any options', function () { return __awaiter(void 0, void 0, void 0, function () {
-            var pg;
+    (0, mocha_1.describe)('connect', function () {
+        (0, mocha_1.it)('should connect to Cloud Spanner', function () { return __awaiter(void 0, void 0, void 0, function () {
+            var pg, port, client, res;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
-                        pg = new src_1.PGAdapter({});
-                        assert.strictEqual(pg.isRunning(), false);
+                        pg = new src_1.PGAdapter({
+                            project: "appdev-soda-spanner-staging",
+                            instance: "knut-test-ycsb",
+                            credentialsFile: "/Users/loite/Downloads/appdev-soda-spanner-staging.json"
+                        });
                         return [4 /*yield*/, pg.start()];
                     case 1:
                         _a.sent();
-                        assert.strictEqual(pg.isRunning(), true);
-                        // PGAdapter is automatically stopped when the main process stops.
-                        // We therefore do not need to explicitly stop it. But as these tests
-                        // start multiple PGAdapter instances, we stop them as well to prevent
-                        // using too many resources.
-                        pg.stop();
-                        return [2 /*return*/];
-                }
-            });
-        }); });
-        (0, mocha_1.it)('should assign port', function () { return __awaiter(void 0, void 0, void 0, function () {
-            var pg;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        pg = new src_1.PGAdapter({});
-                        return [4 /*yield*/, pg.start()];
-                    case 1:
+                        port = pg.getHostPort();
+                        client = new pg_1.Client({ host: "localhost", port: port, database: "knut-test-db" });
+                        return [4 /*yield*/, client.connect()];
+                    case 2:
                         _a.sent();
-                        assert(pg.getHostPort());
-                        pg.stop();
+                        return [4 /*yield*/, client.query('SELECT $1::text as message', ['Hello world!'])];
+                    case 3:
+                        res = _a.sent();
+                        console.log(res.rows[0].message); // Hello world!
+                        return [4 /*yield*/, client.end()];
+                    case 4:
+                        _a.sent();
                         return [2 /*return*/];
                 }
             });

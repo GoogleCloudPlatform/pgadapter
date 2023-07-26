@@ -37,12 +37,23 @@ describe('PGAdapter', () => {
   });
 
   describe('start', () => {
-    it('should start without any options', () => {
+    it('should start without any options', async () => {
       const pg = new PGAdapter({});
       assert.strictEqual(pg.isRunning(), false);
-      pg.start();
+      await pg.start();
       assert.strictEqual(pg.isRunning(), true);
       // PGAdapter is automatically stopped when the main process stops.
+      // We therefore do not need to explicitly stop it. But as these tests
+      // start multiple PGAdapter instances, we stop them as well to prevent
+      // using too many resources.
+      pg.stop();
+    });
+
+    it('should assign port', async () => {
+      const pg = new PGAdapter({});
+      await pg.start();
+      assert(pg.getHostPort());
+      pg.stop();
     });
   });
 });
