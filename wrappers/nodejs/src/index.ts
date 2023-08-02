@@ -27,8 +27,7 @@ import {extract} from "tar";
 import {
   TestContainer,
   StartedTestContainer,
-  StoppedTestContainer,
-  GenericContainer, AlwaysPullPolicy
+  GenericContainer, AlwaysPullPolicy,
 } from "testcontainers";
 
 
@@ -159,6 +158,7 @@ class PGAdapter {
 
   private readonly options: Options;
   private pgadapter?: ChildProcess;
+  private container?: StartedTestContainer;
   private port?: number;
 
   constructor(options:Options) {
@@ -174,7 +174,7 @@ class PGAdapter {
     return Object.assign({}, this.options);
   }
 
-  private _arguments(): string[] {
+  private _arguments(execEnv?: ExecutionEnvironment): string[] {
     let res: string[] = [];
     if (this.options.project) {
       res.push("-p", this.options.project);
@@ -185,11 +185,16 @@ class PGAdapter {
     if (this.options.database) {
       res.push("-d", this.options.database);
     }
-    if (this.options.credentialsFile) {
+    if (execEnv === ExecutionEnvironment.Docker) {
+      res.push("-c", "/credentials.json");
+    } else if (this.options.credentialsFile) {
       res.push("-c", this.options.credentialsFile);
     }
     if (this.options.requireAuthentication) {
       res.push("-a");
+    }
+    if (execEnv === ExecutionEnvironment.Docker) {
+      res.push("-x");
     }
     return res;
   }
@@ -244,14 +249,41 @@ class PGAdapter {
     if (!this.options.version) {
       container = container.withPullPolicy(new AlwaysPullPolicy());
     }
-    container = container.withCommand(this._arguments());
-    const startedContainer: StartedTestContainer = await container.start();
+    if (this.options.credentialsFile) {
+      container = container.withCopyFilesToContainer([{
+        source: this.options.credentialsFile,
+        target: "/credentials.json",
+        mode: 700
+      }])
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      container = container.withCopyFilesToContainer([{
+        source: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        target: "/credentials.json",
+        mode: 700
+      }])
+    } else {
+      throw new Error("Running PGAdapter in Docker requires a credentials file. Set options.credentialsFile to a valid user or service account file.");
+    }
+    if (this.options.port) {
+      container = container.withExposedPorts({host: this.options.port, container: 5432});
+    } else {
+      container = container.withExposedPorts(5432);
+    }
+    container = container.withCommand(this._arguments(ExecutionEnvironment.Docker));
+    this.container = await container.start();
+    process.on("exit", () => {
+      if (this.container) {
+        this.container.stop();
+        this.container = undefined;
+      }
+    });
+    this.port = this.container.getMappedPort(5432);
   }
 
   private async startJava() {
     const jarFile = await this.downloadJar();
     let args = ["-jar", jarFile];
-    args.push(...this._arguments());
+    args.push(...this._arguments(ExecutionEnvironment.Java));
     let port: Promise<number>;
     if (this.options.port) {
       port = Promise.resolve(this.options.port);
@@ -290,7 +322,7 @@ class PGAdapter {
         return;
       } catch (e) {
         // ignore and retry
-        await this.sleep(50);
+        await this.sleep(20);
       }
     }
     throw new Error("PGAdapter failed to start successfully");
@@ -410,19 +442,25 @@ class PGAdapter {
    * @returns true if this instance of PGAdapter has been started.
    */
   isRunning(): boolean {
-    return this.pgadapter !== undefined;
+    return this.pgadapter !== undefined || (this.container !== undefined);
   }
 
   /**
    * Stops this PGAdapter instance. The PGAdapter instance is also automatically stopped
    * when your application is shut down gracefully.
    */
-  stop(): void {
-    if (!this.pgadapter) {
+  async stop(): Promise<void> {
+    if (!this.pgadapter && !this.container) {
       throw new Error("This PGAdapter instance is not running");
     }
-    this.pgadapter.kill("SIGINT");
-    this.pgadapter = undefined;
+    if (this.pgadapter) {
+      this.pgadapter.kill("SIGINT");
+      this.pgadapter = undefined;
+    }
+    if (this.container) {
+      await this.container.stop();
+      this.container = undefined;
+    }
   }
 }
 

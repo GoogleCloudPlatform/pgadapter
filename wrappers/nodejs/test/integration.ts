@@ -15,26 +15,44 @@
  */
 
 import {describe, it} from "mocha";
-import {PGAdapter} from "../src";
-import { Client } from "pg";
+import {ExecutionEnvironment, PGAdapter} from "../src";
+import {Client} from "pg";
+import assert = require("assert");
 
 describe('PGAdapter', () => {
   describe('connect', () => {
-    it('should connect to Cloud Spanner', async () => {
+    it('should connect to Cloud Spanner using Java', async () => {
       const pg = new PGAdapter({
+        executionEnvironment: ExecutionEnvironment.Java,
         project: "appdev-soda-spanner-staging",
         instance: "knut-test-ycsb",
         credentialsFile: "/Users/loite/Downloads/appdev-soda-spanner-staging.json",
       });
-      await pg.start();
-      const port = pg.getHostPort();
+      await runConnectionTest(pg);
+    });
 
-      const client = new Client({host: "localhost", port: port, database: "knut-test-db"});
-      await client.connect();
-
-      const res = await client.query('SELECT $1::text as message', ['Hello world!'])
-      console.log(res.rows[0].message) // Hello world!
-      await client.end()
+    it('should connect to Cloud Spanner using Docker', async () => {
+      const pg = new PGAdapter({
+        executionEnvironment: ExecutionEnvironment.Docker,
+        project: "appdev-soda-spanner-staging",
+        instance: "knut-test-ycsb",
+        credentialsFile: "/Users/loite/Downloads/appdev-soda-spanner-staging.json",
+      });
+      await runConnectionTest(pg);
     });
   });
 });
+
+
+async function runConnectionTest(pg: PGAdapter) {
+  await pg.start();
+  const port = pg.getHostPort();
+
+  const client = new Client({host: "localhost", port: port, database: "knut-test-db"});
+  await client.connect();
+
+  const res = await client.query('SELECT $1::text as message', ['Hello world!'])
+  assert.strictEqual(res.rows[0].message, "Hello world!");
+  await client.end()
+  await pg.stop();
+}

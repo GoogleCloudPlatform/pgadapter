@@ -130,6 +130,7 @@ declare class PGAdapter {
     private readonly dockerImage;
     private readonly options;
     private pgadapter?;
+    private container?;
     private port?;
     constructor(options: Options);
     command(): string;
@@ -167,6 +168,6 @@ declare class PGAdapter {
      * Stops this PGAdapter instance. The PGAdapter instance is also automatically stopped
      * when your application is shut down gracefully.
      */
-    stop(): void;
+    stop(): Promise<void>;
 }
 export { PGAdapter };
