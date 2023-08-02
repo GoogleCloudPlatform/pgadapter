@@ -37,7 +37,10 @@ public class LatencyBenchmark {
         "o",
         "operations",
         true,
-        "The number of clients that will be executing queries in parallel.");
+        "The number of operations that each client will execute. Defaults to 1000.");
+    options.addOption("skip_pg", false, "Skip PostgreSQL JDBC benchmarks.");
+    options.addOption("skip_jdbc", false, "Skip Cloud Spanner JDBC benchmarks.");
+    options.addOption("skip_spanner", false, "Skip Cloud Spanner client library benchmarks.");
     CommandLineParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(options, args);
 
@@ -70,6 +73,9 @@ public class LatencyBenchmark {
         commandLine.hasOption('c') ? Integer.parseInt(commandLine.getOptionValue('c')) : 16;
     int operations =
         commandLine.hasOption('o') ? Integer.parseInt(commandLine.getOptionValue('o')) : 1000;
+    boolean runPg = !commandLine.hasOption("skip_pg");
+    boolean runJdbc = !commandLine.hasOption("skip_jdbc");
+    boolean runSpanner = !commandLine.hasOption("skip_spanner");
 
     System.out.println();
     System.out.println("Running benchmark with the following options");
@@ -77,26 +83,35 @@ public class LatencyBenchmark {
     System.out.printf("Clients: %d\n", clients);
     System.out.printf("Operations: %d\n", operations);
 
-    System.out.println();
-    System.out.println("Running benchmark for PostgreSQL JDBC driver");
-    PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
-    List<Duration> pgJdbcResults =
-        pgJdbcRunner.execute(
-            "select col_varchar from latency_test where col_bigint=?", clients, operations);
+    List<Duration> pgJdbcResults = null;
+    if (runPg) {
+      System.out.println();
+      System.out.println("Running benchmark for PostgreSQL JDBC driver");
+      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
+      pgJdbcResults =
+          pgJdbcRunner.execute(
+              "select col_varchar from latency_test where col_bigint=?", clients, operations);
+    }
 
-    System.out.println();
-    System.out.println("Running benchmark for Cloud Spanner JDBC driver");
-    JdbcRunner jdbcRunner = new JdbcRunner(databaseId);
-    List<Duration> jdbcResults =
-        jdbcRunner.execute(
-            "select col_varchar from latency_test where col_bigint=?", clients, operations);
+    List<Duration> jdbcResults = null;
+    if (runJdbc) {
+      System.out.println();
+      System.out.println("Running benchmark for Cloud Spanner JDBC driver");
+      JdbcRunner jdbcRunner = new JdbcRunner(databaseId);
+      jdbcResults =
+          jdbcRunner.execute(
+              "select col_varchar from latency_test where col_bigint=?", clients, operations);
+    }
 
-    System.out.println();
-    System.out.println("Running benchmark for Java Client Library");
-    JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
-    List<Duration> javaClientResults =
-        javaClientRunner.execute(
-            "select col_varchar from latency_test where col_bigint=$1", clients, operations);
+    List<Duration> javaClientResults = null;
+    if (runSpanner) {
+      System.out.println();
+      System.out.println("Running benchmark for Java Client Library");
+      JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
+      javaClientResults =
+          javaClientRunner.execute(
+              "select col_varchar from latency_test where col_bigint=$1", clients, operations);
+    }
 
     printResults("PostgreSQL JDBC Driver", pgJdbcResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
@@ -104,6 +119,9 @@ public class LatencyBenchmark {
   }
 
   public void printResults(String header, List<Duration> results) {
+    if (results == null) {
+      return;
+    }
     List<Duration> orderedResults = new ArrayList<>(results);
     Collections.sort(orderedResults);
     System.out.println();
