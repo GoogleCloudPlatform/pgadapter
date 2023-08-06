@@ -15,14 +15,14 @@ Modify the `service.yaml` file to match your Cloud Run project and region, and y
 # TODO: Modify MY-REGION and MY-PROJECT to match your application container image.
 image: MY-REGION.pkg.dev/MY-PROJECT/cloud-run-source-deploy/pgadapter-sidecar-example
 ...
-
-# TODO: Modify to match your Cloud Spanner database.
-args:
-  - -p MY-PROJECT
-  - -i MY-INSTANCE
-  - -d MY-DATABASE
-  - -dir /sockets
-  - -x
+# TODO: Modify these environment variables to match your Cloud Spanner database.
+env:
+  - name: SPANNER_PROJECT
+    value: my-project
+  - name: SPANNER_INSTANCE
+    value: my-instance
+  - name: SPANNER_DATABASE
+    value: my-database
 ```
 
 ## Optional - Build and Run Locally
@@ -34,11 +34,14 @@ run the application.
 ```shell
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
+  --name pgadapter-cloud-run-example \
   --rm -d -p 5432:5432 \
   -v /path/to/credentials.json:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
-  -p my-project -i my-instance -d my-database \
   -c /credentials.json -x
+export SPANNER_PROJECT=my-project
+export SPANNER_INSTANCE=my-instance
+export SPANNER_DATABASE=my-database
 mvn spring-boot:run
 ```
 
@@ -46,6 +49,12 @@ This will start a web server on port 8080. Run the following command to verify t
 
 ```shell
 curl localhost:8080
+```
+
+Stop the PGAdapter Docker container again with:
+
+```shell
+docker container stop pgadapter-cloud-run-example
 ```
 
 ## Deploying to Cloud Run
@@ -59,7 +68,7 @@ gcloud auth configure-docker
 Build and deploy the application to Cloud Run with this command:
 
 ```shell
-gcloud run deploy pgadapter-sidecar-example
+gcloud run deploy pgadapter-sidecar-example --source .
 ```
 
 __NOTE__: This example does not specify any credentials for PGAdapter when it is run on Cloud Run. This means that

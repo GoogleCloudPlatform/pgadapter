@@ -86,11 +86,6 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
         <version>${spring-boot.version}</version>
-        <configuration>
-          <systemPropertyVariables>
-            <connection_url>jdbc:postgresql://localhost:5432/</connection_url>
-          </systemPropertyVariables>
-        </configuration>
         <executions>
           <execution>
             <goals>

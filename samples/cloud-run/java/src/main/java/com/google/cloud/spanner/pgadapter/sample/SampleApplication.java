@@ -14,6 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.sample;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -36,22 +39,46 @@ public class SampleApplication {
   @Value("${NAME:World}")
   String name;
 
+  final String project = getEnvOrDefault("SPANNER_PROJECT", "my-project");
+  final String instance = getEnvOrDefault("SPANNER_INSTANCE", "my-instance");
+  final String database = getEnvOrDefault("SPANNER_DATABASE", "my-database");
+  final String qualifiedDatabaseName =
+      String.format("projects/%s/instances/%s/databases/%s", project, instance, database);
+  final String urlEncodedDatabaseName;
+  final String pgadapterHost = getEnvOrDefault("PGADAPTER_HOST", "localhost");
+  final String pgadapterPort = getEnvOrDefault("PGADAPTER_PORT", "5432");
+
+  SampleApplication() {
+    try {
+      // We need to URL-encode the fully qualified database name before we can use it in a JDBC
+      // connection URL. Otherwise, the JDBC driver will complain about the connection string
+      // containing too many '/' characters.
+      urlEncodedDatabaseName = URLEncoder.encode(qualifiedDatabaseName, StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException exception) {
+      throw new RuntimeException(exception);
+    }
+  }
+
+  static String getEnvOrDefault(String key, String defaultValue) {
+    return System.getenv(key) == null ? defaultValue : System.getenv(key);
+  }
+
   @RestController
   class HelloworldController {
     @GetMapping("/")
     String hello() {
       String connectionUrl;
-      if (System.getProperty("connection_url") != null) {
-        // This system property is set in the pom.xml file and is used when running locally with the
-        // `mvn spring-boot:run` command.
-        connectionUrl = System.getProperty("connection_url");
-      } else {
+      if (pgadapterHost.startsWith("/")) {
         // Connect to PGAdapter using Unix Domain Sockets. This gives you the lowest possible
         // latency. The PGAdapter sidecar container and the main container both share the /sockets
         // directory, and PGAdapter is instructed to use this directory for Unix domain sockets.
-        connectionUrl = String.format("jdbc:postgresql://localhost/?"
+        connectionUrl = String.format("jdbc:postgresql://localhost/%s?"
             + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
-            + "&socketFactoryArg=/sockets/.s.PGSQL.%d", 5432);
+            + "&socketFactoryArg=%s/.s.PGSQL.%s", urlEncodedDatabaseName, pgadapterHost, pgadapterPort);
+      } else {
+        // Use a TCP connection.
+        connectionUrl = String.format("jdbc:postgresql://%s:%s/%s",
+            pgadapterHost, pgadapterPort, urlEncodedDatabaseName);
       }
       // NOTE: You should use a JDBC connection pool for a production application.
       try (Connection connection = DriverManager.getConnection(connectionUrl)) {
@@ -59,7 +86,7 @@ public class SampleApplication {
         // name that will be greeted.
         try (PreparedStatement statement =
             connection.prepareStatement(
-                "select 'Hello ' || ? || ' from Cloud Spanner!' as greeting")) {
+                "select 'Hello ' || ? || ' from Cloud Spanner using JDBC!' as greeting")) {
           statement.setString(1, name);
           try (ResultSet resultSet = statement.executeQuery()) {
             if (resultSet.next()) {
