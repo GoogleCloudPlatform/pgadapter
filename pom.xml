@@ -36,7 +36,7 @@
     </excludedTests>
 
     <spanner.version>6.43.0</spanner.version>
-    <junixsocket.version>2.6.2</junixsocket.version>
+    <junixsocket.version>2.7.0</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -81,7 +81,7 @@
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.35.0</version>
+      <version>3.36.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
