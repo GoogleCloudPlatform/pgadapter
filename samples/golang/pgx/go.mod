@@ -3,7 +3,7 @@ module pgadapter-pgx-sample
 go 1.20
 
 require (
-	github.com/jackc/pgx/v5 v5.4.2
+	github.com/jackc/pgx/v5 v5.4.3
 	github.com/testcontainers/testcontainers-go v0.22.0
 	golang.org/x/oauth2 v0.11.0
 )
