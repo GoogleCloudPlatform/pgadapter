@@ -66,10 +66,13 @@ First make sure that you have authentication set up for pushing Docker images.
 gcloud auth configure-docker
 ```
 
-Build the Docker image from source and push it to Artifact Registry:
+Build the application from source and deploy it to Cloud Run. Replace the generated service
+file with the one from this directory. The latter will add PGAdapter as a sidecar container to the
+service.
 
 ```shell
 gcloud run deploy pgadapter-sidecar-example --source .
+gcloud run services replace service.yaml
 ```
 
 __NOTE__: This example does not specify any credentials for PGAdapter when it is run on Cloud Run. This means that
