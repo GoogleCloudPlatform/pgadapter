@@ -21,7 +21,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
-import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Statement.Builder;
@@ -62,7 +61,9 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), "d", ImmutableList.of("-ddl=AutocommitExplicitTransaction"));
+        createMockSpannerThatReturnsOneQueryPartition(),
+        "d",
+        ImmutableList.of("-ddl=AutocommitExplicitTransaction"));
   }
 
   private static boolean isPsqlAvailable() {

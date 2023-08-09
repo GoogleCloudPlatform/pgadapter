@@ -97,7 +97,11 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
         // Only partition queries that use the random result generator.
         if (!request.getSql().equals("select * from random")) {
-          super.partitionQuery(request, responseObserver);
+          responseObserver.onNext(
+              PartitionResponse.newBuilder()
+                  .addPartitions(Partition.newBuilder().setPartitionToken(ByteString.EMPTY).build())
+                  .build());
+          responseObserver.onCompleted();
           return;
         }
 
