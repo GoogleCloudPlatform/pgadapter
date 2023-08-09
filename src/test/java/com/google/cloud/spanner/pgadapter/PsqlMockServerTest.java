@@ -21,7 +21,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
-import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Statement.Builder;
@@ -30,15 +29,10 @@ import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteStreams;
-import com.google.protobuf.ByteString;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
-import com.google.spanner.v1.Partition;
-import com.google.spanner.v1.PartitionQueryRequest;
-import com.google.spanner.v1.PartitionResponse;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.TypeCode;
-import io.grpc.stub.StreamObserver;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -67,18 +61,7 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl() {
-          @Override
-          public void partitionQuery(
-              PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
-            responseObserver.onNext(
-                PartitionResponse.newBuilder()
-                    .addPartitions(
-                        Partition.newBuilder().setPartitionToken(ByteString.EMPTY).build())
-                    .build());
-            responseObserver.onCompleted();
-          }
-        },
+        createMockSpannerThatReturnsOneQueryPartition(),
         "d",
         ImmutableList.of("-ddl=AutocommitExplicitTransaction"));
   }

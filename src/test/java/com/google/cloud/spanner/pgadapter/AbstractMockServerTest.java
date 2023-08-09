@@ -38,11 +38,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Empty;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
+import com.google.spanner.v1.Partition;
+import com.google.spanner.v1.PartitionQueryRequest;
+import com.google.spanner.v1.PartitionResponse;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.SpannerGrpc;
@@ -62,6 +66,7 @@ import io.grpc.ServerInterceptor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.stub.StreamObserver;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -914,16 +919,30 @@ public abstract class AbstractMockServerTest {
     return ResultSetMetadata.newBuilder().setRowType(builder.build()).build();
   }
 
+  static MockSpannerServiceImpl createMockSpannerThatReturnsOneQueryPartition() {
+    return new MockSpannerServiceImpl() {
+      @Override
+      public void partitionQuery(
+          PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
+        responseObserver.onNext(
+            PartitionResponse.newBuilder()
+                .addPartitions(Partition.newBuilder().setPartitionToken(ByteString.EMPTY).build())
+                .build());
+        responseObserver.onCompleted();
+      }
+    };
+  }
+
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), "d", Collections.emptyList());
+        createMockSpannerThatReturnsOneQueryPartition(), "d", Collections.emptyList());
   }
 
   protected static void doStartMockSpannerAndPgAdapterServers(
       String defaultDatabase, Iterable<String> extraPGAdapterOptions) throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), defaultDatabase, extraPGAdapterOptions);
+        createMockSpannerThatReturnsOneQueryPartition(), defaultDatabase, extraPGAdapterOptions);
   }
 
   public static PGobject createJdbcPgJsonbObject(String value) throws SQLException {
