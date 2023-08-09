@@ -74,11 +74,6 @@ gcloud run deploy pgadapter-sidecar-example --source .
 gcloud run services replace service.yaml
 ```
 
-
-```shell
-gcloud run deploy pgadapter-sidecar-example --source .
-```
-
 __NOTE__: This example does not specify any credentials for PGAdapter when it is run on Cloud Run. This means that
 PGAdapter will use the default credentials that is used by Cloud Run. This is by default the default compute engine
 service account. See https://cloud.google.com/run/docs/securing/service-identity for more information on how service
