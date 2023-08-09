@@ -54,7 +54,7 @@ PGAdapter is configured with two command line arguments in this example:
    listener for incoming Unix Domain Socket connection requests.
 2. `-x`: This instructs PGAdapter to accept TCP connection requests from other hosts than localhost.
    This is necessary for the TCP prober in the service file. _NOTE_: This will not make PGAdapter
-   accessible from the Internet. Cloud Run only allows ingress traffic to the main container.
+   accessible from the Internet. Cloud Run allows ingress traffic only to the main container.
 
 ## Unix Domain Sockets
 
