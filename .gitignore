@@ -31,4 +31,4 @@ samples/cloud-run/nodejs/**/package-lock.json
 samples/cloud-run/nodejs/**/.DS_Store
 
 src/test/ruby/**/Gemfile.lock
-samples/ruby/**/Gemfile.lock
+samples/**/ruby/**/Gemfile.lock
