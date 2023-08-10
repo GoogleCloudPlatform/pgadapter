@@ -543,6 +543,11 @@ func unpackJar(ctx context.Context, tarGzFile string) error {
 		case header == nil:
 			continue
 		}
+		// Make sure that there are no relative paths in the gzipped file that could overwrite any existing files on
+		// this system.
+		if strings.Contains(header.Name, "..") {
+			return fmt.Errorf("zipped file contains relative path: %s", header.Name)
+		}
 		target := filepath.Join(dst, header.Name)
 
 		// check the file type
