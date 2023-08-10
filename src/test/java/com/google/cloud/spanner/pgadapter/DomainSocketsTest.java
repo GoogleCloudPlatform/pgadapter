@@ -20,7 +20,6 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,7 +27,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collections;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -65,7 +63,7 @@ public class DomainSocketsTest extends AbstractMockServerTest {
 
   @Test
   public void testDefaultDomainSocketFile() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(null, Collections.emptyList());
+    doStartMockSpannerAndPgAdapterServers(null, builder -> {});
 
     String sql = "SELECT 1";
 
@@ -82,7 +80,8 @@ public class DomainSocketsTest extends AbstractMockServerTest {
 
   @Test
   public void testCustomDomainSocketFile() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-dir", "./"));
+    doStartMockSpannerAndPgAdapterServers(
+        null, builder -> builder.setUnixDomainSocketDirectory("./"));
 
     String sql = "SELECT 1";
 
@@ -99,7 +98,8 @@ public class DomainSocketsTest extends AbstractMockServerTest {
 
   @Test
   public void testConnectionFailsForIncorrectDomainSocketFile() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-dir", "./sockets"));
+    doStartMockSpannerAndPgAdapterServers(
+        null, builder -> builder.setUnixDomainSocketDirectory("./sockets"));
 
     assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl("./.s.PGSQL.%d")));
 
@@ -118,7 +118,8 @@ public class DomainSocketsTest extends AbstractMockServerTest {
     assumeFalse(
         "Skip test if the test container allows creating files in the root directory", canCreate);
 
-    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-dir", "/"));
+    doStartMockSpannerAndPgAdapterServers(
+        null, builder -> builder.setUnixDomainSocketDirectory("/"));
 
     // Verify that we cannot connect to the invalid (not permitted) domain socket.
     assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl("/.s.PGSQL.%d")));
