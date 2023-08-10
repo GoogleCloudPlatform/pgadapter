@@ -21,11 +21,11 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
-import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Statement.Builder;
 import com.google.cloud.spanner.ValueBinder;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.common.collect.ImmutableList;
@@ -62,7 +62,9 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), "d", ImmutableList.of("-ddl=AutocommitExplicitTransaction"));
+        createMockSpannerThatReturnsOneQueryPartition(),
+        "d",
+        builder -> builder.setDdlTransactionMode(DdlTransactionMode.AutocommitExplicitTransaction));
   }
 
   private static boolean isPsqlAvailable() {

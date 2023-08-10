@@ -44,14 +44,32 @@ updates:
     schedule:
       interval: "daily"
   - package-ecosystem: "maven"
-    directory: "/samples/java/liquibase"
+    directory: "/samples/java/cloudrun"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "maven"
+    directory: "/samples/java/hibernate"
     schedule:
       interval: "daily"
   - package-ecosystem: "maven"
     directory: "/samples/java/jdbc"
     schedule:
       interval: "daily"
+  - package-ecosystem: "maven"
+    directory: "/samples/java/liquibase"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "maven"
+    directory: "/samples/java/spring-data-jpa"
+    schedule:
+      interval: "daily"
   - package-ecosystem: "pip"
     directory: "/samples/python/psycopg3"
+    schedule:
+      interval: "daily"
+
+  # benchmarks
+  - package-ecosystem: "maven"
+    directory: "/benchmarks/latency-comparison/java"
     schedule:
       interval: "daily"

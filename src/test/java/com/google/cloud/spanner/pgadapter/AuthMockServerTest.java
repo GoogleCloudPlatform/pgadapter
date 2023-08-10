@@ -21,8 +21,8 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.Builder;
 import com.google.cloud.spanner.pgadapter.wireprotocol.PasswordMessage;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.security.KeyPair;
@@ -59,7 +59,7 @@ public class AuthMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     // Start PGAdapter with authentication mode enabled.
-    doStartMockSpannerAndPgAdapterServers("d", ImmutableList.of("-a"));
+    doStartMockSpannerAndPgAdapterServers("d", Builder::setRequireAuthentication);
   }
 
   private String createUrl() {

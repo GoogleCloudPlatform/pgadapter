@@ -1,0 +1,66 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+  name: pgadapter-sidecar-example
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen1
+        # This registers 'pgadapter' as a dependency of 'app' and will ensure that pgadapter starts
+        # before the app container.
+        run.googleapis.com/container-dependencies: '{"app":["pgadapter"]}'
+    spec:
+      # Create an in-memory volume that can be used for Unix domain sockets.
+      volumes:
+        - name: sockets-dir
+          emptyDir:
+            sizeLimit: 50Mi
+            medium: Memory
+      containers:
+        # This is the main application container.
+        - name: app
+          # TODO: Modify MY-REGION and MY-PROJECT to match your application container image.
+          # Example: europe-north1-docker.pkg.dev/my-test-project/cloud-run-source-deploy/pgadapter-sidecar-example
+          image: MY-REGION.pkg.dev/MY-PROJECT/cloud-run-source-deploy/pgadapter-sidecar-example
+          # TODO: Modify these environment variables to match your Cloud Spanner database.
+          # The PGADAPTER_HOST variable is set to point to /sockets, which is the shared in-memory
+          # volume that is used for Unix domain sockets.
+          env:
+            - name: SPANNER_PROJECT
+              value: my-project
+            - name: SPANNER_INSTANCE
+              value: my-instance
+            - name: SPANNER_DATABASE
+              value: my-database
+            - name: PGADAPTER_HOST
+              value: /sockets
+            - name: PGADAPTER_PORT
+              value: "5432"
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - mountPath: /sockets
+              name: sockets-dir
+        # This is the PGAdapter sidecar container.
+        - name: pgadapter
+          image: gcr.io/cloud-spanner-pg-adapter/pgadapter
+          volumeMounts:
+            - mountPath: /sockets
+              name: sockets-dir
+          args:
+            - -dir /sockets
+            - -x
+          # Add a startup probe that checks that PGAdapter is listening on port 5432.
+          # NOTE: This probe will cause PGAdapter to log an EOF warning. This error may be ignored.
+          # The warning is caused by the TCP probe, which will open a TCP connection to PGAdapter,
+          # but not send a PostgreSQL startup message, and instead just close the connection.
+          startupProbe:
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+            tcpSocket:
+              port: 5432

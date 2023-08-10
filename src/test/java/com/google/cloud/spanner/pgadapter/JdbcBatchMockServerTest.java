@@ -32,7 +32,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
@@ -52,7 +51,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(null, Collections.emptyList());
+    doStartMockSpannerAndPgAdapterServers(null, builder -> {});
   }
 
   @Parameter public String preferQueryMode;

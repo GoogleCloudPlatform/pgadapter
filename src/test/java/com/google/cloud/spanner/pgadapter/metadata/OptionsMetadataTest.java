@@ -18,11 +18,19 @@ import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.parseS
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.toServerVersionNum;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.OAuth2Credentials;
+import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.InstanceId;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -275,5 +283,217 @@ public class OptionsMetadataTest {
     assertFalse(SslMode.Disable.isSslEnabled());
     assertTrue(SslMode.Enable.isSslEnabled());
     assertTrue(SslMode.Require.isSslEnabled());
+  }
+
+  @Test
+  public void testBuilder() {
+    assertFalse(
+        OptionsMetadata.newBuilder()
+            .setProject("my-project")
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .hasDefaultInstanceId());
+    assertEquals(
+        InstanceId.of("my-project", "my-instance"),
+        OptionsMetadata.newBuilder()
+            .setProject("my-project")
+            .setInstance("my-instance")
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getDefaultInstanceId());
+    assertEquals(
+        DatabaseId.of("my-project", "my-instance", "my-database"),
+        OptionsMetadata.newBuilder()
+            .setProject("my-project")
+            .setInstance("my-instance")
+            .setDatabase("my-database")
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getDefaultDatabaseId());
+    assertEquals(
+        "/path/to/credentials.json",
+        OptionsMetadata.newBuilder()
+            .setCredentialsFile("/path/to/credentials.json")
+            .build()
+            .buildCredentialsFile());
+    assertNull(OptionsMetadata.newBuilder().build().getCredentials());
+    assertEquals(
+        NoCredentials.getInstance(),
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getCredentials());
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSessionPoolOptions());
+    assertEquals(
+        SessionPoolOptions.newBuilder().setMinSessions(500).setMaxSessions(1000).build(),
+        OptionsMetadata.newBuilder()
+            .setSessionPoolOptions(
+                SessionPoolOptions.newBuilder().setMinSessions(500).setMaxSessions(1000).build())
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSessionPoolOptions());
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("numChannels"));
+    assertEquals(
+        "4",
+        OptionsMetadata.newBuilder()
+            .setNumChannels(4)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("numChannels"));
+    assertEquals(
+        "16",
+        OptionsMetadata.newBuilder()
+            .setNumChannels(16)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("numChannels"));
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("databaseRole"));
+    assertEquals(
+        "my-role",
+        OptionsMetadata.newBuilder()
+            .setDatabaseRole("my-role")
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("databaseRole"));
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("usePlainText"));
+    assertEquals(
+        "true",
+        OptionsMetadata.newBuilder()
+            .setUsePlainText()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("usePlainText"));
+    assertEquals(
+        DdlTransactionMode.Batch,
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getDdlTransactionMode());
+    assertEquals(
+        DdlTransactionMode.AutocommitImplicitTransaction,
+        OptionsMetadata.newBuilder()
+            .setDdlTransactionMode(DdlTransactionMode.AutocommitImplicitTransaction)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getDdlTransactionMode());
+    assertFalse(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .shouldAuthenticate());
+    assertTrue(
+        OptionsMetadata.newBuilder()
+            .setRequireAuthentication()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .shouldAuthenticate());
+    assertFalse(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .disableLocalhostCheck());
+    assertTrue(
+        OptionsMetadata.newBuilder()
+            .setDisableLocalhostCheck()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .disableLocalhostCheck());
+    assertEquals(
+        SslMode.Disable,
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSslMode());
+    assertEquals(
+        SslMode.Require,
+        OptionsMetadata.newBuilder()
+            .setSslMode(SslMode.Require)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSslMode());
+    assertEquals(
+        0,
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getProxyPort());
+    assertEquals(
+        9999,
+        OptionsMetadata.newBuilder()
+            .setPort(9999)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getProxyPort());
+    boolean isWindows =
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .isWindows();
+    assertEquals(
+        isWindows ? "" : "/tmp/.s.PGSQL.9999",
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSocketFile(9999));
+    if (!isWindows) {
+      assertEquals(
+          "/var/pg/.s.PGSQL.5432",
+          OptionsMetadata.newBuilder()
+              .setUnixDomainSocketDirectory("/var/pg")
+              .setCredentials(NoCredentials.getInstance())
+              .build()
+              .getSocketFile(5432));
+    }
+    assertEquals(
+        "",
+        OptionsMetadata.newBuilder()
+            .disableUnixDomainSockets()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getSocketFile(5432));
+
+    assertThrows(
+        SpannerException.class,
+        () -> OptionsMetadata.newBuilder().setInstance("my-instance").build());
+    assertThrows(
+        SpannerException.class,
+        () -> OptionsMetadata.newBuilder().setDatabase("my-database").build());
+    assertThrows(
+        SpannerException.class,
+        () ->
+            OptionsMetadata.newBuilder()
+                .setCredentialsFile("/path/to/credentials.json")
+                .setRequireAuthentication()
+                .build());
+    assertThrows(
+        SpannerException.class,
+        () ->
+            OptionsMetadata.newBuilder()
+                .setCredentials(OAuth2Credentials.create(AccessToken.newBuilder().build()))
+                .setRequireAuthentication()
+                .build());
   }
 }
