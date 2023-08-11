@@ -24,6 +24,7 @@ import (
 
 // This test application automatically starts PGAdapter in a Docker container and connects to
 // Cloud Spanner through PGAdapter using `pgx`.
+// Run with `go run pgx_sample.go -project my-project -instance my-instance -database my-database`
 func main() {
 	// TODO(developer): Uncomment if your environment does not already have default credentials set.
 	// os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/credentials.json")

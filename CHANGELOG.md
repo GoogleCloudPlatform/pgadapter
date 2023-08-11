@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.23.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.22.1...v0.23.0) (2023-08-10)
+
+
+### Features
+
+* add Go wrapper for PGAdapter ([#926](https://github.com/GoogleCloudPlatform/pgadapter/issues/926)) ([5bb71b0](https://github.com/GoogleCloudPlatform/pgadapter/commit/5bb71b038325426ac520ee89dae4ae66dba1b305))
+* create options builder ([#917](https://github.com/GoogleCloudPlatform/pgadapter/issues/917)) ([3ceec38](https://github.com/GoogleCloudPlatform/pgadapter/commit/3ceec3827768f9a7637e1b9e2c3eeb8906e57e60))
+
+
+### Documentation
+
+* Cloud Run sidecar with .NET sample app ([#965](https://github.com/GoogleCloudPlatform/pgadapter/issues/965)) ([bae6f23](https://github.com/GoogleCloudPlatform/pgadapter/commit/bae6f23b8862929b14b0abfc98f2e6c2f1f8305a))
+* Cloud Run sidecar with Go sample app ([#962](https://github.com/GoogleCloudPlatform/pgadapter/issues/962)) ([03fdbf1](https://github.com/GoogleCloudPlatform/pgadapter/commit/03fdbf172401616401c8de5db5a84910b4b1abdf))
+* Cloud Run sidecar with Java app sample ([#959](https://github.com/GoogleCloudPlatform/pgadapter/issues/959)) ([e6603ef](https://github.com/GoogleCloudPlatform/pgadapter/commit/e6603ef73a734ebfdd08a52c11cf3264e645a3f8))
+* Cloud Run sidecar with Node.js sample app ([#963](https://github.com/GoogleCloudPlatform/pgadapter/issues/963)) ([dd2d420](https://github.com/GoogleCloudPlatform/pgadapter/commit/dd2d4208e5c77ee740378e976284a048465e6003))
+* Cloud Run sidecar with Python sample app ([#964](https://github.com/GoogleCloudPlatform/pgadapter/issues/964)) ([81d0d36](https://github.com/GoogleCloudPlatform/pgadapter/commit/81d0d360d03a597ff7242ce7254013180160d2b3))
+* Cloud Run sidecar with Ruby sample app ([#966](https://github.com/GoogleCloudPlatform/pgadapter/issues/966)) ([e9914b3](https://github.com/GoogleCloudPlatform/pgadapter/commit/e9914b39951b4b579853c9a884f758598bcd27c7))
+* create generic cloud-run sidecar sample ([#973](https://github.com/GoogleCloudPlatform/pgadapter/issues/973)) ([00ce9b5](https://github.com/GoogleCloudPlatform/pgadapter/commit/00ce9b5d3dd9bb5d7792f6cd03294c518cece232))
+
+
+### Dependencies
+
+* bump Spanner to 6.45.0 ([#974](https://github.com/GoogleCloudPlatform/pgadapter/issues/974)) ([f39d70f](https://github.com/GoogleCloudPlatform/pgadapter/commit/f39d70fd614a776196f0ecc2ecfe485e39bb4111))
+* update dependabot config ([#938](https://github.com/GoogleCloudPlatform/pgadapter/issues/938)) ([16adeab](https://github.com/GoogleCloudPlatform/pgadapter/commit/16adeab4f521f05f4a2524e774f008234f0a4cb1))
+
 ## [0.22.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.22.0...v0.22.1) (2023-07-03)
 
 

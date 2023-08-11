@@ -54,7 +54,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
@@ -87,7 +86,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        createMockSpannerServiceWithQueryPartitions(), "d", Collections.emptyList());
+        createMockSpannerServiceWithQueryPartitions(), "d", builder -> {});
   }
 
   private static MockSpannerServiceImpl createMockSpannerServiceWithQueryPartitions() {
@@ -97,7 +96,11 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
         // Only partition queries that use the random result generator.
         if (!request.getSql().equals("select * from random")) {
-          super.partitionQuery(request, responseObserver);
+          responseObserver.onNext(
+              PartitionResponse.newBuilder()
+                  .addPartitions(Partition.newBuilder().setPartitionToken(ByteString.EMPTY).build())
+                  .build());
+          responseObserver.onCompleted();
           return;
         }
 
