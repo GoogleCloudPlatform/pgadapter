@@ -31,10 +31,8 @@ class PGAdapter {
    * server when your application shuts down.
    */
   static ProxyServer startPGAdapter() {
-    OptionsMetadata options =
-        new OptionsMetadata(
-            // Start PGAdapter using the default credentials in the environment on port 9432.
-            new String[] {"-s", "9432"});
+    // Start PGAdapter using the default credentials of the runtime environment on port 9432.
+    OptionsMetadata options = OptionsMetadata.newBuilder().setPort(9432).build();
     ProxyServer server = new ProxyServer(options);
     server.startServer();
     server.awaitRunning();

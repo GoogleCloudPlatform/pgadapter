@@ -110,26 +110,22 @@ public class SampleApplication {
    *
    * @param project the Google Cloud project that PGAdapter should connect to
    * @param instance the Cloud Spanner instance that PGAdapter should connect to
-   * @param credentials the full path of a credentials file that PGAdapter should use, or <code>null
-   *     </code> if PGAdapter should use the application default credentials
+   * @param credentialsFile the full path of a credentials file that PGAdapter should use, or <code>
+   *     null</code> if PGAdapter should use the application default credentials
    */
-  static ProxyServer startPGAdapter(String project, String instance, String credentials) {
-    OptionsMetadata options =
-        new OptionsMetadata(
-            credentials == null
-                ? new String[] {
-                  "-p", project,
-                  "-i", instance,
-                  "-s", "0" // Start PGAdapter on any available port.
-                }
-                : new String[] {
-                  "-p", project,
-                  "-i", instance,
-                  "-c", credentials,
-                  "-s", "0" // Start PGAdapter on any available port.
-                });
-    ProxyServer server = new ProxyServer(options);
+  static ProxyServer startPGAdapter(String project, String instance, String credentialsFile) {
+    OptionsMetadata.Builder builder =
+        OptionsMetadata.newBuilder()
+            .setProject(project)
+            .setInstance(instance)
+            // Start PGAdapter on any available port.
+            .setPort(0);
+    if (credentialsFile != null) {
+      builder.setCredentialsFile(credentialsFile);
+    }
+    ProxyServer server = new ProxyServer(builder.build());
     server.startServer();
+    server.awaitRunning();
 
     return server;
   }
