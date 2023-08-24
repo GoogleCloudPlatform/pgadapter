@@ -178,6 +178,7 @@ public class ConnectionHandler extends Thread {
       uri = uri.substring("jdbc:".length());
     }
     uri = appendPropertiesToUrl(uri, getServer().getProperties());
+    uri = uri + ";dialect=postgresql";
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
           uri
