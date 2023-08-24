@@ -23,6 +23,7 @@ gcloud beta run jobs create $PGADAPTER_YCSB_JOB \
     --tasks 1 \
     --set-env-vars SPANNER_INSTANCE=$SPANNER_INSTANCE \
     --set-env-vars SPANNER_DATABASE=$SPANNER_DATABASE \
+    --set-env-vars GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true \
     --max-retries 0 \
     --cpu 8 \
     --memory 4Gi \
