@@ -2,4 +2,4 @@ primaryBranch: postgresql-dialect
 releaseType: java-yoshi
 bumpMinorPreMajor: true
 handleGHRelease: true
-extraFiles: ["README.md"]
+extraFiles: ["README.md", "samples/java/jdbc/README.md"]
