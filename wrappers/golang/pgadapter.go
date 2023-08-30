@@ -395,7 +395,10 @@ func startJava(ctx context.Context, config Config) (*PGAdapter, error) {
 		return nil, err
 	}
 	// Wait for PGAdapter to start.
-	_ = waitForPort(port, 50*time.Millisecond, 20)
+	if err := waitForPort(port, 50*time.Millisecond, 20); err != nil {
+		cancelFunc()
+		return nil, err
+	}
 	return &PGAdapter{stopFunc: cancelFunc, port: port}, nil
 }
 

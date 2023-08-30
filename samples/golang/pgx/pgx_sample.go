@@ -17,6 +17,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 
 	pgadapter "github.com/GoogleCloudPlatform/pgadapter/wrappers/golang"
 	"github.com/jackc/pgx/v5"
@@ -59,7 +60,13 @@ func main() {
 		return
 	}
 	// Connect to Cloud Spanner through PGAdapter.
-	connString := fmt.Sprintf("postgres://uid:pwd@localhost:%d/%s?sslmode=disable", port, *database)
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("localhost:%d", port))
+	if err != nil {
+		fmt.Printf("failed to resolve localhost address %v\n", err)
+		return
+	}
+	fmt.Printf("Connecting to PGAdapter on address %s\n", addr)
+	connString := fmt.Sprintf("postgres://uid:pwd@%s/%s?sslmode=disable", addr, *database)
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		fmt.Printf("failed to connect to PGAdapter: %v\n", err)
