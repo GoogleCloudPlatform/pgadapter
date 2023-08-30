@@ -65,7 +65,7 @@ import org.postgresql.core.Oid;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 
-@Category(IntegrationTest.class)
+@Category({IntegrationTest.class, SlowTest.class})
 @RunWith(Parameterized.class)
 public class ITJdbcTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();

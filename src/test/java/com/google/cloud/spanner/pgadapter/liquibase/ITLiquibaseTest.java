@@ -21,7 +21,9 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
+import com.google.cloud.spanner.pgadapter.SlowTest;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.File;
@@ -39,9 +41,11 @@ import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+@Category({IntegrationTest.class, SlowTest.class})
 @RunWith(JUnit4.class)
 public class ITLiquibaseTest {
   private static final Logger LOGGER = Logger.getLogger(ITLiquibaseTest.class.getName());
