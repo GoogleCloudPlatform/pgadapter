@@ -48,7 +48,7 @@ jobs:
           distribution: zulu
           java-version: ${{matrix.java}}
       - run: java -version
-      - run: mvn -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -B test
+      - run: mvn -B test
   macos:
     runs-on: macos-latest
     env:
