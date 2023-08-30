@@ -56,7 +56,13 @@ public class ITPgxSampleTest implements IntegrationTest {
     assertEquals(0, res);
 
     testEnv.setUp();
-    database = testEnv.createDatabase(ImmutableList.of());
+    database =
+        testEnv.createDatabase(
+            ImmutableList.of(
+                "create table test (\n"
+                    + "  id bigint primary key,\n"
+                    + "  value varchar\n"
+                    + ")"));
   }
 
   @AfterClass
