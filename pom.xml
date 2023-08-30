@@ -34,7 +34,7 @@
       com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest,
       com.google.cloud.spanner.pgadapter.ruby.RubyTest,
     </excludedTests>
-    <excludedIntegrationTests></excludedIntegrationTests>
+    <excludedIntegrationTests/>
 
     <junixsocket.version>2.7.0</junixsocket.version>
   </properties>
