@@ -21,6 +21,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
@@ -32,7 +33,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
@@ -45,7 +45,8 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        "d", Collections.singleton("-ddl=AutocommitImplicitTransaction"));
+        "d",
+        builder -> builder.setDdlTransactionMode(DdlTransactionMode.AutocommitImplicitTransaction));
   }
 
   @Test

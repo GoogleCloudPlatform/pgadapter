@@ -18,6 +18,8 @@ import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.DEFAULT_DATA_M
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
@@ -31,6 +33,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -110,7 +113,97 @@ public class ITPsqlTest implements IntegrationTest {
     createDataModel();
 
     testEnv.setUp();
-    database = testEnv.createDatabase(DEFAULT_DATA_MODEL);
+    database =
+        testEnv.createDatabase(
+            ImmutableList.<String>builder()
+                .addAll(DEFAULT_DATA_MODEL)
+                .add(
+                    "create table if not exists singers (\n"
+                        + "    id         varchar not null primary key,\n"
+                        + "    first_name varchar,\n"
+                        + "    last_name  varchar not null,\n"
+                        + "    full_name  varchar generated always as (CASE WHEN first_name IS NULL THEN last_name\n"
+                        + "                                                 WHEN last_name  IS NULL THEN first_name\n"
+                        + "                                                 ELSE first_name || ' ' || last_name END) stored,\n"
+                        + "    active     boolean,\n"
+                        + "    created_at timestamptz,\n"
+                        + "    updated_at timestamptz\n"
+                        + ")")
+                .add(
+                    "create table if not exists albums (\n"
+                        + "    id               varchar not null primary key,\n"
+                        + "    title            varchar not null,\n"
+                        + "    marketing_budget numeric,\n"
+                        + "    release_date     date,\n"
+                        + "    cover_picture    bytea,\n"
+                        + "    singer_id        varchar not null,\n"
+                        + "    created_at       timestamptz,\n"
+                        + "    updated_at       timestamptz,\n"
+                        + "    constraint fk_albums_singers foreign key (singer_id) references singers (id)\n"
+                        + ")")
+                .add(
+                    "create table if not exists tracks (\n"
+                        + "    id           varchar not null,\n"
+                        + "    track_number bigint not null,\n"
+                        + "    title        varchar not null,\n"
+                        + "    sample_rate  float8 not null,\n"
+                        + "    created_at   timestamptz,\n"
+                        + "    updated_at   timestamptz,\n"
+                        + "    primary key (id, track_number)\n"
+                        + ") interleave in parent albums on delete cascade")
+                .add(
+                    "create table if not exists track_recordings (\n"
+                        + "    id               varchar not null,\n"
+                        + "    track_number     bigint not null,\n"
+                        + "    recording_number bigint not null,\n"
+                        + "    sample_rate      float8 not null,\n"
+                        + "    recorded_at      timestamptz not null,\n"
+                        + "    primary key (id, track_number, recording_number)\n"
+                        + ") interleave in parent tracks on delete cascade\n"
+                        + "ttl interval '30 days' on recorded_at")
+                .add(
+                    "create table if not exists venues (\n"
+                        + "    id          varchar not null primary key,\n"
+                        + "    name        varchar not null,\n"
+                        + "    description varchar not null,\n"
+                        + "    created_at  timestamptz,\n"
+                        + "    updated_at  timestamptz\n"
+                        + ")")
+                .add(
+                    "create table if not exists concerts (\n"
+                        + "    id          varchar not null primary key,\n"
+                        + "    venue_id    varchar not null,\n"
+                        + "    singer_id   varchar not null,\n"
+                        + "    name        varchar not null,\n"
+                        + "    start_time  timestamptz not null,\n"
+                        + "    end_time    timestamptz not null,\n"
+                        + "    created_at  timestamptz,\n"
+                        + "    updated_at  timestamptz,\n"
+                        + "    constraint fk_concerts_venues  foreign key (venue_id)  references venues  (id),\n"
+                        + "    constraint fk_concerts_singers foreign key (singer_id) references singers (id),\n"
+                        + "    constraint chk_end_time_after_start_time check (end_time > start_time)\n"
+                        + ")")
+                .add(
+                    "create or replace view v_singers\n"
+                        + "sql security invoker\n"
+                        + "as\n"
+                        + "select id, full_name\n"
+                        + "from singers\n"
+                        + "order by last_name, id")
+                .add("create index idx_singers_last_name on singers (last_name)")
+                .add(
+                    "create unique index idx_tracks_title on tracks (id, title) interleave in albums")
+                .add(
+                    "create index idx_concerts_start_time on concerts (start_time) include (end_time)")
+                .add(
+                    "create index idx_singers_albums_release_date on albums (singer_id, release_date desc) where release_date is not null")
+                .add(
+                    "create change stream cs_singers for singers (first_name, last_name, active)\n"
+                        + "with (retention_period = '2d',\n"
+                        + "value_capture_type = 'OLD_AND_NEW_VALUES')")
+                .add("create role hr_manager")
+                .add("grant select on table singers to hr_manager")
+                .build());
     testEnv.startPGAdapterServer(Collections.emptyList());
   }
 
@@ -200,14 +293,39 @@ public class ITPsqlTest implements IntegrationTest {
           "-d",
           POSTGRES_DATABASE,
           "-c",
-          "drop table if exists all_types; drop table if exists numbers;"
+          "drop database \"" + POSTGRES_DATABASE + "_dump\" with (force);",
+          "-c",
+          "/* Dropping schema objects that are created by this test. */\n"
+              + "drop view if exists v_singers;\n"
+              + "drop table if exists track_recordings;\n"
+              + "drop table if exists tracks;\n"
+              + "drop table if exists albums;\n"
+              + "drop table if exists concerts;\n"
+              + "drop table if exists venues;\n"
+              + "drop table if exists singers;\n"
+              + "drop table if exists all_types;\n"
+              + "drop table if exists numbers;\n"
+              + "drop foreign table if exists f_all_types;\n"
+              + "drop foreign table if exists f_numbers;\n"
+              + "drop role if exists hr_manager;\n"
         };
     ProcessBuilder builder = new ProcessBuilder().command(dropTablesCommand);
     setPgPassword(builder);
     Process process = builder.start();
+    String errors = readAll(process.getErrorStream());
 
     int res = process.waitFor();
-    assertEquals(0, res);
+    assertEquals(errors, 0, res);
+  }
+
+  static String readAll(InputStream inputStream) {
+    StringBuilder result = new StringBuilder();
+    try (Scanner scanner = new Scanner(new InputStreamReader(inputStream))) {
+      while (scanner.hasNextLine()) {
+        result.append(scanner.nextLine()).append("\n");
+      }
+    }
+    return result.toString();
   }
 
   private String createJdbcUrlForLocalPg() {
@@ -441,6 +559,7 @@ public class ITPsqlTest implements IntegrationTest {
   public void testCopyBetweenPostgreSQLAndCloudSpanner() throws Exception {
     int numRows = 100;
 
+    truncatePostgreSQLAllTypesTable();
     logger.info("Copying initial data to PG");
     // Generate 99 random rows.
     copyRandomRowsToPostgreSQL(numRows - 1);
@@ -807,10 +926,12 @@ public class ITPsqlTest implements IntegrationTest {
           ZoneId.of("Asia/Amman"),
           // Iran observed DST in 1978. Not all databases agree on this.
           ZoneId.of("Asia/Tehran"),
-          // Rankin_Inlet and Resolute did not observer DST in 1970-1979, but not all databases
+          // Rankin_Inlet and Resolute did not observe DST in 1970-1979, but not all databases
           // agree.
           ZoneId.of("America/Rankin_Inlet"),
           ZoneId.of("America/Resolute"),
+          ZoneId.of("America/Iqaluit"),
+          ZoneId.of("America/Inuvik"),
           // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
           ZoneId.of("America/Pangnirtung"),
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
@@ -915,6 +1036,13 @@ public class ITPsqlTest implements IntegrationTest {
     }
   }
 
+  private void truncatePostgreSQLAllTypesTable() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      connection.createStatement().executeUpdate("truncate table all_types");
+    }
+  }
+
   private void copyRandomRowsToPostgreSQL(int numRows) throws Exception {
     // Generate random rows and copy these into the all_types table in a local PostgreSQL database.
     ProcessBuilder builder = new ProcessBuilder();
@@ -974,5 +1102,289 @@ public class ITPsqlTest implements IntegrationTest {
     assertEquals("COPY " + numRows + "\n", output.toString());
     int res = process.waitFor();
     assertEquals(errors.toString(), 0, res);
+  }
+
+  @Test
+  public void testForeignDataWrapper() throws Exception {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          "-h",
+          POSTGRES_HOST,
+          "-p",
+          POSTGRES_PORT,
+          "-U",
+          POSTGRES_USER,
+          "-d",
+          POSTGRES_DATABASE
+        };
+    builder.command(psqlCommand);
+    setPgPassword(builder);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    String createForeignTablesCommand =
+        DEFAULT_DATA_MODEL.stream()
+            .map(s -> s.replace("create table ", "create foreign table f_"))
+            .map(s -> s.replace("primary key", ""))
+            .map(s -> s.replace("col_int int", "col_int bigint"))
+            .map(s -> s.replace("col_array_int int[]", "col_array_int bigint[]"))
+            .map(
+                s ->
+                    s
+                        + String.format(
+                            " server pgadapter options (table_name '%s');",
+                            s.substring(
+                                "create foreign table f_".length(),
+                                s.indexOf(' ', "create foreign table f_".length()))))
+            .collect(Collectors.joining("\n"));
+
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write("DROP EXTENSION IF EXISTS postgres_fdw CASCADE;\n");
+      writer.write("CREATE EXTENSION IF NOT EXISTS postgres_fdw;\n");
+      writer.write(
+          String.format(
+              "CREATE SERVER IF NOT EXISTS pgadapter FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s', options '-c spanner.read_only=true');\n",
+              (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost()),
+              testEnv.getPGAdapterPort(),
+              database.getId().getDatabase()));
+      writer.write(
+          String.format(
+              "CREATE USER MAPPING IF NOT EXISTS FOR %s SERVER pgadapter OPTIONS (user '%s', password_required 'false');\n",
+              POSTGRES_USER, POSTGRES_USER));
+      writer.write(
+          String.format("GRANT USAGE ON FOREIGN SERVER pgadapter TO %s;\n", POSTGRES_USER));
+      writer.write(createForeignTablesCommand);
+      writer.write("truncate table all_types;\n");
+      writer.write("\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertTrue(errors, "".equals(errors) || !errors.contains("ERROR:"));
+    assertEquals(
+        "DROP EXTENSION\n"
+            + "CREATE EXTENSION\n"
+            + "CREATE SERVER\n"
+            + "CREATE USER MAPPING\n"
+            + "GRANT\n"
+            + "CREATE FOREIGN TABLE\n"
+            + "CREATE FOREIGN TABLE\n"
+            + "TRUNCATE TABLE",
+        output);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    truncatePostgreSQLAllTypesTable();
+    // Generate 250 random rows.
+    int numRows = 250;
+    copyRandomRowsToPostgreSQL(numRows - 1);
+    // Also add one row with all nulls to ensure that nulls are also copied correctly.
+    long nullRowId = random.nextLong();
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("insert into all_types (col_bigint) values (?)")) {
+        preparedStatement.setLong(1, nullRowId);
+        assertEquals(1, preparedStatement.executeUpdate());
+      }
+    }
+
+    // Make sure the all_types table on Cloud Spanner is empty.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+    // COPY the rows to Cloud Spanner.
+    builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy all_types to stdout (format binary) \" "
+            + "  | psql "
+            + " -h "
+            + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+            + " -p "
+            + testEnv.getPGAdapterPort()
+            + " -d "
+            + database.getId().getDatabase()
+            + " -c \"copy all_types from stdin (format binary)"
+            + ";\"\n");
+    setPgPassword(builder);
+    process = builder.start();
+    res = process.waitFor();
+    assertEquals(0, res);
+
+    // Make sure we can access the data in Cloud Spanner through the foreign data wrapper.
+    int foundRows = 0;
+    int foundNullRows = 0;
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      connection
+          .createStatement()
+          .execute("set session characteristics as transaction isolation level serializable");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from f_all_types")) {
+        while (resultSet.next()) {
+          foundRows++;
+          if (resultSet.getLong(1) == nullRowId) {
+            foundNullRows++;
+          }
+          for (int col = 2; col <= resultSet.getMetaData().getColumnCount(); col++) {
+            if (resultSet.getLong(1) == nullRowId) {
+              assertNull(resultSet.getObject(col));
+            } else {
+              assertNotNull(resultSet.getObject(col));
+            }
+          }
+        }
+      }
+      assertEquals(numRows, foundRows);
+      assertEquals(1, foundNullRows);
+
+      // Also verify that we can use parameterized queries with the foreign table.
+      // These parameters are however converted to literals by the PostgreSQL Foreign Data Wrapper.
+      // That means that the queries that are executed on Cloud Spanner are always unparameterized.
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("select * from f_all_types where col_bigint=?")) {
+        preparedStatement.setLong(1, nullRowId);
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          for (int col = 2; col <= resultSet.getMetaData().getColumnCount(); col++) {
+            assertNull(resultSet.getObject(col));
+          }
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    // Create a user-defined function and use it on the data in Cloud Spanner.
+    builder = new ProcessBuilder();
+    builder.command(psqlCommand);
+    setPgPassword(builder);
+    process = builder.start();
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write("set session characteristics as transaction isolation level serializable;");
+      writer.write("DROP FUNCTION IF EXISTS date_timestamp_year_diff;\n");
+      writer.write(
+          "CREATE FUNCTION date_timestamp_year_diff(ts timestamptz, dt date) RETURNS integer AS $$\n"
+              + "    SELECT extract(year from ts) - extract(year from dt);\n"
+              + "$$ LANGUAGE SQL;\n");
+      writer.write(
+          "select date_timestamp_year_diff(col_timestamptz, col_date) as year_diff\n"
+              + "from f_all_types\n"
+              + "order by year_diff asc nulls first;\n");
+      writer.write("\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+    assertTrue(errors, "".equals(errors) || !errors.contains("ERROR:"));
+    assertTrue(
+        output,
+        output.startsWith(
+            "SET\n"
+                + "DROP FUNCTION\n"
+                + "CREATE FUNCTION\n"
+                + " year_diff \n"
+                + "-----------\n"
+                + "          \n"));
+    assertTrue(output, output.endsWith("(250 rows)\n"));
+    res = process.waitFor();
+    assertEquals(0, res);
+  }
+
+  @Test
+  public void testPgDump_PgRestore() throws Exception {
+    createDumpDatabase();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] command = new String[] {"./run-pg-dump.sh"};
+
+    builder.directory(new File("./local-postgresql-copy"));
+    builder.environment().put("PGADAPTER_HOST", "localhost");
+    builder.environment().put("PGADAPTER_PORT", String.valueOf(testEnv.getPGAdapterPort()));
+    builder.environment().put("SPANNER_DATABASE", database.getId().getDatabase());
+
+    builder.environment().put("POSTGRES_HOST", POSTGRES_HOST);
+    builder.environment().put("POSTGRES_PORT", POSTGRES_PORT);
+    builder.environment().put("POSTGRES_USER", POSTGRES_USER);
+    builder.environment().put("POSTGRES_DB", POSTGRES_DATABASE + "_dump");
+    if (POSTGRES_PASSWORD != null) {
+      builder.environment().put("POSTGRES_PASSWORD", POSTGRES_PASSWORD);
+    }
+    builder.command(command);
+    Process process = builder.start();
+    String errors;
+    String output;
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write("Y\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+    assertEquals(errors, 0, process.waitFor());
+    assertTrue(output, output.contains("Finished running pg_dump"));
+  }
+
+  private void createDumpDatabase() throws Exception {
+    String[] createDatabaseCommand =
+        new String[] {
+          "psql",
+          "-h",
+          POSTGRES_HOST,
+          "-p",
+          POSTGRES_PORT,
+          "-U",
+          POSTGRES_USER,
+          "-d",
+          POSTGRES_DATABASE
+        };
+    ProcessBuilder builder = new ProcessBuilder().command(createDatabaseCommand);
+    setPgPassword(builder);
+    Process process = builder.start();
+
+    String errors;
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write(
+          "SELECT 'CREATE DATABASE \""
+              + POSTGRES_DATABASE
+              + "_dump\"'\n"
+              + "WHERE NOT EXISTS ("
+              + "SELECT "
+              + "FROM pg_database "
+              + "WHERE datname = '"
+              + POSTGRES_DATABASE
+              + "_dump') \\gexec\n");
+      writer.write("\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+    }
+    int res = process.waitFor();
+    assertEquals(errors, 0, res);
   }
 }

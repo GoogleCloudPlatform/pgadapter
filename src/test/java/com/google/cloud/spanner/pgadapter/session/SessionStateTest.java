@@ -35,6 +35,7 @@ import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import org.junit.Test;
@@ -161,7 +162,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(358, allSettings.size());
+    assertEquals(360, allSettings.size());
   }
 
   @Test
@@ -199,7 +200,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(360, allSettings.size());
+    assertEquals(362, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -467,7 +468,8 @@ public class SessionStateTest {
     PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("select * from pg_settings");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         "with " + getDefaultSessionStateExpression() + "\n" + statement.getSql(),
@@ -484,7 +486,8 @@ public class SessionStateTest {
             .to("some-name")
             .build();
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         Statement.newBuilder(
@@ -501,7 +504,8 @@ public class SessionStateTest {
     PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("select * from some_table");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertSame(statement, withSessionState);
   }
@@ -512,7 +516,8 @@ public class SessionStateTest {
     PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("/* This comment is preserved */ select * from pg_settings");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         "with " + getDefaultSessionStateExpression() + "\n" + statement.getSql(),
@@ -527,7 +532,8 @@ public class SessionStateTest {
         Statement.of(
             "with my_cte as (select col1, col2 from foo) select * from pg_settings inner join my_cte on my_cte.col1=pg_settings.name");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         "with "
@@ -544,7 +550,8 @@ public class SessionStateTest {
         Statement.of(
             "/* This comment is preserved */ with foo as (select * from bar)\nselect * from pg_settings");
 
-    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+    Statement withSessionState =
+        pgCatalog.replacePgCatalogTables(statement, statement.getSql().toLowerCase(Locale.ENGLISH));
 
     assertEquals(
         "with "
@@ -714,6 +721,76 @@ public class SessionStateTest {
     state.set("spanner", "replace_pg_catalog_tables", null);
 
     assertFalse(state.isReplacePgCatalogTables());
+  }
+
+  @Test
+  public void testIsEmulatePgClassTables_resetVal() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    PGSetting setting =
+        new PGSetting(
+            "spanner",
+            "emulate_pg_class_tables",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            /* resetVal = */ "off",
+            null,
+            null,
+            false);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of("spanner.emulate_pg_class_tables", setting), optionsMetadata);
+    state.set("spanner", "emulate_pg_class_tables", null);
+
+    assertFalse(state.isEmulatePgClassTables());
+  }
+
+  @Test
+  public void testIsEmulatePgClassTables_bootVal() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    PGSetting setting =
+        new PGSetting(
+            "spanner",
+            "emulate_pg_class_tables",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            /* bootVal = */ "off",
+            null,
+            null,
+            null,
+            false);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of("spanner.emulate_pg_class_tables", setting), optionsMetadata);
+    state.set("spanner", "emulate_pg_class_tables", null);
+
+    assertFalse(state.isEmulatePgClassTables());
+  }
+
+  @Test
+  public void testIsEmulatePgClassTables_NoValue() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+    state.getSettings().clear();
+    assertFalse(state.isEmulatePgClassTables());
   }
 
   @Test

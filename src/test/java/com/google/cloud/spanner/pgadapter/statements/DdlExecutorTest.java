@@ -16,13 +16,16 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.DdlExecutor.unquoteIdentifier;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
-import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.RegexQueryPartReplacer;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableList;
+import java.util.regex.Pattern;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -53,348 +56,9 @@ public class DdlExecutorTest {
   }
 
   @Test
-  public void testTranslateCreateTableNotExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean tableExists(TableOrIndexName name) {
-            return false;
-          }
-        };
-
-    assertEquals(
-        Statement.of("create table foo (id int)"),
-        translate("create table foo (id int)", executor));
-    assertEquals(
-        Statement.of("create table foo(id int)"), translate("create table foo(id int)", executor));
-    assertEquals(
-        Statement.of("create table \"Foo\" (id int)"),
-        translate("create table \"Foo\" (id int)", executor));
-    assertEquals(
-        Statement.of("create table s.foo (id int)"),
-        translate("create table s.foo (id int)", executor));
-    assertEquals(
-        Statement.of("create table s.\"Foo\" (id int)"),
-        translate("create table s.\"Foo\" (id int)", executor));
-    assertEquals(
-        Statement.of("create table \"s\".\"Foo\" (id int)"),
-        translate("create table \"s\".\"Foo\" (id int)", executor));
-    assertEquals(Statement.of("create table"), translate("create table", executor));
-    assertEquals(Statement.of("create table "), translate("create table ", executor));
-
-    assertEquals(
-        Statement.of("create table foo (id int)"),
-        translate("create table if not exists foo (id int)", executor));
-    assertEquals(
-        Statement.of("create table \"Foo\" (id int)"),
-        translate("create table if not exists \"Foo\" (id int)", executor));
-    assertEquals(
-        Statement.of("create table s.foo (id int)"),
-        translate("create table if not exists s.foo (id int)", executor));
-    assertEquals(
-        Statement.of("create table s.\"Foo\" (id int)"),
-        translate("create table if not exists s.\"Foo\" (id int)", executor));
-    assertEquals(
-        Statement.of("create table \"s\".\"Foo\" (id int)"),
-        translate("create table if not exists \"s\".\"Foo\" (id int)", executor));
-    assertEquals(
-        Statement.of("create table if not exists"),
-        translate("create table if not exists", executor));
-  }
-
-  @Test
-  public void testTranslateCreateTableExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean tableExists(TableOrIndexName name) {
-            return true;
-          }
-        };
-
-    assertEquals(
-        Statement.of("create table foo (id int)"),
-        translate("create table foo (id int)", executor));
-    assertEquals(
-        Statement.of("create table \"Foo\" (id int)"),
-        translate("create table \"Foo\" (id int)", executor));
-    assertEquals(
-        Statement.of("create table s.foo (id int)"),
-        translate("create table s.foo (id int)", executor));
-    assertEquals(
-        Statement.of("create table \"S\".\"Foo\" (id int)"),
-        translate("create table \"S\".\"Foo\" (id int)", executor));
-    assertEquals(Statement.of("create table"), translate("create table", executor));
-
-    assertNull(translate("create table if not exists foo (id int)", executor));
-    assertNull(translate("create table if not exists \"Foo\" (id int)", executor));
-    assertNull(translate("create table if not exists s.foo (id int)", executor));
-    assertNull(translate("create table if not exists \"S\".\"Foo\" (id int)", executor));
-    assertEquals(
-        Statement.of("create table if not exists"),
-        translate("create table if not exists", executor));
-  }
-
-  @Test
-  public void testTranslateCreateIndexNotExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean indexExists(TableOrIndexName name) {
-            return false;
-          }
-        };
-
-    assertEquals(
-        Statement.of("create index foo on bar(id)"),
-        translate("create index foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index \"Foo\" on bar(id)"),
-        translate("create index \"Foo\" on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index s.foo on bar(id)"),
-        translate("create index s.foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index \"s\".\"Foo\" on bar(id)"),
-        translate("create index \"s\".\"Foo\" on bar(id)", executor));
-    assertEquals(Statement.of("create index"), translate("create index", executor));
-    assertEquals(Statement.of("create index "), translate("create index ", executor));
-
-    assertEquals(
-        Statement.of("create index foo on bar(id)"),
-        translate("create index if not exists foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index \"Foo\" on bar(id)"),
-        translate("create index if not exists \"Foo\" on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index s.foo on bar(id)"),
-        translate("create index if not exists s.foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index \"s\".\"Foo\" on bar(id)"),
-        translate("create index if not exists \"s\".\"Foo\" on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index if not exists"),
-        translate("create index if not exists", executor));
-  }
-
-  @Test
-  public void testTranslateCreateIndexExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean indexExists(TableOrIndexName name) {
-            return true;
-          }
-        };
-
-    assertEquals(
-        Statement.of("create index foo on bar(id)"),
-        translate("create index foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index \"Foo\" on bar(id)"),
-        translate("create index \"Foo\" on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index s.foo on bar(id)"),
-        translate("create index s.foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create index \"s\".\"Foo\" on bar(id)"),
-        translate("create index \"s\".\"Foo\" on bar(id)", executor));
-    assertEquals(Statement.of("create index"), translate("create index", executor));
-
-    assertNull(translate("create index if not exists foo on bar(id int)", executor));
-    assertNull(translate("create index if not exists \"Foo\" on bar(id int)", executor));
-    assertNull(translate("create index if not exists s.foo on bar(id int)", executor));
-    assertNull(translate("create index if not exists \"s\".\"Foo\" on bar(id int)", executor));
-    assertEquals(
-        Statement.of("create index if not exists"),
-        translate("create index if not exists", executor));
-  }
-
-  @Test
-  public void testTranslateCreateUniqueIndexNotExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean indexExists(TableOrIndexName name) {
-            return false;
-          }
-        };
-
-    assertEquals(
-        Statement.of("create unique index foo on bar(id)"),
-        translate("create unique index foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index \"Foo\" on bar(id)"),
-        translate("create unique index \"Foo\" on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index s.foo on bar(id)"),
-        translate("create unique index s.foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index \"s\".\"Foo\" on bar(id)"),
-        translate("create unique index \"s\".\"Foo\" on bar(id)", executor));
-    assertEquals(Statement.of("create unique index"), translate("create unique index", executor));
-    assertEquals(Statement.of("create unique index "), translate("create unique index ", executor));
-
-    assertEquals(
-        Statement.of("create unique index foo on bar(id)"),
-        translate("create unique index if not exists foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index \"Foo\" on bar(id)"),
-        translate("create unique index if not exists \"Foo\" on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index s.foo on bar(id)"),
-        translate("create unique index if not exists s.foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index \"s\".\"Foo\" on bar(id)"),
-        translate("create unique index if not exists \"s\".\"Foo\" on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index if not exists"),
-        translate("create unique index if not exists", executor));
-  }
-
-  @Test
-  public void testTranslateCreateUniqueIndexExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean indexExists(TableOrIndexName name) {
-            return true;
-          }
-        };
-
-    assertEquals(
-        Statement.of("create unique index foo on bar(id)"),
-        translate("create unique index foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index \"Foo\" on bar(id)"),
-        translate("create unique index \"Foo\" on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index s.foo on bar(id)"),
-        translate("create unique index s.foo on bar(id)", executor));
-    assertEquals(
-        Statement.of("create unique index \"s\".\"Foo\" on bar(id)"),
-        translate("create unique index \"s\".\"Foo\" on bar(id)", executor));
-    assertEquals(Statement.of("create unique index"), translate("create unique index", executor));
-
-    assertNull(translate("create unique index if not exists foo on bar(id int)", executor));
-    assertNull(translate("create unique index if not exists \"Foo\" on bar(id int)", executor));
-    assertNull(translate("create unique index if not exists s.foo on bar(id int)", executor));
-    assertNull(
-        translate("create unique index if not exists \"s\".\"Foo\" on bar(id int)", executor));
-    assertEquals(
-        Statement.of("create unique index if not exists"),
-        translate("create unique index if not exists", executor));
-  }
-
-  @Test
-  public void testTranslateDropTableNotExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean tableExists(TableOrIndexName name) {
-            return false;
-          }
-        };
-
-    assertEquals(Statement.of("drop table foo"), translate("drop table foo", executor));
-    assertEquals(Statement.of("drop table \"Foo\""), translate("drop table \"Foo\"", executor));
-    assertEquals(Statement.of("drop table s.foo"), translate("drop table s.foo", executor));
-    assertEquals(
-        Statement.of("drop table \"s\".\"Foo\""), translate("drop table \"s\".\"Foo\"", executor));
-    assertEquals(Statement.of("drop table"), translate("drop table", executor));
-    assertEquals(Statement.of("drop table "), translate("drop table ", executor));
-
-    assertNull(translate("drop table if exists foo", executor));
-    assertNull(translate("drop table if exists \"Foo\"", executor));
-    assertNull(translate("drop table if exists sfoo", executor));
-    assertNull(translate("drop table if exists \"s\".\"Foo\"", executor));
-    assertEquals(Statement.of("drop table if exists"), translate("drop table if exists", executor));
-  }
-
-  @Test
-  public void testTranslateDropTableExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean tableExists(TableOrIndexName name) {
-            return true;
-          }
-        };
-
-    assertEquals(Statement.of("drop table foo"), translate("drop table foo", executor));
-    assertEquals(Statement.of("drop table \"Foo\""), translate("drop table \"Foo\"", executor));
-    assertEquals(Statement.of("drop table s.foo"), translate("drop table s.foo", executor));
-    assertEquals(
-        Statement.of("drop table \"s\".\"Foo\""), translate("drop table \"s\".\"Foo\"", executor));
-    assertEquals(Statement.of("drop table"), translate("drop table", executor));
-
-    assertEquals(Statement.of("drop table foo"), translate("drop table if exists foo", executor));
-    assertEquals(
-        Statement.of("drop table \"Foo\""), translate("drop table if exists \"Foo\"", executor));
-    assertEquals(
-        Statement.of("drop table s.foo"), translate("drop table if exists s.foo", executor));
-    assertEquals(
-        Statement.of("drop table \"s\".\"Foo\""),
-        translate("drop table if exists \"s\".\"Foo\"", executor));
-    assertEquals(Statement.of("drop table if exists"), translate("drop table if exists", executor));
-  }
-
-  @Test
-  public void testTranslateDropIndexNotExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean indexExists(TableOrIndexName name) {
-            return false;
-          }
-        };
-
-    assertEquals(Statement.of("drop index foo"), translate("drop index foo", executor));
-    assertEquals(Statement.of("drop index \"Foo\""), translate("drop index \"Foo\"", executor));
-    assertEquals(Statement.of("drop index s.foo"), translate("drop index s.foo", executor));
-    assertEquals(
-        Statement.of("drop index \"s\".\"Foo\""), translate("drop index \"s\".\"Foo\"", executor));
-    assertEquals(Statement.of("drop index"), translate("drop index", executor));
-    assertEquals(Statement.of("drop index "), translate("drop index ", executor));
-
-    assertNull(translate("drop index if exists foo", executor));
-    assertNull(translate("drop index if exists \"Foo\"", executor));
-    assertNull(translate("drop index if exists s.foo", executor));
-    assertNull(translate("drop index if exists \"s\".\"Foo\"", executor));
-    assertEquals(Statement.of("drop index if exists"), translate("drop index if exists", executor));
-  }
-
-  @Test
-  public void testTranslateDropIndexExists() {
-    DdlExecutor executor =
-        new DdlExecutor(mock(BackendConnection.class)) {
-          @Override
-          boolean indexExists(TableOrIndexName name) {
-            return true;
-          }
-        };
-
-    assertEquals(Statement.of("drop index foo"), translate("drop index foo", executor));
-    assertEquals(Statement.of("drop index \"Foo\""), translate("drop index \"Foo\"", executor));
-    assertEquals(Statement.of("drop index s.foo"), translate("drop index s.foo", executor));
-    assertEquals(
-        Statement.of("drop index \"s\".\"Foo\""), translate("drop index \"s\".\"Foo\"", executor));
-    assertEquals(Statement.of("drop index"), translate("drop index", executor));
-
-    assertEquals(Statement.of("drop index foo"), translate("drop index if exists foo", executor));
-    assertEquals(
-        Statement.of("drop index \"Foo\""), translate("drop index if exists \"Foo\"", executor));
-    assertEquals(
-        Statement.of("drop index s.foo"), translate("drop index if exists s.foo", executor));
-    assertEquals(
-        Statement.of("drop index \"s\".\"Foo\""),
-        translate("drop index if exists \"s\".\"Foo\"", executor));
-    assertEquals(Statement.of("drop index if exists"), translate("drop index if exists", executor));
-  }
-
-  @Test
   public void testMaybeRemovePrimaryKeyConstraintName() {
-    DdlExecutor ddlExecutor = new DdlExecutor(mock(BackendConnection.class));
+    DdlExecutor ddlExecutor =
+        new DdlExecutor(mock(BackendConnection.class), Suppliers.ofInstance(ImmutableList.of()));
 
     assertEquals(
         Statement.of("create table foo (id bigint primary key, value text)"),
@@ -448,5 +112,44 @@ public class DdlExecutorTest {
         ddlExecutor.maybeRemovePrimaryKeyConstraintName(
             Statement.of(
                 "CREATE TABLE \"user\" (\"id\" integer NOT NULL, \"firstName\" character varying NOT NULL, \"lastName\" character varying NOT NULL, \"age\" integer NOT NULL, CONSTRAINT \"PK_user\" PRIMARY KEY (\"id\"))")));
+  }
+
+  @Test
+  public void testDdlReplacements() {
+    DdlExecutor ddlExecutorWithoutReplacements =
+        new DdlExecutor(mock(BackendConnection.class), Suppliers.ofInstance(ImmutableList.of()));
+    String sql = "create table my_table (id bigint primary key, value varchar)";
+    assertSame(sql, ddlExecutorWithoutReplacements.applyReplacers(sql));
+
+    DdlExecutor ddlExecutorWithReplacements =
+        new DdlExecutor(
+            mock(BackendConnection.class),
+            Suppliers.ofInstance(
+                ImmutableList.of(
+                    RegexQueryPartReplacer.replace(Pattern.compile("timestamp"), "timestamptz"),
+                    RegexQueryPartReplacer.replaceAndStop(
+                        Pattern.compile(
+                            "create table databasechangelog \\(id bigint primary key\\)"),
+                        "create table databasechangelog_replaced (id bigint primary key)"),
+                    RegexQueryPartReplacer.replace(
+                        Pattern.compile("create table databasechangelog_replaced"),
+                        "create table databasechangelog_reverted"))));
+    assertSame(sql, ddlExecutorWithReplacements.applyReplacers(sql));
+    assertEquals(
+        "create table my_table (id bigint primary key, value timestamptz)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table my_table (id bigint primary key, value timestamp)"));
+    assertEquals(
+        "create table databasechangelog_replaced (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog (id bigint primary key)"));
+    assertEquals(
+        "create table databasechangelog_replaced (id bigint primary key); create table databasechangelog_replaced (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog (id bigint primary key); create table databasechangelog (id bigint primary key)"));
+    assertEquals(
+        "create table databasechangelog_reverted (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog_replaced (id bigint primary key)"));
   }
 }

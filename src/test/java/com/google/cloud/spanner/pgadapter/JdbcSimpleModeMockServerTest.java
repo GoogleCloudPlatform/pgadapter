@@ -44,7 +44,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Collections;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
@@ -70,7 +69,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(null, Collections.emptyList());
+    doStartMockSpannerAndPgAdapterServers(null, builder -> {});
   }
 
   @Parameter public boolean useDomainSocket;

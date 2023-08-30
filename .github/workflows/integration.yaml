@@ -44,7 +44,7 @@ jobs:
     services:
       # Container label
       postgres:
-        image: postgres
+        image: postgres:14
         env:
           POSTGRES_PASSWORD: postgres
         # Set health checks to wait until postgres has started
@@ -52,6 +52,7 @@ jobs:
           - 5432:5432
         volumes:
           - /pg:/var/run/postgresql
+          - /tmp:/tmp
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -88,10 +89,14 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
       - name: Setup psql
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends postgresql-client
+          sudo apt-get install --yes --no-install-recommends postgresql-client-14
       - name: Create PostgreSQL test database
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"

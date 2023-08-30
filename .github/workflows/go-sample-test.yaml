@@ -1,0 +1,49 @@
+on:
+  push:
+    branches:
+      - postgresql-dialect
+  pull_request:
+name: go-sample-test
+env:
+  GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
+  GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
+  GOOGLE_CLOUD_DATABASE: "testdb_integration"
+  GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
+jobs:
+  check-env:
+    outputs:
+      has-key: ${{ steps.project-id.outputs.defined }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: project-id
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        if: "${{ env.GCP_PROJECT_ID != '' }}"
+        run: echo "::set-output name=defined::true"
+  sample-test:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: zulu
+          java-version: 11
+      - run: java -version
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '^1.20.0'
+      - name: Setup GCloud
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
+          export_default_credentials: true
+      - run: go version
+      - name: Run Go wrapper tests
+        working-directory: ./wrappers/golang
+        run: go test

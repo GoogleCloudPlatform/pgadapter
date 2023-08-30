@@ -4,6 +4,9 @@ PGAdapter can be used in combination with Hibernate, but with a number of limita
 shows the command line arguments and configuration that is needed in order to use Hibernate with
 PGAdapter.
 
+> __Note__: This sample uses Hibernate directly. There is also a sample for using [Spring Data JPA
+with PGAdapter here](../spring-data-jpa).
+
 ## Start PGAdapter
 You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
 pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
@@ -69,8 +72,8 @@ The following limitations are currently known:
 
 
 ### Schema Updates
-Schema updates are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect. It is recommended to
-create the schema manually. Note that PGAdapter does support `create table if not exists` / `drop table if exists`.
+Schema updates are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect.
+It is recommended to create the schema manually.
 See [sample-schema.sql](src/main/resources/sample-schema-sql) for the data model for this example.
 
 ### Generated Primary Keys

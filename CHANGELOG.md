@@ -1,5 +1,116 @@
 # Changelog
 
+## [0.23.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.22.1...v0.23.0) (2023-08-10)
+
+
+### Features
+
+* add Go wrapper for PGAdapter ([#926](https://github.com/GoogleCloudPlatform/pgadapter/issues/926)) ([5bb71b0](https://github.com/GoogleCloudPlatform/pgadapter/commit/5bb71b038325426ac520ee89dae4ae66dba1b305))
+* create options builder ([#917](https://github.com/GoogleCloudPlatform/pgadapter/issues/917)) ([3ceec38](https://github.com/GoogleCloudPlatform/pgadapter/commit/3ceec3827768f9a7637e1b9e2c3eeb8906e57e60))
+
+
+### Documentation
+
+* Cloud Run sidecar with .NET sample app ([#965](https://github.com/GoogleCloudPlatform/pgadapter/issues/965)) ([bae6f23](https://github.com/GoogleCloudPlatform/pgadapter/commit/bae6f23b8862929b14b0abfc98f2e6c2f1f8305a))
+* Cloud Run sidecar with Go sample app ([#962](https://github.com/GoogleCloudPlatform/pgadapter/issues/962)) ([03fdbf1](https://github.com/GoogleCloudPlatform/pgadapter/commit/03fdbf172401616401c8de5db5a84910b4b1abdf))
+* Cloud Run sidecar with Java app sample ([#959](https://github.com/GoogleCloudPlatform/pgadapter/issues/959)) ([e6603ef](https://github.com/GoogleCloudPlatform/pgadapter/commit/e6603ef73a734ebfdd08a52c11cf3264e645a3f8))
+* Cloud Run sidecar with Node.js sample app ([#963](https://github.com/GoogleCloudPlatform/pgadapter/issues/963)) ([dd2d420](https://github.com/GoogleCloudPlatform/pgadapter/commit/dd2d4208e5c77ee740378e976284a048465e6003))
+* Cloud Run sidecar with Python sample app ([#964](https://github.com/GoogleCloudPlatform/pgadapter/issues/964)) ([81d0d36](https://github.com/GoogleCloudPlatform/pgadapter/commit/81d0d360d03a597ff7242ce7254013180160d2b3))
+* Cloud Run sidecar with Ruby sample app ([#966](https://github.com/GoogleCloudPlatform/pgadapter/issues/966)) ([e9914b3](https://github.com/GoogleCloudPlatform/pgadapter/commit/e9914b39951b4b579853c9a884f758598bcd27c7))
+* create generic cloud-run sidecar sample ([#973](https://github.com/GoogleCloudPlatform/pgadapter/issues/973)) ([00ce9b5](https://github.com/GoogleCloudPlatform/pgadapter/commit/00ce9b5d3dd9bb5d7792f6cd03294c518cece232))
+
+
+### Dependencies
+
+* bump Spanner to 6.45.0 ([#974](https://github.com/GoogleCloudPlatform/pgadapter/issues/974)) ([f39d70f](https://github.com/GoogleCloudPlatform/pgadapter/commit/f39d70fd614a776196f0ecc2ecfe485e39bb4111))
+* update dependabot config ([#938](https://github.com/GoogleCloudPlatform/pgadapter/issues/938)) ([16adeab](https://github.com/GoogleCloudPlatform/pgadapter/commit/16adeab4f521f05f4a2524e774f008234f0a4cb1))
+
+## [0.22.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.22.0...v0.22.1) (2023-07-03)
+
+
+### Documentation
+
+* add sample for Spring Data JPA ([#892](https://github.com/GoogleCloudPlatform/pgadapter/issues/892)) ([abb7f12](https://github.com/GoogleCloudPlatform/pgadapter/commit/abb7f12e233c561a01af8ef075fcad699d279215))
+* document mysql import steps ([#872](https://github.com/GoogleCloudPlatform/pgadapter/issues/872)) ([5088c64](https://github.com/GoogleCloudPlatform/pgadapter/commit/5088c64e76027466493fa0f43be4d67495226292))
+* emphasize running PGAdapter in-process ([#913](https://github.com/GoogleCloudPlatform/pgadapter/issues/913)) ([fea8f3f](https://github.com/GoogleCloudPlatform/pgadapter/commit/fea8f3f3650fc1084201a0aecc6cc82b6b516d70))
+
+## [0.22.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.21.0...v0.22.0) (2023-07-01)
+
+
+### Features
+
+* create local PostgreSQL copy and support pg_dump and pg_restore ([#878](https://github.com/GoogleCloudPlatform/pgadapter/issues/878)) ([ff0d5ea](https://github.com/GoogleCloudPlatform/pgadapter/commit/ff0d5ea6507408b8443395b82f2a8729e6c4cec0))
+* replace 'for update' clauses with LOCK_SCANNED_RANGES=exclusive hint ([#699](https://github.com/GoogleCloudPlatform/pgadapter/issues/699)) ([08b567c](https://github.com/GoogleCloudPlatform/pgadapter/commit/08b567c8c4163c8c72342c4ff2b1f92b5076a0fc))
+* support replacement of DDL statements ([#893](https://github.com/GoogleCloudPlatform/pgadapter/issues/893)) ([7880f1f](https://github.com/GoogleCloudPlatform/pgadapter/commit/7880f1fef8629c532a2726b70a755e1e753c712b))
+
+
+### Bug Fixes
+
+* remove invalid BootstrapMessage length check ([#910](https://github.com/GoogleCloudPlatform/pgadapter/issues/910)) ([be431a8](https://github.com/GoogleCloudPlatform/pgadapter/commit/be431a8b453f7731522d42e0b775ffbdba2f5346))
+
+
+### Dependencies
+
+* bump Spanner client to 6.43.0 ([#875](https://github.com/GoogleCloudPlatform/pgadapter/issues/875)) ([08fa0ad](https://github.com/GoogleCloudPlatform/pgadapter/commit/08fa0adff4fb0abffb383ea4602842ac044cee2f))
+
+
+### Documentation
+
+* add Cloud Run sample for Java ([#883](https://github.com/GoogleCloudPlatform/pgadapter/issues/883)) ([ddbba41](https://github.com/GoogleCloudPlatform/pgadapter/commit/ddbba4114aa84739106bda0b5f260b6ab32c55ce))
+* add Cloud Run sample for Python ([#884](https://github.com/GoogleCloudPlatform/pgadapter/issues/884)) ([576a56a](https://github.com/GoogleCloudPlatform/pgadapter/commit/576a56ae5113514a56681abaac2acb6a8f4f1c57))
+* add sample for Node.js with Cloud Run ([#885](https://github.com/GoogleCloudPlatform/pgadapter/issues/885)) ([7b03c4e](https://github.com/GoogleCloudPlatform/pgadapter/commit/7b03c4ed512e4ef173c3e4f6750d496f5d5e9c24))
+* Go sample equal to the other samples ([#886](https://github.com/GoogleCloudPlatform/pgadapter/issues/886)) ([f7ef506](https://github.com/GoogleCloudPlatform/pgadapter/commit/f7ef5060a6aebf0d1ede1d9da26b3ff036c3f45b))
+* update IntelliJ example to allow all databases ([#890](https://github.com/GoogleCloudPlatform/pgadapter/issues/890)) ([62afdf9](https://github.com/GoogleCloudPlatform/pgadapter/commit/62afdf9f479b08b12c2df528480995b6e088bfee))
+
+## [0.21.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.20.0...v0.21.0) (2023-06-07)
+
+
+### Features
+
+* support cursors and foreign data wrapper ([#797](https://github.com/GoogleCloudPlatform/pgadapter/issues/797)) ([5ee2200](https://github.com/GoogleCloudPlatform/pgadapter/commit/5ee220070257f8abf1106caf1fde1bd779ed25ec))
+* support setting the well-known client ([#837](https://github.com/GoogleCloudPlatform/pgadapter/issues/837)) ([045156c](https://github.com/GoogleCloudPlatform/pgadapter/commit/045156cda729975f34c63a084c606470903850ef))
+
+
+### Documentation
+
+* document how to connect to IntelliJ ([#870](https://github.com/GoogleCloudPlatform/pgadapter/issues/870)) ([35ec68f](https://github.com/GoogleCloudPlatform/pgadapter/commit/35ec68f78598ce45246ffbaa9092caac58070bb3))
+
+## [0.20.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.19.1...v0.20.0) (2023-05-26)
+
+
+### Features
+
+* add support for Ruby ActiveRecord ([#749](https://github.com/GoogleCloudPlatform/pgadapter/issues/749)) ([442e45c](https://github.com/GoogleCloudPlatform/pgadapter/commit/442e45ceef9e8ac9d834126a3f90d03b75b6821a))
+* detect relation not found errors ([#834](https://github.com/GoogleCloudPlatform/pgadapter/issues/834)) ([8d21df7](https://github.com/GoogleCloudPlatform/pgadapter/commit/8d21df7e427fbbbff75ab71cac04adb339eba49e))
+
+
+### Bug Fixes
+
+* latency benchmark should use random local port ([#843](https://github.com/GoogleCloudPlatform/pgadapter/issues/843)) ([e15711f](https://github.com/GoogleCloudPlatform/pgadapter/commit/e15711f4ef0c80c391b4df70abb349029e6c80cc))
+
+## [0.19.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.19.0...v0.19.1) (2023-05-17)
+
+
+### Performance Improvements
+
+* add latency comparision test ([#790](https://github.com/GoogleCloudPlatform/pgadapter/issues/790)) ([9be6b09](https://github.com/GoogleCloudPlatform/pgadapter/commit/9be6b09d5e156d7f916d25467ca679e028aa19d1))
+* bundle Ready response with the rest ([#806](https://github.com/GoogleCloudPlatform/pgadapter/issues/806)) ([af98023](https://github.com/GoogleCloudPlatform/pgadapter/commit/af98023a7363d6a2bb2bfb356b747f3ed8499e0e))
+
+## [0.19.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.4...v0.19.0) (2023-05-05)
+
+
+### Features
+
+* automatically add LIMIT clause ([#792](https://github.com/GoogleCloudPlatform/pgadapter/issues/792)) ([c382392](https://github.com/GoogleCloudPlatform/pgadapter/commit/c38239213dabab0c17cd1b1ffedfe033607cbcbc))
+* emulate pg_class and related tables ([#766](https://github.com/GoogleCloudPlatform/pgadapter/issues/766)) ([e602750](https://github.com/GoogleCloudPlatform/pgadapter/commit/e60275074ca7de8e88d63c6aa7465d90780b9a59))
+* support savepoints ([#796](https://github.com/GoogleCloudPlatform/pgadapter/issues/796)) ([570fb96](https://github.com/GoogleCloudPlatform/pgadapter/commit/570fb96b4b42e903000e4e5efd3428bfca90f57d))
+
+
+### Documentation
+
+* add sample for Cloud Run ([#770](https://github.com/GoogleCloudPlatform/pgadapter/issues/770)) ([751030d](https://github.com/GoogleCloudPlatform/pgadapter/commit/751030db44797ab5a006b6b0ffadc34d66bb16c3))
+* document psycopg3 and SQLAlchemy 2.x support ([#801](https://github.com/GoogleCloudPlatform/pgadapter/issues/801)) ([fe73c63](https://github.com/GoogleCloudPlatform/pgadapter/commit/fe73c6353cfa539e5f73945fa74e0d9df5d5b02e))
+
 ## [0.18.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.3...v0.18.4) (2023-04-15)
 
 

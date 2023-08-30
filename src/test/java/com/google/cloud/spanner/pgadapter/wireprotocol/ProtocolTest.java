@@ -21,6 +21,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -156,7 +157,6 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
-    when(backendConnection.getConnectionState()).thenReturn(ConnectionState.IDLE);
     when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1098,13 +1098,15 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
-    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.IDLE);
 
     WireMessage message = ControlMessage.create(connectionHandler);
@@ -1131,13 +1133,15 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
-    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.TRANSACTION);
 
     WireMessage message = ControlMessage.create(connectionHandler);
@@ -1175,7 +1179,7 @@ public class ProtocolTest {
     message.send();
 
     verify(extendedQueryProtocolHandler).flush();
-    verify(extendedQueryProtocolHandler, never()).sync();
+    verify(extendedQueryProtocolHandler, never()).sync(anyBoolean());
   }
 
   @Test
@@ -1201,7 +1205,7 @@ public class ProtocolTest {
     message.send();
 
     verify(extendedQueryProtocolHandler).flush();
-    verify(extendedQueryProtocolHandler, never()).sync();
+    verify(extendedQueryProtocolHandler, never()).sync(anyBoolean());
   }
 
   @Test

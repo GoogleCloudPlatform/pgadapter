@@ -34,6 +34,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.connection.SavepointSupport;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -199,6 +200,14 @@ public class ConnectionHandler extends Thread {
     if (credentials != null) {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
+    } else if (options.getCredentials() != null) {
+      connectionOptionsBuilder =
+          ConnectionOptionsHelper.setCredentials(
+              connectionOptionsBuilder, options.getCredentials());
+    }
+    if (options.getSessionPoolOptions() != null) {
+      connectionOptionsBuilder =
+          connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
     }
     ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
     Connection spannerConnection = connectionOptions.getConnection();
@@ -240,6 +249,7 @@ public class ConnectionHandler extends Thread {
       spannerConnection.close();
       throw e;
     }
+    spannerConnection.setSavepointSupport(SavepointSupport.ENABLED);
     this.spannerConnection = spannerConnection;
     this.databaseId = connectionOptions.getDatabaseId();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
@@ -446,6 +456,7 @@ public class ConnectionHandler extends Thread {
   public void handleTerminate() {
     synchronized (this) {
       closeAllPortals();
+      closeAllStatements();
       if (this.spannerConnection != null) {
         this.spannerConnection.close();
       }
@@ -508,7 +519,7 @@ public class ConnectionHandler extends Thread {
   }
 
   /** Closes all named and unnamed portals on this connection. */
-  private void closeAllPortals() {
+  public void closeAllPortals() {
     for (IntermediatePortalStatement statement : portalsMap.values()) {
       try {
         statement.close();
@@ -518,12 +529,12 @@ public class ConnectionHandler extends Thread {
       }
     }
     this.portalsMap.clear();
-    this.statementsMap.clear();
   }
 
   public IntermediatePortalStatement getPortal(String portalName) {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered portal: " + portalName);
+      throw PGExceptionFactory.newPGException(
+          "unrecognized portal name: " + portalName, SQLState.InvalidCursorName);
     }
     return this.portalsMap.get(portalName);
   }
@@ -534,9 +545,10 @@ public class ConnectionHandler extends Thread {
 
   public void closePortal(String portalName) throws Exception {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered portal: " + portalName);
+      throw PGExceptionFactory.newPGException(
+          "unrecognized portal name: " + portalName, SQLState.InvalidCursorName);
     }
-    IntermediatePortalStatement portal = this.portalsMap.get(portalName);
+    IntermediatePortalStatement portal = this.portalsMap.remove(portalName);
     portal.close();
   }
 

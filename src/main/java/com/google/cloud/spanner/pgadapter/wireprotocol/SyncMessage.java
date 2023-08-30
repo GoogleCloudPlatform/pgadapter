@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.text.MessageFormat;
 
 /**
@@ -38,15 +37,7 @@ public class SyncMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    connection.getExtendedQueryProtocolHandler().sync();
-    new ReadyResponse(
-            this.outputStream,
-            connection
-                .getExtendedQueryProtocolHandler()
-                .getBackendConnection()
-                .getConnectionState()
-                .getReadyResponseStatus())
-        .send();
+    connection.getExtendedQueryProtocolHandler().sync(true);
   }
 
   @Override

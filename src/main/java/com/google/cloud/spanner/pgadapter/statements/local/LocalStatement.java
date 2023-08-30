@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements.local;
 
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 
@@ -31,6 +32,19 @@ public interface LocalStatement {
    * only intended to cover auto-generated query strings from frameworks/tools.
    */
   String[] getSql();
+
+  /** Returns true if the statement has a static replacement SQL string. */
+  default boolean hasReplacementStatement() {
+    return false;
+  }
+
+  /**
+   * Returns the static replacement statement for this local statement, or null if {@link
+   * #hasReplacementStatement()} returns false.
+   */
+  default Statement getReplacementStatement(Statement statement) {
+    return null;
+  }
 
   /** Executes the local statement and returns the result. */
   StatementResult execute(BackendConnection backendConnection);

@@ -15,20 +15,25 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString.unescapeQuotedStringValue;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.unquoteOrFoldIdentifier;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Locale;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -73,6 +78,7 @@ public class SimpleParserTest {
   public void testTableOrIndexName() {
     assertEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "foo"));
     assertNotEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "bar"));
+    assertFalse(new TableOrIndexName(null, "bar").equals(new Object()));
   }
 
   @Test
@@ -128,6 +134,16 @@ public class SimpleParserTest {
     assertTrue(new SimpleParser("\t(   foo").eatToken("("));
     assertFalse(new SimpleParser("foo(").eatToken("("));
     assertFalse(new SimpleParser("").eatToken("("));
+  }
+
+  @Test
+  public void testUnquoteOrFoldIdentifier() {
+    assertEquals("test", unquoteOrFoldIdentifier("test"));
+    assertEquals("test", unquoteOrFoldIdentifier("TEST"));
+    assertEquals("test", unquoteOrFoldIdentifier("Test"));
+    assertEquals("test", unquoteOrFoldIdentifier("\"test\""));
+    assertEquals("TEST", unquoteOrFoldIdentifier("\"TEST\""));
+    assertEquals("Test", unquoteOrFoldIdentifier("\"Test\""));
   }
 
   @Test
@@ -426,6 +442,14 @@ public class SimpleParserTest {
 
   @Test
   public void testQuotedString() {
+    QuotedString quotedString = new QuotedString(false, '\'', "'test'");
+    assertEquals("test", quotedString.getValue());
+    assertEquals("test", quotedString.getValue());
+    assertThrows(PGException.class, () -> new QuotedString(false, '\'', "'").getValue());
+    assertThrows(PGException.class, () -> new QuotedString(false, '\'', "'foo").getValue());
+    assertThrows(PGException.class, () -> new QuotedString(true, '\'', "'").getValue());
+    assertThrows(PGException.class, () -> new QuotedString(true, '\'', "'foo").getValue());
+
     assertEquals("test", new SimpleParser("'test'").readQuotedString('\'').getValue());
     assertEquals("test", new SimpleParser("e'test'").readQuotedString('\'').getValue());
     PGException exception =
@@ -497,5 +521,240 @@ public class SimpleParserTest {
     assertEquals(ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{foo, bar}", true));
     assertEquals(
         ImmutableList.of("foo 1", "bar 2"), SimpleParser.readArrayLiteral("{foo 1, bar 2}", true));
+  }
+
+  @Test
+  public void testReadQueryParameter() {
+    assertEquals("$1", new SimpleParser("$1").readQueryParameter());
+    assertEquals("$9999999", new SimpleParser("$9999999").readQueryParameter());
+    assertEquals("$1", new SimpleParser("  \n\t /*comment*/$1\n--comment\n").readQueryParameter());
+
+    assertNull(new SimpleParser("foo").readQueryParameter());
+    assertNull(new SimpleParser("   ").readQueryParameter());
+    assertNull(new SimpleParser("$foo").readQueryParameter());
+    assertNull(new SimpleParser("$").readQueryParameter());
+    assertNull(new SimpleParser("$ ").readQueryParameter());
+    assertNull(new SimpleParser("").readQueryParameter());
+  }
+
+  @Test
+  public void testAddLimitIfParameterizedOffset() {
+    Statement statement;
+
+    statement = Statement.of("select * from foo");
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement = Statement.newBuilder("select * from foo where id=$1").bind("p1").to(1L).build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement = Statement.of("select * from foo limit 1");
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement = Statement.of("select * from foo limit 1 offset 1");
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement = Statement.of("select * from foo offset 1");
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from (select id from bar limit 1) where id=$1")
+            .bind("p1")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from (select id from bar offset 1) where id=$1")
+            .bind("p1")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from (select id from bar limit 1 offset 1) where id=$1")
+            .bind("p1")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from (select id from bar limit $1 offset $2) where id=$3")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .bind("p3")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    // The replacement is only done in the outer main query and not in any sub queries.
+    statement =
+        Statement.newBuilder("select * from (select id from bar offset $1) where id=$2")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 limit $2 offset $3")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .bind("p3")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2 limit $3")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .bind("p3")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 limit $2")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to((Long) null)
+            .build();
+    assertEquals(
+        Statement.newBuilder("select * from foo where id=$1 offset $2 limit 4611686018427387903")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to((Long) null)
+            .build(),
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertEquals(
+        Statement.newBuilder("select * from foo where id=$1 offset $2 limit 4611686018427387903")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build(),
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1   offset   $2   ")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertEquals(
+        Statement.newBuilder(
+                "select * from foo where id=$1   offset   $2    limit 4611686018427387903")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build(),
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2 /* some comment */")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertEquals(
+        Statement.newBuilder(
+                "select * from foo where id=$1 offset $2 /* some comment */ limit 4611686018427387903")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build(),
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    statement =
+        Statement.newBuilder(
+                "select * from foo where id=$1 offset -- Single line comment\n$2 /* some comment */")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertEquals(
+        Statement.newBuilder(
+                "select * from foo where id=$1 offset -- Single line comment\n$2 /* some comment */ limit 4611686018427387903")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build(),
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+    // This is an invalid query. That will be caught by the backend parser.
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2 offset $3")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .bind("p3")
+            .to(1L)
+            .build();
+    assertSame(
+        statement,
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+
+    statement = Statement.of("select * from foo where id=$1 offset $2");
+    assertEquals(
+        Statement.of("select * from foo where id=$1 offset $2 limit 4611686018427387903"),
+        addLimitIfParameterizedOffset(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+  }
+
+  @Test
+  public void testReadIntegerLiteral() {
+    assertEquals(1L, new SimpleParser("1").readIntegerLiteral().longValue());
+    assertEquals(-1L, new SimpleParser("-1").readIntegerLiteral().longValue());
+    assertEquals(100L, new SimpleParser("100").readIntegerLiteral().longValue());
+    assertEquals(1L, new SimpleParser(" 1").readIntegerLiteral().longValue());
+    assertEquals(1L, new SimpleParser("1 ").readIntegerLiteral().longValue());
+    assertEquals(1L, new SimpleParser("\n1\t").readIntegerLiteral().longValue());
+    assertEquals(1L, new SimpleParser("/* comment */1--foo").readIntegerLiteral().longValue());
+
+    assertNull(new SimpleParser("foo").readIntegerLiteral());
+    assertNull(new SimpleParser("").readIntegerLiteral());
+    assertNull(new SimpleParser("+-1").readIntegerLiteral());
+    assertNull(new SimpleParser("-+1").readIntegerLiteral());
   }
 }

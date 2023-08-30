@@ -79,7 +79,7 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     // Start PGAdapter without a default database.
-    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of());
+    doStartMockSpannerAndPgAdapterServers(null, builder -> {});
 
     mockSpanner.putStatementResults(
         StatementResult.update(Statement.of(INSERT1), 1L),

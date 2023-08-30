@@ -14,16 +14,21 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.InstanceId;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
+import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.Server;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.DatabaseName;
 import java.io.File;
 import java.io.IOException;
@@ -31,6 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -41,6 +47,337 @@ import org.json.simple.JSONObject;
 
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
+
+  /**
+   * Builder class for creating an instance of {@link OptionsMetadata}.
+   *
+   * <p>A default instance of this Builder will create a PGAdapter proxy server that:
+   *
+   * <ol>
+   *   <li>Accepts connections to any Cloud Spanner database. The database name must be given as a
+   *       fully qualified database name in the PostgreSQL connection URL.
+   *   <li>Accepts connections on a dynamically assigned port. You can get the port that was
+   *       assigned to the server after the server has started by calling {@link
+   *       ProxyServer#getLocalPort()}.
+   *   <li>Uses the default credentials in the current runtime environment.
+   *   <li>Listens for Unix domain socket connections on '/tmp'.
+   * </ol>
+   */
+  public static class Builder {
+    private String project;
+    private String instance;
+    private String database;
+    private SessionPoolOptions sessionPoolOptions;
+    private Integer numChannels;
+    private String databaseRole;
+    private DdlTransactionMode ddlTransactionMode;
+    private String credentialsFile;
+    private Credentials credentials;
+    private boolean requireAuthentication;
+    private boolean skipLocalhostCheck;
+    private SslMode sslMode;
+    private int port;
+    private String unixDomainSocketDirectory;
+    private boolean debugMode;
+    private String endpoint;
+    private boolean usePlainText;
+
+    Builder() {}
+
+    /**
+     * (Optional) The Google Cloud project ID that PGAdapter should connect to.
+     *
+     * <p>It is not required to set a project ID for PGAdapter, but you are required to use a fully
+     * qualified database name in the form
+     * `projects/my-project/instances/my-instance/databases/my-database` in any connection URL if
+     * you do not set a project ID here.
+     */
+    public Builder setProject(String project) {
+      this.project = project;
+      return this;
+    }
+
+    /**
+     * (Optional) The Google Cloud Spanner instance ID that PGAdapter should connect to.
+     *
+     * <p>It is not required to set an instance ID for PGAdapter, but you are required to use a
+     * fully qualified database name in the form
+     * `projects/my-project/instances/my-instance/databases/my-database` in any connection URL if
+     * you do not set an instance ID here.
+     */
+    public Builder setInstance(String instance) {
+      this.instance = instance;
+      return this;
+    }
+
+    /**
+     * (Optional) The Google Cloud Spanner database ID that PGAdapter should connect to. You can
+     * only set this property if you also set the project and instance ID that PGAdapter should use.
+     *
+     * <p><b>Note:</b>Setting a project, instance and database ID will lock PGAdapter to only this
+     * specific database. Any database information in a PostgreSQL connection URL that PGAdapter
+     * receives will be ignored.
+     *
+     * <p>It is not required to set a database ID for PGAdapter. You must include a database name in
+     * the PostgreSQL connection URL if you do not set a database name on this builder. The database
+     * name in the connection URL can be:
+     *
+     * <ul>
+     *   <li>A database ID: This is only supported if you have set a project and instance ID on this
+     *       builder. The database ID must be a valid database ID on the selected Cloud Spanner
+     *       instance.
+     *   <li>A fully qualified database name in the form
+     *       `projects/my-project/instances/my-instance/databases/my-database`. This database can be
+     *       on any Cloud Spanner instance, and is not restricted to any project and instance ID
+     *       that might have been set on this builder.
+     * </ul>
+     */
+    public Builder setDatabase(String database) {
+      this.database = database;
+      return this;
+    }
+
+    /** (Optional) The {@link SessionPoolOptions} to use for connections to Cloud Spanner. */
+    public Builder setSessionPoolOptions(SessionPoolOptions sessionPoolOptions) {
+      this.sessionPoolOptions = Preconditions.checkNotNull(sessionPoolOptions);
+      return this;
+    }
+
+    /** (Optional) The number of gRPC channels to use for connections to Cloud Spanner. */
+    public Builder setNumChannels(int numChannels) {
+      this.numChannels = numChannels;
+      return this;
+    }
+
+    /** (Optional) The database role to use for connections to Cloud Spanner. */
+    public Builder setDatabaseRole(String databaseRole) {
+      this.databaseRole = databaseRole;
+      return this;
+    }
+
+    /**
+     * (Optional) Sets the default DDL transaction mode. Cloud Spanner does not support DDL
+     * statements in transactions, but some tools and frameworks will assume that it does. This
+     * option enables you to specify the behavior that PGAdapter should use when it encounters a DDL
+     * statement in a read/write transaction.
+     *
+     * <p>See also <a
+     * href="https://github.com/GoogleCloudPlatform/pgadapter/blob/postgresql-dialect/docs/ddl.md">DDL
+     * Options</a> for more information.
+     */
+    public Builder setDdlTransactionMode(DdlTransactionMode ddlTransactionMode) {
+      this.ddlTransactionMode = Preconditions.checkNotNull(ddlTransactionMode);
+      return this;
+    }
+
+    /**
+     * (Optional) The credentials file (user credentials or service account key file) that PGAdapter
+     * should use to connect to Cloud Spanner.
+     *
+     * <p><b>Note:</b>Specifying a credentials file is only necessary if you do not want PGAdapter
+     * to use the default credentials of the runtime environment.
+     *
+     * <p>You can only specify either a credentials file using this method or a {@link Credentials}
+     * instance using {@link #setCredentials(Credentials)}.
+     */
+    public Builder setCredentialsFile(String credentialsFile) {
+      Preconditions.checkState(
+          credentials == null, "Cannot set both credentials and credentialsFile");
+      this.credentialsFile = Preconditions.checkNotNull(credentialsFile);
+      return this;
+    }
+
+    /**
+     * (Optional) The credentials that PGAdapter should use to connect to Cloud Spanner.
+     *
+     * <p><b>Note:</b>Specifying a credentials file is only necessary if you do not want PGAdapter
+     * to use the default credentials of the runtime environment.
+     *
+     * <p>You can only specify either a credentials instance using this method or a credentials file
+     * using {@link #setCredentialsFile(String)}.
+     */
+    public Builder setCredentials(Credentials credentials) {
+      Preconditions.checkState(
+          this.credentialsFile == null, "Cannot set both credentials and credentialsFile");
+      this.credentials = Preconditions.checkNotNull(credentials);
+      return this;
+    }
+
+    /**
+     * Require PostgreSQL clients that connect to PGAdapter to authenticate. The PostgreSQL client
+     * should provide the serialized credentials that PGAdapter should use to connect to Cloud
+     * Spanner as a password.
+     *
+     * <p>See <a
+     * href="https://github.com/GoogleCloudPlatform/pgadapter/blob/postgresql-dialect/docs/authentication.md">authentication.md</a>
+     * for more information.
+     */
+    public Builder setRequireAuthentication() {
+      this.requireAuthentication = true;
+      return this;
+    }
+
+    /**
+     * PGAdapter by default only allows connections from localhost. Call this method to disable this
+     * check. You should only allow connections from private networks, unless you are also using SSL
+     * and require clients to authenticate.
+     */
+    public Builder setDisableLocalhostCheck() {
+      this.skipLocalhostCheck = true;
+      return this;
+    }
+
+    /**
+     * PGAdapter by default does not support SSL connections. Call this method to allow or require
+     * SSL connections.
+     *
+     * <p>See <a
+     * href="https://github.com/GoogleCloudPlatform/pgadapter/blob/postgresql-dialect/docs/ssl.md">SSL
+     * options</a> for more information on setting up SSL for PGAdapter.
+     */
+    public Builder setSslMode(SslMode sslMode) {
+      this.sslMode = Preconditions.checkNotNull(sslMode);
+      return this;
+    }
+
+    /**
+     * (Optional) Sets the port that PGAdapter should use to listen for incoming connections. The
+     * default is 0, which dynamically assigns an available port to PGAdapter. The port that was
+     * assigned can be retrieved by calling {@link ProxyServer#getLocalPort()} after the server has
+     * started.
+     */
+    public Builder setPort(int port) {
+      Preconditions.checkArgument(port >= 0, "Port must be >= 0");
+      this.port = port;
+      return this;
+    }
+
+    /**
+     * (Optional) The directory to use for Unix domain socket connections. The default is '/tmp'.
+     */
+    public Builder setUnixDomainSocketDirectory(String directory) {
+      this.unixDomainSocketDirectory = Preconditions.checkNotNull(directory);
+      return this;
+    }
+
+    /**
+     * Disables the use of Unix domain sockets. This is necessary on systems that do not support
+     * Unix domain sockets, or if you do not intend to use Unix domain sockets to connect to
+     * PGAdapter.
+     */
+    public Builder disableUnixDomainSockets() {
+      this.unixDomainSocketDirectory = "";
+      return this;
+    }
+
+    Builder enableDebugMode() {
+      this.debugMode = true;
+      return this;
+    }
+
+    Builder setEndpoint(String endpoint) {
+      this.endpoint = endpoint;
+      return this;
+    }
+
+    Builder setUsePlainText() {
+      this.usePlainText = true;
+      return this;
+    }
+
+    public OptionsMetadata build() {
+      if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "You must also specify a project if you specify an instance that PGAdapter should connect to.");
+      }
+      if (Strings.isNullOrEmpty(instance) && !Strings.isNullOrEmpty(database)) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "You must also specify an instance if you specify a database that PGAdapter should connect to.");
+      }
+      if (!(Strings.isNullOrEmpty(credentialsFile)
+              && (credentials == null || NoCredentials.getInstance().equals(credentials)))
+          && requireAuthentication) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Cannot set both a credentialsFile and requireAuthentication. If you set requireAuthentication, the PostgreSQL client that connects to PGAdapter must supply the credentials in the password message.");
+      }
+      return new OptionsMetadata(this);
+    }
+
+    private String[] toCommandLineArguments() {
+      ImmutableList.Builder<String> args = ImmutableList.builder();
+      if (!Strings.isNullOrEmpty(project)) {
+        addOption(args, OPTION_PROJECT_ID, project);
+      }
+      if (!Strings.isNullOrEmpty(instance)) {
+        addOption(args, OPTION_INSTANCE_ID, instance);
+      }
+      if (!Strings.isNullOrEmpty(database)) {
+        addOption(args, OPTION_DATABASE_NAME, database);
+      }
+      if (!Strings.isNullOrEmpty(credentialsFile)) {
+        addOption(args, OPTION_CREDENTIALS_FILE, credentialsFile);
+      }
+      if (requireAuthentication) {
+        addOption(args, OPTION_AUTHENTICATE);
+      }
+      if (skipLocalhostCheck) {
+        addOption(args, OPTION_DISABLE_LOCALHOST_CHECK);
+      }
+      if (sslMode != null) {
+        addLongOption(args, OPTION_SSL, sslMode.name());
+      }
+      if (ddlTransactionMode != null) {
+        addLongOption(args, OPTION_DDL_TRANSACTION_MODE, ddlTransactionMode.name());
+      }
+      if (unixDomainSocketDirectory != null) {
+        addLongOption(args, OPTION_SOCKET_DIR, unixDomainSocketDirectory);
+      }
+      if (endpoint != null) {
+        addOption(args, OPTION_SPANNER_ENDPOINT, endpoint);
+      }
+      if (usePlainText || numChannels != null || databaseRole != null) {
+        StringBuilder jdbcOptionBuilder = new StringBuilder();
+        if (usePlainText) {
+          jdbcOptionBuilder.append("usePlainText=true;");
+        }
+        if (numChannels != null) {
+          jdbcOptionBuilder.append("numChannels=").append(numChannels).append(";");
+        }
+        if (databaseRole != null) {
+          jdbcOptionBuilder.append("databaseRole=").append(databaseRole).append(";");
+        }
+        addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
+      }
+      if (debugMode) {
+        addOption(args, OPTION_INTERNAL_DEBUG_MODE);
+        addOption(args, OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING);
+      }
+      addOption(args, OPTION_SERVER_PORT, String.valueOf(port));
+      return args.build().toArray(new String[0]);
+    }
+  }
+
+  private static void addOption(ImmutableList.Builder<String> builder, String option) {
+    builder.add("-" + option);
+  }
+
+  private static void addOption(
+      ImmutableList.Builder<String> builder, String option, String value) {
+    builder.add("-" + option, value);
+  }
+
+  private static void addLongOption(
+      ImmutableList.Builder<String> builder, String option, String value) {
+    builder.add("-" + option + "=" + value);
+  }
+
+  /** Creates a {@link Builder} for an {@link OptionsMetadata} instance. */
+  public static Builder newBuilder() {
+    return new Builder();
+  }
 
   /** Returns true if the current JVM is Java 8. */
   public static boolean isJava8() {
@@ -130,6 +467,8 @@ public class OptionsMetadata {
 
   private final String osName;
   private final CommandLine commandLine;
+  private final Credentials credentials;
+  private final SessionPoolOptions sessionPoolOptions;
   private final CommandMetadataParser commandMetadataParser;
   private final String defaultConnectionUrl;
   private final int proxyPort;
@@ -151,13 +490,37 @@ public class OptionsMetadata {
   private final String serverVersion;
   private final boolean debugMode;
 
+  /**
+   * Creates a new instance of {@link OptionsMetadata} from the given arguments.
+   *
+   * <p>It is recommended to use {@link #newBuilder()} to create an options {@link Builder} instead
+   * of calling this method directly.
+   */
   public OptionsMetadata(String[] args) {
     this(System.getProperty("os.name", ""), args);
   }
 
+  private OptionsMetadata(Builder builder) {
+    this(
+        System.getProperty("os.name", ""),
+        builder.toCommandLineArguments(),
+        builder.credentials,
+        builder.sessionPoolOptions);
+  }
+
   OptionsMetadata(String osName, String[] args) {
+    this(osName, args, null, null);
+  }
+
+  OptionsMetadata(
+      String osName,
+      String[] args,
+      @Nullable Credentials credentials,
+      @Nullable SessionPoolOptions sessionPoolOptions) {
     this.osName = osName;
     this.commandLine = buildOptions(args);
+    this.credentials = credentials;
+    this.sessionPoolOptions = sessionPoolOptions;
     this.commandMetadataParser = new CommandMetadataParser();
     if (this.commandLine.hasOption(OPTION_AUTHENTICATE)
         && this.commandLine.hasOption(OPTION_CREDENTIALS_FILE)
@@ -210,6 +573,11 @@ public class OptionsMetadata {
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
   }
 
+  /**
+   * @deprecated Use {@link #newBuilder()} to create an options builder, and then call {@link
+   *     Builder#build()} instead of using this constructor.
+   */
+  @Deprecated
   public OptionsMetadata(
       String defaultConnectionUrl,
       int proxyPort,
@@ -231,6 +599,7 @@ public class OptionsMetadata {
         commandMetadata);
   }
 
+  @VisibleForTesting
   OptionsMetadata(
       String osName,
       String defaultConnectionUrl,
@@ -243,6 +612,8 @@ public class OptionsMetadata {
       JSONObject commandMetadata) {
     this.osName = osName;
     this.commandLine = null;
+    this.credentials = null;
+    this.sessionPoolOptions = null;
     this.commandMetadataParser = new CommandMetadataParser();
     this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
@@ -347,12 +718,32 @@ public class OptionsMetadata {
   }
 
   /**
-   * Get credential file path from either command line or application default. If neither throw
-   * error.
+   * Returns the {@link Credentials} instance that has been set for this {@link OptionsMetadata}.
+   * This overrides both any credentials file and any default credentials in the current runtime
+   * environment.
+   */
+  @Nullable
+  public Credentials getCredentials() {
+    return this.credentials;
+  }
+
+  /** Returns the {@link SessionPoolOptions} that has been set for this {@link OptionsMetadata}. */
+  @Nullable
+  public SessionPoolOptions getSessionPoolOptions() {
+    return this.sessionPoolOptions;
+  }
+
+  /**
+   * Get credential file path from either command line or application default. If neither are set,
+   * then throw an error.
    *
    * @return The absolute path of the credentials file.
    */
   public String buildCredentialsFile() {
+    // Skip if a com.google.auth.Credentials instance has been set.
+    if (credentials != null) {
+      return null;
+    }
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
       try {
         // This will throw an IOException if no default credentials are available.
