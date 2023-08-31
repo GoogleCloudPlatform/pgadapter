@@ -3,9 +3,8 @@ module pgadapter-pgx-sample
 go 1.20
 
 require (
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20230830153403-4e5c6030add9
 	github.com/jackc/pgx/v5 v5.4.3
-	github.com/testcontainers/testcontainers-go v0.22.0
-	golang.org/x/oauth2 v0.11.0
 )
 
 require (
@@ -37,10 +36,12 @@ require (
 	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/testcontainers/testcontainers-go v0.22.0 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
 	golang.org/x/exp v0.0.0-20230510235704-dd950f8aeaea // indirect
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
+	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect

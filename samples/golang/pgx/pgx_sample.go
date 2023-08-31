@@ -17,13 +17,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 
+	pgadapter "github.com/GoogleCloudPlatform/pgadapter/wrappers/golang"
 	"github.com/jackc/pgx/v5"
-	"pgadapter-pgx-sample/pgadapter"
 )
 
 // This test application automatically starts PGAdapter in a Docker container and connects to
 // Cloud Spanner through PGAdapter using `pgx`.
+// Run with `go run pgx_sample.go -project my-project -instance my-instance -database my-database`
 func main() {
 	// TODO(developer): Uncomment if your environment does not already have default credentials set.
 	// os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/credentials.json")
@@ -36,17 +38,35 @@ func main() {
 	flag.Parse()
 	fmt.Printf("\nConnecting to projects/%s/instances/%s/databases/%s\n\n", *project, *instance, *database)
 
-	// Start PGAdapter in a Docker container.
-	port, cleanup, err := pgadapter.StartPGAdapter(context.Background(), *project, *instance)
-	defer cleanup()
+	// Start PGAdapter as a child process.
+	// PGAdapter will by default be started as a Java application if Java is available on this host.
+	// Otherwise, it will fall back to starting PGAdapter in a Docker test container.
+	ctx := context.Background()
+	pg, err := pgadapter.Start(ctx, pgadapter.Config{Project: *project, Instance: *instance})
 	if err != nil {
 		fmt.Printf("failed to start PGAdapter: %v\n", err)
 		return
 	}
+	// Stop PGAdapter when this function returns.
+	// This is not required, as the PGAdapter sub-process shuts down automatically when your
+	// application shuts down. The PGAdapter sub-process is not guaranteed to shut down if
+	// your application is killed or crashes.
+	defer pg.Stop(ctx)
 
+	// Get the TCP port that was assigned to PGAdapter.
+	port, err := pg.GetHostPort()
+	if err != nil {
+		fmt.Printf("failed to start get TCP port for PGAdapter: %v\n", err)
+		return
+	}
 	// Connect to Cloud Spanner through PGAdapter.
-	connString := fmt.Sprintf("postgres://uid:pwd@localhost:%d/%s?sslmode=disable", port, *database)
-	ctx := context.Background()
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("localhost:%d", port))
+	if err != nil {
+		fmt.Printf("failed to resolve localhost address %v\n", err)
+		return
+	}
+	fmt.Printf("Connecting to PGAdapter on address %s\n", addr)
+	connString := fmt.Sprintf("postgres://uid:pwd@%s/%s?sslmode=disable", addr, *database)
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		fmt.Printf("failed to connect to PGAdapter: %v\n", err)
