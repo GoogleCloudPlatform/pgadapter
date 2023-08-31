@@ -3,7 +3,7 @@ module gorm
 go 1.17
 
 require (
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/shopspring/decimal v1.3.1
 	gorm.io/datatypes v1.2.0
 	gorm.io/driver/postgres v1.5.2
