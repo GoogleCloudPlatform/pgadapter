@@ -119,7 +119,7 @@ public class ITSpringDataJpaSampleTest {
       process.destroy();
     }
     assertTrue(process.waitFor(10L, TimeUnit.MINUTES));
-    assertEquals(errors, 0, process.exitValue());
+    assertEquals(errors + "\n\n" + output, 0, process.exitValue());
 
     return output;
   }
