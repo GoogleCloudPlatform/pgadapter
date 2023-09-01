@@ -101,9 +101,6 @@ public class ITSpringDataJpaSampleTest {
         ImmutableList.<String>builder().add("mvn", "spring-boot:run").build();
     builder.command(runCommand);
     builder.directory(new File(SPRING_DATA_JPA_SAMPLE_DIRECTORY));
-    builder
-        .environment()
-        .put("JAVA_HOME", "/Users/loite/Library/Java/JavaVirtualMachines/openjdk-17/Contents/Home");
     Process process = builder.start();
 
     String errors;
