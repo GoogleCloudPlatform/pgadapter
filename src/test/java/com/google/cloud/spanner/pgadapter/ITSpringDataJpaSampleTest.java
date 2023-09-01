@@ -106,21 +106,24 @@ public class ITSpringDataJpaSampleTest {
     Process process = builder.start();
 
     String errors;
-    String output;
+    StringBuilder output = new StringBuilder();
 
     try (BufferedReader reader =
             new BufferedReader(new InputStreamReader(process.getInputStream()));
         BufferedReader errorReader =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        output.append(line).append("\n");
+        if (line.contains(expectedOutput)) {
+          process.destroy();
+        }
+      }
       errors = errorReader.lines().collect(Collectors.joining("\n"));
-      output = reader.lines().collect(Collectors.joining("\n"));
-    }
-    if (output.contains(expectedOutput)) {
-      process.destroy();
     }
     assertTrue(process.waitFor(10L, TimeUnit.MINUTES));
     assertEquals(errors + "\n\n" + output, 0, process.exitValue());
 
-    return output;
+    return output.toString();
   }
 }
