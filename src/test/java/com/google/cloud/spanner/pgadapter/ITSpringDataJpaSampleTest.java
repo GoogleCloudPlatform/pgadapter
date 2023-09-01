@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -91,11 +92,12 @@ public class ITSpringDataJpaSampleTest {
 
   @Test
   public void testRunApplication() throws IOException, InterruptedException {
-    String output = runApplication();
-    assertTrue(output, output.contains("concerts using a stale read."));
+    String expectedOutput = "concerts using a stale read.";
+    String output = runApplication(expectedOutput);
+    assertTrue(output, output.contains(expectedOutput));
   }
 
-  String runApplication() throws IOException, InterruptedException {
+  String runApplication(String expectedOutput) throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
     ImmutableList<String> runCommand =
         ImmutableList.<String>builder().add("mvn", "spring-boot:run").build();
@@ -113,8 +115,11 @@ public class ITSpringDataJpaSampleTest {
       errors = errorReader.lines().collect(Collectors.joining("\n"));
       output = reader.lines().collect(Collectors.joining("\n"));
     }
-    int res = process.waitFor();
-    assertEquals(errors, 0, res);
+    if (output.contains(expectedOutput)) {
+      process.destroy();
+    }
+    assertTrue(process.waitFor(10L, TimeUnit.MINUTES));
+    assertEquals(errors, 0, process.exitValue());
 
     return output;
   }
