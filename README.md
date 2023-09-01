@@ -23,7 +23,7 @@ PGAdapter can be used with the following drivers and clients:
 
 ## ORMs, Frameworks and Tools
 PGAdapter can be used with the following frameworks and tools:
-1. `Hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
+1. `Hibernate`: Version 5.3.20.Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
 1. `Spring Data JPA`: Spring Data JPA in combination with Hibernate is also supported. See the [Spring Data JPA Sample Application](samples/java/spring-data-jpa) for a full example.
 1. `Liquibase`: Version 4.12.0 and higher are supported. See [Liquibase support](docs/liquibase.md)
    for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
