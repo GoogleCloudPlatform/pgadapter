@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
@@ -41,6 +42,8 @@ public class ITPgxSampleTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
+    assumeTrue("This test only works on the default Spanner URL", testEnv.getSpannerUrl() == null);
+
     String currentPath = new java.io.File(".").getCanonicalPath();
     String relativeSampleFilePath = "samples/golang/pgx/pgx_sample.go";
     String sampleFilePath = String.format("%s/%s", currentPath, relativeSampleFilePath);
@@ -56,18 +59,11 @@ public class ITPgxSampleTest implements IntegrationTest {
     assertEquals(0, res);
 
     testEnv.setUp();
-    database =
-        testEnv.createDatabase(
-            ImmutableList.of(
-                "create table test (\n"
-                    + "  id bigint primary key,\n"
-                    + "  value varchar\n"
-                    + ")"));
+    database = testEnv.createDatabase(ImmutableList.of());
   }
 
   @AfterClass
   public static void teardown() {
-    testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
   }
 
