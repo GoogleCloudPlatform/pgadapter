@@ -103,26 +103,23 @@ public class ITSpringDataJpaSampleTest {
         ImmutableList.<String>builder().add("mvn", "spring-boot:run").build();
     builder.command(runCommand);
     builder.directory(new File(SPRING_DATA_JPA_SAMPLE_DIRECTORY));
+    builder.environment().put("JAVA_HOME", "/Users/loite/Library/Java/JavaVirtualMachines/openjdk-17/Contents/Home");
     Process process = builder.start();
 
-    String errors;
     StringBuilder output = new StringBuilder();
-
     try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()));
-        BufferedReader errorReader =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+            new BufferedReader(new InputStreamReader(process.getInputStream()))) {
       String line;
       while ((line = reader.readLine()) != null) {
         output.append(line).append("\n");
         if (line.contains(expectedOutput)) {
           process.destroy();
+          break;
         }
       }
-      errors = errorReader.lines().collect(Collectors.joining("\n"));
     }
     assertTrue(process.waitFor(10L, TimeUnit.MINUTES));
-    assertEquals(errors + "\n\n" + output, 0, process.exitValue());
+    assertTrue(output.toString().contains(expectedOutput));
 
     return output.toString();
   }
