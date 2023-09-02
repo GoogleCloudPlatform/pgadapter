@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 
@@ -30,7 +29,6 @@ import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -103,24 +101,26 @@ public class ITSpringDataJpaSampleTest {
         ImmutableList.<String>builder().add("mvn", "spring-boot:run").build();
     builder.command(runCommand);
     builder.directory(new File(SPRING_DATA_JPA_SAMPLE_DIRECTORY));
-    builder.environment().put("JAVA_HOME", "/Users/loite/Library/Java/JavaVirtualMachines/openjdk-17/Contents/Home");
     Process process = builder.start();
 
-    StringBuilder output = new StringBuilder();
+    StringBuilder outputBuilder = new StringBuilder();
     try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+        new BufferedReader(new InputStreamReader(process.getInputStream()))) {
       String line;
       while ((line = reader.readLine()) != null) {
-        output.append(line).append("\n");
+        outputBuilder.append(line).append("\n");
         if (line.contains(expectedOutput)) {
           process.destroy();
           break;
         }
       }
     }
-    assertTrue(process.waitFor(10L, TimeUnit.MINUTES));
-    assertTrue(output.toString().contains(expectedOutput));
+    if (!process.waitFor(5L, TimeUnit.MINUTES)) {
+      process.destroyForcibly();
+    }
+    String output = outputBuilder.toString();
+    assertTrue(output, output.contains(expectedOutput));
 
-    return output.toString();
+    return output;
   }
 }
