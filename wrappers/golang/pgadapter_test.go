@@ -45,20 +45,20 @@ func TestStart(t *testing.T) {
 		}
 		port, err := pgadapter.GetHostPort()
 		if err != nil {
-			t.Fatalf("failed to get port from PGAdapter: %v", err)
+			t.Fatalf("%d: failed to get port from PGAdapter: %v", i, err)
 		}
 		if port == 0 {
-			t.Fatal("Port should be non-zero", err)
+			t.Fatalf("%d: Port should be non-zero: %v", i, err)
 		}
 
 		servAddr := fmt.Sprintf("localhost:%d", port)
 		tcpAddr, err := net.ResolveTCPAddr("tcp", servAddr)
 		if err != nil {
-			t.Fatalf("ResolveTCPAddr failed: %v", err)
+			t.Fatalf("%d: ResolveTCPAddr failed: %v", i, err)
 		}
 		conn, err := net.DialTCP("tcp", nil, tcpAddr)
 		if err != nil {
-			t.Fatalf("Dial failed: %v", err)
+			t.Fatalf("%d: Dial failed: %v", i, err)
 		}
 		// Send an invalid startup message. This should validate that we are talking to
 		// a working PGAdapter instance.

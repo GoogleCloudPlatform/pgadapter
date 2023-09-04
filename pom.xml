@@ -34,8 +34,8 @@
       com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest,
       com.google.cloud.spanner.pgadapter.ruby.RubyTest,
     </excludedTests>
+    <excludedIntegrationTests/>
 
-    <spanner.version>6.45.0</spanner.version>
     <junixsocket.version>2.7.0</junixsocket.version>
   </properties>
 
@@ -71,22 +71,39 @@
       <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
     </license>
   </licenses>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-spanner-bom</artifactId>
+        <version>6.45.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-shared-dependencies</artifactId>
+        <version>3.14.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
-      <version>1.10.2</version>
+      <version>1.10.3</version>
     </dependency>
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.37.0</version>
+      <version>3.38.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>${spanner.version}</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
@@ -139,14 +156,12 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>${spanner.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.google.api</groupId>
       <artifactId>gax-grpc</artifactId>
-      <version>2.18.2</version>
       <classifier>testlib</classifier>
       <scope>test</scope>
     </dependency>
@@ -446,6 +461,7 @@
           </execution>
         </executions>
         <configuration>
+          <excludedGroups>${excludedIntegrationTests}</excludedGroups>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <forkCount>${it.forkCount}</forkCount>
           <reuseForks>true</reuseForks>

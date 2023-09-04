@@ -51,7 +51,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.jdbc.PgStatement;
 
-@Category(IntegrationTest.class)
+@Category({IntegrationTest.class, SlowTest.class})
 @RunWith(JUnit4.class)
 public class ITJdbcDescribeStatementTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
