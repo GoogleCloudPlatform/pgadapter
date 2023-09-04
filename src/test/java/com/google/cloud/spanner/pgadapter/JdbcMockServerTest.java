@@ -582,6 +582,55 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testPreparedStatementReturnColumnNamesForDmlWithReturningClause()
+      throws SQLException {
+    // A DML statement that already contains a returning clause is not modified by the PG JDBC
+    // driver.
+    String sql = "insert into test (id, value) values (1, 'One') returning *";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.INT64, TypeCode.STRING),
+                        ImmutableList.of("id", "value")))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("One").build())
+                        .build())
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        PreparedStatement statement =
+            connection.prepareStatement(sql, new String[] {"id", "value"})) {
+      assertFalse(statement.execute(sql, new String[] {"id", "value"}));
+      // The result is returned as an update count, although the statement did include a returning
+      // clause. This happens because the statement requested generated keys to be returned.
+      assertEquals(1, statement.getUpdateCount());
+      try (ResultSet resultSet = statement.getGeneratedKeys()) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertEquals("One", resultSet.getString(2));
+      }
+      assertFalse(statement.getMoreResults());
+    }
+
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        PreparedStatement statement =
+            connection.prepareStatement(sql, new String[] {"id", "value"})) {
+      assertEquals(1, statement.executeUpdate(sql, new String[] {"id", "value"}));
+      try (ResultSet resultSet = statement.getGeneratedKeys()) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertEquals("One", resultSet.getString(2));
+      }
+    }
+  }
+
+  @Test
   public void testReturnGeneratedKeysForUpdate() throws SQLException {
     String sql = "update test set value='Two' where id=1";
     mockSpanner.putStatementResult(
