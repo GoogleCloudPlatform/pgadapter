@@ -76,7 +76,7 @@ func TestStart(t *testing.T) {
 			n, err := conn.Read(tmp)
 			if err != nil {
 				if err != io.EOF {
-					t.Fatalf("Read failed: %v", err)
+					t.Fatalf("%d: Read failed: %v", i, err)
 				}
 				break
 			}
