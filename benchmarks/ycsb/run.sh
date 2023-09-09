@@ -153,7 +153,7 @@ do
                                read_min, read_max, read_avg, read_p50, read_p95, read_p99,
                                update_min, update_max, update_avg, update_p50, update_p95, update_p99,
                                insert_min, insert_max, insert_avg, insert_p50, insert_p95, insert_p99) values
-                               ('$EXECUTED_AT', '$DEPLOYMENT', '$WORKLOAD', $THREADS, $BATCH_SIZE, $OPERATION_COUNT, $OVERALL_RUNTIME, $OVERALL_THROUGHPUT,
+                               ('$EXECUTED_AT', '$DEPLOYMENT - Direct Path', '$WORKLOAD', $THREADS, $BATCH_SIZE, $OPERATION_COUNT, $OVERALL_RUNTIME, $OVERALL_THROUGHPUT,
                                 $READ_MIN, $READ_MAX, $READ_AVG, $READ_P50, $READ_P95, $READ_P99,
                                 $UPDATE_MIN, $UPDATE_MAX, $UPDATE_AVG, $UPDATE_P50, $UPDATE_P95, $UPDATE_P99,
                                 $INSERT_MIN, $INSERT_MAX, $INSERT_AVG, $INSERT_P50, $INSERT_P95, $INSERT_P99)"
