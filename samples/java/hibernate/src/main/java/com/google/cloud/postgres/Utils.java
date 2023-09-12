@@ -61,7 +61,7 @@ public class Utils {
     return concerts;
   }
 
-  public static Tracks createTracks(UUID albumId) {
+  public static Tracks createTracks(String albumId) {
     final Tracks tracks = new Tracks();
     tracks.setCreatedAt(LocalDateTime.now());
     tracks.setTitle("Perfect");

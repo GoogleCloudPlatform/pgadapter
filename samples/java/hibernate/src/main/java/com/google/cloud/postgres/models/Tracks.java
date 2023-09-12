@@ -15,10 +15,10 @@
 package com.google.cloud.postgres.models;
 
 import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
+import jakarta.persistence.Column;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
 import java.time.LocalDateTime;
-import javax.persistence.Column;
-import javax.persistence.EmbeddedId;
-import javax.persistence.Entity;
 import org.hibernate.annotations.GenerationTime;
 import org.hibernate.annotations.GeneratorType;
 
@@ -26,7 +26,8 @@ import org.hibernate.annotations.GeneratorType;
 public class Tracks {
 
   // For composite primary keys, @EmbeddedId will have to be used.
-  @EmbeddedId private TracksId id;
+  @EmbeddedId
+  private TracksId id;
 
   @Column(name = "title", nullable = false)
   private String title;
