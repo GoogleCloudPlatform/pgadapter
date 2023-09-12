@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.23.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.23.0...v0.23.1) (2023-09-07)
+
+
+### Documentation
+
+* include dependencies in sample README ([#1001](https://github.com/GoogleCloudPlatform/pgadapter/issues/1001)) ([d2c5529](https://github.com/GoogleCloudPlatform/pgadapter/commit/d2c55299ff2e5a5d7a57a3266776304129d14109))
+* modify pgx sample to use Go PGAdapter wrapper ([#927](https://github.com/GoogleCloudPlatform/pgadapter/issues/927)) ([3514bbc](https://github.com/GoogleCloudPlatform/pgadapter/commit/3514bbc7d618e8c5112e1af7a2288f79a667c0c5))
+* use Options Builder for samples ([#918](https://github.com/GoogleCloudPlatform/pgadapter/issues/918)) ([cc982c6](https://github.com/GoogleCloudPlatform/pgadapter/commit/cc982c62453a3a84b966e8b8f8064dbd81f7c73a))
+
+
+### Dependencies
+
+* bump GitHub Actions gcloud ([#1028](https://github.com/GoogleCloudPlatform/pgadapter/issues/1028)) ([0215ea3](https://github.com/GoogleCloudPlatform/pgadapter/commit/0215ea35854030dfe315fe303eb5d6ab3d47f92d))
+* bump Spring Boot to 3.1.3 for Cloud Run sample ([#1023](https://github.com/GoogleCloudPlatform/pgadapter/issues/1023)) ([bc2ed9e](https://github.com/GoogleCloudPlatform/pgadapter/commit/bc2ed9ee911d2616ad6be8b62a14d4f8deb09099))
+* import Spanner pom instead of individual deps ([#986](https://github.com/GoogleCloudPlatform/pgadapter/issues/986)) ([be3d7fd](https://github.com/GoogleCloudPlatform/pgadapter/commit/be3d7fd4b052052009182a83af1d6fd0f6d9a3c1))
+
 ## [0.23.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.22.1...v0.23.0) (2023-08-10)
 
 

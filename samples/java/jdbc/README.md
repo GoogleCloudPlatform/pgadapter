@@ -14,12 +14,12 @@ The sample application adds the following dependencies:
 <dependency>
   <groupId>org.postgresql</groupId>
   <artifactId>postgresql</artifactId>
-  <version>42.6.0</version>
+  <version>0.23.1</version>
 </dependency>
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.23.0</version>
+  <version>0.23.1</version>
 </dependency>
 <!-- [END pgadapter_and_jdbc_dependency] -->
 ```

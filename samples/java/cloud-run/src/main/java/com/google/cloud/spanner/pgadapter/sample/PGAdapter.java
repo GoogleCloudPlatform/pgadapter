@@ -56,10 +56,11 @@ public class PGAdapter {
    * @param instance the Cloud Spanner instance that PGAdapter should connect to
    */
   static ProxyServer startPGAdapter(String project, String instance) {
-    OptionsMetadata options = OptionsMetadata.newBuilder()
-        .setProject(project)
-        .setInstance(instance)
-        .build();
+    OptionsMetadata options =
+        OptionsMetadata.newBuilder()
+            .setProject(project)
+            .setInstance(instance)
+            .build();
     ProxyServer server = new ProxyServer(options);
     server.startServer();
     server.awaitRunning();
