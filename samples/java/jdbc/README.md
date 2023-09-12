@@ -8,22 +8,20 @@ application.
 
 The sample application adds the following dependencies:
 
-<!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
 ```xml
 <!-- [START pgadapter_and_jdbc_dependency] -->
 <dependency>
   <groupId>org.postgresql</groupId>
   <artifactId>postgresql</artifactId>
-  <version>0.23.1</version>
+  <version>42.6.0</version>
 </dependency>
 <dependency>
   <groupId>com.google.cloud</groupId>
-  <artifactId>google-cloud-spanner-pgadapter</artifactId>
+  <artifactId>google-cloud-spanner-pgadapter</artifactId><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <version>0.23.1</version>
 </dependency>
 <!-- [END pgadapter_and_jdbc_dependency] -->
 ```
-<!--- {x-version-update-end} -->
 
 ### Connecting
 PGAdapter is started in-process with the sample application:
