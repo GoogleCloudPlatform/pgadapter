@@ -74,6 +74,13 @@ public class PGExceptionFactory {
 
   /** Converts the given {@link SpannerException} to a {@link PGException}. */
   public static PGException toPGException(SpannerException spannerException) {
+    if (spannerException.getErrorCode() == ErrorCode.ABORTED) {
+      return PGException.newBuilder(extractMessage(spannerException))
+          // This is the equivalent of an Aborted transaction error in Cloud Spanner.
+          // A client should be prepared to retry this.
+          .setSQLState(SQLState.SerializationFailure)
+          .build();
+    }
     if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
         && RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))

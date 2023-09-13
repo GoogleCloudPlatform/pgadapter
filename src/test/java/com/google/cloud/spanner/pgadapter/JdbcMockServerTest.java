@@ -5058,6 +5058,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  @Test
+  public void testTransactionAbortedByCloudSpanner() throws SQLException {
+    String sql = "SELECT * FROM random";
+    RandomResultSetGenerator generator = new RandomResultSetGenerator(5, Dialect.POSTGRESQL);
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), generator.generate()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        while (resultSet.next()) {
+          // just consume the results.
+        }
+      }
+      // Change the results to force any retry of the transaction to fail.
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of(sql), generator.generate()));
+      mockSpanner.abortNextStatement();
+      PSQLException exception = assertThrows(PSQLException.class, connection::commit);
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          SQLState.SerializationFailure.toString(),
+          exception.getServerErrorMessage().getSQLState());
+    }
+  }
+
   @Ignore("Only used for manual performance testing")
   @Test
   public void testBasePerformance() throws SQLException {
