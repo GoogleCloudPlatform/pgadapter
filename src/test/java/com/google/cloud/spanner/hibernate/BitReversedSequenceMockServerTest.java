@@ -17,12 +17,14 @@ package com.google.cloud.spanner.hibernate;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.AbstractMessage;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
@@ -55,12 +57,62 @@ import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Parameter;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.dialect.PostgreSQLDialect;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class BitReversedSequenceMockServerTest extends AbstractMockServerTest {
+
+  @BeforeClass
+  public static void addGetKeywordsResult() {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "select 'abort,access,aggregate,also,analyse,analyze,backward,bit,cache,checkpoint,class,cluster,comment,concurrently,connection,conversion,copy,csv,database,delimiter,delimiters,disable,do,enable,encoding,encrypted,exclusive,explain,force,forward,freeze,greatest,handler,header,if,ilike,immutable,implicit,index,indexes,inherit,inherits,instead,isnull,least,limit,listen,load,location,lock,mode,move,nothing,notify,notnull,nowait,off,offset,oids,operator,owned,owner,password,prepared,procedural,quote,reassign,recheck,reindex,rename,replace,reset,restrict,returning,rule,setof,share,show,stable,statistics,stdin,stdout,storage,strict,sysid,tablespace,temp,template,truncate,trusted,unencrypted,unlisten,until,vacuum,valid,validator,verbose,volatile'"),
+            SELECT1_RESULTSET));
+  }
+
+  static ResultSet createBitReversedSequenceResultSet(long startValue, long endValue) {
+    return ResultSet.newBuilder()
+        .setMetadata(
+            ResultSetMetadata.newBuilder()
+                .setRowType(
+                    StructType.newBuilder()
+                        .addFields(
+                            Field.newBuilder()
+                                .setName("n")
+                                .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                .build())
+                        .build())
+                .build())
+        .addAllRows(
+            LongStream.range(startValue, endValue)
+                .map(Long::reverse)
+                .mapToObj(
+                    id ->
+                        ListValue.newBuilder()
+                            .addValues(
+                                Value.newBuilder().setStringValue(String.valueOf(id)).build())
+                            .build())
+                .collect(Collectors.toList()))
+        .build();
+  }
+
+  private static final String FETCH_IDENTIFIERS_SQL =
+      "WITH t AS (\n"
+          + "\tselect nextval('test_sequence') AS n\n"
+          + "\tUNION ALL\n"
+          + "\tselect nextval('test_sequence') AS n\n"
+          + "\tUNION ALL\n"
+          + "\tselect nextval('test_sequence') AS n\n"
+          + "\tUNION ALL\n"
+          + "\tselect nextval('test_sequence') AS n\n"
+          + "\tUNION ALL\n"
+          + "\tselect nextval('test_sequence') AS n\n"
+          + ")\n"
+          + "SELECT n FROM t";
 
   @Entity
   @Table(name = "test")
@@ -103,13 +155,31 @@ public class BitReversedSequenceMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  private static final String INSERT_SQL = "insert into test (name,id) values ($1,$2)";
+
+  private static final ResultSet DESCRIBE_INSERT_RESULT_SET =
+      ResultSet.newBuilder()
+          .setMetadata(
+              ResultSetMetadata.newBuilder()
+                  .setUndeclaredParameters(
+                      StructType.newBuilder()
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("p1")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING))
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("p2")
+                                  .setType(Type.newBuilder().setCode(TypeCode.INT64))
+                                  .build())
+                          .build())
+                  .build())
+          .setStats(ResultSetStats.newBuilder().build())
+          .build();
+
   @Test
   public void testGenerateSchema() {
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(
-                "select 'abort,access,aggregate,also,analyse,analyze,backward,bit,cache,checkpoint,class,cluster,comment,concurrently,connection,conversion,copy,csv,database,delimiter,delimiters,disable,do,enable,encoding,encrypted,exclusive,explain,force,forward,freeze,greatest,handler,header,if,ilike,immutable,implicit,index,indexes,inherit,inherits,instead,isnull,least,limit,listen,load,location,lock,mode,move,nothing,notify,notnull,nowait,off,offset,oids,operator,owned,owner,password,prepared,procedural,quote,reassign,recheck,reindex,rename,replace,reset,restrict,returning,rule,setof,share,show,stable,statistics,stdin,stdout,storage,strict,sysid,tablespace,temp,template,truncate,trusted,unencrypted,unlisten,until,vacuum,valid,validator,verbose,volatile'"),
-            SELECT1_RESULTSET));
     // Add two responses, as the schema generation results in two separate statements.
     addDdlResponseToSpannerAdmin();
     addDdlResponseToSpannerAdmin();
@@ -143,75 +213,12 @@ public class BitReversedSequenceMockServerTest extends AbstractMockServerTest {
   public void testGenerateIdentifiers() {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(
-                "select 'abort,access,aggregate,also,analyse,analyze,backward,bit,cache,checkpoint,class,cluster,comment,concurrently,connection,conversion,copy,csv,database,delimiter,delimiters,disable,do,enable,encoding,encrypted,exclusive,explain,force,forward,freeze,greatest,handler,header,if,ilike,immutable,implicit,index,indexes,inherit,inherits,instead,isnull,least,limit,listen,load,location,lock,mode,move,nothing,notify,notnull,nowait,off,offset,oids,operator,owned,owner,password,prepared,procedural,quote,reassign,recheck,reindex,rename,replace,reset,restrict,returning,rule,setof,share,show,stable,statistics,stdin,stdout,storage,strict,sysid,tablespace,temp,template,truncate,trusted,unencrypted,unlisten,until,vacuum,valid,validator,verbose,volatile'"),
-            SELECT1_RESULTSET));
-    String fetchIdentifiersSql =
-        "WITH t AS (\n"
-            + "\tselect nextval('test_sequence') AS n\n"
-            + "\tUNION ALL\n"
-            + "\tselect nextval('test_sequence') AS n\n"
-            + "\tUNION ALL\n"
-            + "\tselect nextval('test_sequence') AS n\n"
-            + "\tUNION ALL\n"
-            + "\tselect nextval('test_sequence') AS n\n"
-            + "\tUNION ALL\n"
-            + "\tselect nextval('test_sequence') AS n\n"
-            + ")\n"
-            + "SELECT n FROM t";
+            Statement.of(FETCH_IDENTIFIERS_SQL), createBitReversedSequenceResultSet(5000L, 5005L)));
     mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(fetchIdentifiersSql),
-            ResultSet.newBuilder()
-                .setMetadata(
-                    ResultSetMetadata.newBuilder()
-                        .setRowType(
-                            StructType.newBuilder()
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("n")
-                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                                        .build())
-                                .build())
-                        .build())
-                .addAllRows(
-                    LongStream.range(5000L, 5005L)
-                        .mapToObj(
-                            l ->
-                                ListValue.newBuilder()
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(String.valueOf(Long.reverse(l)))
-                                            .build())
-                                    .build())
-                        .collect(Collectors.toList()))
-                .build()));
-    String insertSql = "insert into test (name,id) values ($1,$2)";
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(insertSql),
-            ResultSet.newBuilder()
-                .setMetadata(
-                    ResultSetMetadata.newBuilder()
-                        .setUndeclaredParameters(
-                            StructType.newBuilder()
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("p1")
-                                        .setType(Type.newBuilder().setCode(TypeCode.STRING))
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("p2")
-                                        .setType(Type.newBuilder().setCode(TypeCode.INT64))
-                                        .build())
-                                .build())
-                        .build())
-                .setStats(ResultSetStats.newBuilder().build())
-                .build()));
+        StatementResult.query(Statement.of(INSERT_SQL), DESCRIBE_INSERT_RESULT_SET));
     mockSpanner.putStatementResult(
         StatementResult.update(
-            Statement.newBuilder(insertSql)
+            Statement.newBuilder(INSERT_SQL)
                 .bind("p1")
                 .to("test1")
                 .bind("p2")
@@ -220,7 +227,7 @@ public class BitReversedSequenceMockServerTest extends AbstractMockServerTest {
             1L));
     mockSpanner.putStatementResult(
         StatementResult.update(
-            Statement.newBuilder(insertSql)
+            Statement.newBuilder(INSERT_SQL)
                 .bind("p1")
                 .to("test2")
                 .bind("p2")
@@ -259,7 +266,7 @@ public class BitReversedSequenceMockServerTest extends AbstractMockServerTest {
     assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest fetchIdentifiersRequest =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
-    assertEquals(fetchIdentifiersSql, fetchIdentifiersRequest.getSql());
+    assertEquals(FETCH_IDENTIFIERS_SQL, fetchIdentifiersRequest.getSql());
     assertTrue(fetchIdentifiersRequest.hasTransaction());
     assertTrue(fetchIdentifiersRequest.getTransaction().hasBegin());
     assertTrue(fetchIdentifiersRequest.getTransaction().getBegin().hasReadWrite());
@@ -267,7 +274,7 @@ public class BitReversedSequenceMockServerTest extends AbstractMockServerTest {
     // the insert statement is described before it is executed.
     ExecuteSqlRequest describeInsertRequest =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
-    assertEquals(insertSql, describeInsertRequest.getSql());
+    assertEquals(INSERT_SQL, describeInsertRequest.getSql());
     assertEquals(QueryMode.PLAN, describeInsertRequest.getQueryMode());
     assertTrue(describeInsertRequest.hasTransaction());
     assertTrue(describeInsertRequest.getTransaction().hasBegin());
@@ -277,8 +284,96 @@ public class BitReversedSequenceMockServerTest extends AbstractMockServerTest {
     ExecuteBatchDmlRequest batchDmlRequest =
         mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
     assertEquals(2, batchDmlRequest.getStatementsCount());
-    assertEquals(insertSql, batchDmlRequest.getStatements(0).getSql());
-    assertEquals(insertSql, batchDmlRequest.getStatements(1).getSql());
+    assertEquals(INSERT_SQL, batchDmlRequest.getStatements(0).getSql());
+    assertEquals(INSERT_SQL, batchDmlRequest.getStatements(1).getSql());
+    assertTrue(batchDmlRequest.hasTransaction());
+    assertTrue(batchDmlRequest.getTransaction().hasId());
+  }
+
+  @Test
+  public void testGenerateIdentifiersAborted() {
+    mockSpanner.putStatementResult(
+        StatementResult.queryAndThen(
+            Statement.of(FETCH_IDENTIFIERS_SQL),
+            createBitReversedSequenceResultSet(5000L, 5005L),
+            createBitReversedSequenceResultSet(5005L, 5010L)));
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(INSERT_SQL), DESCRIBE_INSERT_RESULT_SET));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(INSERT_SQL)
+                .bind("p1")
+                .to("test1")
+                .bind("p2")
+                .to(Long.reverse(5000L))
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(INSERT_SQL)
+                .bind("p1")
+                .to("test2")
+                .bind("p2")
+                .to(Long.reverse(5001L))
+                .build(),
+            1L));
+
+    try (SessionFactory sessionFactory =
+            createTestHibernateConfig(
+                    ImmutableList.of(TestEntity.class),
+                    ImmutableMap.of("hibernate.jdbc.batch_size", "100"))
+                .buildSessionFactory();
+        Session session = sessionFactory.openSession()) {
+      // Make sure the next transaction that commits is aborted.
+      // This should be the transaction that fetches the identifier values.
+      mockSpanner.setCommitExecutionTime(
+          SimulatedExecutionTime.ofException(
+              mockSpanner.createAbortedException(ByteString.copyFromUtf8("test"))));
+      Transaction transaction = session.beginTransaction();
+      session.persist(new TestEntity("test1"));
+      session.persist(new TestEntity("test2"));
+      transaction.commit();
+    }
+
+    // There should be three read/write transactions that are committed:
+    // 1. A system query executed by Hibernate. Hibernate uses read/write transactions for
+    //    everything, even for these system queries.
+    // 2. Fetching the identifiers from the sequence should use a separate read/write transaction.
+    //    Sequences require read/write transactions, but we do not want the transaction that is used
+    //    to fetch the identifiers to be mixed with the main read/write transaction, because if the
+    //    main read/write transaction is aborted and retried, it would always fail during retry if
+    //    it included fetching identifiers. The latter is because the sequence will return new
+    //    values every time, even if the transaction is aborted or rolled back.
+    // 3. The main read/write transaction.
+    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
+
+    // There are three ExecuteSql requests:
+    // 1. The initial system query.
+    // 2. The query to fetch identifiers.
+    // 3. A request to describe the insert statement. This is part of the PG wire-protocol.
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest fetchIdentifiersRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(FETCH_IDENTIFIERS_SQL, fetchIdentifiersRequest.getSql());
+    assertTrue(fetchIdentifiersRequest.hasTransaction());
+    assertTrue(fetchIdentifiersRequest.getTransaction().hasBegin());
+    assertTrue(fetchIdentifiersRequest.getTransaction().getBegin().hasReadWrite());
+
+    // the insert statement is described before it is executed.
+    ExecuteSqlRequest describeInsertRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertEquals(INSERT_SQL, describeInsertRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeInsertRequest.getQueryMode());
+    assertTrue(describeInsertRequest.hasTransaction());
+    assertTrue(describeInsertRequest.getTransaction().hasBegin());
+    assertTrue(describeInsertRequest.getTransaction().getBegin().hasReadWrite());
+    // The insert statements should be executed as a single batch DML request.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest batchDmlRequest =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, batchDmlRequest.getStatementsCount());
+    assertEquals(INSERT_SQL, batchDmlRequest.getStatements(0).getSql());
+    assertEquals(INSERT_SQL, batchDmlRequest.getStatements(1).getSql());
     assertTrue(batchDmlRequest.hasTransaction());
     assertTrue(batchDmlRequest.getTransaction().hasId());
   }

@@ -238,29 +238,32 @@ public class EnhancedBitReversedSequenceStyleGenerator
   private Iterator<Long> fetchIdentifiers(SharedSessionContractImplementor session)
       throws HibernateException {
     Connection connection = null;
+    Boolean retryAbortsInternally = null;
     try {
       // Use a separate connection to get new sequence values. This ensures that it also uses a
       // separate read/write transaction, which again means that it will not interfere with any
       // retries of the actual business transaction.
       connection = session.getJdbcConnectionAccess().obtainConnection();
-      connection.createStatement().execute("begin");
-      connection.createStatement().execute("set transaction read write");
-      List<Long> identifiers = new ArrayList<>(this.fetchSize);
-      try (Statement statement = connection.createStatement();
-          ResultSet resultSet = statement.executeQuery(this.select)) {
-        while (resultSet.next()) {
-          identifiers.add(resultSet.getLong(1));
+      try (Statement statement = connection.createStatement()) {
+        // TODO: Use 'set local spanner.retry_aborts_internally=false' when that has been
+        //       implemented.
+        retryAbortsInternally = isRetryAbortsInternally(statement);
+        statement.execute("set spanner.retry_aborts_internally=false");
+        statement.execute("begin");
+        statement.execute("set transaction read write");
+        List<Long> identifiers = new ArrayList<>(this.fetchSize);
+        try (ResultSet resultSet = statement.executeQuery(this.select)) {
+          while (resultSet.next()) {
+            identifiers.add(resultSet.getLong(1));
+          }
         }
+        statement.execute("commit");
+        return identifiers.iterator();
       }
-      connection.createStatement().execute("commit");
-      return identifiers.iterator();
     } catch (SQLException sqlException) {
-      try {
-        if (connection != null) {
-          connection.createStatement().execute("rollback");
-        }
-      } catch (SQLException ignore) {
-        // ignore any exceptions during the rollback
+      if (connection != null) {
+        Connection finalConnection = connection;
+        ignoreSqlException(() -> finalConnection.createStatement().execute("rollback"));
       }
       if (sqlException instanceof PSQLException) {
         PSQLException jdbcSqlException = (PSQLException) sqlException;
@@ -274,12 +277,42 @@ public class EnhancedBitReversedSequenceStyleGenerator
           .convert(sqlException, "could not get next sequence values", this.select);
     } finally {
       if (connection != null) {
-        try {
-          session.getJdbcConnectionAccess().releaseConnection(connection);
-        } catch (SQLException ignore) {
-          // ignore any errors during release of the connection.
+        Connection finalConnection = connection;
+        if (retryAbortsInternally != null) {
+          Boolean finalRetryAbortsInternally = retryAbortsInternally;
+          ignoreSqlException(
+              () ->
+                  finalConnection
+                      .createStatement()
+                      .execute(
+                          "set spanner.retry_aborts_internally=" + finalRetryAbortsInternally));
         }
+        ignoreSqlException(
+            () -> session.getJdbcConnectionAccess().releaseConnection(finalConnection));
       }
+    }
+  }
+
+  private Boolean isRetryAbortsInternally(Statement statement) {
+    try (ResultSet resultSet = statement.executeQuery("show spanner.retry_aborts_internally")) {
+      if (resultSet.next()) {
+        return resultSet.getBoolean(1);
+      }
+      return null;
+    } catch (Throwable ignore) {
+      return null;
+    }
+  }
+
+  private interface SqlRunnable {
+    void run() throws SQLException;
+  }
+
+  private void ignoreSqlException(SqlRunnable runnable) {
+    try {
+      runnable.run();
+    } catch (SQLException ignore) {
+      // ignore any SQLException
     }
   }
 
