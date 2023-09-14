@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
@@ -666,7 +667,8 @@ public class ConnectionHandlerTest {
 
   @Test
   public void testBuildConnectionUrl() {
-    OptionsMetadata options = OptionsMetadata.newBuilder().build();
+    OptionsMetadata options =
+        OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
     // Check that the dialect is included in the connection URL. This is required to support the
     // 'autoConfigEmulator' property.
     assertEquals(
@@ -689,6 +691,7 @@ public class ConnectionHandlerTest {
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             OptionsMetadata.newBuilder()
+                .setCredentials(NoCredentials.getInstance())
                 .setProject("test-project")
                 .setInstance("test-instance")
                 .setDatabase("test-database")

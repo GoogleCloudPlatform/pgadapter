@@ -281,7 +281,7 @@ public class OptionsMetadata {
      */
     public Builder autoConfigureEmulator() {
       this.autoConfigEmulator = true;
-      return this;
+      return this.setCredentials(NoCredentials.getInstance());
     }
 
     Builder enableDebugMode() {
