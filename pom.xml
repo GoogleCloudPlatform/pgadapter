@@ -36,12 +36,12 @@
     </excludedTests>
     <excludedIntegrationTests/>
 
-    <junixsocket.version>2.7.0</junixsocket.version>
+    <junixsocket.version>2.7.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.23.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.23.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -94,7 +94,7 @@
     <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
-      <version>1.10.3</version>
+      <version>1.10.4</version>
     </dependency>
     <dependency>
       <groupId>org.checkerframework</groupId>

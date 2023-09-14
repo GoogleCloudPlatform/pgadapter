@@ -21,7 +21,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <junixsocket.version>2.7.0</junixsocket.version>
+    <junixsocket.version>2.7.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -35,17 +35,18 @@
   </description>
 
   <dependencies>
+    <!-- [START pgadapter_and_jdbc_dependency] -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <version>42.6.0</version>
-      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.23.0</version>
+      <version>0.23.1</version>
     </dependency>
+    <!-- [END pgadapter_and_jdbc_dependency] -->
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
       <artifactId>junixsocket-core</artifactId>

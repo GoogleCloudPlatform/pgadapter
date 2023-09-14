@@ -3189,7 +3189,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   && expected.getDayOfMonth() > 20)) {
             // Just assert that we can get the value. Dates in the Julian/Gregorian cutover period
             // are weird, as are potential intercalaris values.
-            assertNotNull(pgResult.getDate(col + 1).toLocalDate());
+            assertNotNull(pgResult.getDate(col + 1));
           } else {
             assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());
           }
@@ -5055,6 +5055,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             resultSet.getString(1));
         assertFalse(resultSet.next());
       }
+    }
+  }
+
+  @Test
+  public void testTransactionAbortedByCloudSpanner() throws SQLException {
+    String sql = "SELECT * FROM random";
+    RandomResultSetGenerator generator = new RandomResultSetGenerator(5, Dialect.POSTGRESQL);
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), generator.generate()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        while (resultSet.next()) {
+          // just consume the results.
+        }
+      }
+      // Change the results to force any retry of the transaction to fail.
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of(sql), generator.generate()));
+      mockSpanner.abortNextStatement();
+      PSQLException exception = assertThrows(PSQLException.class, connection::commit);
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          SQLState.SerializationFailure.toString(),
+          exception.getServerErrorMessage().getSQLState());
     }
   }
 
