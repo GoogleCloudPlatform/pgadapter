@@ -335,33 +335,32 @@ public class BitReversedSequenceMockServerTest extends AbstractMockServerTest {
       transaction.commit();
     }
 
-    // There should be three read/write transactions that are committed:
+    // There should be four read/write transactions that are committed:
     // 1. A system query executed by Hibernate. Hibernate uses read/write transactions for
     //    everything, even for these system queries.
     // 2. Fetching the identifiers from the sequence should use a separate read/write transaction.
-    //    Sequences require read/write transactions, but we do not want the transaction that is used
-    //    to fetch the identifiers to be mixed with the main read/write transaction, because if the
-    //    main read/write transaction is aborted and retried, it would always fail during retry if
-    //    it included fetching identifiers. The latter is because the sequence will return new
-    //    values every time, even if the transaction is aborted or rolled back.
+    //    The first of these transactions is aborted by Cloud Spanner, and then retried.
     // 3. The main read/write transaction.
-    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(CommitRequest.class));
 
     // There are three ExecuteSql requests:
     // 1. The initial system query.
-    // 2. The query to fetch identifiers.
-    // 3. A request to describe the insert statement. This is part of the PG wire-protocol.
-    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    ExecuteSqlRequest fetchIdentifiersRequest =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
-    assertEquals(FETCH_IDENTIFIERS_SQL, fetchIdentifiersRequest.getSql());
-    assertTrue(fetchIdentifiersRequest.hasTransaction());
-    assertTrue(fetchIdentifiersRequest.getTransaction().hasBegin());
-    assertTrue(fetchIdentifiersRequest.getTransaction().getBegin().hasReadWrite());
+    // 2. The initial query to fetch identifiers.
+    // 3. The retried query to fetch identifiers.
+    // 4. A request to describe the insert statement. This is part of the PG wire-protocol.
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (int index = 1; index <= 2; index++) {
+      ExecuteSqlRequest fetchIdentifiersRequest =
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(index);
+      assertEquals(FETCH_IDENTIFIERS_SQL, fetchIdentifiersRequest.getSql());
+      assertTrue(fetchIdentifiersRequest.hasTransaction());
+      assertTrue(fetchIdentifiersRequest.getTransaction().hasBegin());
+      assertTrue(fetchIdentifiersRequest.getTransaction().getBegin().hasReadWrite());
+    }
 
     // the insert statement is described before it is executed.
     ExecuteSqlRequest describeInsertRequest =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(3);
     assertEquals(INSERT_SQL, describeInsertRequest.getSql());
     assertEquals(QueryMode.PLAN, describeInsertRequest.getQueryMode());
     assertTrue(describeInsertRequest.hasTransaction());

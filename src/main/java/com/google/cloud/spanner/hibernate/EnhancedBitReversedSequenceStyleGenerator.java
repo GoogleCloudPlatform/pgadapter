@@ -16,6 +16,7 @@ package com.google.cloud.spanner.hibernate;
 
 import static org.hibernate.id.enhanced.SequenceStyleGenerator.SEQUENCE_PARAM;
 
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
@@ -28,6 +29,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -249,7 +251,7 @@ public class EnhancedBitReversedSequenceStyleGenerator
         //       implemented.
         retryAbortsInternally = isRetryAbortsInternally(statement);
         statement.execute("set spanner.retry_aborts_internally=false");
-        statement.execute("begin");
+        statement.execute("begin transaction");
         statement.execute("set transaction read write");
         List<Long> identifiers = new ArrayList<>(this.fetchSize);
         try (ResultSet resultSet = statement.executeQuery(this.select)) {
@@ -266,10 +268,15 @@ public class EnhancedBitReversedSequenceStyleGenerator
         ignoreSqlException(() -> finalConnection.createStatement().execute("rollback"));
       }
       if (sqlException instanceof PSQLException) {
-        PSQLException jdbcSqlException = (PSQLException) sqlException;
-        //        if (jdbcSqlException.getCode() == Code.ABORTED) {
-        //          return EMPTY_ITERATOR;
-        //        }
+        PSQLException psqlException = (PSQLException) sqlException;
+        // Check if the error is caused by an aborted transaction.
+        if (psqlException.getServerErrorMessage() != null
+            && Objects.equals(
+                SQLState.SerializationFailure.toString(),
+                psqlException.getServerErrorMessage().getSQLState())) {
+          // Return an empty iterator to force a retry.
+          return EMPTY_ITERATOR;
+        }
       }
       throw session
           .getJdbcServices()
