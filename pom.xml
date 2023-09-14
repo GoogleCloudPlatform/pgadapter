@@ -152,16 +152,6 @@
       <version>1.70</version>
     </dependency>
 
-    <!-- Hibernate dependencies -->
-    <!-- These all have 'provided' scope, as they are only intended for use by applications that
-     add Hibernate as a dependency separately. -->
-    <dependency>
-      <groupId>org.hibernate.orm</groupId>
-      <artifactId>hibernate-core</artifactId>
-      <version>6.2.7.Final</version>
-      <scope>provided</scope>
-    </dependency>
-
     <!-- Test dependencies -->
     <dependency>
       <groupId>com.google.cloud</groupId>
