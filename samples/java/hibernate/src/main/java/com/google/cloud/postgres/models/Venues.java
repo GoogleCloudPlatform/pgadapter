@@ -15,33 +15,35 @@
 package com.google.cloud.postgres.models;
 
 import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.OneToMany;
 import org.hibernate.annotations.GenerationTime;
 import org.hibernate.annotations.GeneratorType;
-import org.hibernate.annotations.Type;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 public class Venues {
 
   @Id
-  @Column(columnDefinition = "varchar", nullable = false)
-  @GeneratedValue
-  private UUID id;
+  @Column(columnDefinition = "varchar(36)")
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private String id;
 
   @Column(name = "name", nullable = false)
   private String name;
 
   @Column(name = "description", nullable = false, columnDefinition = "jsonb")
-  @Type(type = "com.vladmihalcea.hibernate.type.json.JsonBinaryType")
+  @JdbcTypeCode(SqlTypes.JSON)
   private VenueDescription description;
 
   @Column(name = "created_at", columnDefinition = "timestamptz")
@@ -55,11 +57,11 @@ public class Venues {
   @JoinColumn(name = "venue_id")
   private List<Concerts> concerts;
 
-  public UUID getId() {
+  public String getId() {
     return id;
   }
 
-  public void setId(UUID id) {
+  public void setId(String id) {
     this.id = id;
   }
 

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.buildConnectionURL;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
@@ -42,6 +43,7 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClie
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -50,6 +52,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -658,5 +662,51 @@ public class ConnectionHandlerTest {
 
     assertTrue(connectionHandler.isHasDeterminedClientUsingQuery());
     assertTrue(connectionHandler.getSkippedAutoDetectParseMessages().isEmpty());
+  }
+
+  @Test
+  public void testBuildConnectionUrl() {
+    OptionsMetadata options = OptionsMetadata.newBuilder().build();
+    // Check that the dialect is included in the connection URL. This is required to support the
+    // 'autoConfigEmulator' property.
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of())));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;key1=value1;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of("key1", "value1"))));
+
+    // If the options contain a full database specification, then the database in the connection
+    // request is ignored.
+    assertEquals(
+        "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            OptionsMetadata.newBuilder()
+                .setProject("test-project")
+                .setInstance("test-instance")
+                .setDatabase("test-database")
+                .build(),
+            buildProperties(ImmutableMap.of())));
+    // Enable the autoConfigEmulator flag through the options builder.
+    OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;autoConfigEmulator=true;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            emulatorOptions,
+            buildProperties(emulatorOptions.getPropertyMap())));
+  }
+
+  static Properties buildProperties(Map<String, String> map) {
+    Properties properties = new Properties();
+    properties.putAll(map);
+    return properties;
   }
 }

@@ -34,13 +34,14 @@
       com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest,
       com.google.cloud.spanner.pgadapter.ruby.RubyTest,
     </excludedTests>
+    <excludedIntegrationTests/>
 
-    <junixsocket.version>2.7.0</junixsocket.version>
+    <junixsocket.version>2.7.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.23.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.23.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -75,14 +76,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-spanner-bom</artifactId>
-        <version>6.45.4-SNAPSHOT</version>
+        <version>6.47.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-shared-dependencies</artifactId>
-        <version>3.14.0</version>
+        <version>3.15.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -93,12 +94,12 @@
     <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
-      <version>1.10.3</version>
+      <version>1.10.4</version>
     </dependency>
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.37.0</version>
+      <version>3.38.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
@@ -460,6 +461,7 @@
           </execution>
         </executions>
         <configuration>
+          <excludedGroups>${excludedIntegrationTests}</excludedGroups>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <forkCount>${it.forkCount}</forkCount>
           <reuseForks>true</reuseForks>

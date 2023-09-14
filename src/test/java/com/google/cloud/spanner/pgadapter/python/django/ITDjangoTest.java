@@ -19,6 +19,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
+import com.google.cloud.spanner.pgadapter.SlowTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -33,7 +34,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-@Category(IntegrationTest.class)
+@Category({IntegrationTest.class, SlowTest.class})
 public class ITDjangoTest extends DjangoTestSetup {
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();

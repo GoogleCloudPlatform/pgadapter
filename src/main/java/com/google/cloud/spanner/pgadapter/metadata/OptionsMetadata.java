@@ -78,6 +78,7 @@ public class OptionsMetadata {
     private SslMode sslMode;
     private int port;
     private String unixDomainSocketDirectory;
+    private boolean autoConfigEmulator;
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
@@ -270,6 +271,19 @@ public class OptionsMetadata {
       return this;
     }
 
+    /**
+     * Instructs PGAdapter to connect to the Cloud Spanner emulator and to automatically create the
+     * instance and the database in the connection request if the instance or database does not yet
+     * exist on the emulator. Setting this flag takes care of everything you need to connect to the
+     * emulator (except for starting the emulator), and the auto-creation of the instance and
+     * database removes the need for any additional scripts that must be executed before connecting
+     * to the emulator.
+     */
+    public Builder autoConfigureEmulator() {
+      this.autoConfigEmulator = true;
+      return this;
+    }
+
     Builder enableDebugMode() {
       this.debugMode = true;
       return this;
@@ -338,7 +352,7 @@ public class OptionsMetadata {
       if (endpoint != null) {
         addOption(args, OPTION_SPANNER_ENDPOINT, endpoint);
       }
-      if (usePlainText || numChannels != null || databaseRole != null) {
+      if (usePlainText || numChannels != null || databaseRole != null || autoConfigEmulator) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -348,6 +362,9 @@ public class OptionsMetadata {
         }
         if (databaseRole != null) {
           jdbcOptionBuilder.append("databaseRole=").append(databaseRole).append(";");
+        }
+        if (autoConfigEmulator) {
+          jdbcOptionBuilder.append("autoConfigEmulator=true;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }

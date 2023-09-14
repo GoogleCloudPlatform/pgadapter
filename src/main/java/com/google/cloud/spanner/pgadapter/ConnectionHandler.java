@@ -170,33 +170,7 @@ public class ConnectionHandler extends Thread {
   @InternalApi
   public void connectToSpanner(String database, @Nullable Credentials credentials) {
     OptionsMetadata options = getServer().getOptions();
-    String uri =
-        options.hasDefaultConnectionUrl()
-            ? options.getDefaultConnectionUrl()
-            : options.buildConnectionURL(database);
-    if (uri.startsWith("jdbc:")) {
-      uri = uri.substring("jdbc:".length());
-    }
-    uri = appendPropertiesToUrl(uri, getServer().getProperties());
-    uri = uri + ";dialect=postgresql";
-    if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
-      uri =
-          uri
-              + ";"
-              + ConnectionOptions.CHANNEL_PROVIDER_PROPERTY_NAME
-              + "="
-              + System.getProperty(CHANNEL_PROVIDER_PROPERTY);
-      // This forces the connection to use NoCredentials.
-      uri = uri + ";usePlainText=true";
-      try {
-        Class.forName(System.getProperty(CHANNEL_PROVIDER_PROPERTY));
-      } catch (ClassNotFoundException e) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "Unknown or invalid channel provider: "
-                + System.getProperty(CHANNEL_PROVIDER_PROPERTY));
-      }
-    }
+    String uri = buildConnectionURL(database, options, getServer().getProperties());
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
     if (credentials != null) {
       connectionOptionsBuilder =
@@ -256,7 +230,40 @@ public class ConnectionHandler extends Thread {
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
   }
 
-  private String appendPropertiesToUrl(String url, Properties info) {
+  @VisibleForTesting
+  static String buildConnectionURL(
+      String database, OptionsMetadata options, Properties properties) {
+    String uri =
+        options.hasDefaultConnectionUrl()
+            ? options.getDefaultConnectionUrl()
+            : options.buildConnectionURL(database);
+    if (uri.startsWith("jdbc:")) {
+      uri = uri.substring("jdbc:".length());
+    }
+    uri = appendPropertiesToUrl(uri, properties);
+    uri = uri + ";dialect=postgresql";
+    if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
+      uri =
+          uri
+              + ";"
+              + ConnectionOptions.CHANNEL_PROVIDER_PROPERTY_NAME
+              + "="
+              + System.getProperty(CHANNEL_PROVIDER_PROPERTY);
+      // This forces the connection to use NoCredentials.
+      uri = uri + ";usePlainText=true";
+      try {
+        Class.forName(System.getProperty(CHANNEL_PROVIDER_PROPERTY));
+      } catch (ClassNotFoundException e) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Unknown or invalid channel provider: "
+                + System.getProperty(CHANNEL_PROVIDER_PROPERTY));
+      }
+    }
+    return uri;
+  }
+
+  private static String appendPropertiesToUrl(String url, Properties info) {
     if (info == null || info.isEmpty()) {
       return url;
     }

@@ -1,6 +1,8 @@
 # PGAdapter Cloud Run Sample for Java
 
-This sample application shows how to build and deploy a Java application with PGAdapter to Google Cloud Run.
+This sample application shows how to build and deploy a Java application with PGAdapter to Google
+Cloud Run. This sample runs PGAdapter as an in-process dependency with the Java application. You
+can also [run PGAdapter as a side-car container](../../cloud-run/java).
 
 The sample is based on the [Cloud Run Quickstart Guide for Java](https://cloud.google.com/run/docs/quickstarts/build-and-deploy/deploy-java-service).
 Refer to that guide for more in-depth information on how to work with Cloud Run.
