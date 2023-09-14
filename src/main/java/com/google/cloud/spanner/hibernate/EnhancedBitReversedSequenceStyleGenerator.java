@@ -63,6 +63,31 @@ import org.postgresql.util.PSQLException;
 /**
  * Sequence generator that uses a bit-reversed sequence and that fetches multiple values from the
  * sequence in a single round-trip. This ensures that the generator is compatible with batching.
+ *
+ * <p>Example usage:
+ *
+ * <pre>{@code
+ * @Id
+ * @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "venue_id_generator")
+ * @GenericGenerator(
+ *   // This is the name of the generator to use. This must correspond to the name in the
+ *   // @GeneratedValue annotation above.
+ *   name = "venue_id_generator",
+ *   // This specifies the Cloud Spanner PostgreSQL bit-reversed sequence generator.
+ *   type = EnhancedBitReversedSequenceStyleGenerator.class,
+ *   parameters = {
+ *     // This specifies the sequence name in the database.
+ *     @Parameter(name = "sequence_name", value = "venue_id_sequence"),
+ *     // Setting an increment size larger than 1 enables JDBC batching in Hibernate.
+ *     // This generator supports increment_size between 1 and 60 (inclusive).
+ *     @Parameter(name = "increment_size", value = "60"),
+ *     // The initial counter value of the bit-reversed sequence.
+ *     @Parameter(name = "initial_value", value = "5000"),
+ *     // Specify a range that should be excluded from generation by the sequence if you already
+ *     // have rows in your table with identifier values in a specific range.
+ *     @Parameter(name = "exclude_range", value = "[10000,20000]")
+ *   })
+ * }</pre>
  */
 public class EnhancedBitReversedSequenceStyleGenerator
     implements BulkInsertionCapableIdentifierGenerator, PersistentIdentifierGenerator {
@@ -70,7 +95,7 @@ public class EnhancedBitReversedSequenceStyleGenerator
   /**
    * The default increment (fetch) size for an {@link EnhancedBitReversedSequenceStyleGenerator}.
    */
-  public static final int DEFAULT_INCREMENT_SIZE = 100;
+  public static final int DEFAULT_INCREMENT_SIZE = 50;
 
   /**
    * Configuration property for defining ranges that should be excluded by a bit-reversed sequence
@@ -246,26 +271,24 @@ public class EnhancedBitReversedSequenceStyleGenerator
       // separate read/write transaction, which again means that it will not interfere with any
       // retries of the actual business transaction.
       connection = session.getJdbcConnectionAccess().obtainConnection();
+      connection.setAutoCommit(false);
       try (Statement statement = connection.createStatement()) {
+        retryAbortsInternally = isRetryAbortsInternally(statement);
         // TODO: Use 'set local spanner.retry_aborts_internally=false' when that has been
         //       implemented.
-        retryAbortsInternally = isRetryAbortsInternally(statement);
         statement.execute("set spanner.retry_aborts_internally=false");
-        statement.execute("begin transaction");
-        statement.execute("set transaction read write");
         List<Long> identifiers = new ArrayList<>(this.fetchSize);
         try (ResultSet resultSet = statement.executeQuery(this.select)) {
           while (resultSet.next()) {
             identifiers.add(resultSet.getLong(1));
           }
         }
-        statement.execute("commit");
+        connection.commit();
         return identifiers.iterator();
       }
     } catch (SQLException sqlException) {
       if (connection != null) {
-        Connection finalConnection = connection;
-        ignoreSqlException(() -> finalConnection.createStatement().execute("rollback"));
+        ignoreSqlException(connection::rollback);
       }
       if (sqlException instanceof PSQLException) {
         PSQLException psqlException = (PSQLException) sqlException;
@@ -284,16 +307,9 @@ public class EnhancedBitReversedSequenceStyleGenerator
           .convert(sqlException, "could not get next sequence values", this.select);
     } finally {
       if (connection != null) {
+        resetRetryAbortsInternally(connection, retryAbortsInternally);
+        // We need an effectively-final variable to use it in a lambda expression.
         Connection finalConnection = connection;
-        if (retryAbortsInternally != null) {
-          Boolean finalRetryAbortsInternally = retryAbortsInternally;
-          ignoreSqlException(
-              () ->
-                  finalConnection
-                      .createStatement()
-                      .execute(
-                          "set spanner.retry_aborts_internally=" + finalRetryAbortsInternally));
-        }
         ignoreSqlException(
             () -> session.getJdbcConnectionAccess().releaseConnection(finalConnection));
       }
@@ -308,6 +324,16 @@ public class EnhancedBitReversedSequenceStyleGenerator
       return null;
     } catch (Throwable ignore) {
       return null;
+    }
+  }
+
+  private void resetRetryAbortsInternally(Connection connection, Boolean retryAbortsInternally) {
+    if (retryAbortsInternally != null) {
+      ignoreSqlException(
+          () ->
+              connection
+                  .createStatement()
+                  .execute("set spanner.retry_aborts_internally=" + retryAbortsInternally));
     }
   }
 
