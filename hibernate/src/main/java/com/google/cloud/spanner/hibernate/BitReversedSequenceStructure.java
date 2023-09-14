@@ -28,6 +28,7 @@ import org.hibernate.dialect.Dialect;
 import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
 import org.hibernate.id.enhanced.SequenceStructure;
 
+/** This class generates a bit-reversed sequence for a Cloud Spanner PostgreSQL database. */
 public class BitReversedSequenceStructure extends SequenceStructure {
   private final String contributor;
   private final QualifiedName qualifiedSequenceName;
@@ -78,13 +79,13 @@ public class BitReversedSequenceStructure extends SequenceStructure {
     @Override
     public String[] sqlCreateStrings(SqlStringGenerationContext context) {
       return new String[] {
-        context
-                .getDialect()
-                .getSequenceSupport()
-                .getCreateSequenceString(context.format(sequence.getName()))
-            + " bit_reversed_positive"
-            + buildSkipRangeOptions(excludeRanges)
-            + buildStartCounterOption(sequence.getInitialValue())
+          context
+              .getDialect()
+              .getSequenceSupport()
+              .getCreateSequenceString(context.format(sequence.getName()))
+              + " bit_reversed_positive"
+              + buildSkipRangeOptions(excludeRanges)
+              + buildStartCounterOption(sequence.getInitialValue())
       };
     }
 

@@ -16,7 +16,6 @@ package com.google.cloud.spanner.hibernate;
 
 import static org.hibernate.id.enhanced.SequenceStyleGenerator.SEQUENCE_PARAM;
 
-import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
@@ -117,14 +116,14 @@ public class EnhancedBitReversedSequenceStyleGenerator
       Dialect dialect, QualifiedSequenceName sequenceName, int fetchSize) {
     return "WITH t AS (\n"
         + IntStream.range(0, fetchSize)
-            .mapToObj(
-                ignore ->
-                    "\t"
-                        + dialect
-                            .getSequenceSupport()
-                            .getSequenceNextValString(sequenceName.render())
-                        + " AS n")
-            .collect(Collectors.joining("\n\tUNION ALL\n"))
+        .mapToObj(
+            ignore ->
+                "\t"
+                    + dialect
+                    .getSequenceSupport()
+                    .getSequenceNextValString(sequenceName.render())
+                    + " AS n")
+        .collect(Collectors.joining("\n\tUNION ALL\n"))
         + "\n)\n"
         + "SELECT n FROM t";
   }
@@ -295,8 +294,8 @@ public class EnhancedBitReversedSequenceStyleGenerator
         // Check if the error is caused by an aborted transaction.
         if (psqlException.getServerErrorMessage() != null
             && Objects.equals(
-                SQLState.SerializationFailure.toString(),
-                psqlException.getServerErrorMessage().getSQLState())) {
+            /* '40001' == serialization_failure */ "40001",
+            psqlException.getServerErrorMessage().getSQLState())) {
           // Return an empty iterator to force a retry.
           return EMPTY_ITERATOR;
         }
