@@ -22,7 +22,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.TableGenerator;
 import java.time.OffsetDateTime;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Parameter;
@@ -30,7 +29,11 @@ import org.hibernate.annotations.Parameter;
 @Table(name = "concerts")
 @Entity
 public class Concert extends AbstractBaseEntity {
-  /** This id is generated using a bit-reversed sequence in the database. The generator supports an increment_size up to 60. This allows Hibernate to fetch up to 60 new identifiers in a single round-trip to the database, and allows applications to enable JDBC batching in Hibernate. */
+  /**
+   * This id is generated using a bit-reversed sequence in the database. The generator supports an
+   * increment_size up to 60. This allows Hibernate to fetch up to 60 new identifiers in a single
+   * round-trip to the database, and allows applications to enable JDBC batching in Hibernate.
+   */
   @Id
   @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "concert_id_generator")
   @GenericGenerator(
@@ -40,11 +43,11 @@ public class Concert extends AbstractBaseEntity {
       // This specifies the Cloud Spanner PostgreSQL bit-reversed sequence generator.
       type = EnhancedBitReversedSequenceStyleGenerator.class,
       parameters = {
-          // This specifies the sequence name in the database.
-          @Parameter(name = "sequence_name", value = "concert_id_sequence"),
-          // Setting an increment size larger than 1 enables JDBC batching in Hibernate.
-          // This generator supports increment_size between 1 and 60 (inclusive).
-          @Parameter(name = "increment_size", value = "60"),
+        // This specifies the sequence name in the database.
+        @Parameter(name = "sequence_name", value = "concert_id_sequence"),
+        // Setting an increment size larger than 1 enables JDBC batching in Hibernate.
+        // This generator supports increment_size between 1 and 60 (inclusive).
+        @Parameter(name = "increment_size", value = "60"),
       })
   private long id;
 
