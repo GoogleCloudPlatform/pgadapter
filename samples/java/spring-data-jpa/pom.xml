@@ -33,6 +33,11 @@
       <artifactId>postgresql</artifactId>
       <version>42.6.0</version>
     </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-pgadapter-hibernate</artifactId>
+      <version>1.0-SNAPSHOT</version>
+    </dependency>
     <!-- Add Jackson for json parsing. This is required for using JSONB columns with Spring Data JPA. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
