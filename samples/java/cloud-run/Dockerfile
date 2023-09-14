@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Use the official maven/Java image to create a build artifact.
-FROM maven:3.8-jdk-11 as builder
+FROM maven:3.9.4-eclipse-temurin-17 as builder
 
 # Copy local code to the container image.
 WORKDIR /app
@@ -24,7 +24,7 @@ COPY src ./src
 RUN mvn package -DskipTests
 
 # Use AdoptOpenJDK for base image.
-FROM adoptopenjdk/openjdk11:alpine-jre
+FROM eclipse-temurin:17-jre-alpine
 
 # Copy the jar to the production image from the builder stage.
 COPY --from=builder /app/target/google-cloud-spanner-pgadapter-samples-cloud-run-*.jar /google-cloud-spanner-pgadapter-samples-cloud-run.jar
