@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.buildConnectionURL;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -27,10 +28,12 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.TestChannelProvider;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -705,6 +708,46 @@ public class ConnectionHandlerTest {
             "projects/my-project/instances/my-instance/databases/my-database",
             emulatorOptions,
             buildProperties(emulatorOptions.getPropertyMap())));
+
+    // Set a channel provider.
+    String currentChannelProvider = System.getProperty("CHANNEL_PROVIDER");
+    String currentEnableChannelProvider = System.getProperty("ENABLE_CHANNEL_PROVIDER");
+    try {
+      System.setProperty("CHANNEL_PROVIDER", TestChannelProvider.class.getName());
+      assertEquals(
+          "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database"
+              + ";userAgent=pg-adapter;dialect=postgresql"
+              + ";channelProvider=com.google.cloud.spanner.connection.TestChannelProvider"
+              + ";usePlainText=true",
+          buildConnectionURL(
+              "projects/my-project/instances/my-instance/databases/my-database",
+              options,
+              buildProperties(ImmutableMap.of())));
+      assertEquals("true", System.getProperty("ENABLE_CHANNEL_PROVIDER"));
+
+      // Set an invalid channel provider.
+      System.clearProperty("ENABLE_CHANNEL_PROVIDER");
+      System.setProperty("CHANNEL_PROVIDER", "foo");
+      assertThrows(
+          SpannerException.class,
+          () ->
+              buildConnectionURL(
+                  "projects/my-project/instances/my-instance/databases/my-database",
+                  options,
+                  buildProperties(ImmutableMap.of())));
+      assertNull(System.getProperty("ENABLE_CHANNEL_PROVIDER"));
+    } finally {
+      if (currentChannelProvider == null) {
+        System.clearProperty("CHANNEL_PROVIDER");
+      } else {
+        System.setProperty("CHANNEL_PROVIDER", currentChannelProvider);
+      }
+      if (currentEnableChannelProvider == null) {
+        System.clearProperty("ENABLE_CHANNEL_PROVIDER");
+      } else {
+        System.setProperty("ENABLE_CHANNEL_PROVIDER", currentEnableChannelProvider);
+      }
+    }
   }
 
   static Properties buildProperties(Map<String, String> map) {

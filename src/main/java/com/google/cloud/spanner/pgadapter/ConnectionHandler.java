@@ -237,9 +237,6 @@ public class ConnectionHandler extends Thread {
         options.hasDefaultConnectionUrl()
             ? options.getDefaultConnectionUrl()
             : options.buildConnectionURL(database);
-    if (uri.startsWith("jdbc:")) {
-      uri = uri.substring("jdbc:".length());
-    }
     uri = appendPropertiesToUrl(uri, properties);
     uri = uri + ";dialect=postgresql";
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
@@ -253,6 +250,9 @@ public class ConnectionHandler extends Thread {
       uri = uri + ";usePlainText=true";
       try {
         Class.forName(System.getProperty(CHANNEL_PROVIDER_PROPERTY));
+        // Also set the system property for the Connection API that allows us to use a custom
+        // channel provider.
+        System.setProperty("ENABLE_CHANNEL_PROVIDER", "true");
       } catch (ClassNotFoundException e) {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT,

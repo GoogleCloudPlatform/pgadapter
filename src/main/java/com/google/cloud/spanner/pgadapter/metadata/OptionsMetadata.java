@@ -632,7 +632,10 @@ public class OptionsMetadata {
     this.credentials = null;
     this.sessionPoolOptions = null;
     this.commandMetadataParser = new CommandMetadataParser();
-    this.defaultConnectionUrl = defaultConnectionUrl;
+    this.defaultConnectionUrl =
+        defaultConnectionUrl.startsWith("jdbc:")
+            ? defaultConnectionUrl.substring("jdbc:".length())
+            : defaultConnectionUrl;
     this.proxyPort = proxyPort;
     this.socketFile = isWindows() ? "" : DEFAULT_SOCKET_DIR + File.separatorChar + SOCKET_FILE_NAME;
     this.maxBacklog = DEFAULT_MAX_BACKLOG;
