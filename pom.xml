@@ -36,7 +36,7 @@
     </excludedTests>
     <excludedIntegrationTests/>
 
-    <junixsocket.version>2.7.1</junixsocket.version>
+    <junixsocket.version>2.7.2</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
