@@ -192,7 +192,7 @@ public class ITGormSampleTest implements IntegrationTest {
                 + "  id character varying NOT NULL,\n"
                 + "  first_name character varying,\n"
                 + "  last_name character varying NOT NULL,\n"
-                + "  full_name character varying GENERATED ALWAYS AS (COALESCE(concat(first_name, ' '::character varying, last_name), last_name)) STORED,\n"
+                + "  full_name character varying(300) GENERATED ALWAYS AS (CASE WHEN (first_name IS NULL) THEN last_name WHEN (last_name IS NULL) THEN first_name ELSE ((first_name || ' '::text) || last_name) END) STORED,\n"
                 + "  active boolean,\n"
                 + "  created_at timestamp with time zone,\n"
                 + "  updated_at timestamp with time zone,\n"
