@@ -827,7 +827,8 @@ public class OptionsMetadata {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.FAILED_PRECONDITION,
             "The database name does not include an instance ID, and there is no default instance ID in the command line arguments of PGAdapter. "
-                + "Either start PGAdapter with the -i <instance-id> command line argument, or specify the database as a fully qualified database name in the format 'projects/my-project/instances/my-instance/database/my-database'.");
+                + "Either start PGAdapter with the -i <instance-id> command line argument, or specify the database as a fully qualified database "
+                + "name in the format 'projects/my-project/instances/my-instance/databases/my-database'.");
       }
       databaseName =
           DatabaseName.newBuilder()
