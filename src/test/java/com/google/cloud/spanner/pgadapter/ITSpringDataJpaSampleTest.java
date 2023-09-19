@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -48,6 +49,7 @@ public class ITSpringDataJpaSampleTest {
   @BeforeClass
   public static void setup() throws ClassNotFoundException, IOException, SQLException {
     assumeFalse("Spring Data sample requires at least Java 9", OptionsMetadata.isJava8());
+    assumeTrue("This test only works on the default Spanner URL", testEnv.getSpannerUrl() == null);
 
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
@@ -82,8 +84,10 @@ public class ITSpringDataJpaSampleTest {
 
   @AfterClass
   public static void teardown() throws IOException {
-    try (FileWriter writer = new FileWriter(APPLICATION_PROPERTIES_FILE)) {
-      writer.write(originalApplicationProperties);
+    if (originalApplicationProperties != null) {
+      try (FileWriter writer = new FileWriter(APPLICATION_PROPERTIES_FILE)) {
+        writer.write(originalApplicationProperties);
+      }
     }
     testEnv.cleanUp();
   }
