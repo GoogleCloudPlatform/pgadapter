@@ -39,7 +39,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * <p>This sample shows how to do the following:
  *
  * <ol>
- *   <li>Start PGAdapter in-process together with teh main application
+ *   <li>Start PGAdapter in-process together with the main application
  *   <li>Configure and use Spring Boot Data JPA with PGAdapter
  *   <li>Configure and use Liquibase with PGAdapter to create the schema of the database
  *   <li>Use UUID primary key values
@@ -93,11 +93,11 @@ public class SampleApplication implements CommandLineRunner {
   }
 
   public static void main(String[] args) {
-    SpringApplication.run(SampleApplication.class, args);
+    SpringApplication.run(SampleApplication.class, args).close();
   }
 
   @Override
-  public void run(String... args) throws Exception {
+  public void run(String... args) {
     // First clear the current tables.
     log.info("Deleting all existing data");
     concertService.deleteAllConcerts();
