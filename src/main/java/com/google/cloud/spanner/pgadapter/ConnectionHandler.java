@@ -238,6 +238,10 @@ public class ConnectionHandler extends Thread {
             ? options.getDefaultConnectionUrl()
             : options.buildConnectionURL(database);
     uri = appendPropertiesToUrl(uri, properties);
+    // We add 'dialect=postgresql' here in all cases, although it is only being used if
+    // 'autoConfigEmulator=true' has also been set in the connection URL. This dialect property is
+    // only used to determine what dialect the database should have that is being created on the
+    // emulator when 'autoConfigEmulator=true'.
     uri = uri + ";dialect=postgresql";
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
