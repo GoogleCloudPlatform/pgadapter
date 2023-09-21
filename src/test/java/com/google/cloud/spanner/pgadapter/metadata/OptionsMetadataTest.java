@@ -32,6 +32,7 @@ import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -495,5 +496,22 @@ public class OptionsMetadataTest {
                 .setCredentials(OAuth2Credentials.create(AccessToken.newBuilder().build()))
                 .setRequireAuthentication()
                 .build());
+  }
+
+  @Test
+  public void testStripJdbcPrefix() {
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database",
+        new OptionsMetadata(
+                "linux",
+                "jdbc:cloudspanner:/projects/my-project/instances/my-instance/databases/my-database",
+                5432,
+                TextFormat.POSTGRESQL,
+                false,
+                false,
+                false,
+                false,
+                null)
+            .getDefaultConnectionUrl());
   }
 }
