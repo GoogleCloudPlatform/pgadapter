@@ -1,11 +1,17 @@
 -- Executing the schema creation in a batch will improve execution speed.
-start batch ddl;
+-- All statements that are prefixed with /* skip_on_open_source_pg */ will be skipped on open-source PostgreSQL.
+
+/* skip_on_open_source_pg */ start batch ddl;
 
 create table if not exists singers (
     id         varchar not null primary key,
     first_name varchar,
     last_name  varchar not null,
-    full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,
+    full_name varchar(300) generated always as (
+        CASE WHEN first_name IS NULL THEN last_name
+             WHEN last_name  IS NULL THEN first_name
+             ELSE first_name || ' ' || last_name
+        END) stored,
     active     boolean,
     created_at timestamptz,
     updated_at timestamptz
@@ -31,7 +37,9 @@ create table if not exists tracks (
     created_at   timestamptz,
     updated_at   timestamptz,
     primary key (id, track_number)
-) interleave in parent albums on delete cascade;
+)
+/* skip_on_open_source_pg */ interleave in parent albums on delete cascade
+;
 
 create table if not exists venues (
     id          varchar not null primary key,
@@ -55,4 +63,4 @@ create table if not exists concerts (
     constraint chk_end_time_after_start_time check (end_time > start_time)
 );
 
-run batch;
+/* skip_on_open_source_pg */ run batch;
