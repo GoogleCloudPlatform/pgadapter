@@ -14,8 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.buildConnectionURL;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -24,11 +26,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.TestChannelProvider;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -42,6 +47,7 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClie
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -50,6 +56,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -658,5 +666,93 @@ public class ConnectionHandlerTest {
 
     assertTrue(connectionHandler.isHasDeterminedClientUsingQuery());
     assertTrue(connectionHandler.getSkippedAutoDetectParseMessages().isEmpty());
+  }
+
+  @Test
+  public void testBuildConnectionUrl() {
+    OptionsMetadata options =
+        OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
+    // Check that the dialect is included in the connection URL. This is required to support the
+    // 'autoConfigEmulator' property.
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of())));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;key1=value1;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of("key1", "value1"))));
+
+    // If the options contain a full database specification, then the database in the connection
+    // request is ignored.
+    assertEquals(
+        "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            OptionsMetadata.newBuilder()
+                .setCredentials(NoCredentials.getInstance())
+                .setProject("test-project")
+                .setInstance("test-instance")
+                .setDatabase("test-database")
+                .build(),
+            buildProperties(ImmutableMap.of())));
+    // Enable the autoConfigEmulator flag through the options builder.
+    OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;autoConfigEmulator=true;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            emulatorOptions,
+            buildProperties(emulatorOptions.getPropertyMap())));
+
+    // Set a channel provider.
+    String currentChannelProvider = System.getProperty("CHANNEL_PROVIDER");
+    String currentEnableChannelProvider = System.getProperty("ENABLE_CHANNEL_PROVIDER");
+    try {
+      System.setProperty("CHANNEL_PROVIDER", TestChannelProvider.class.getName());
+      assertEquals(
+          "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database"
+              + ";userAgent=pg-adapter;dialect=postgresql"
+              + ";channelProvider=com.google.cloud.spanner.connection.TestChannelProvider"
+              + ";usePlainText=true",
+          buildConnectionURL(
+              "projects/my-project/instances/my-instance/databases/my-database",
+              options,
+              buildProperties(ImmutableMap.of())));
+      assertEquals("true", System.getProperty("ENABLE_CHANNEL_PROVIDER"));
+
+      // Set an invalid channel provider.
+      System.clearProperty("ENABLE_CHANNEL_PROVIDER");
+      System.setProperty("CHANNEL_PROVIDER", "foo");
+      assertThrows(
+          SpannerException.class,
+          () ->
+              buildConnectionURL(
+                  "projects/my-project/instances/my-instance/databases/my-database",
+                  options,
+                  buildProperties(ImmutableMap.of())));
+      assertNull(System.getProperty("ENABLE_CHANNEL_PROVIDER"));
+    } finally {
+      if (currentChannelProvider == null) {
+        System.clearProperty("CHANNEL_PROVIDER");
+      } else {
+        System.setProperty("CHANNEL_PROVIDER", currentChannelProvider);
+      }
+      if (currentEnableChannelProvider == null) {
+        System.clearProperty("ENABLE_CHANNEL_PROVIDER");
+      } else {
+        System.setProperty("ENABLE_CHANNEL_PROVIDER", currentEnableChannelProvider);
+      }
+    }
+  }
+
+  static Properties buildProperties(Map<String, String> map) {
+    Properties properties = new Properties();
+    properties.putAll(map);
+    return properties;
   }
 }
