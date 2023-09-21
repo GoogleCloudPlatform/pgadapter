@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.24.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.23.1...v0.24.0) (2023-09-21)
+
+
+### Features
+
+* translate Aborted to SerializationFailure errors ([#1045](https://github.com/GoogleCloudPlatform/pgadapter/issues/1045)) ([e5fce8b](https://github.com/GoogleCloudPlatform/pgadapter/commit/e5fce8b9fecd6efbbdf97c406a96504a30643a81))
+
+
+### Dependencies
+
+* bump Spanner to 6.47.0 ([#1047](https://github.com/GoogleCloudPlatform/pgadapter/issues/1047)) ([bccdcbc](https://github.com/GoogleCloudPlatform/pgadapter/commit/bccdcbc77bd318579cf60773c3d3f2351b8aa742))
+
+
+### Documentation
+
+* add missing 's' in fully qualified name in error message ([54182d0](https://github.com/GoogleCloudPlatform/pgadapter/commit/54182d0a1a1c3f2aa8425ecc36ead103d2ba3ec5))
+* add missing 's' in fully qualified name in error message ([#1058](https://github.com/GoogleCloudPlatform/pgadapter/issues/1058)) ([3db97ba](https://github.com/GoogleCloudPlatform/pgadapter/commit/3db97ba5115be7ed0a87eb8af3cd59e69eb966f0))
+* update Hibernate sample to Hibernate 6.2 ([#1020](https://github.com/GoogleCloudPlatform/pgadapter/issues/1020)) ([71dc0ef](https://github.com/GoogleCloudPlatform/pgadapter/commit/71dc0efa00cbbb66b755e839c16498f36e72793d))
+* use Go wrapper for gorm sample ([#1055](https://github.com/GoogleCloudPlatform/pgadapter/issues/1055)) ([bc71c8b](https://github.com/GoogleCloudPlatform/pgadapter/commit/bc71c8be1962a1807313b2527255bb40601baa74))
+
 ## [0.23.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.23.0...v0.23.1) (2023-09-07)
 
 
