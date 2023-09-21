@@ -156,6 +156,13 @@ public enum SQLState {
   SavepointException("3B000"),
   InvalidSavepointSpecification("3B001"),
 
+  // Class 40 — Transaction Rollback
+  TransactionRollback("40000"),
+  TransactionIntegrityConstraintViolation("40002"),
+  SerializationFailure("40001"),
+  StatementCompletionUnknown("40003"),
+  DeadlockDetected("40P01"),
+
   // Class 42 — Syntax Error or Access Rule Violation
   SyntaxErrorOrAccessRuleViolation("42000"),
   SyntaxError("42601"),
