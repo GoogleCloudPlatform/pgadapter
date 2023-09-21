@@ -14,16 +14,23 @@
 
 package com.google.cloud.spanner.pgadapter.sample.model;
 
+import com.google.cloud.spanner.hibernate.EnhancedBitReversedSequenceStyleGenerator;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.TableGenerator;
 import java.io.Serializable;
+import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Parameter;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Venue uses a bit-reversed sequence to generate the primary key values. For this, it uses a
+ * sequence generator specifically developed for Cloud Spanner PostgreSQL. The generator is the
+ * {@link com.google.cloud.spanner.hibernate.EnhancedBitReversedSequenceStyleGenerator}.
+ */
 @Table(name = "venues")
 @Entity
 public class Venue extends AbstractBaseEntity {
@@ -63,22 +70,31 @@ public class Venue extends AbstractBaseEntity {
     }
   }
 
+  /**
+   * This id is generated using a bit-reversed sequence in the database. The generator supports an
+   * increment_size up to 60. This allows Hibernate to fetch up to 60 new identifiers in a single
+   * round-trip to the database, and allows applications to enable JDBC batching in Hibernate.
+   */
   @Id
-  @GeneratedValue(strategy = GenerationType.TABLE, generator = "venue-generator")
-  // Note that we reuse the 'seq-ids' table for different entities, but use a different name for
-  // each entity. This ensures that there is a separate row in the table for each entity that uses
-  // a table-backed sequence generator. This ensures that a single high-write entity does not cause
-  // lock contention for all other entities that also use this type of identifier generation.
-  @TableGenerator(
-      name = "venue-generator",
-      table = "seq_ids",
-      pkColumnName = "seq_id",
-      valueColumnName = "seq_value",
-      initialValue = 1,
-      // Use a sufficiently big allocation size to reduce the number of round-trips to the database
-      // for generating new identifiers. An allocation size of 1000 means that we need a round-trip
-      // to the database once for every 1000 records that we insert to generate identifiers.
-      allocationSize = 1000)
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "venue_id_generator")
+  @GenericGenerator(
+      // This is the name of the generator to use. This must correspond to the name in the
+      // @GeneratedValue annotation above.
+      name = "venue_id_generator",
+      // This specifies the Cloud Spanner bit-reversed sequence generator.
+      type = EnhancedBitReversedSequenceStyleGenerator.class,
+      parameters = {
+        // This specifies the sequence name in the database.
+        @Parameter(name = "sequence_name", value = "venue_id_sequence"),
+        // Setting an increment size larger than 1 enables JDBC batching in Hibernate.
+        // This generator supports increment_size between 1 and 60 (inclusive).
+        @Parameter(name = "increment_size", value = "60"),
+        // The initial counter value of the bit-reversed sequence.
+        @Parameter(name = "initial_value", value = "5000"),
+        // Specify a range that should be excluded from generation by the sequence if you already
+        // have rows in your table with identifier values in a specific range.
+        @Parameter(name = "exclude_range", value = "[10000,20000]")
+      })
   private long id;
 
   private String name;

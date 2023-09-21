@@ -37,36 +37,30 @@ create table tracks (
     primary key (id, track_number)
 ) interleave in parent albums on delete cascade;
 
--- This table is used to generate sequential primary key values.
--- Note that one table can be used to generate primary keys for multiple entities.
--- It is highly recommended to use a separate generator for each entity (that is; use a separate row
--- in this table for each entity).
-create table seq_ids (
-    seq_id varchar not null primary key,
-    seq_value bigint not null
-);
+-- This creates the bit-reversed sequence that is used to create primary key values for the Venue
+-- entity. The values that are set here correspond with the values that are set in the annotations
+-- for the id property in the Venue entity class file.
+-- Note that Cloud Spanner bit-reversed sequences do not support setting an increment_size. Instead,
+-- this is handled by the EnhancedBitReversedSequenceStyleGenerator class that is set as the
+-- generator to use for the entity.
+-- See also https://cloud.google.com/spanner/docs/reference/postgresql/data-definition-language#create_sequence.
+create sequence venue_id_sequence
+    bit_reversed_positive -- This is a Cloud Spanner specific extension to open-source PostgreSQL.
+    skip range 10000 20000
+    start counter with 5000;
 
 create table venues (
-    -- shard_id is not visible to Hibernate and is only here to prevent write-hotspots in Cloud Spanner.
-    -- See https://cloud.google.com/spanner/docs/generated-column/how-to#primary-key-generated-column
-    -- for more information.
-    shard_id    bigint generated always as (mod(id, '2048'::bigint)) stored not null,
-    id          bigint not null,
+    id          bigint not null primary key,
     name        varchar not null,
     description jsonb not null,
     created_at  timestamptz,
-    updated_at  timestamptz,
-    primary key (shard_id, id)
+    updated_at  timestamptz
 );
 
+create sequence concert_id_sequence bit_reversed_positive;
+
 create table concerts (
-    -- shard_id is not visible to Hibernate and is only here to prevent write-hotspots in Cloud Spanner.
-    -- See https://cloud.google.com/spanner/docs/generated-column/how-to#primary-key-generated-column
-    -- for more information.
-    shard_id       bigint generated always as (mod(id, '2048'::bigint)) stored not null,
-    id             bigint not null,
-    -- venue_shard_id is not visible to Hibernate.
-    venue_shard_id bigint generated always as (mod(venue_id, '2048'::bigint)) stored not null,
+    id             bigint not null primary key,
     venue_id       bigint not null,
     singer_id      varchar not null,
     name           varchar not null,
@@ -74,13 +68,13 @@ create table concerts (
     end_time       timestamptz not null,
     created_at     timestamptz,
     updated_at     timestamptz,
-    constraint fk_concerts_venues  foreign key (venue_shard_id, venue_id)  references venues (shard_id, id),
+    constraint fk_concerts_venues  foreign key (venue_id)  references venues (id),
     constraint fk_concerts_singers foreign key (singer_id) references singers (id),
-    constraint chk_end_time_after_start_time check (end_time > start_time),
-    primary key (shard_id, id)
+    constraint chk_end_time_after_start_time check (end_time > start_time)
 );
 
---rollback drop table if exists seq_ids;
+--rollback drop sequence if exists concert_id_sequence;
+--rollback drop sequence if exists venue_id_sequence;
 --rollback drop table if exists concerts;
 --rollback drop table if exists venues;
 --rollback drop table if exists tracks;
