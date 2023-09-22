@@ -73,6 +73,44 @@ class DdlExecutor {
    * make the statement compatible with Cloud Spanner.
    */
   StatementResult execute(ParsedStatement parsedStatement, Statement statement) {
+    Tuple<ParsedStatement, Statement> replaced = replace(parsedStatement, statement);
+    parsedStatement = replaced.x();
+    statement = replaced.y();
+
+    if (!backendConnection.getSessionState().isSupportDropCascade()) {
+      return connection.execute(translate(parsedStatement, statement));
+    } else {
+      ImmutableList<Statement> allStatements =
+          getDependentStatements(translate(parsedStatement, statement));
+      if (allStatements.size() == 1) {
+        return connection.execute(allStatements.get(0));
+      } else {
+        boolean startedBatch = false;
+        try {
+          if (!connection.isDdlBatchActive()) {
+            connection.execute(Statement.of("START BATCH DDL"));
+            startedBatch = true;
+          }
+          StatementResult result = null;
+          for (Statement dropDependency : allStatements) {
+            result = connection.execute(dropDependency);
+          }
+          if (startedBatch) {
+            result = connection.execute(Statement.of("RUN BATCH"));
+          }
+          return result;
+        } catch (Throwable t) {
+          if (startedBatch && connection.isDdlBatchActive()) {
+            connection.abortBatch();
+          }
+          throw t;
+        }
+      }
+    }
+  }
+
+  private Tuple<ParsedStatement, Statement> replace(
+      ParsedStatement parsedStatement, Statement statement) {
     if (!ddlStatementReplacements.get().isEmpty()) {
       String replaced = applyReplacers(statement.getSql());
       if (!replaced.equals(statement.getSql())) {
@@ -80,7 +118,7 @@ class DdlExecutor {
         parsedStatement = AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
       }
     }
-    return connection.execute(translate(parsedStatement, statement));
+    return Tuple.of(parsedStatement, statement);
   }
 
   @VisibleForTesting

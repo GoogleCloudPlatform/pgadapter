@@ -124,7 +124,7 @@ public class DdlExecutorTest {
     when(sessionState.isSupportDropCascade()).thenReturn(true);
     when(connection.getSessionState()).thenReturn(sessionState);
     DdlExecutor ddlExecutor =
-        new DdlExecutor(connection, Suppliers.memoize(ImmutableList::of)) {
+        new DdlExecutor(connection, Suppliers.ofInstance(ImmutableList.of())) {
           @Override
           ImmutableList<Statement> getDropDependentIndexesStatements(TableOrIndexName tableName) {
             return ImmutableList.of(Statement.of("drop dependent indexes of " + tableName));
@@ -199,7 +199,7 @@ public class DdlExecutorTest {
     SessionState sessionState = mock(SessionState.class);
     when(sessionState.isSupportDropCascade()).thenReturn(true);
     when(connection.getSessionState()).thenReturn(sessionState);
-    DdlExecutor ddlExecutor = new DdlExecutor(connection, Suppliers.memoize(ImmutableList::of));
+    DdlExecutor ddlExecutor = new DdlExecutor(connection, Suppliers.ofInstance(ImmutableList.of()));
 
     assertGetDependentStatementsReturnsSame(
         ddlExecutor, Statement.of("create table foo (id bigint primary key)"));
