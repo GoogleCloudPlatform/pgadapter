@@ -1,7 +1,7 @@
 # Connect Cloud Spanner PostgreSQL to JetBrains
 
-Connecting your Cloud Spanner PostgreSQL databases with a JetBrains IDE will give you
-automatic code completion and error checking for your database code. You can also run
+Connecting your Cloud Spanner PostgreSQL databases with a JetBrains IDE such as IntelliJ IDEA will
+give you automatic code completion and error checking for your database code. You can also run
 queries directly from the IDE.
 
 ## Connecting
@@ -19,13 +19,14 @@ First create a run configuration for PGAdapter:
 
 1. Click on `Run | Edit configurations` and then `Add new run configuration`. Select `Docker image`.
 2. Fill in the following:
-3. Name: PGAdapter
-4. Image ID or name: gcr.io/cloud-spanner-pg-adapter/pgadapter
-5. Container name: pgadapter
-6. Bind port: 9000:5432 (or choose any other available local port that you want to use)
-7. Command: -p <your-project-id> -i <your-instance-id> -c /credentials.json
-8. Bind mounts: /local/path/to/credentials.json:/credentials.json:ro (Change the local path to match your own credentials or a local service account file)
-9. Run options: --rm (optional)
+3. Name: `PGAdapter`
+4. Image ID or name: `gcr.io/cloud-spanner-pg-adapter/pgadapter`
+5. Container name: `pgadapter-dev`
+6. Bind port: `9030:5432` (or choose any other available local port that you want to use)
+7. Command: `-c /credentials.json -x`
+8. Bind mounts: `/local/path/to/credentials.json:/credentials.json:ro` (Change the local path to match your own credentials or a local service account file)
+9. Run options: `--rm` (optional)
+10. Pull image: `Always` (optional)
 
 ![PGAdapter Docker Run Configuration](img/pgadapter-docker-container.png?raw=true "PGAdapter Docker Run Configuration")
 
@@ -45,10 +46,10 @@ PostgreSQL driver. Open the Database tool window by clicking on the menu item
 
 Fill in the following properties in the window:
 
-1. Host: localhost (assuming you are running PGAdapter on your local machine)
-2. Port: 9000 (change if you started PGAdapter on a different port than 9000)
-3. Authentication: No auth
-4. Database: your-database-id
+1. Host: `localhost` (assuming you are running PGAdapter on your local machine)
+2. Port: `9030` (change if you started PGAdapter on a different port than 9030)
+3. Authentication: `No auth`
+4. Database: `projects/my-project/instances/my-instance/databases/my-database`
 5. You now need to instruct IntelliJ to use the standard JDBC metadata methods to introspect the database. Click on the Advanced tab for this.
 6. Select the following option on the Advanced tab of the connection dialog:
 7. Click `Expert Options` in the bottom right corner of the dialog.

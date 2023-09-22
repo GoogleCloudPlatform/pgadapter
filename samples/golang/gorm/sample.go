@@ -19,13 +19,18 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/testcontainers/testcontainers-go"
+	pgWrapper "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
+
+	wrapper "github.com/GoogleCloudPlatform/pgadapter/wrappers/golang"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/datatypes"
@@ -34,9 +39,6 @@ import (
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
-
-// TODO(developer): Change this to match your PGAdapter instance and database name
-var connectionString = "host=/tmp port=5433 database=gorm-sample2"
 
 // BaseModel is embedded in all other models to add common database fields.
 type BaseModel struct {
@@ -103,13 +105,87 @@ type Concert struct {
 
 var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
+// This test application automatically starts PGAdapter in a Docker test container and connects to
+// Cloud Spanner through PGAdapter using `gorm`.
+// Run with `go run sample.go -project my-project -instance my-instance -database my-database`
+//
+// This sample application can also be executed on an open-source PostgreSQL database. This shows
+// how you could create a portable application than can run on both Cloud Spanner PostgreSQL and
+// open-source PostgreSQL.
+//
+// Run with `go run sample.go -postgres=true` to run the sample application on open-source PostgreSQL.
+// The sample will start open-source PostgreSQL in a Docker test container and automatically create
+// a database in the container.
 func main() {
-	if err := RunSample(connectionString); err != nil {
+	// TODO(developer): Uncomment if your environment does not already have default credentials set.
+	// os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/credentials.json")
+
+	// TODO(developer): Replace defaults with your project, instance and database if you want to run the sample
+	//                  without having to specify any command line arguments.
+	project := flag.String("project", "my-project", "The Google Cloud project of the Cloud Spanner instance")
+	instance := flag.String("instance", "my-instance", "The Cloud Spanner instance to connect to")
+	database := flag.String("database", "my-database", "The Cloud Spanner database to connect to")
+	osPG := flag.Bool("postgres", false, "Set this to true to run the sample on an open-source PostgreSQL database")
+	flag.Parse()
+	if *osPG {
+		fmt.Printf("\nRunning sample on open-source PostgreSQL\n")
+	} else {
+		fmt.Printf("\nConnecting to projects/%s/instances/%s/databases/%s\n\n", *project, *instance, *database)
+	}
+
+	if err := runSample(*project, *instance, *database, *osPG); err != nil {
+		fmt.Printf("Failed to run sample: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func RunSample(connString string) error {
+func runSample(project, instance, database string, isOpenSourcePG bool) error {
+	var connString string
+	if isOpenSourcePG {
+		// Start open-source PostgreSQL in a Docker test container.
+		pg, err := startOpenSourcePostgreSQL(context.Background())
+		if err != nil {
+			return err
+		}
+		defer pg.Terminate(context.Background())
+		connString, err = pg.ConnectionString(context.Background(), "sslmode=disable")
+		if err != nil {
+			return err
+		}
+	} else {
+		// Start PGAdapter in a Docker test container. You should not do this in a production environment, as this
+		// application and the PGAdapter Docker container will be running in different networks, which will greatly
+		// increase the latency between your application and PGAdapter.
+		// Instead, you should run PGAdapter as a side-car along your main application container, or run both directly on
+		// the same host.
+		pgadapter, err := startPGAdapter()
+		if err != nil {
+			fmt.Printf("Could not start PGAdapter: %v\n", err)
+			return err
+		}
+		defer pgadapter.Stop(context.Background())
+		port, err := pgadapter.GetHostPort()
+		if err != nil {
+			return err
+		}
+		// Use the fully-qualified database name, as PGAdapter was started without any specific project, instance or
+		// database in the command line arguments.
+		connString = fmt.Sprintf("host=localhost port=%d database=projects/%s/instances/%s/databases/%s", port, project, instance, database)
+	}
+	fmt.Printf("Connecting to %s\n", connString)
+	return RunSample(connString, isOpenSourcePG)
+}
+
+func startPGAdapter() (*wrapper.PGAdapter, error) {
+	var err error
+	// Start PGAdapter in a Docker test container.
+	pgadapter, err := wrapper.Start(context.Background(), wrapper.Config{
+		ExecutionEnvironment: &wrapper.Docker{AlwaysPullImage: true},
+	})
+	return pgadapter, err
+}
+
+func RunSample(connString string, isOpenSourcePG bool) error {
 	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{
 		// DisableNestedTransaction will turn off the use of Savepoints if gorm
 		// detects a nested transaction. Cloud Spanner does not support Savepoints,
@@ -122,7 +198,7 @@ func RunSample(connString string) error {
 	}
 
 	// Create the sample tables if they do not yet exist.
-	if err := CreateTablesIfNotExist(db); err != nil {
+	if err := CreateTablesIfNotExist(db, isOpenSourcePG); err != nil {
 		return err
 	}
 
@@ -630,13 +706,17 @@ func DeleteRandomAlbum(db *gorm.DB) error {
 	return nil
 }
 
-// CreateTablesIfNotExist creates all tables that are required for this sample if tney do not yet exist.
-func CreateTablesIfNotExist(db *gorm.DB) error {
+// CreateTablesIfNotExist creates all tables that are required for this sample if they do not yet exist.
+func CreateTablesIfNotExist(db *gorm.DB, isOpenSourcePG bool) error {
 	fmt.Println("Creating tables...")
-	ddl, err := ioutil.ReadFile("create_data_model.sql")
+	ddl, err := os.ReadFile("create_data_model.sql")
 	if err != nil {
 		fmt.Printf("Could not read create_data_model.sql file: %v\n", err)
 		return err
+	}
+	// Skip Cloud Spanner-specific extensions when executing on open-source PostgreSQL.
+	if isOpenSourcePG {
+		ddl = removeCloudSpannerExtensions(ddl)
 	}
 	ddlStatements := strings.FieldsFunc(string(ddl), func(r rune) bool {
 		return r == ';'
@@ -655,12 +735,29 @@ func CreateTablesIfNotExist(db *gorm.DB) error {
 	return nil
 }
 
+func removeCloudSpannerExtensions(ddl []byte) []byte {
+	lines := strings.FieldsFunc(string(ddl), func(r rune) bool {
+		return r == '\n'
+	})
+	result := ""
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "/* skip_on_open_source_pg */") {
+			continue
+		}
+		result += line + "\n"
+	}
+	return []byte(result)
+}
+
 // DeleteAllData deletes all existing records in the database.
 func DeleteAllData(db *gorm.DB) error {
 	if err := db.Exec("DELETE FROM concerts").Error; err != nil {
 		return err
 	}
 	if err := db.Exec("DELETE FROM venues").Error; err != nil {
+		return err
+	}
+	if err := db.Exec("DELETE FROM tracks").Error; err != nil {
 		return err
 	}
 	if err := db.Exec("DELETE FROM albums").Error; err != nil {
@@ -807,13 +904,30 @@ func parseTimestamp(ts string) time.Time {
 	return t.UTC()
 }
 
+func startOpenSourcePostgreSQL(ctx context.Context) (*pgWrapper.PostgresContainer, error) {
+	pgContainer, err := pgWrapper.RunContainer(ctx,
+		testcontainers.WithImage("postgres:15.4-alpine"),
+		pgWrapper.WithDatabase("gorm-sample"),
+		pgWrapper.WithUsername("postgres"),
+		pgWrapper.WithPassword("postgres"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).WithStartupTimeout(20*time.Second)),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return pgContainer, nil
+}
+
 // TestRunSample is used for testing.
+//
 //export TestRunSample
 func TestRunSample(connString, directory string) *C.char {
 	if err := os.Chdir(directory); err != nil {
 		return C.CString(fmt.Sprintf("Failed to change current directory: %v", err))
 	}
-	if err := RunSample(connString); err != nil {
+	if err := RunSample(connString, false); err != nil {
 		return C.CString(fmt.Sprintf("Failed to run sample: %v", err))
 	}
 	return nil

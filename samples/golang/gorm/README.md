@@ -1,14 +1,23 @@
 # PGAdapter and gorm
 
-PGAdapter has Pilot Support for [gorm](https://gorm.io/) with the `pgx` driver. This document shows
+PGAdapter supports [gorm](https://gorm.io/) with the `pgx` driver. This document shows
 how to use this sample application, and lists the limitations when working with `gorm` with PGAdapter.
 
 The [sample.go](sample.go) file contains a sample application using `gorm` with PGAdapter. Use this as a reference for
 features of `gorm` that are supported with PGAdapter. This sample assumes that the reader is familiar with `gorm`, and
 it is not intended as a tutorial for how to use `gorm` in general.
 
-## Pilot Support
-Pilot Support means that `gorm` can be used with Cloud Spanner PostgreSQL databases, but with limitations.
+You can run the sample application with this command:
+
+```shell
+go run sample.go -project my-project -instance my-instance -database my-database
+```
+
+Replace the project, instance, and database with your Cloud Spanner PostgreSQL database. The sample will automatically
+create the required tables for this sample.
+
+## Support Level
+`gorm` can be used with Cloud Spanner PostgreSQL databases, but with limitations.
 Applications that have been developed with `gorm` for PostgreSQL will probably require modifications
 before they can be used with Cloud Spanner PostgreSQL databases. It is possible to develop new
 applications using `gorm` with Cloud Spanner PostgreSQL databases. These applications will also work
@@ -16,36 +25,16 @@ with PostgreSQL without modifications.
 
 See [Limitations](#limitations) for a full list of limitations when working with `gorm`.
 
-## Start PGAdapter
-You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
-pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
-to run PGAdapter.
+## PGAdapter Docker
+PGAdapter is started in a Docker test container by the sample application. Docker is therefore required to be installed
+on your system to run this sample.
+
+## Open Source PostgreSQL
+This sample can also be executed on open-source PostgreSQL. PostgreSQL is started in a Docker test container by the
+sample application. Use this command to run the sample application on open-source PostgreSQL:
 
 ```shell
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
-docker run \
-  -d -p 5432:5432 \
-  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS \
-  -v /tmp:/tmp \
-  gcr.io/cloud-spanner-pg-adapter/pgadapter \
-  -p my-project -i my-instance \
-  -x
-```
-
-## Creating the Sample Data Model
-Run the following command in this directory. Replace the host, port and database name with the actual host, port and
-database name for your PGAdapter and database setup.
-
-```shell
-psql -h localhost -p 5432 -d my-database -f create_data_model.sql
-```
-
-You can also drop an existing data model using the `drop_data_model.sql` script:
-
-```shell
-psql -h localhost -p 5432 -d my-database -f drop_data_model.sql
+go run sample.go -postgres=true
 ```
 
 ## Data Types

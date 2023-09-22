@@ -21,7 +21,9 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
+import com.google.cloud.spanner.pgadapter.SlowTest;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.File;
@@ -33,16 +35,17 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.Scanner;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+@Category({IntegrationTest.class, SlowTest.class})
 @RunWith(JUnit4.class)
 public class ITLiquibaseTest {
   private static final Logger LOGGER = Logger.getLogger(ITLiquibaseTest.class.getName());
@@ -63,27 +66,6 @@ public class ITLiquibaseTest {
     testEnv.setUp();
     database = testEnv.createDatabase(ImmutableList.of());
     testEnv.startPGAdapterServer(ImmutableList.of());
-    // Create databasechangelog and databasechangeloglock tables.
-    StringBuilder builder = new StringBuilder();
-    try (Scanner scanner = new Scanner(new FileReader(LIQUIBASE_DB_CHANGELOG_DDL_FILE))) {
-      while (scanner.hasNextLine()) {
-        builder.append(scanner.nextLine()).append("\n");
-      }
-    }
-    // Note: We know that all semicolons in this file are outside of literals etc.
-    String[] ddl = builder.toString().split(";");
-    String url =
-        String.format(
-            "jdbc:postgresql://localhost:%d/%s?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction",
-            testEnv.getPGAdapterPort(), database.getId().getDatabase());
-    try (Connection connection = DriverManager.getConnection(url)) {
-      try (Statement statement = connection.createStatement()) {
-        for (String sql : ddl) {
-          LOGGER.info("Executing " + sql);
-          statement.execute(sql);
-        }
-      }
-    }
 
     // Write liquibase.properties
     StringBuilder original = new StringBuilder();

@@ -52,6 +52,12 @@ public class PGExceptionFactoryTest {
                     /* cause= */ null,
                     GrpcStatusCode.of(Code.NOT_FOUND),
                     /* retryable= */ false))));
+    assertEquals(
+        SQLState.SerializationFailure,
+        toPGException(
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.ABORTED, "The transaction was aborted"))
+            .getSQLState());
   }
 
   @Test

@@ -26,6 +26,7 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.PREPA
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.RELEASE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.ROLLBACK;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SAVEPOINT;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW_DATABASE_DDL;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.TRUNCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.VACUUM;
 
@@ -50,6 +51,7 @@ import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
 import com.google.cloud.spanner.pgadapter.statements.ReleaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.RollbackToStatement;
 import com.google.cloud.spanner.pgadapter.statements.SavepointStatement;
+import com.google.cloud.spanner.pgadapter.statements.ShowDatabaseDdlStatement;
 import com.google.cloud.spanner.pgadapter.statements.TruncateStatement;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
@@ -203,6 +205,13 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
         // ROLLBACK [WORK | TRANSACTION] TO [SAVEPOINT] savepoint_name is not recognized by the
         // Connection API as any known statement.
         return new RollbackToStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(SHOW_DATABASE_DDL, originalStatement.getSql())) {
+        return new ShowDatabaseDdlStatement(
             connectionHandler,
             connectionHandler.getServer().getOptions(),
             name,

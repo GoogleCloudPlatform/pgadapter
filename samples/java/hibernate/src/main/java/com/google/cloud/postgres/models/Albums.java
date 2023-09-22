@@ -1,40 +1,44 @@
 package com.google.cloud.postgres.models;
 
 import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.UUID;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.Lob;
-import javax.persistence.ManyToOne;
 import org.hibernate.annotations.GenerationTime;
 import org.hibernate.annotations.GeneratorType;
+import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.Type;
+import org.hibernate.type.descriptor.jdbc.BinaryJdbcType;
+import org.hibernate.type.descriptor.jdbc.VarbinaryJdbcType;
 
 @Entity
 public class Albums {
 
   @Id
-  @Column(columnDefinition = "varchar", nullable = false)
-  @GeneratedValue
-  private UUID id;
+  @Column(columnDefinition = "varchar(36)")
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private String id;
 
   private String title;
 
-  @Column(name = "marketing_budget")
+  @Column(name = "marketing_budget", columnDefinition = "numeric")
   private BigDecimal marketingBudget;
 
   @Column(name = "release_date", columnDefinition = "date")
   private LocalDate releaseDate;
 
   @Lob
-  @Type(type = "org.hibernate.type.BinaryType")
+  @JdbcType(BinaryJdbcType.class)
   @Column(name = "cover_picture")
   private byte[] coverPicture;
 
@@ -49,11 +53,11 @@ public class Albums {
   @Column(name = "updated_at", columnDefinition = "timestamptz")
   private LocalDateTime updatedAt;
 
-  public UUID getId() {
+  public String getId() {
     return id;
   }
 
-  public void setId(UUID id) {
+  public void setId(String id) {
     this.id = id;
   }
 

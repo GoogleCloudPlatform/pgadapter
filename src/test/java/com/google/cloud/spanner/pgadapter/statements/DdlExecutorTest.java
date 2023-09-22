@@ -25,7 +25,10 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.RegexQueryPartReplacer;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
+import java.util.regex.Pattern;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -57,7 +60,8 @@ public class DdlExecutorTest {
 
   @Test
   public void testMaybeRemovePrimaryKeyConstraintName() {
-    DdlExecutor ddlExecutor = new DdlExecutor(mock(BackendConnection.class));
+    DdlExecutor ddlExecutor =
+        new DdlExecutor(mock(BackendConnection.class), Suppliers.ofInstance(ImmutableList.of()));
 
     assertEquals(
         Statement.of("create table foo (id bigint primary key, value text)"),
@@ -120,7 +124,7 @@ public class DdlExecutorTest {
     when(sessionState.isSupportDropCascade()).thenReturn(true);
     when(connection.getSessionState()).thenReturn(sessionState);
     DdlExecutor ddlExecutor =
-        new DdlExecutor(connection) {
+        new DdlExecutor(connection, Suppliers.ofInstance(ImmutableList.of())) {
           @Override
           ImmutableList<Statement> getDropDependentIndexesStatements(TableOrIndexName tableName) {
             return ImmutableList.of(Statement.of("drop dependent indexes of " + tableName));
@@ -195,7 +199,7 @@ public class DdlExecutorTest {
     SessionState sessionState = mock(SessionState.class);
     when(sessionState.isSupportDropCascade()).thenReturn(true);
     when(connection.getSessionState()).thenReturn(sessionState);
-    DdlExecutor ddlExecutor = new DdlExecutor(connection);
+    DdlExecutor ddlExecutor = new DdlExecutor(connection, Suppliers.ofInstance(ImmutableList.of()));
 
     assertGetDependentStatementsReturnsSame(
         ddlExecutor, Statement.of("create table foo (id bigint primary key)"));
@@ -206,5 +210,44 @@ public class DdlExecutorTest {
     assertGetDependentStatementsReturnsSame(ddlExecutor, Statement.of("drop schema foo invalid"));
     assertGetDependentStatementsReturnsSame(ddlExecutor, Statement.of("drop schema foo"));
     assertGetDependentStatementsReturnsSame(ddlExecutor, Statement.of("drop schema foo restrict"));
+  }
+
+  @Test
+  public void testDdlReplacements() {
+    DdlExecutor ddlExecutorWithoutReplacements =
+        new DdlExecutor(mock(BackendConnection.class), Suppliers.ofInstance(ImmutableList.of()));
+    String sql = "create table my_table (id bigint primary key, value varchar)";
+    assertSame(sql, ddlExecutorWithoutReplacements.applyReplacers(sql));
+
+    DdlExecutor ddlExecutorWithReplacements =
+        new DdlExecutor(
+            mock(BackendConnection.class),
+            Suppliers.ofInstance(
+                ImmutableList.of(
+                    RegexQueryPartReplacer.replace(Pattern.compile("timestamp"), "timestamptz"),
+                    RegexQueryPartReplacer.replaceAndStop(
+                        Pattern.compile(
+                            "create table databasechangelog \\(id bigint primary key\\)"),
+                        "create table databasechangelog_replaced (id bigint primary key)"),
+                    RegexQueryPartReplacer.replace(
+                        Pattern.compile("create table databasechangelog_replaced"),
+                        "create table databasechangelog_reverted"))));
+    assertSame(sql, ddlExecutorWithReplacements.applyReplacers(sql));
+    assertEquals(
+        "create table my_table (id bigint primary key, value timestamptz)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table my_table (id bigint primary key, value timestamp)"));
+    assertEquals(
+        "create table databasechangelog_replaced (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog (id bigint primary key)"));
+    assertEquals(
+        "create table databasechangelog_replaced (id bigint primary key); create table databasechangelog_replaced (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog (id bigint primary key); create table databasechangelog (id bigint primary key)"));
+    assertEquals(
+        "create table databasechangelog_reverted (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog_replaced (id bigint primary key)"));
   }
 }

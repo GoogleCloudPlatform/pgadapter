@@ -20,17 +20,16 @@ import com.google.cloud.postgres.models.HibernateConfiguration;
 import com.google.cloud.postgres.models.Singers;
 import com.google.cloud.postgres.models.Tracks;
 import com.google.cloud.postgres.models.Venues;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaDelete;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.CriteriaUpdate;
+import jakarta.persistence.criteria.Root;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaDelete;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.CriteriaUpdate;
-import javax.persistence.criteria.Root;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.query.Query;
@@ -95,7 +94,7 @@ public class HibernateSampleTest {
       CriteriaUpdate<Albums> albumsCriteriaUpdate = cb.createCriteriaUpdate(Albums.class);
       Root<Albums> albumsRoot = albumsCriteriaUpdate.from(Albums.class);
       albumsCriteriaUpdate.set("marketingBudget", new BigDecimal("5.0"));
-      albumsCriteriaUpdate.where(cb.equal(albumsRoot.get("id"), UUID.fromString(albumsId.get(0))));
+      albumsCriteriaUpdate.where(cb.equal(albumsRoot.get("id"), albumsId.get(0)));
       Transaction transaction = s.beginTransaction();
       s.createQuery(albumsCriteriaUpdate).executeUpdate();
       transaction.commit();
@@ -133,6 +132,8 @@ public class HibernateSampleTest {
 
       query = s.createQuery("from Singers order by fullName");
       query.setFirstResult(2);
+      // We must use a limit when we use an offset.
+      query.setMaxResults(Integer.MAX_VALUE);
       list = query.list();
       System.out.println("Singers list size with first result: " + list.size());
 
@@ -149,7 +150,7 @@ public class HibernateSampleTest {
 
   public void testOneToManyData() {
     try (Session s = hibernateConfiguration.openSession()) {
-      Venues venues = s.get(Venues.class, UUID.fromString(venuesId.get(0)));
+      Venues venues = s.get(Venues.class, venuesId.get(0));
       if (venues == null) {
         logger.log(Level.SEVERE, "Previously Added Venues Not Found.");
       }
