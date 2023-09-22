@@ -26,6 +26,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -79,39 +80,11 @@ class DdlExecutor {
         parsedStatement = AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
       }
     }
-    Statement translated = translate(parsedStatement, statement);
-    if (!backendConnection.getSessionState().isSupportDropCascade()) {
-      return connection.execute(translated);
-    } else {
-      ImmutableList<Statement> allStatements = getDependentStatements(translated);
-      if (allStatements.size() == 1) {
-        return connection.execute(allStatements.get(0));
-      } else {
-        boolean startedBatch = false;
-        try {
-          if (!connection.isDdlBatchActive()) {
-            connection.execute(Statement.of("START BATCH DDL"));
-            startedBatch = true;
-          }
-          StatementResult result = null;
-          for (Statement dropDependency : allStatements) {
-            result = connection.execute(dropDependency);
-          }
-          if (startedBatch) {
-            result = connection.execute(Statement.of("RUN BATCH"));
-          }
-          return result;
-        } catch (Throwable t) {
-          if (startedBatch && connection.isDdlBatchActive()) {
-            connection.abortBatch();
-          }
-          throw t;
-        }
-      }
-    }
+    return connection.execute(translate(parsedStatement, statement));
   }
 
-  private String applyReplacers(String sql) {
+  @VisibleForTesting
+  String applyReplacers(String sql) {
     for (QueryPartReplacer functionReplacement : ddlStatementReplacements.get()) {
       Tuple<String, ReplacementStatus> result = functionReplacement.replace(sql);
       if (result.y() == ReplacementStatus.STOP) {

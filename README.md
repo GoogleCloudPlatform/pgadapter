@@ -5,6 +5,10 @@ equivalent for Spanner databases [that use the PostgreSQL interface](https://clo
 It enables you to use standard PostgreSQL drivers and tools with Cloud Spanner and is designed for
 the [lowest possible latency](benchmarks/latency-comparison/README.md).
 
+__Note__: JVM-based applications can add PGAdapter as a compile-time dependency and run the proxy
+in the same process as the main application. See [samples/java/jdbc](samples/java/jdbc) for a
+small sample application that shows how to do this.
+
 ## Drivers and Clients
 PGAdapter can be used with the following drivers and clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
@@ -15,11 +19,12 @@ PGAdapter can be used with the following drivers and clients:
 1. `psycopg3`: Version 3.1.x and higher are supported. See [psycopg3 support](docs/psycopg3.md) for more details.
 1. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 1. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
-1. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
 1. `postgres_fdw`: The PostgreSQL foreign data wrapper has experimental support. See [Foreign Data Wrapper sample](samples/foreign-data-wrapper) for more details.
 
-## Frameworks and Tools
+## ORMs, Frameworks and Tools
 PGAdapter can be used with the following frameworks and tools:
+1. `Hibernate`: Version 5.3.20.Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
+1. `Spring Data JPA`: Spring Data JPA in combination with Hibernate is also supported. See the [Spring Data JPA Sample Application](samples/java/spring-data-jpa) for a full example.
 1. `Liquibase`: Version 4.12.0 and higher are supported. See [Liquibase support](docs/liquibase.md)
    for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
 1. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
@@ -46,7 +51,7 @@ using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers a
 
 ## Usage
 PGAdapter can be started both as a Docker container, a standalone process as well as an
-in-process server (the latter is only supported for Java applications).
+in-process server (the latter is only supported for Java and other JVM-based applications).
 
 ### Docker
 
@@ -58,21 +63,35 @@ Replace the project, instance and database names and the credentials file in the
 run PGAdapter from a pre-built Docker image.
 
 ```shell
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
   -d -p 5432:5432 \
-  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS \
+  -v /path/to/credentials.json:/credentials.json:ro \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
-  -x
+  -c /credentials.json -x
 ```
 
 The `-x` argument turns off the requirement that all TCP connections must come from localhost.
 This is required when running PGAdapter in a Docker container.
 
 See [Options](#Options) for an explanation of all further options.
+
+#### Distroless Docker Image
+
+We also publish a [distroless Docker image](https://github.com/GoogleContainerTools/distroless) for
+PGAdapter under the tag `gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless`. This Docker image
+runs PGAdapter as a non-root user.
+
+```shell
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless
+docker run \
+  -d -p 5432:5432 \
+  -v /path/to/credentials.json:/credentials.json:ro \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter-distroless \
+  -p my-project -i my-instance -d my-database \
+  -c /credentials.json -x
+```
 
 ### Standalone with pre-built jar
 
@@ -88,9 +107,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.21.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.24.0` with the version you want to download):
 ```shell
-VERSION=v0.21.0
+VERSION=v0.24.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -125,7 +144,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.21.0</version>
+  <version>0.24.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -154,6 +173,9 @@ class PGProxyRunner {
     }
 }
 ```
+
+See [samples/java/jdbc](samples/java/jdbc) for a small sample application that adds
+PGAdapter as a compile-time dependency and runs it together with the main application.
 
 ### Options
 

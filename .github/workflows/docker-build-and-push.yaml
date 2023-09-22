@@ -21,7 +21,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - id: 'auth'
         uses: 'google-github-actions/auth@v1'
@@ -44,6 +44,13 @@ jobs:
             . -f build/Dockerfile \
             -t "$GCR_HOSTNAME"/"$IMAGE":"$TAG" \
             -t "$GCR_HOSTNAME"/"$IMAGE":latest \
+            --push \
+            --build-arg GITHUB_SHA="$GITHUB_SHA" \
+            --build-arg GITHUB_REF="$GITHUB_REF"
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            . -f build/distroless/Dockerfile \
+            -t "$GCR_HOSTNAME"/"$IMAGE"-distroless:"$TAG" \
+            -t "$GCR_HOSTNAME"/"$IMAGE"-distroless:latest \
             --push \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
             --build-arg GITHUB_REF="$GITHUB_REF"

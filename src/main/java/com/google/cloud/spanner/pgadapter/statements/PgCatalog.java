@@ -33,7 +33,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -215,10 +214,9 @@ public class PgCatalog {
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */
-  public Statement replacePgCatalogTables(Statement statement) {
+  public Statement replacePgCatalogTables(Statement statement, String lowerCaseSql) {
     // Only replace tables if the statement contains at least one of the known prefixes.
-    String sql = statement.getSql().toLowerCase(Locale.ENGLISH);
-    if (checkPrefixes.stream().noneMatch(sql::contains)) {
+    if (checkPrefixes.stream().noneMatch(lowerCaseSql::contains)) {
       return statement;
     }
 

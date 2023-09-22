@@ -44,7 +44,7 @@ jobs:
     services:
       # Container label
       postgres:
-        image: postgres
+        image: postgres:14
         env:
           POSTGRES_PASSWORD: postgres
         # Set health checks to wait until postgres has started
@@ -71,12 +71,16 @@ jobs:
         if: github.event.schedule=='14 3 * * *'
         run: |
           echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
-      - uses: actions/checkout@v3
+      - id: set-excluded-integration-tests
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "EXCLUDED_INTEGRATION_TESTS=SlowTest" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: zulu
-          java-version: 11
+          java-version: 17
       - run: java -version
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -96,7 +100,7 @@ jobs:
       - name: Setup psql
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends postgresql-client
+          sudo apt-get install --yes --no-install-recommends postgresql-client-14
       - name: Create PostgreSQL test database
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
@@ -109,7 +113,7 @@ jobs:
           service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
           export_default_credentials: true
       - name: Run integration tests
-        run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
+        run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DexcludedIntegrationTests="$EXCLUDED_INTEGRATION_TESTS" -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
         env:
           POSTGRES_HOST: /pg
           POSTGRES_PORT: 5432

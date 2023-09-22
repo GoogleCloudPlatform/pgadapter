@@ -15,12 +15,14 @@
 package com.google.cloud.postgres.models;
 
 import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.UUID;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
 import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.GenerationTime;
 import org.hibernate.annotations.GeneratorType;
@@ -29,9 +31,9 @@ import org.hibernate.annotations.GeneratorType;
 public class Singers {
 
   @Id
-  @Column(columnDefinition = "varchar", nullable = false)
-  @GeneratedValue
-  private UUID id;
+  @Column(columnDefinition = "varchar(36)")
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private String id;
 
   @Column(name = "first_name")
   private String firstName;
@@ -52,7 +54,7 @@ public class Singers {
   @Column(name = "updated_at", columnDefinition = "timestamptz")
   private LocalDateTime updatedAt;
 
-  public UUID getId() {
+  public String getId() {
     return id;
   }
 
@@ -72,7 +74,7 @@ public class Singers {
     return active;
   }
 
-  public void setId(UUID id) {
+  public void setId(String id) {
     this.id = id;
   }
 

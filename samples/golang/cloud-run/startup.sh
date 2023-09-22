@@ -11,7 +11,7 @@
 #    supported on Cloud Run.
 
 # Start PGAdapter in the background.
-java -jar /home/pgadapter/pgadapter.jar -dir= &
+java -jar /pgadapter/pgadapter.jar -dir= &
 
 # Start the app server as the main application of the Docker container.
 exec "/app/server"

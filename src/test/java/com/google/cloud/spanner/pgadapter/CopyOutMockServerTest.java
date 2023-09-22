@@ -40,14 +40,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.utils.CopyInParser;
 import com.google.cloud.spanner.pgadapter.utils.CopyRecord;
 import com.google.protobuf.ByteString;
-import com.google.spanner.v1.CommitRequest;
-import com.google.spanner.v1.ExecuteSqlRequest;
-import com.google.spanner.v1.PartialResultSet;
-import com.google.spanner.v1.Partition;
-import com.google.spanner.v1.PartitionQueryRequest;
-import com.google.spanner.v1.PartitionResponse;
-import com.google.spanner.v1.Transaction;
-import com.google.spanner.v1.TypeCode;
+import com.google.spanner.v1.*;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
@@ -61,7 +54,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
@@ -94,7 +86,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        createMockSpannerServiceWithQueryPartitions(), "d", Collections.emptyList());
+        createMockSpannerServiceWithQueryPartitions(), "d", builder -> {});
   }
 
   private static MockSpannerServiceImpl createMockSpannerServiceWithQueryPartitions() {
@@ -104,7 +96,11 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
         // Only partition queries that use the random result generator.
         if (!request.getSql().equals("select * from random")) {
-          super.partitionQuery(request, responseObserver);
+          responseObserver.onNext(
+              PartitionResponse.newBuilder()
+                  .addPartitions(Partition.newBuilder().setPartitionToken(ByteString.EMPTY).build())
+                  .build());
+          responseObserver.onCompleted();
           return;
         }
 
@@ -630,7 +626,12 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       mockSpanner.putStatementResult(
           StatementResult.query(Statement.of("select * from random"), resultSet));
 
-      try (Connection connection = DriverManager.getConnection(createUrl())) {
+      String separator = useDomainSocket ? "&" : "?";
+      try (Connection connection =
+          DriverManager.getConnection(
+              createUrl()
+                  + separator
+                  + "options=-c spanner.read_only_staleness='read_timestamp 2023-06-12T14:27:00Z'")) {
         CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
         StringWriter writer = new StringWriter();
         long rows = copyManager.copyOut("COPY random TO STDOUT", writer);
@@ -648,6 +649,16 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           }
           assertEquals(expectedRowCount, lineCount);
         }
+        assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        BeginTransactionRequest beginRequest =
+            mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+        assertTrue(beginRequest.hasOptions());
+        assertTrue(beginRequest.getOptions().hasReadOnly());
+        assertTrue(beginRequest.getOptions().getReadOnly().hasReadTimestamp());
+        assertEquals(
+            Timestamp.parseTimestamp("2023-06-12T14:27:00Z").toProto(),
+            beginRequest.getOptions().getReadOnly().getReadTimestamp());
+        mockSpanner.clearRequests();
       }
     }
   }

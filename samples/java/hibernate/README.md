@@ -4,6 +4,9 @@ PGAdapter can be used in combination with Hibernate, but with a number of limita
 shows the command line arguments and configuration that is needed in order to use Hibernate with
 PGAdapter.
 
+> __Note__: This sample uses Hibernate directly. There is also a sample for using [Spring Data JPA
+with PGAdapter here](../spring-data-jpa).
+
 ## Start PGAdapter
 You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
 pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
@@ -52,17 +55,11 @@ Cloud Spanner supports the following data types in combination with `Hibernate`.
 | date                                   | LocalDate         |
 | jsonb                                  | Custom Data Type  |
 
-### JSONB
-Hibernate 5.* does not have native support for JSONB. For this, a custom data type
-must be added. This sample uses [vladmihalcea/hibernate-types](https://github.com/vladmihalcea/hibernate-types).
-
 ## Limitations
 The following limitations are currently known:
 
 | Limitation             | Workaround                                                                                                                                                                                                                                                                   |
 |------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Hibernate Version      | Version 5.3.20.Final is supported.                                                                                                                                                                                                                                           |
-| Postgresql JDBC driver | Version 42.4.3 is supported.                                                                                                                                                                                                                                                 |
 | Schema updates         | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated schema updates using `hibernate` are therefore not supported. It is recommended to set the option `hibernate.hbm2ddl.auto=none` (or `spring.jpa.hibernate.ddl-auto=none` if you are using Spring). |
 | Generated primary keys | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Remove auto increment annotation for primary key columns. The recommended type of primary key is a client side generated `UUID` stored as a string.                                 |
 | Pessimistic Locking    | Cloud Spanner does not support `LockMode.UPGRADE` and `LockMode.UPGRADE_NOWAIT` lock modes.                                                                                                                                                                                  |
@@ -70,8 +67,13 @@ The following limitations are currently known:
 
 ### Schema Updates
 Schema updates are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect.
-It is recommended to create the schema manually.
+For this sample, the schema must be created manually.
 See [sample-schema.sql](src/main/resources/sample-schema-sql) for the data model for this example.
+
+It is recommended to use a higher-level schema management tool like Liquibase for gradual updates of
+your schema in production. This gives you more control over the changes that are applied, and allows
+you to store schema changes in a code repository. See [Spring Data JPA with PGAdapter here](../spring-data-jpa)
+for an example of how to integrate Liquibase with your application.
 
 ### Generated Primary Keys
 `Sequences` are not supported. Hence, auto increment primary key is not supported and should be replaced with primary key definitions that
@@ -83,8 +85,8 @@ keys.
 public class User {
 	// This uses auto generated UUID.
     @Id
-    @Column(columnDefinition = "varchar", nullable = false)
-    @GeneratedValue
+    @Column(columnDefinition = "varchar(36)")
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 }
 ```

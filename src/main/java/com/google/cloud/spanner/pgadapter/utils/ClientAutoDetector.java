@@ -310,6 +310,63 @@ public class ClientAutoDetector {
         return ImmutableMap.of(
             "spanner.guess_types", String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE));
       }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getDdlReplacements() {
+        // Replace known metadata tables for Liquibase.
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile(
+                    "CREATE\\s+TABLE\\s+(?:.*\\.)?databasechangeloglock\\s*\\(\\s*"
+                        + "ID\\s+INTEGER\\s+NOT\\s+NULL\\s*,\\s*"
+                        + "LOCKED\\s+BOOLEAN\\s+NOT\\s+NULL\\s*,\\s*"
+                        + "LOCKGRANTED\\s+TIMESTAMP\\s+WITHOUT\\s+TIME\\s+ZONE\\s*,\\s*"
+                        + "LOCKEDBY\\s+VARCHAR\\s*\\(255\\)\\s*,\\s*"
+                        + "CONSTRAINT\\s*databasechangeloglock_pkey\\s*PRIMARY\\s+KEY\\s*\\(ID\\)\\s*\\s*"
+                        + "\\)\\s*",
+                    Pattern.CASE_INSENSITIVE),
+                "CREATE TABLE databasechangeloglock (\n"
+                    + "    ID INTEGER NOT NULL,\n"
+                    + "    LOCKED BOOLEAN NOT NULL,\n"
+                    + "    LOCKGRANTED TIMESTAMPTZ,\n"
+                    + "    LOCKEDBY VARCHAR(255),\n"
+                    + "    PRIMARY KEY (ID)\n"
+                    + ")"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile(
+                    "CREATE\\s+TABLE\\s+(?:.*\\.)?databasechangelog\\s*\\(\\s*"
+                        + "ID\\s+VARCHAR\\s*\\(255\\)\\s*NOT\\s+NULL\\s*,\\s*"
+                        + "AUTHOR\\s+VARCHAR\\s*\\(255\\)\\s*NOT\\s+NULL\\s*,\\s*"
+                        + "FILENAME\\s+VARCHAR\\s*\\(255\\)\\s*NOT\\s+NULL\\s*,\\s*"
+                        + "DATEEXECUTED\\s+TIMESTAMP(?:.*)?\\s+NOT\\s+NULL\\s*,\\s*"
+                        + "ORDEREXECUTED\\s+INTEGER\\s+NOT\\s+NULL\\s*,\\s*"
+                        + "EXECTYPE\\s+VARCHAR\\s*\\(10\\)\\s*NOT\\s+NULL\\s*,\\s*"
+                        + "MD5SUM\\s+VARCHAR\\s*\\(35\\)\\s*,\\s*"
+                        + "DESCRIPTION\\s+VARCHAR\\s*\\(255\\)\\s*,\\s*"
+                        + "COMMENTS\\s+VARCHAR\\s*\\(255\\)\\s*,\\s*"
+                        + "TAG\\s+VARCHAR\\s*\\(255\\)\\s*,\\s*"
+                        + "LIQUIBASE\\s+VARCHAR\\s*\\(20\\)\\s*,\\s*"
+                        + "CONTEXTS\\s+VARCHAR\\s*\\(255\\)\\s*,\\s*"
+                        + "LABELS\\s+VARCHAR\\s*\\(255\\)\\s*,\\s*"
+                        + "DEPLOYMENT_ID\\s+VARCHAR\\s*\\(10\\)\\s*"
+                        + "\\)\\s*"),
+                "CREATE TABLE databasechangelog (\n"
+                    + "    ID VARCHAR(255) NOT NULL PRIMARY KEY,\n"
+                    + "    AUTHOR VARCHAR(255) NOT NULL,\n"
+                    + "    FILENAME VARCHAR(255) NOT NULL,\n"
+                    + "    DATEEXECUTED TIMESTAMPTZ NOT NULL,\n"
+                    + "    ORDEREXECUTED INTEGER NOT NULL,\n"
+                    + "    EXECTYPE VARCHAR(10) NOT NULL,\n"
+                    + "    MD5SUM VARCHAR(35),\n"
+                    + "    DESCRIPTION VARCHAR(255),\n"
+                    + "    COMMENTS VARCHAR(255),\n"
+                    + "    TAG VARCHAR(255),\n"
+                    + "    LIQUIBASE VARCHAR(20),\n"
+                    + "    CONTEXTS VARCHAR(255),\n"
+                    + "    LABELS VARCHAR(255),\n"
+                    + "    DEPLOYMENT_ID VARCHAR(10)\n"
+                    + ")"));
+      }
     },
     PGX {
       @Override
@@ -322,7 +379,9 @@ public class ClientAutoDetector {
       boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // pgx uses a relatively unique naming scheme for prepared statements (and uses prepared
         // statements for everything by default).
-        return parseMessage.getName() != null && parseMessage.getName().startsWith("lrupsc_");
+        return parseMessage.getName() != null
+            && (parseMessage.getName().startsWith("lrupsc_")
+                || parseMessage.getName().startsWith("stmtcache_"));
       }
     },
     NPGSQL {

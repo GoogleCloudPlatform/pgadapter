@@ -25,8 +25,10 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.RegexQueryPartReplacer;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
+import java.util.regex.Pattern;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -59,7 +61,7 @@ public class DdlExecutorTest {
   @Test
   public void testMaybeRemovePrimaryKeyConstraintName() {
     DdlExecutor ddlExecutor =
-        new DdlExecutor(mock(BackendConnection.class), Suppliers.memoize(ImmutableList::of));
+        new DdlExecutor(mock(BackendConnection.class), Suppliers.ofInstance(ImmutableList.of()));
 
     assertEquals(
         Statement.of("create table foo (id bigint primary key, value text)"),
@@ -208,5 +210,44 @@ public class DdlExecutorTest {
     assertGetDependentStatementsReturnsSame(ddlExecutor, Statement.of("drop schema foo invalid"));
     assertGetDependentStatementsReturnsSame(ddlExecutor, Statement.of("drop schema foo"));
     assertGetDependentStatementsReturnsSame(ddlExecutor, Statement.of("drop schema foo restrict"));
+  }
+
+  @Test
+  public void testDdlReplacements() {
+    DdlExecutor ddlExecutorWithoutReplacements =
+        new DdlExecutor(mock(BackendConnection.class), Suppliers.ofInstance(ImmutableList.of()));
+    String sql = "create table my_table (id bigint primary key, value varchar)";
+    assertSame(sql, ddlExecutorWithoutReplacements.applyReplacers(sql));
+
+    DdlExecutor ddlExecutorWithReplacements =
+        new DdlExecutor(
+            mock(BackendConnection.class),
+            Suppliers.ofInstance(
+                ImmutableList.of(
+                    RegexQueryPartReplacer.replace(Pattern.compile("timestamp"), "timestamptz"),
+                    RegexQueryPartReplacer.replaceAndStop(
+                        Pattern.compile(
+                            "create table databasechangelog \\(id bigint primary key\\)"),
+                        "create table databasechangelog_replaced (id bigint primary key)"),
+                    RegexQueryPartReplacer.replace(
+                        Pattern.compile("create table databasechangelog_replaced"),
+                        "create table databasechangelog_reverted"))));
+    assertSame(sql, ddlExecutorWithReplacements.applyReplacers(sql));
+    assertEquals(
+        "create table my_table (id bigint primary key, value timestamptz)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table my_table (id bigint primary key, value timestamp)"));
+    assertEquals(
+        "create table databasechangelog_replaced (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog (id bigint primary key)"));
+    assertEquals(
+        "create table databasechangelog_replaced (id bigint primary key); create table databasechangelog_replaced (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog (id bigint primary key); create table databasechangelog (id bigint primary key)"));
+    assertEquals(
+        "create table databasechangelog_reverted (id bigint primary key)",
+        ddlExecutorWithReplacements.applyReplacers(
+            "create table databasechangelog_replaced (id bigint primary key)"));
   }
 }

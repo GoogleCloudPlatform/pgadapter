@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.hibernate;
 import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
@@ -35,9 +36,11 @@ import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+@Category({IntegrationTest.class})
 @RunWith(JUnit4.class)
 public class ITHibernateTest {
   private static final Logger LOGGER = Logger.getLogger(ITHibernateTest.class.getName());
@@ -49,7 +52,6 @@ public class ITHibernateTest {
   private static final String HIBERNATE_DEFAULT_URL =
       "jdbc:postgresql://localhost:5432/test-database";
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static Database database;
   private static String originalHibernateProperties;
 
   @BeforeClass
@@ -59,7 +61,7 @@ public class ITHibernateTest {
     Class.forName("org.postgresql.Driver");
 
     testEnv.setUp();
-    database = testEnv.createDatabase(ImmutableList.of());
+    Database database = testEnv.createDatabase(ImmutableList.of());
     testEnv.startPGAdapterServer(ImmutableList.of());
     // Create the sample schema.
     StringBuilder builder = new StringBuilder();
@@ -110,8 +112,7 @@ public class ITHibernateTest {
   }
 
   @Test
-  public void testHibernateUpdate() throws IOException, InterruptedException {
-    System.out.println("Running hibernate test");
+  public void testHibernateSample() throws IOException, InterruptedException {
     ImmutableList<String> hibernateCommand =
         ImmutableList.<String>builder()
             .add(
@@ -120,22 +121,17 @@ public class ITHibernateTest {
                 "-Dexec.mainClass=com.google.cloud.postgres.HibernateSampleTest")
             .build();
     runCommand(hibernateCommand);
-    System.out.println("Hibernate Test Ended");
   }
 
   static void buildHibernateSample() throws IOException, InterruptedException {
-    System.out.println("Building Hibernate Sample.");
     ImmutableList<String> hibernateCommand =
         ImmutableList.<String>builder()
             .add("mvn", "-B", "--no-transfer-progress", "clean", "compile")
             .build();
     runCommand(hibernateCommand);
-    System.out.println("Hibernate Sample build complete.");
   }
 
   static void runCommand(ImmutableList<String> commands) throws IOException, InterruptedException {
-    System.out.println(
-        "Executing commands: " + commands + ". Sample Directory: " + HIBERNATE_SAMPLE_DIRECTORY);
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(commands);
     builder.directory(new File(HIBERNATE_SAMPLE_DIRECTORY));
@@ -147,13 +143,11 @@ public class ITHibernateTest {
             new BufferedReader(new InputStreamReader(process.getInputStream()));
         BufferedReader errorReader =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-      System.out.println("Printing hibernate loadings");
       output = reader.lines().collect(Collectors.joining("\n"));
       errors = errorReader.lines().collect(Collectors.joining("\n"));
-      System.out.println(output);
     }
 
     // Verify that there were no errors, and print the error output if there was an error.
-    assertEquals(errors, 0, process.waitFor());
+    assertEquals(errors + "\n\nOUTPUT:\n" + output, 0, process.waitFor());
   }
 }

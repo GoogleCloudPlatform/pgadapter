@@ -31,7 +31,7 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-@Category(IntegrationTest.class)
+@Category({IntegrationTest.class})
 @RunWith(JUnit4.class)
 public class ITSQLAlchemy2SampleTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();

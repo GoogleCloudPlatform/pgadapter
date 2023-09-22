@@ -23,7 +23,6 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.RandomResultSetGenerator;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import java.sql.Connection;
@@ -52,7 +51,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     // Start PGAdapter without a default database.
-    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of());
+    doStartMockSpannerAndPgAdapterServers(null, builder -> {});
   }
 
   @After

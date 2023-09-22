@@ -14,16 +14,25 @@ src/test/golang/**/*.h
 src/test/golang/**/*.so
 samples/golang/**/*.h
 samples/golang/**/*.so
+samples/golang/pgx/pgx_sample
 samples/**/node_modules
 samples/**/package-lock.json
 
 src/test/csharp/**/bin
 src/test/csharp/**/obj
+samples/**/dotnet/**/bin
+samples/**/dotnet/**/obj
 
 src/test/nodejs/**/node_modules
 src/test/nodejs/**/package-lock.json
 src/test/nodejs/**/.DS_Store
 src/test/nodejs/**/.env
+samples/nodejs/**/node_modules
+samples/nodejs/**/package-lock.json
+samples/nodejs/**/.DS_Store
+samples/cloud-run/nodejs/**/node_modules
+samples/cloud-run/nodejs/**/package-lock.json
+samples/cloud-run/nodejs/**/.DS_Store
 
 src/test/ruby/**/Gemfile.lock
-samples/ruby/**/Gemfile.lock
+samples/**/ruby/**/Gemfile.lock
