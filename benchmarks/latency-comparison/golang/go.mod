@@ -7,7 +7,7 @@ require (
 	github.com/docker/docker v23.0.5+incompatible
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/jackc/pgx/v5 v5.3.1
-	github.com/montanaflynn/stats v0.7.0
+	github.com/montanaflynn/stats v0.7.1
 	github.com/testcontainers/testcontainers-go v0.20.1
 	golang.org/x/oauth2 v0.6.0
 	google.golang.org/api v0.114.0
