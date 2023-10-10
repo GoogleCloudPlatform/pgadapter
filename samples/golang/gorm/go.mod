@@ -10,7 +10,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.24.1
 	gorm.io/datatypes v1.2.0
 	gorm.io/driver/postgres v1.5.2
-	gorm.io/gorm v1.25.4
+	gorm.io/gorm v1.25.5
 )
 
 require (
