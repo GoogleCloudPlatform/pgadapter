@@ -289,7 +289,11 @@ public class SSLMockServerTest extends AbstractMockServerTest {
         output = reader.lines().collect(Collectors.joining("\n"));
       }
 
-      assertEquals(host, "", errors);
+      // Ignore known errors on some Macs on GitHub Actions.
+      if (!(host.startsWith("Mac-")
+          && errors.contains("error: could not translate host name \"Mac-"))) {
+        assertEquals(host, "", errors);
+      }
       assertEquals(" C \n---\n 1\n(1 row)\n", output);
       int res = process.waitFor();
       assertEquals(0, res);
