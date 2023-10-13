@@ -293,13 +293,13 @@ public class SSLMockServerTest extends AbstractMockServerTest {
       if (!(host.startsWith("Mac-")
           && errors.contains("error: could not translate host name \"Mac-"))) {
         assertEquals(host, "", errors);
-      }
-      assertEquals(" C \n---\n 1\n(1 row)\n", output);
-      int res = process.waitFor();
-      assertEquals(0, res);
+        assertEquals(" C \n---\n 1\n(1 row)\n", output);
+        int res = process.waitFor();
+        assertEquals(0, res);
 
-      assertEquals(
-          1L, pgServer.getDebugMessages().stream().filter(m -> m instanceof SSLMessage).count());
+        assertEquals(
+            1L, pgServer.getDebugMessages().stream().filter(m -> m instanceof SSLMessage).count());
+      }
       pgServer.clearDebugMessages();
     }
   }
