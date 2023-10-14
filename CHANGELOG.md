@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.25.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.24.0...v0.25.0) (2023-10-14)
+
+
+### Features
+
+* support drop cascade ([#841](https://github.com/GoogleCloudPlatform/pgadapter/issues/841)) ([0ffa659](https://github.com/GoogleCloudPlatform/pgadapter/commit/0ffa6598120b914737519b45914cc149cedffc77))
+
+
+### Bug Fixes
+
+* accept statements with only comments ([#1122](https://github.com/GoogleCloudPlatform/pgadapter/issues/1122)) ([7439aac](https://github.com/GoogleCloudPlatform/pgadapter/commit/7439aacd7b93d3f40015ea41744ce2d71c23ebb7))
+
+
+### Dependencies
+
+* bump spanner to 6.51.0 ([#1121](https://github.com/GoogleCloudPlatform/pgadapter/issues/1121)) ([e2e326b](https://github.com/GoogleCloudPlatform/pgadapter/commit/e2e326b9932c30a4eef6c531a80365765659cb9c))
+* update dependency npgsql to v7.0.6 ([#1094](https://github.com/GoogleCloudPlatform/pgadapter/issues/1094)) ([56b1894](https://github.com/GoogleCloudPlatform/pgadapter/commit/56b18945a4e62b8fecf389a5191bc14ebd38bac8))
+* update dependency sqlalchemy to v1.4.49 ([#1095](https://github.com/GoogleCloudPlatform/pgadapter/issues/1095)) ([de12090](https://github.com/GoogleCloudPlatform/pgadapter/commit/de12090539bb85a8a43ae542d23c6d337f3897a0))
+* update module github.com/docker/docker to v23.0.7+incompatible ([#1096](https://github.com/GoogleCloudPlatform/pgadapter/issues/1096)) ([4384ffb](https://github.com/GoogleCloudPlatform/pgadapter/commit/4384ffbd690268af4de3756c8a02c7b84062d1ab))
+* update spring-boot.version to v2.7.16 ([#1098](https://github.com/GoogleCloudPlatform/pgadapter/issues/1098)) ([9c0b9d9](https://github.com/GoogleCloudPlatform/pgadapter/commit/9c0b9d9b61ea55be6c5ff3b4814b08ffed2c0694))
+
 ## [0.24.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.23.1...v0.24.0) (2023-09-21)
 
 
