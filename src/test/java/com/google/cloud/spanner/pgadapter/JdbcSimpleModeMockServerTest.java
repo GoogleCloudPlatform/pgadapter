@@ -244,6 +244,30 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testEmptyStatementWithSemiColon() throws SQLException {
+    String sql = ";";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      assertFalse(connection.createStatement().execute(sql));
+    }
+
+    // An empty statement is not sent to Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testPing() throws SQLException {
+    String sql = "-- ping";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      assertFalse(connection.createStatement().execute(sql));
+    }
+
+    // An empty statement is not sent to Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
   public void testInvalidDml() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
