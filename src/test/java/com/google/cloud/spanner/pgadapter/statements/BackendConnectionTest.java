@@ -391,8 +391,9 @@ public class BackendConnectionTest {
   @Test
   public void testGeneralException() {
     Connection connection = mock(Connection.class);
-    ParsedStatement parsedStatement = mock(ParsedStatement.class);
     Statement statement = Statement.of("select foo from bar");
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
     RuntimeException error = new RuntimeException("test error");
     when(connection.execute(statement)).thenThrow(error);
 
@@ -416,8 +417,9 @@ public class BackendConnectionTest {
   @Test
   public void testCancelledException() {
     Connection connection = mock(Connection.class);
-    ParsedStatement parsedStatement = mock(ParsedStatement.class);
     Statement statement = Statement.of("select foo from bar");
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
     SpannerException error =
         SpannerExceptionFactory.newSpannerException(ErrorCode.CANCELLED, "query cancelled");
     when(connection.execute(statement)).thenThrow(error);
