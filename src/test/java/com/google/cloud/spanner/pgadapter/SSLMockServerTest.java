@@ -290,7 +290,7 @@ public class SSLMockServerTest extends AbstractMockServerTest {
       }
 
       // Ignore known errors on some Macs on GitHub Actions.
-      if (!(host.startsWith("Mac-")
+      if (!(System.getProperty("os.name").contains("Mac")
           && errors.contains("error: could not translate host name \"Mac-"))) {
         assertEquals(host, "", errors);
         assertEquals(" C \n---\n 1\n(1 row)\n", output);
