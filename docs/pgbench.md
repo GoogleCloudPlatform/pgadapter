@@ -72,8 +72,12 @@ You can run different benchmarks after finishing the steps above.
 ### Default Benchmark
 Run a default benchmark to verify that everything works as expected.
 
+It is recommended to always use either `--protocol=extended` or `--protocol=prepared` for Cloud
+Spanner. The default `--protocol=simple` mode that is used by `pgbench`, will include all query
+parameters as literals in the query string and cause additional query parsing time on Cloud Spanner.
+
 ```shell
-pgbench "host=/tmp port=5432 dbname=my-database"
+pgbench "host=/tmp port=5432 dbname=my-database" --protocol=extended
 ```
 
 ### Number of Clients
@@ -82,8 +86,36 @@ Increase the number of clients and threads to increase the number of parallel tr
 ```shell
 pgbench "host=/tmp port=5432 dbname=my-database" \
         --client=100 --jobs=100 \
-        --progress=10
+        --progress=10 \
+        --protocol=extended
 ```
+
+Note that PGAdapter by default creates an internal Cloud Spanner session pool containing at most
+400 sessions. Running `pgbench` with more than 400 clients requires more sessions.
+
+Starting PGAdapter using Java with a larger session pool:
+
+```shell
+java -jar pgadapter.jar -p my-project -i my-instance -d my-database \
+     -r="minSessions=800;maxSessions=800;numChannels=16"
+```
+
+Starting PGAdapter using Docker with a larger session pool:
+
+```shell
+docker run -p 5432:5432 \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
+  -p my-project -i my-instance -x \
+  -r="minSessions=800;maxSessions=800;numChannels=16"
+```
+
+```shell
+pgbench "host=/tmp port=5432 dbname=my-database" \
+        --client=800 --jobs=100 \
+        --progress=10 \
+        --protocol=extended
+```
+
 
 ## Dropping Tables
 Execute the following command to remove the `pgbench` tables from your database if you no longer
