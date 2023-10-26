@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
+import static com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest.readAll;
 import static org.junit.Assert.assertEquals;
 
 import com.google.common.io.Files;
@@ -21,6 +22,7 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 
 /** Golang Test interface. */
 public interface GolangTest {
@@ -51,7 +53,11 @@ public interface GolangTest {
     builder.command(compileCommand);
     builder.directory(directory);
     Process process = builder.start();
+    InputStream errorStream = process.getErrorStream();
+
     int res = process.waitFor();
+    String errors = readAll(errorStream);
+    assertEquals("", errors);
     assertEquals(0, res);
 
     // We explicitly use the full path to force JNA to look in a specific directory, instead of in
