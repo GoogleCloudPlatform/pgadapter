@@ -78,7 +78,7 @@ psql -h localhost -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; 
 # Load workloada
 ./bin/ycsb load jdbc -P workloads/workloada \
   -threads 20 \
-  -p recordcount=100000 \
+  -p recordcount=1000000 \
   -p db.batchsize=200 \
   -p jdbc.batchupdateapi=true \
   -P tcp.properties \
@@ -102,10 +102,10 @@ do
     else
       CONN=uds.properties
     fi
-    for THREADS in 1 5 20 50 200
+    for THREADS in 1 200
     do
-      OPERATION_COUNT=`expr $THREADS \* 100`
-      for BATCH_SIZE in 1 10 50 200
+      OPERATION_COUNT=`expr $THREADS \* 1000`
+      for BATCH_SIZE in 1
       do
         if [ $BATCH_SIZE == 1 ]
         then
@@ -117,7 +117,7 @@ do
           -threads $THREADS \
           -p hdrhistogram.percentiles=50,95,99 \
           -p operationcount=$OPERATION_COUNT \
-          -p recordcount=100000 \
+          -p recordcount=1000000 \
           -p db.batchsize=$BATCH_SIZE \
           -p jdbc.batchupdateapi=$BATCH_API \
           -P $CONN \
