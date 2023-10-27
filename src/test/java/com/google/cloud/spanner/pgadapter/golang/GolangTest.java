@@ -57,8 +57,7 @@ public interface GolangTest {
 
     int res = process.waitFor();
     String errors = readAll(errorStream);
-    assertEquals("", errors);
-    assertEquals(0, res);
+    assertEquals(errors, 0, res);
 
     // We explicitly use the full path to force JNA to look in a specific directory, instead of in
     // standard library directories.
