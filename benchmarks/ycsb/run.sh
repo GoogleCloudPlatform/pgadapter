@@ -105,7 +105,7 @@ do
     for THREADS in 1 5 20 50 200
     do
       OPERATION_COUNT=`expr $THREADS \* 1000`
-      for BATCH_SIZE in 1 10 50 200
+      for BATCH_SIZE in 1 10 50
       do
         if [ $BATCH_SIZE == 1 ]
         then
