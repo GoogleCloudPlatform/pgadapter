@@ -432,7 +432,9 @@ public class ClientAutoDetector {
                   Suppliers.ofInstance("'' as regtype")),
               RegexQueryPartReplacer.replace(
                   Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
-                  Suppliers.ofInstance("WHERE t.typname = \\$1")));
+                  Suppliers.ofInstance("WHERE t.typname = \\$1")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("COLLATE \"C\""), Suppliers.ofInstance("")));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
