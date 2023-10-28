@@ -277,7 +277,7 @@ public class BackendConnection {
           // Ignore the statement as it is a no-op to execute COMMIT/ROLLBACK when we are not in a
           // transaction. TODO: Return a warning.
           result.set(NO_RESULT);
-        } else if (statement.getSql().isEmpty()) {
+        } else if (parsedStatement.getSqlWithoutComments().isEmpty()) {
           result.set(NO_RESULT);
         } else if (parsedStatement.isDdl()) {
           if (analyze) {
@@ -716,7 +716,7 @@ public class BackendConnection {
 
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
-  private static final StatementResult NO_RESULT = new NoResult();
+  static final StatementResult NO_RESULT = new NoResult();
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 

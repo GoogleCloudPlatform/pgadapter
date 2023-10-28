@@ -36,14 +36,12 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
-@Ignore("Wait until drop cascade support has been added")
 public class DropCascadeMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass

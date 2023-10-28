@@ -21,7 +21,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <junixsocket.version>2.7.2</junixsocket.version>
+    <junixsocket.version>2.8.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -44,7 +44,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.24.0</version>
+      <version>0.25.0</version>
     </dependency>
     <!-- [END pgadapter_and_jdbc_dependency] -->
     <dependency>

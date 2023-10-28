@@ -36,12 +36,12 @@
     </excludedTests>
     <excludedIntegrationTests/>
 
-    <junixsocket.version>2.7.2</junixsocket.version>
+    <junixsocket.version>2.8.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.24.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.25.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -53,7 +53,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.5.3</version>
+    <version>1.5.8</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -76,14 +76,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-spanner-bom</artifactId>
-        <version>6.47.0</version>
+        <version>6.51.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-shared-dependencies</artifactId>
-        <version>3.15.0</version>
+        <version>3.17.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -99,7 +99,7 @@
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.38.0</version>
+      <version>3.39.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
@@ -144,7 +144,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.9.4</version>
+      <version>3.9.5</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>

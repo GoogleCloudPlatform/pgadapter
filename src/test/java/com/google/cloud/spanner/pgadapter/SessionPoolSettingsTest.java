@@ -28,6 +28,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.threeten.bp.Duration;
 
 @RunWith(JUnit4.class)
 public class SessionPoolSettingsTest extends AbstractMockServerTest {
@@ -44,7 +45,11 @@ public class SessionPoolSettingsTest extends AbstractMockServerTest {
         builder ->
             builder
                 .setSessionPoolOptions(
-                    SessionPoolOptions.newBuilder().setMinSessions(20).setMaxSessions(100).build())
+                    SessionPoolOptions.newBuilder()
+                        .setMinSessions(20)
+                        .setMaxSessions(100)
+                        .setWaitForMinSessions(Duration.ofMillis(1000L))
+                        .build())
                 .setNumChannels(5));
   }
 

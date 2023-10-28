@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.NO_RESULT;
+
 import com.google.cloud.Tuple;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
@@ -40,6 +42,9 @@ import java.util.function.Supplier;
  * features that are not (yet) supported by the backend.
  */
 class DdlExecutor {
+  private static final Statement START_BATCH_DDL = Statement.of("START BATCH DDL");
+
+  private static final Statement RUN_BATCH = Statement.of("RUN BATCH");
 
   private final BackendConnection backendConnection;
   private final Connection connection;
@@ -88,17 +93,16 @@ class DdlExecutor {
         boolean startedBatch = false;
         try {
           if (!connection.isDdlBatchActive()) {
-            connection.execute(Statement.of("START BATCH DDL"));
+            connection.execute(START_BATCH_DDL);
             startedBatch = true;
           }
-          StatementResult result = null;
           for (Statement dropDependency : allStatements) {
-            result = connection.execute(dropDependency);
+            connection.execute(dropDependency);
           }
           if (startedBatch) {
-            result = connection.execute(Statement.of("RUN BATCH"));
+            connection.execute(RUN_BATCH);
           }
-          return result;
+          return NO_RESULT;
         } catch (Throwable t) {
           if (startedBatch && connection.isDdlBatchActive()) {
             connection.abortBatch();
