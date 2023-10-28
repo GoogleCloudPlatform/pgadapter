@@ -137,6 +137,21 @@ public class TableParserTest {
             "pg_type",
             null,
             "pg_type"));
+    assertEquals(
+        Statement.of(
+            "select * from pg_namespace "
+                + "inner join pg_class on pg_namespace.oid = pg_class.relnamespace "
+                + "where pg_class.relname = $1::VARCHAR AND pg_class.relkind = ANY (ARRAY[$2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR]) AND true AND pg_namespace.nspname != $7::VARCHAR'"),
+        replace(
+            Statement.of(
+                "select * from pg_catalog.pg_namespace "
+                    + "inner join pg_catalog.pg_class on pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace "
+                    + "where pg_catalog.pg_class.relname = $1::VARCHAR AND pg_catalog.pg_class.relkind = ANY (ARRAY[$2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR]) AND true AND pg_catalog.pg_namespace.nspname != $7::VARCHAR'"),
+            ImmutableMap.of(
+                TableOrIndexName.of("pg_catalog", "pg_namespace"),
+                    TableOrIndexName.of(null, "pg_namespace"),
+                TableOrIndexName.of("pg_catalog", "pg_class"),
+                    TableOrIndexName.of(null, "pg_class"))));
 
     assertEquals(
         Statement.of("insert into pg_type (name) values ('foo')"),
@@ -862,5 +877,10 @@ public class TableParserTest {
             ImmutableMap.of(
                 new TableOrIndexName(schema, table), new TableOrIndexName(withSchema, withTable)))
         .y();
+  }
+
+  static Statement replace(
+      Statement original, ImmutableMap<TableOrIndexName, TableOrIndexName> detectAndReplaceMap) {
+    return new TableParser(original).detectAndReplaceTables(detectAndReplaceMap).y();
   }
 }
