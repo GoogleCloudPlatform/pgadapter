@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/shopspring/decimal v1.3.1
 	github.com/testcontainers/testcontainers-go v0.26.0
-	github.com/testcontainers/testcontainers-go/modules/postgres v0.25.0
+	github.com/testcontainers/testcontainers-go/modules/postgres v0.26.0
 	gorm.io/datatypes v1.2.0
 	gorm.io/driver/postgres v1.5.4
 	gorm.io/gorm v1.25.5
