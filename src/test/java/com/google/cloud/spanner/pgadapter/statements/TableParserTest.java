@@ -139,12 +139,12 @@ public class TableParserTest {
             "pg_type"));
     assertEquals(
         Statement.of(
-            "select * from pg_namespace "
+            "select pg_class.relname from pg_namespace "
                 + "inner join pg_class on pg_namespace.oid = pg_class.relnamespace "
                 + "where pg_class.relname = $1::VARCHAR AND pg_class.relkind = ANY (ARRAY[$2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR]) AND true AND pg_namespace.nspname != $7::VARCHAR'"),
         replace(
             Statement.of(
-                "select * from pg_catalog.pg_namespace "
+                "select pg_catalog.pg_class.relname from pg_catalog.pg_namespace "
                     + "inner join pg_catalog.pg_class on pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace "
                     + "where pg_catalog.pg_class.relname = $1::VARCHAR AND pg_catalog.pg_class.relkind = ANY (ARRAY[$2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR]) AND true AND pg_catalog.pg_namespace.nspname != $7::VARCHAR'"),
             ImmutableMap.of(

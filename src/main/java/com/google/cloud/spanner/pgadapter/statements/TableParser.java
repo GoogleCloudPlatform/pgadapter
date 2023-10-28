@@ -89,21 +89,13 @@ class TableParser {
           parseTableList(detectAndReplaceMap, replacedTables, detectedTablesBuilder, multipleTables)
               || detectedOrReplacedTable;
     }
-    // Reset to start and search for the WHERE clause.
+    // Reset to start replace full-qualified column names of tables that have been replaced.
     parser.setPos(0);
-    parser.parseExpressionUntilKeyword(ImmutableList.of("where"), true, false, false);
-    // Check whether we found a keyword.
-    if (parser.peekKeyword("where")) {
-      int positionBeforeWhereClause = parser.getPos();
-      String replaced =
-          replaceFullyQualifiedColumnNames(
-              detectAndReplaceMap,
-              replacedTables,
-              positionBeforeWhereClause,
-              parser.getSql().length());
-      if (replaced != null) {
-        parser.setSql(parser.getSql().substring(0, positionBeforeWhereClause) + replaced);
-      }
+    String replaced =
+        replaceFullyQualifiedColumnNames(
+            detectAndReplaceMap, replacedTables, 0, parser.getSql().length());
+    if (replaced != null) {
+      parser.setSql(replaced);
     }
 
     return detectedOrReplacedTable
