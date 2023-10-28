@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.nodejs;
 
 import static com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest.readAll;
-import static com.google.cloud.spanner.pgadapter.nodejs.PrismaSampleTest.runTest;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -66,8 +65,22 @@ public class ITPrismaSampleTest {
     database = testEnv.createDatabase(ImmutableList.of());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
 
-    // Create data model by applying the Prisma migrations.
+    // Generate the Prisma client.
     ProcessBuilder builder = new ProcessBuilder();
+    builder.command("npx", "prisma", "generate");
+    builder.directory(getTestDirectory().getParentFile());
+
+    Process process = builder.start();
+    InputStream errorStream = process.getErrorStream();
+    boolean finished = process.waitFor(300L, TimeUnit.SECONDS);
+
+    String errors = readAll(errorStream);
+    assertEquals("", errors);
+    assertTrue(finished);
+    assertEquals(errors, 0, process.exitValue());
+
+    // Create data model by applying the Prisma migrations.
+    builder = new ProcessBuilder();
     builder.command("npx", "prisma", "migrate", "deploy");
     builder.directory(getTestDirectory().getParentFile());
     builder
@@ -79,17 +92,14 @@ public class ITPrismaSampleTest {
                     + "&options=-c%%20spanner.well_known_client=prisma",
                 testEnv.getPGAdapterPort(), database.getId().getDatabase()));
 
-    Process process = builder.start();
-    InputStream inputStream = process.getInputStream();
-    InputStream errorStream = process.getErrorStream();
-    boolean finished = process.waitFor(300L, TimeUnit.SECONDS);
+    process = builder.start();
+    errorStream = process.getErrorStream();
+    finished = process.waitFor(300L, TimeUnit.SECONDS);
 
-    String output = readAll(inputStream);
-    String errors = readAll(errorStream);
+    errors = readAll(errorStream);
     assertEquals("", errors);
     assertTrue(finished);
     assertEquals(errors, 0, process.exitValue());
-    System.out.println(output);
   }
 
   @AfterClass
