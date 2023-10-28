@@ -391,7 +391,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA.toBuilder()
+                    ALL_TYPES_METADATA
+                        .toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -619,7 +620,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from all_types"),
-            ALL_TYPES_RESULTSET.toBuilder()
+            ALL_TYPES_RESULTSET
+                .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
                 .build()));
 
@@ -636,7 +638,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from all_types"),
-            ALL_TYPES_RESULTSET.toBuilder()
+            ALL_TYPES_RESULTSET
+                .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
                 .build()));
 

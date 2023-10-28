@@ -137,9 +137,7 @@ public class IntermediateStatement {
     }
   }
 
-  /**
-   * @return True if this is a select statement, false otherwise.
-   */
+  /** @return True if this is a select statement, false otherwise. */
   public boolean containsResultSet() {
     return this.parsedStatement.isQuery()
         || (this.parsedStatement.getType() == StatementType.CLIENT_SIDE
@@ -148,9 +146,7 @@ public class IntermediateStatement {
         || (this.parsedStatement.isUpdate() && this.parsedStatement.hasReturningClause());
   }
 
-  /**
-   * @return True if this statement was executed, False otherwise.
-   */
+  /** @return True if this statement was executed, False otherwise. */
   public boolean isExecuted() {
     return executed;
   }
@@ -205,9 +201,7 @@ public class IntermediateStatement {
     return this.exception != null;
   }
 
-  /**
-   * @return True if only a subset of the available data has been returned.
-   */
+  /** @return True if only a subset of the available data has been returned. */
   public boolean isHasMoreData() {
     return this.hasMoreData;
   }
@@ -325,9 +319,7 @@ public class IntermediateStatement {
     return 0;
   }
 
-  /**
-   * @return the extracted command (first word) from the SQL statement.
-   */
+  /** @return the extracted command (first word) from the SQL statement. */
   public String getCommand() {
     return this.command;
   }
@@ -336,9 +328,7 @@ public class IntermediateStatement {
     this.commandTag = Preconditions.checkNotNull(commandTag);
   }
 
-  /**
-   * @return the extracted command (first word) from the really executed SQL statement.
-   */
+  /** @return the extracted command (first word) from the really executed SQL statement. */
   public String getCommandTag() {
     return this.commandTag;
   }

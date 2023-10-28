@@ -816,7 +816,8 @@ public class GormMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA.toBuilder()
+                    ALL_TYPES_METADATA
+                        .toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(

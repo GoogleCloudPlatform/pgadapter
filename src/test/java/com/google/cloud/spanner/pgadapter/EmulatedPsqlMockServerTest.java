@@ -334,7 +334,8 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
             Statement.of("select * from my_table where id=$1"),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(
-                    createAllTypesResultSetMetadata("").toBuilder()
+                    createAllTypesResultSetMetadata("")
+                        .toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -423,7 +424,8 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
             Statement.of("select * from my_table where ts=$1"),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(
-                    createAllTypesResultSetMetadata("").toBuilder()
+                    createAllTypesResultSetMetadata("")
+                        .toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
