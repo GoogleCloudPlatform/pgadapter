@@ -75,7 +75,7 @@ public class ITPrismaSampleTest {
         .put(
             "DATABASE_URL",
             String.format(
-                "postgresql://localhost:%d/%s?sslmode=disable&options=-c%%20spanner.well_known_client=prisma",
+                "postgresql://localhost:%d/%s?options=-c%%20spanner.well_known_client=prisma",
                 testEnv.getPGAdapterPort(), database.getId().getDatabase()));
 
     Process process = builder.start();
