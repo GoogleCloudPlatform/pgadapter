@@ -73,8 +73,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_")
-                        .toBuilder()
+                    createAlbumsMetadata("albums_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -167,8 +166,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createVenuesMetadata("venues_")
-                        .toBuilder()
+                    createVenuesMetadata("venues_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(TypeCode.STRING, TypeCode.INT64))
@@ -605,8 +603,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getAlbumsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_")
-                        .toBuilder()
+                    createAlbumsMetadata("albums_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters()))
@@ -689,8 +686,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getSingerSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createSingersMetadata("singers_")
-                        .toBuilder()
+                    createSingersMetadata("singers_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters()))
@@ -718,8 +714,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getAlbumsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_")
-                        .toBuilder()
+                    createAlbumsMetadata("albums_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -824,8 +819,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getSingerSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createSingersMetadata("singers_")
-                        .toBuilder()
+                    createSingersMetadata("singers_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -906,8 +900,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getAlbumSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_")
-                        .toBuilder()
+                    createAlbumsMetadata("albums_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -938,8 +931,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getTrackSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createTracksMetadata("tracks_")
-                        .toBuilder()
+                    createTracksMetadata("tracks_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -988,8 +980,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getAlbumSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_")
-                        .toBuilder()
+                    createAlbumsMetadata("albums_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -1043,8 +1034,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createTracksMetadata("tracks_")
-                        .toBuilder()
+                    createTracksMetadata("tracks_").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(TypeCode.STRING, TypeCode.INT64))
@@ -1091,8 +1081,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(checkTableExistsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(ImmutableList.of(TypeCode.STRING))
-                        .toBuilder()
+                    createMetadata(ImmutableList.of(TypeCode.STRING)).toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(

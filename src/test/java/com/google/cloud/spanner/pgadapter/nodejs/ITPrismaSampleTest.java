@@ -14,7 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.nodejs;
 
+import static com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest.readAll;
 import static com.google.cloud.spanner.pgadapter.nodejs.PrismaSampleTest.runTest;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
@@ -23,7 +25,9 @@ import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -50,7 +54,8 @@ public class ITPrismaSampleTest {
         testName,
         "localhost",
         testEnv.getPGAdapterPort(),
-        database.getId().getDatabase());
+        database.getId().getDatabase(),
+        "?sslmode=disable&options=-c%20spanner.well_known_client=prisma");
   }
 
   @BeforeClass
@@ -60,6 +65,30 @@ public class ITPrismaSampleTest {
     testEnv.setUp();
     database = testEnv.createDatabase(ImmutableList.of());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
+
+    // Create data model by applying the Prisma migrations.
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command("npx", "prisma", "migrate", "deploy");
+    builder.directory(getTestDirectory().getParentFile());
+    builder
+        .environment()
+        .put(
+            "DATABASE_URL",
+            String.format(
+                "postgresql://localhost:%d/%s?sslmode=disable&options=-c%%20spanner.well_known_client=prisma",
+                testEnv.getPGAdapterPort(), database.getId().getDatabase()));
+
+    Process process = builder.start();
+    InputStream inputStream = process.getInputStream();
+    InputStream errorStream = process.getErrorStream();
+    boolean finished = process.waitFor(300L, TimeUnit.SECONDS);
+
+    String output = readAll(inputStream);
+    String errors = readAll(errorStream);
+    assertEquals("", errors);
+    assertTrue(finished);
+    assertEquals(errors, 0, process.exitValue());
+    System.out.println(output);
   }
 
   @AfterClass
@@ -69,17 +98,14 @@ public class ITPrismaSampleTest {
   }
 
   @Test
-  public void testCreateRandomSingersAndAlbums() throws Exception {
+  public void testRunSample() throws Exception {
     String output = runTest("testCreateRandomSingersAndAlbums");
-
     assertTrue(output, output.startsWith("Creating random singers and albums\n"));
-    assertTrue(output, output.matches("(?s).*Created \\d+ singers and \\d+ albums.*"));
-  }
+    assertTrue(
+        output, output.matches("(?s).*Created \\d+ singers, \\d+ albums, and \\d+ tracks.*"));
 
-  @Test
-  public void testPrintSingersAndAlbums() throws Exception {
-    String output = runTest("testPrintSingersAndAlbums");
-
-    assertTrue(output, output.startsWith("Creating random singers and albums\n"));
+    output = runTest("testPrintSingersAndAlbums");
+    assertTrue(output, output.startsWith("Printing all singers and albums\n"));
+    assertTrue(output, output.matches("(?s).*Singer .* has \\d+ albums:.*"));
   }
 }

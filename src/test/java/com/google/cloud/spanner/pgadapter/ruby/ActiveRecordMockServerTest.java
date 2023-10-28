@@ -1409,8 +1409,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
   }
 
   static ResultSetMetadata addSelectOneParameters(ResultSetMetadata metadata) {
-    return metadata
-        .toBuilder()
+    return metadata.toBuilder()
         .setUndeclaredParameters(
             StructType.newBuilder()
                 .addFields(

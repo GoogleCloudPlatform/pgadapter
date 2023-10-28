@@ -51,17 +51,28 @@ public interface NodeJSTest {
       throws IOException, InterruptedException {
     String currentPath = new java.io.File(".").getCanonicalPath();
     String testFilePath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
-    return runTest(new File(testFilePath), "start", testName, host, port, database);
+    return runTest(new File(testFilePath), "start", testName, host, port, database, "");
   }
 
   static String runTest(
-      File directory, String scriptName, String testName, String host, int port, String database)
+      File directory,
+      String scriptName,
+      String testName,
+      String host,
+      int port,
+      String database,
+      String extraDatabaseUrlParameters)
       throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(
         "npm", "--silent", scriptName, testName, host, String.format("%d", port), database);
     builder.directory(directory);
-    builder.environment().put("DATABASE_URL", String.format("postgresql://localhost:%d/d", port));
+    builder
+        .environment()
+        .put(
+            "DATABASE_URL",
+            String.format(
+                "postgresql://localhost:%d/%s%s", port, database, extraDatabaseUrlParameters));
 
     Process process = builder.start();
     InputStream inputStream = process.getInputStream();

@@ -71,7 +71,7 @@ CREATE TABLE "Concert" (
 CREATE INDEX "Singer_lastName_idx" ON "Singer"("lastName");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Album_id_title_idx" ON "Track"("id", "title");
+CREATE UNIQUE INDEX "Album_singerId_title_idx" ON "Album"("singerId", "title");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Track_id_title_idx" ON "Track"("id", "title");

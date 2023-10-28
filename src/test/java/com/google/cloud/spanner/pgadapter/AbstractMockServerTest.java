@@ -1005,8 +1005,7 @@ public abstract class AbstractMockServerTest {
       boolean alsoAsArrays,
       ImmutableList<String> names,
       ImmutableList<TypeCode> parameterTypes) {
-    return createMetadata(types, alsoAsArrays, names)
-        .toBuilder()
+    return createMetadata(types, alsoAsArrays, names).toBuilder()
         .setUndeclaredParameters(
             createParameterTypesMetadata(parameterTypes).getUndeclaredParameters())
         .build();

@@ -35,7 +35,7 @@ model Album {
   singerId        String
   tracks          Track[]
 
-  @@unique([id, title])
+  @@unique([singer, title])
 }
 
 model Track {

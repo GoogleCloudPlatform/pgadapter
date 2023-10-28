@@ -102,7 +102,7 @@ export async function createRandomSingersAndAlbumsAndTracks(numSingers?: number 
     numCreatedTracks += createdTracks.count;
   }
 
-  console.log(`Created ${singers.length} singers,  ${numCreatedAlbums} albums, and ${numCreatedTracks} tracks.`);
+  console.log(`Created ${singers.length} singers, ${numCreatedAlbums} albums, and ${numCreatedTracks} tracks.`);
   console.log();
 }
 

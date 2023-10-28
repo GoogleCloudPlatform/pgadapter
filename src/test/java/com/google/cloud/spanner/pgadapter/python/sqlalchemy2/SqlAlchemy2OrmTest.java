@@ -571,8 +571,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
             Statement.of(insertUserSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(ImmutableList.of(TypeCode.INT64))
-                        .toBuilder()
+                    createMetadata(ImmutableList.of(TypeCode.INT64)).toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(TypeCode.STRING, TypeCode.STRING))
@@ -587,8 +586,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                 .bind("p2")
                 .to("Pearl Krabs")
                 .build(),
-            SELECT1_RESULTSET
-                .toBuilder()
+            SELECT1_RESULTSET.toBuilder()
                 .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
                 .build()));
     String insertAddressesSql =
@@ -601,8 +599,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
             Statement.of(insertAddressesSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(ImmutableList.of(TypeCode.INT64))
-                        .toBuilder()
+                    createMetadata(ImmutableList.of(TypeCode.INT64)).toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(

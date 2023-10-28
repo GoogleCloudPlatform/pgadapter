@@ -113,8 +113,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(TypeCode.INT64, TypeCode.INT64))
@@ -188,8 +187,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -254,8 +252,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
               Statement.of(sql),
               ResultSet.newBuilder()
                   .setMetadata(
-                      metadata
-                          .toBuilder()
+                      metadata.toBuilder()
                           .setUndeclaredParameters(
                               createParameterTypesMetadata(
                                       ImmutableList.of(
@@ -512,8 +509,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     String insertUserSql =
         "INSERT INTO \"public\".\"User\" (\"id\",\"email\") VALUES ($1,$2) RETURNING \"public\".\"User\".\"id\"";
     ResultSetMetadata insertUserMetadata =
-        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING))
-            .toBuilder()
+        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING)).toBuilder()
             .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
             .build();
     mockSpanner.putStatementResult(
@@ -637,8 +633,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -780,8 +775,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    allTypesMetadata
-                        .toBuilder()
+                    allTypesMetadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -955,8 +949,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    allTypesMetadata
-                        .toBuilder()
+                    allTypesMetadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -1280,8 +1273,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    allTypesMetadata
-                        .toBuilder()
+                    allTypesMetadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -1438,9 +1430,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                     .build())
             .build();
     ListValue row =
-        createAllTypesResultSet("")
-            .getRows(0)
-            .toBuilder()
+        createAllTypesResultSet("").getRows(0).toBuilder()
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -1457,8 +1447,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    selectMetadata
-                        .toBuilder()
+                    selectMetadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(

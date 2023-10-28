@@ -154,7 +154,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     this.hasHeader = hasHeader;
   }
 
-  /** @return number of rows copied into Spanner */
+  /**
+   * @return number of rows copied into Spanner
+   */
   public long getRowCount() {
     return this.rowCount;
   }
