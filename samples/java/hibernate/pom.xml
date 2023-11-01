@@ -16,6 +16,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
   </properties>
   <dependencies>
+    <!-- [START spanner_hibernate_dependencies] -->
     <!-- Hibernate core dependency -->
     <dependency>
       <groupId>org.hibernate.orm</groupId>
@@ -29,6 +30,7 @@
       <artifactId>postgresql</artifactId>
       <version>42.6.0</version>
     </dependency>
+    <!-- [END spanner_hibernate_dependencies] -->
 
     <!-- Jackson is required if you want to use JSONB with Hibernate. -->
     <dependency>
