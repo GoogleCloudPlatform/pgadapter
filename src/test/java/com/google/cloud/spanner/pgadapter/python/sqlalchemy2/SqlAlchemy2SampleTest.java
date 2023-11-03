@@ -1083,9 +1083,9 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             + "        schema_name as nspname, null as nspowner, null as nspacl\n"
             + "  from information_schema.schemata\n"
             + ")\n"
-            + "SELECT pg_catalog.pg_class.relname \n"
-            + "FROM pg_class JOIN pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace \n"
-            + "WHERE pg_catalog.pg_class.relname = $1::VARCHAR(64) COLLATE \"C\" AND pg_catalog.pg_class.relkind = ANY (ARRAY[$2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR]) AND true COLLATE \"C\"";
+            + "SELECT pg_class.relname \n"
+            + "FROM pg_class JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace \n"
+            + "WHERE pg_class.relname = $1::VARCHAR(64)  AND pg_class.relkind = ANY (ARRAY[$2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR]) AND true ";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(checkTableExistsSql),

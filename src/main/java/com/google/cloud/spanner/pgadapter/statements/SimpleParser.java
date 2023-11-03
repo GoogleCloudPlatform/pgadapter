@@ -806,7 +806,9 @@ public class SimpleParser {
         || peekKeyword("full")
         || peekKeyword("inner")
         || peekKeyword("outer")
-        || peekKeyword("cross");
+        || peekKeyword("cross")
+        || peekKeyword("on")
+        || peekKeyword("using");
   }
 
   boolean eatJoinType() {

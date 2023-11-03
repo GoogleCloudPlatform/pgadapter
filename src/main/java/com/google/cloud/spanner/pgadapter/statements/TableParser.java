@@ -20,6 +20,7 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
@@ -38,11 +39,12 @@ class TableParser {
 
   Tuple<Set<TableOrIndexName>, Statement> detectAndReplaceTables(
       ImmutableMap<TableOrIndexName, TableOrIndexName> detectAndReplaceMap) {
-    return detectAndReplaceTables(detectAndReplaceMap, true);
+    return detectAndReplaceTables(detectAndReplaceMap, new HashSet<>(), true);
   }
 
   Tuple<Set<TableOrIndexName>, Statement> detectAndReplaceTables(
       ImmutableMap<TableOrIndexName, TableOrIndexName> detectAndReplaceMap,
+      Set<TableOrIndexName> replacedTables,
       boolean searchForKeywordBeforeFirstTable) {
     boolean potentialMatch = false;
     String lowerCaseSql = parser.getSql().toLowerCase();
@@ -84,9 +86,18 @@ class TableParser {
       }
       searchForKeywordBeforeFirstTable = true;
       detectedOrReplacedTable =
-          parseTableList(detectAndReplaceMap, detectedTablesBuilder, multipleTables)
+          parseTableList(detectAndReplaceMap, replacedTables, detectedTablesBuilder, multipleTables)
               || detectedOrReplacedTable;
     }
+    // Reset to start replace full-qualified column names of tables that have been replaced.
+    parser.setPos(0);
+    String replaced =
+        replaceFullyQualifiedColumnNames(
+            detectAndReplaceMap, replacedTables, 0, parser.getSql().length());
+    if (replaced != null) {
+      parser.setSql(replaced);
+    }
+
     return detectedOrReplacedTable
         ? Tuple.of(
             detectedTablesBuilder.build(),
@@ -96,6 +107,7 @@ class TableParser {
 
   private boolean parseTableList(
       ImmutableMap<TableOrIndexName, TableOrIndexName> detectAndReplaceMap,
+      Set<TableOrIndexName> replacedTables,
       ImmutableSet.Builder<TableOrIndexName> detectedTablesBuilder,
       boolean multipleTables) {
     boolean detectedOrReplacedTable = false;
@@ -108,6 +120,7 @@ class TableParser {
         Tuple<Set<TableOrIndexName>, Statement> subResult =
             subParser.detectAndReplaceTables(
                 detectAndReplaceMap,
+                replacedTables,
                 subParser.parser.peekKeyword("select") || subParser.parser.peekKeyword("with"));
         if (!subResult.x().isEmpty()) {
           detectedOrReplacedTable = true;
@@ -131,10 +144,10 @@ class TableParser {
         if (detectAndReplaceMap.containsKey(tableOrIndexName)) {
           detectedOrReplacedTable = true;
           // Add the translated table name to the set of discovered tables so that a CTE can be
-          // added
-          // for it.
+          // added for it.
           detectedTablesBuilder.add(
               Objects.requireNonNull(detectAndReplaceMap.get(tableOrIndexName)));
+          replacedTables.add(tableOrIndexName);
           // Check if the entry in the table map contains a different replacement value than the
           // original. Some tables may be added to the map of replacements with the same replacement
           // value as the original with the sole purpose of detecting the use of the table.
@@ -159,11 +172,56 @@ class TableParser {
       }
       if (wasJoin) {
         // Skip the join condition.
+        int positionBeforeJoinCondition = parser.getPos();
         parser.eatJoinCondition();
+        // Replace fully-qualified table names with unqualified table names in the join condition.
+        String joinCondition =
+            replaceFullyQualifiedColumnNames(
+                detectAndReplaceMap, replacedTables, positionBeforeJoinCondition, parser.getPos());
+        if (joinCondition != null) {
+          parser.setSql(
+              parser.getSql().substring(0, positionBeforeJoinCondition)
+                  + joinCondition
+                  + parser.getSql().substring(parser.getPos()));
+          // Set the position of the parser to after the replaced join condition.
+          parser.setPos(positionBeforeJoinCondition + joinCondition.length());
+        }
       }
     } while (multipleTables && (parser.eatToken(",") || (wasJoin = parser.eatJoinType())));
 
     return detectedOrReplacedTable;
+  }
+
+  private String replaceFullyQualifiedColumnNames(
+      ImmutableMap<TableOrIndexName, TableOrIndexName> detectAndReplaceMap,
+      Set<TableOrIndexName> replacedTables,
+      int replaceFromPosition,
+      int replaceToPosition) {
+    boolean replaced = false;
+    String sql = parser.getSql().substring(replaceFromPosition, replaceToPosition);
+    for (TableOrIndexName table : replacedTables) {
+      if (table.schema != null) {
+        TableOrIndexName replacement = detectAndReplaceMap.get(table);
+        if (replacement != null) {
+          while (true) {
+            String replacedSql =
+                sql.replaceAll(
+                    table.getUnquotedSchema() + "\\." + table.getUnquotedName() + "\\.(.+)",
+                    replacement.getUnquotedName() + ".$1");
+            if (!Objects.equals(replacedSql, sql)) {
+              sql = replacedSql;
+              replaced = true;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (replaced) {
+      return sql;
+    }
+    return null;
   }
 
   @Override
