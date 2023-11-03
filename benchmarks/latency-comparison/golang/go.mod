@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	cloud.google.com/go/spanner v1.45.1
-	github.com/docker/docker v23.0.7+incompatible
+	github.com/docker/docker v24.0.7+incompatible
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/jackc/pgx/v5 v5.3.1
 	github.com/montanaflynn/stats v0.7.0
