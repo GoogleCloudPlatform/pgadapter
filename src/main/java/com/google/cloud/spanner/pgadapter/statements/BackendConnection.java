@@ -60,11 +60,14 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
+import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -78,6 +81,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.time.Duration;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -90,6 +94,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -101,6 +107,8 @@ import javax.annotation.Nullable;
  */
 @InternalApi
 public class BackendConnection {
+  private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
+
   public static final String TRANSACTION_ABORTED_ERROR =
       "current transaction is aborted, commands ignored until end of transaction block";
 
@@ -387,12 +395,41 @@ public class BackendConnection {
           && new SimpleParser(statement.getSql()).peekKeyword("insert")) {
         try {
           spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.TRANSACTIONAL);
-          return spannerConnection.execute(statement);
+          return executeOnSpannerWithLogging(statement);
         } finally {
           spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.PARTITIONED_NON_ATOMIC);
         }
       }
-      return spannerConnection.execute(statement);
+      return executeOnSpannerWithLogging(statement);
+    }
+
+    private StatementResult executeOnSpannerWithLogging(Statement statement) {
+      logger.log(
+          Level.FINER,
+          Logging.format(
+              "Executing",
+              Action.Starting,
+              () -> String.format("Statement: %s", statement.getSql())));
+      Stopwatch stopwatch = Stopwatch.createStarted();
+      StatementResult result = spannerConnection.execute(statement);
+      Duration executionDuration = stopwatch.elapsed();
+      logger.log(
+          Level.FINER,
+          Logging.format(
+              "Executing",
+              Action.Finished,
+              () -> String.format("Statement: %s", statement.getSql())));
+      if (executionDuration.compareTo(sessionState.getLogSlowStatementThreshold()) >= 0) {
+        logger.log(
+            Level.FINE,
+            Logging.format(
+                "Executing",
+                () ->
+                    String.format(
+                        "Slow statement: %s\n" + "Duration: %s",
+                        statement.getSql(), executionDuration)));
+      }
+      return result;
     }
 
     /**

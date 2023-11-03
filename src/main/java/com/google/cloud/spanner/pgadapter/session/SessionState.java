@@ -30,6 +30,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -472,6 +473,19 @@ public class SessionState {
         () -> DdlTransactionMode.valueOf(setting.getSetting()),
         () -> DdlTransactionMode.valueOf(setting.getResetVal()),
         () -> DdlTransactionMode.valueOf(setting.getBootVal()));
+  }
+
+  /** Returns the threshold for when a query should be considered slow and should be logged. */
+  public Duration getLogSlowStatementThreshold() {
+    PGSetting setting = internalGet(toKey("spanner", "log_slow_statement_threshold"), false);
+    if (setting == null) {
+      return Duration.ofSeconds(1L);
+    }
+    return tryGetFirstNonNull(
+        Duration.ofSeconds(1L),
+        () -> Duration.parse(setting.getSetting()),
+        () -> Duration.parse(setting.getResetVal()),
+        () -> Duration.parse(setting.getBootVal()));
   }
 
   private ZoneId cachedZoneId;

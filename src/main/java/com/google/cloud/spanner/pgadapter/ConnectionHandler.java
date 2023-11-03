@@ -50,6 +50,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStateme
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
@@ -289,16 +290,20 @@ public class ConnectionHandler extends Thread {
   public void run() {
     logger.log(
         Level.INFO,
-        () ->
-            String.format(
-                "Connection handler with ID %s starting for client %s",
-                getName(), socket.getInetAddress().getHostAddress()));
+        Logging.format(
+            "Run",
+            () ->
+                String.format(
+                    "Connection handler with ID %s starting for client %s",
+                    getName(), socket.getInetAddress().getHostAddress())));
     if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
       logger.log(
           Level.INFO,
-          () ->
-              String.format(
-                  "Connection handler with ID %s is restarted so it can use SSL", getName()));
+          Logging.format(
+              "Run",
+              () ->
+                  String.format(
+                      "Connection handler with ID %s is restarted so it can use SSL", getName())));
       restartConnectionWithSsl();
     }
   }
@@ -392,7 +397,10 @@ public class ConnectionHandler extends Thread {
     } finally {
       if (result != RunConnectionState.RESTART_WITH_SSL) {
         logger.log(
-            Level.INFO, () -> String.format("Closing connection handler with ID %s", getName()));
+            Level.INFO,
+            Logging.format(
+                "RunConnection",
+                () -> String.format("Closing connection handler with ID %s", getName())));
         try {
           if (this.spannerConnection != null) {
             this.spannerConnection.close();
@@ -402,13 +410,18 @@ public class ConnectionHandler extends Thread {
           logger.log(
               Level.WARNING,
               e,
-              () ->
-                  String.format(
-                      "Exception while closing connection handler with ID %s", getName()));
+              Logging.format(
+                  "RunConnection",
+                  () ->
+                      String.format(
+                          "Exception while closing connection handler with ID %s", getName())));
         }
         this.server.deregister(this);
         logger.log(
-            Level.INFO, () -> String.format("Connection handler with ID %s closed", getName()));
+            Level.INFO,
+            Logging.format(
+                "RunConnection",
+                () -> String.format("Connection handler with ID %s closed", getName())));
       }
     }
     return result;
@@ -587,19 +600,24 @@ public class ConnectionHandler extends Thread {
     if (connectionToCancel == null) {
       logger.log(
           Level.WARNING,
-          () ->
-              MessageFormat.format(
-                  "User attempted to cancel an unknown connection. Connection: {0}", connectionId));
+          Logging.format(
+              "CancelActiveStatement",
+              () ->
+                  MessageFormat.format(
+                      "User attempted to cancel an unknown connection. Connection: {0}",
+                      connectionId)));
       return false;
     }
     if (secret != connectionToCancel.secret) {
       logger.log(
           Level.WARNING,
-          () ->
-              MessageFormat.format(
-                  "User attempted to cancel a connection with the incorrect secret."
-                      + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
-                  connectionId, secret, connectionToCancel.secret));
+          Logging.format(
+              "CancelActiveStatement",
+              () ->
+                  MessageFormat.format(
+                      "User attempted to cancel a connection with the incorrect secret."
+                          + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
+                      connectionId, secret, connectionToCancel.secret)));
       // Since the user does not accept a response, there is no need to except here: simply return.
       return false;
     }
@@ -744,10 +762,12 @@ public class ConnectionHandler extends Thread {
     if (this.wellKnownClient != WellKnownClient.UNSPECIFIED) {
       logger.log(
           Level.INFO,
-          () ->
-              String.format(
-                  "Well-known client %s detected for connection %d.",
-                  this.wellKnownClient, getConnectionId()));
+          Logging.format(
+              "SetWellKnownClient",
+              () ->
+                  String.format(
+                      "Well-known client %s detected for connection %d.",
+                      this.wellKnownClient, getConnectionId())));
     }
   }
 

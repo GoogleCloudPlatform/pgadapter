@@ -41,6 +41,8 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.Partition
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
+import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
@@ -247,50 +249,56 @@ public abstract class ControlMessage extends WireMessage {
    */
   void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
-    String command = statement.getCommandTag();
-    if (Strings.isNullOrEmpty(command)) {
-      new EmptyQueryResponse(this.outputStream).send(false);
-      return;
-    }
-    if (statement.getStatementResult() == null) {
-      return;
-    }
-    switch (statement.getStatementType()) {
-      case DDL:
-      case UNKNOWN:
-        new CommandCompleteResponse(this.outputStream, command).send(false);
-        break;
-      case CLIENT_SIDE:
-        if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
+    logger.log(Level.FINER, Logging.format("Send result", Action.Starting));
+    try {
+      String command = statement.getCommandTag();
+      if (Strings.isNullOrEmpty(command)) {
+        new EmptyQueryResponse(this.outputStream).send(false);
+        return;
+      }
+      if (statement.getStatementResult() == null) {
+        return;
+      }
+      switch (statement.getStatementType()) {
+        case DDL:
+        case UNKNOWN:
           new CommandCompleteResponse(this.outputStream, command).send(false);
           break;
-        }
-        // fallthrough to QUERY
-      case QUERY:
-      case UPDATE:
-        if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
-          SendResultSetState state = sendResultSet(statement, mode, maxRows);
-          statement.setHasMoreData(state.hasMoreRows());
-          if (state.hasMoreRows() && mode == QueryMode.EXTENDED) {
-            new PortalSuspendedResponse(this.outputStream).send(false);
-          } else {
-            if (!state.hasMoreRows() && mode == QueryMode.EXTENDED) {
-              statement.close();
-            }
-            new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
-                .send(false);
+        case CLIENT_SIDE:
+          if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
+            new CommandCompleteResponse(this.outputStream, command).send(false);
+            break;
           }
-        } else {
-          // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
-          // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
-          // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
-          // always 0.
-          command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
-          new CommandCompleteResponse(this.outputStream, command).send(false);
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
+          // fallthrough to QUERY
+        case QUERY:
+        case UPDATE:
+          if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
+            SendResultSetState state = sendResultSet(statement, mode, maxRows);
+            statement.setHasMoreData(state.hasMoreRows());
+            if (state.hasMoreRows() && mode == QueryMode.EXTENDED) {
+              new PortalSuspendedResponse(this.outputStream).send(false);
+            } else {
+              if (!state.hasMoreRows() && mode == QueryMode.EXTENDED) {
+                statement.close();
+              }
+              new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
+                  .send(false);
+            }
+          } else {
+            // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
+            // inserted. oid used to be the object ID of the inserted row if rows was 1 and the
+            // target
+            // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
+            // always 0.
+            command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
+            new CommandCompleteResponse(this.outputStream, command).send(false);
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
+      }
+    } finally {
+      logger.log(Level.FINER, Logging.format("Send result", Action.Finished));
     }
   }
 
