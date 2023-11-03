@@ -3,7 +3,7 @@ module github.com/GoogleCloudPlatform/pgadapter/wrappers/golang
 go 1.20
 
 require (
-	github.com/docker/docker v24.0.5+incompatible
+	github.com/docker/docker v24.0.7+incompatible
 	github.com/testcontainers/testcontainers-go v0.22.0
 	golang.org/x/oauth2 v0.9.0
 )
