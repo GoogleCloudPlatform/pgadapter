@@ -53,7 +53,7 @@ public class KnexMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void installDependencies() throws IOException, InterruptedException {
-    NodeJSTest.installDependencies("node-postgres");
+    NodeJSTest.installDependencies("knex-tests");
   }
 
   private String getHost() {
