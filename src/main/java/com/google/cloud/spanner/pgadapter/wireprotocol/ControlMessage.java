@@ -287,9 +287,8 @@ public abstract class ControlMessage extends WireMessage {
           } else {
             // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
             // inserted. oid used to be the object ID of the inserted row if rows was 1 and the
-            // target
-            // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
-            // always 0.
+            // target table had OIDs, but OIDs system columns are not supported anymore; therefore
+            // oid is always 0.
             command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
             new CommandCompleteResponse(this.outputStream, command).send(false);
           }

@@ -342,7 +342,8 @@ java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1
 java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
 ```
 
-Start PGAdapter with `-Djava.util.logging.config.file=logging.properties` when running PGAdapter.
+Start PGAdapter with `-Djava.util.logging.config.file=logging.properties` when running PGAdapter
+as a jar.
 
 ### Logging in Docker
 

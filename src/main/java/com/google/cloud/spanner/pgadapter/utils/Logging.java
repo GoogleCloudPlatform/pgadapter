@@ -16,21 +16,27 @@ package com.google.cloud.spanner.pgadapter.utils;
 
 import java.util.function.Supplier;
 
+/** Util class for formatting log messages. */
 public class Logging {
   public enum Action {
     Starting,
     Finished,
   }
 
+  /** Format a log message by prepending the current thread name and method to the message. */
   public static Supplier<String> format(String method, Supplier<String> message) {
     return () ->
         String.format("[%s]: [%s] " + message.get(), Thread.currentThread().getName(), method);
   }
 
+  /** Create a log message with the current thread name, method and action. */
   public static Supplier<String> format(String method, Action action) {
     return () -> String.format("[%s]: [%s] [%s]", Thread.currentThread().getName(), method, action);
   }
 
+  /**
+   * Format a log message by prepending the current thread name, method, and action to the message.
+   */
   public static Supplier<String> format(String method, Action action, Supplier<String> message) {
     return () ->
         String.format(
