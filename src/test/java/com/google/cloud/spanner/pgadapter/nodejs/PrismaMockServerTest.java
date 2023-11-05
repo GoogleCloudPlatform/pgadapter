@@ -344,12 +344,14 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCreateUser() throws Exception {
     String sql =
-        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\"";
     ResultSetMetadata metadata =
         createParameterTypesMetadata(
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
-            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
             .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -370,40 +372,6 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(metadata)
-                .addRows(
-                    ListValue.newBuilder()
-                        .addValues(
-                            Value.newBuilder()
-                                .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
-                                .build())
-                        .build())
-                .build()));
-
-    String selectSql =
-        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" FROM \"public\".\"User\" WHERE \"public\".\"User\".\"id\" = $1 LIMIT $2 OFFSET $3";
-    ResultSetMetadata selectMetadata =
-        createParameterTypesMetadata(
-                ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
-            .toBuilder()
-            .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
-                    .getRowType())
-            .build();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(selectSql), ResultSet.newBuilder().setMetadata(selectMetadata).build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(selectSql)
-                .bind("p1")
-                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
-                .bind("p2")
-                .to(1L)
-                .bind("p3")
-                .to(0L)
-                .build(),
-            ResultSet.newBuilder()
-                .setMetadata(selectMetadata)
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(
@@ -435,22 +403,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
     assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
-    assertTrue(executeRequest.getTransaction().hasId());
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
 
-    List<ExecuteSqlRequest> selectRequests =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(request -> request.getSql().equals(selectSql))
-            .collect(Collectors.toList());
-    assertEquals(2, selectRequests.size());
-    ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
-    assertTrue(planSelectRequest.getTransaction().hasId());
-    assertEquals(QueryMode.PLAN, planSelectRequest.getQueryMode());
-    ExecuteSqlRequest executeSelectRequest = selectRequests.get(1);
-    assertTrue(executeSelectRequest.getTransaction().hasId());
-    assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
-
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -870,7 +827,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .build()));
 
     String updateSql =
-        "UPDATE \"public\".\"AllTypes\" SET \"col_bool\" = $1, \"col_bytea\" = $2, \"col_float8\" = $3, \"col_int\" = $4, \"col_numeric\" = $5, \"col_timestamptz\" = $6, \"col_date\" = $7, \"col_varchar\" = $8, \"col_jsonb\" = $9 WHERE (\"public\".\"AllTypes\".\"col_bigint\" IN ($10) AND (\"public\".\"AllTypes\".\"col_bigint\" = $11 AND 1=1))";
+        "UPDATE \"public\".\"AllTypes\" SET \"col_bool\" = $1, \"col_bytea\" = $2, \"col_float8\" = $3, \"col_int\" = $4, \"col_numeric\" = $5, \"col_timestamptz\" = $6, \"col_date\" = $7, \"col_varchar\" = $8, \"col_jsonb\" = $9 WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $10 AND 1=1) RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(updateSql),
@@ -1204,45 +1161,17 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDeleteAllTypes() throws IOException, InterruptedException {
-    String selectIdSql =
-        "SELECT \"public\".\"AllTypes\".\"col_bigint\" FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $1 AND 1=1)";
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(selectIdSql),
-            ResultSet.newBuilder()
-                .setMetadata(
-                    createMetadata(
-                        ImmutableList.of(TypeCode.INT64),
-                        false,
-                        ImmutableList.of("col_bigint"),
-                        ImmutableList.of(TypeCode.INT64)))
-                .build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(selectIdSql).bind("p1").to(1L).build(),
-            ResultSet.newBuilder()
-                .setMetadata(
-                    createMetadata(
-                        ImmutableList.of(TypeCode.INT64), ImmutableList.of("col_bigint")))
-                .addRows(
-                    ListValue.newBuilder()
-                        .addValues(Value.newBuilder().setStringValue("1").build())
-                        .build())
-                .build()));
-
     String deleteSql =
-        "DELETE FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" IN ($1) AND (\"public\".\"AllTypes\".\"col_bigint\" = $2 AND 1=1))";
+        "DELETE FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $1 AND 1=1)";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(deleteSql),
             ResultSet.newBuilder()
-                .setMetadata(
-                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.INT64)))
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
-        StatementResult.update(
-            Statement.newBuilder(deleteSql).bind("p1").to(1L).bind("p2").to(1L).build(), 1L));
+        StatementResult.update(Statement.newBuilder(deleteSql).bind("p1").to(1L).build(), 1L));
 
     String selectSql =
         "SELECT \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\" FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $1 AND 1=1) LIMIT $2 OFFSET $3";
@@ -1327,20 +1256,17 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "}\n",
         output);
 
-    assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(selectSql, requests.get(0).getSql());
-    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
-    assertEquals(selectSql, requests.get(1).getSql());
-    assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
-    assertEquals(selectIdSql, requests.get(2).getSql());
-    assertEquals(QueryMode.PLAN, requests.get(2).getQueryMode());
-    assertEquals(selectIdSql, requests.get(3).getSql());
-    assertEquals(QueryMode.NORMAL, requests.get(3).getQueryMode());
-    assertEquals(deleteSql, requests.get(4).getSql());
-    assertEquals(QueryMode.PLAN, requests.get(4).getQueryMode());
-    assertEquals(deleteSql, requests.get(5).getSql());
-    assertEquals(QueryMode.NORMAL, requests.get(5).getQueryMode());
+    int index = -1;
+    assertEquals(selectSql, requests.get(++index).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(index).getQueryMode());
+    assertEquals(selectSql, requests.get(++index).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(index).getQueryMode());
+    assertEquals(deleteSql, requests.get(++index).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(index).getQueryMode());
+    assertEquals(deleteSql, requests.get(++index).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(index).getQueryMode());
   }
 
   @Ignore("Skip this, as the SQL generated by createMany contains the columns in random order")
@@ -1509,12 +1435,14 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCreateMultipleUsersWithoutTransaction() throws Exception {
     String insertSql =
-        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\"";
     ResultSetMetadata metadata =
         createParameterTypesMetadata(
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
-            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
             .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1541,6 +1469,8 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                             Value.newBuilder()
                                 .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
                                 .build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
                         .build())
                 .build()));
     mockSpanner.putStatementResult(
@@ -1555,62 +1485,6 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(metadata)
-                .addRows(
-                    ListValue.newBuilder()
-                        .addValues(
-                            Value.newBuilder()
-                                .setStringValue("e673150f-17ff-451a-8bc7-641fe77f1226")
-                                .build())
-                        .build())
-                .build()));
-
-    String selectSql =
-        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" FROM \"public\".\"User\" WHERE \"public\".\"User\".\"id\" = $1 LIMIT $2 OFFSET $3";
-    ResultSetMetadata selectMetadata =
-        createParameterTypesMetadata(
-                ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
-            .toBuilder()
-            .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
-                    .getRowType())
-            .build();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(selectSql), ResultSet.newBuilder().setMetadata(selectMetadata).build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(selectSql)
-                .bind("p1")
-                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
-                .bind("p2")
-                .to(1L)
-                .bind("p3")
-                .to(0L)
-                .build(),
-            ResultSet.newBuilder()
-                .setMetadata(selectMetadata)
-                .addRows(
-                    ListValue.newBuilder()
-                        .addValues(
-                            Value.newBuilder()
-                                .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
-                                .build())
-                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
-                        .addValues(Value.newBuilder().setStringValue("Alice").build())
-                        .build())
-                .build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(selectSql)
-                .bind("p1")
-                .to("e673150f-17ff-451a-8bc7-641fe77f1226")
-                .bind("p2")
-                .to(1L)
-                .bind("p3")
-                .to(0L)
-                .build(),
-            ResultSet.newBuilder()
-                .setMetadata(selectMetadata)
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(
@@ -1637,7 +1511,8 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
     assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
-    assertTrue(executeRequest.getTransaction().hasId());
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
 
     ExecuteSqlRequest execute2Request = executeSqlRequests.get(2);
@@ -1645,32 +1520,21 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
     assertEquals(QueryMode.NORMAL, execute2Request.getQueryMode());
 
-    // The selects are executed in the same transaction as the last insert.
-    List<ExecuteSqlRequest> selectRequests =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(request -> request.getSql().equals(selectSql))
-            .collect(Collectors.toList());
-    assertEquals(3, selectRequests.size());
-    ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
-    assertTrue(planSelectRequest.getTransaction().hasId());
-    assertEquals(QueryMode.PLAN, planSelectRequest.getQueryMode());
-    ExecuteSqlRequest executeSelectRequest = selectRequests.get(1);
-    assertTrue(executeSelectRequest.getTransaction().hasId());
-    assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
-
-    // Both transactions are committed.
-    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // All transactions are committed.
+    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
   public void testCreateMultipleUsersInTransaction() throws Exception {
     String insertSql =
-        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\"";
     ResultSetMetadata metadata =
         createParameterTypesMetadata(
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
-            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
             .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1697,6 +1561,8 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                             Value.newBuilder()
                                 .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
                                 .build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
                         .build())
                 .build()));
     mockSpanner.putStatementResult(
@@ -1711,62 +1577,6 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(metadata)
-                .addRows(
-                    ListValue.newBuilder()
-                        .addValues(
-                            Value.newBuilder()
-                                .setStringValue("e673150f-17ff-451a-8bc7-641fe77f1226")
-                                .build())
-                        .build())
-                .build()));
-
-    String selectSql =
-        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" FROM \"public\".\"User\" WHERE \"public\".\"User\".\"id\" = $1 LIMIT $2 OFFSET $3";
-    ResultSetMetadata selectMetadata =
-        createParameterTypesMetadata(
-                ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
-            .toBuilder()
-            .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
-                    .getRowType())
-            .build();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(selectSql), ResultSet.newBuilder().setMetadata(selectMetadata).build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(selectSql)
-                .bind("p1")
-                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
-                .bind("p2")
-                .to(1L)
-                .bind("p3")
-                .to(0L)
-                .build(),
-            ResultSet.newBuilder()
-                .setMetadata(selectMetadata)
-                .addRows(
-                    ListValue.newBuilder()
-                        .addValues(
-                            Value.newBuilder()
-                                .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
-                                .build())
-                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
-                        .addValues(Value.newBuilder().setStringValue("Alice").build())
-                        .build())
-                .build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(selectSql)
-                .bind("p1")
-                .to("e673150f-17ff-451a-8bc7-641fe77f1226")
-                .bind("p2")
-                .to(1L)
-                .bind("p3")
-                .to(0L)
-                .build(),
-            ResultSet.newBuilder()
-                .setMetadata(selectMetadata)
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(
@@ -1801,31 +1611,20 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
     assertEquals(QueryMode.NORMAL, execute2Request.getQueryMode());
 
-    // The selects are executed in the same transaction as the last insert.
-    List<ExecuteSqlRequest> selectRequests =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(request -> request.getSql().equals(selectSql))
-            .collect(Collectors.toList());
-    assertEquals(3, selectRequests.size());
-    ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
-    assertTrue(planSelectRequest.getTransaction().hasId());
-    assertEquals(QueryMode.PLAN, planSelectRequest.getQueryMode());
-    ExecuteSqlRequest executeSelectRequest = selectRequests.get(1);
-    assertTrue(executeSelectRequest.getTransaction().hasId());
-    assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
-
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
   public void testUnhandledErrorInTransaction() throws Exception {
     String insertSql =
-        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\"";
     ResultSetMetadata metadata =
         createParameterTypesMetadata(
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
-            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
             .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1849,6 +1648,8 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
                         .build())
                 .build()));
     mockSpanner.putStatementResult(
@@ -1864,39 +1665,6 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Status.ALREADY_EXISTS
                 .withDescription("Row with id 1 already exists")
                 .asRuntimeException()));
-
-    String selectSql =
-        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" FROM \"public\".\"User\" WHERE \"public\".\"User\".\"id\" = $1 LIMIT $2 OFFSET $3";
-    ResultSetMetadata selectMetadata =
-        createParameterTypesMetadata(
-                ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
-            .toBuilder()
-            .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
-                    .getRowType())
-            .build();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(selectSql), ResultSet.newBuilder().setMetadata(selectMetadata).build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(selectSql)
-                .bind("p1")
-                .to("1")
-                .bind("p2")
-                .to(1L)
-                .bind("p3")
-                .to(0L)
-                .build(),
-            ResultSet.newBuilder()
-                .setMetadata(selectMetadata)
-                .addRows(
-                    ListValue.newBuilder()
-                        .addValues(Value.newBuilder().setStringValue("1").build())
-                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
-                        .addValues(Value.newBuilder().setStringValue("Alice").build())
-                        .build())
-                .build()));
 
     String output = runTest("testUnhandledErrorInTransaction", getHost(), pgServer.getLocalPort());
 
@@ -1919,18 +1687,6 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(executeRequest2.getTransaction().hasId());
     assertEquals(QueryMode.NORMAL, executeRequest2.getQueryMode());
 
-    List<ExecuteSqlRequest> selectRequests =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(request -> request.getSql().equals(selectSql))
-            .collect(Collectors.toList());
-    assertEquals(2, selectRequests.size());
-    ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
-    assertTrue(planSelectRequest.getTransaction().hasId());
-    assertEquals(QueryMode.PLAN, planSelectRequest.getQueryMode());
-    ExecuteSqlRequest executeSelectRequest = selectRequests.get(1);
-    assertTrue(executeSelectRequest.getTransaction().hasId());
-    assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
-
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
@@ -1938,12 +1694,14 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   @Test
   public void testHandledErrorInTransaction() throws Exception {
     String insertSql =
-        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\"";
     ResultSetMetadata metadata =
         createParameterTypesMetadata(
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
-            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
             .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -2002,7 +1760,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(
         output,
         output.contains(
-            "ERROR: current transaction is aborted, commands ignored until end of transaction block"));
+            "current transaction is aborted, commands ignored until end of transaction block"));
   }
 
   static String runTest(String testName, String host, int port)
