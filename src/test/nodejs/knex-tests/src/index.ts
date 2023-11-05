@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import "reflect-metadata"
-
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>) {
   const knex = require('knex')({
     client: 'pg',
