@@ -16,6 +16,8 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
+import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
@@ -24,12 +26,17 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Handles the message flow for the extended query protocol. Wire-protocol messages are buffered in
  * memory until a flush/sync is received.
  */
 public class ExtendedQueryProtocolHandler {
+  private static final Logger logger =
+      Logger.getLogger(ExtendedQueryProtocolHandler.class.getName());
+
   private final LinkedList<AbstractQueryProtocolMessage> messages = new LinkedList<>();
   private final ConnectionHandler connectionHandler;
   private final BackendConnection backendConnection;
@@ -92,6 +99,7 @@ public class ExtendedQueryProtocolHandler {
    * the buffer is a Sync message.
    */
   public void flush() throws Exception {
+    logger.log(Level.FINER, Logging.format("Flush", Action.Starting));
     if (isExtendedProtocol()) {
       // Wait at most 2 milliseconds for the next message to arrive. The method will just return 0
       // if no message could be found in the buffer within this timeframe.
@@ -107,6 +115,7 @@ public class ExtendedQueryProtocolHandler {
     } else {
       internalFlush();
     }
+    logger.log(Level.FINER, Logging.format("Flush", Action.Finished));
   }
 
   private void internalFlush() throws Exception {
@@ -120,8 +129,10 @@ public class ExtendedQueryProtocolHandler {
    * the frontend.
    */
   public void sync(boolean includeReadyResponse) throws Exception {
+    logger.log(Level.FINER, Logging.format("Sync", Action.Starting));
     backendConnection.sync();
     flushMessages(includeReadyResponse);
+    logger.log(Level.FINER, Logging.format("Sync", Action.Finished));
   }
 
   /** Flushes the wire-protocol messages to the frontend. */
@@ -130,9 +141,18 @@ public class ExtendedQueryProtocolHandler {
   }
 
   private void flushMessages(boolean includeReadyResponse) throws Exception {
+    logger.log(Level.FINER, Logging.format("Flushing messages", Action.Starting));
     try {
       for (AbstractQueryProtocolMessage message : messages) {
+        logger.log(
+            Level.FINEST,
+            Logging.format(
+                "Flushing message", Action.Starting, () -> String.format("Message: %s", message)));
         message.flush();
+        logger.log(
+            Level.FINEST,
+            Logging.format(
+                "Flushing message", Action.Finished, () -> String.format("Message: %s", message)));
         if (message.isReturnedErrorResponse()) {
           break;
         }
@@ -149,6 +169,7 @@ public class ExtendedQueryProtocolHandler {
     } finally {
       connectionHandler.getConnectionMetadata().getOutputStream().flush();
       messages.clear();
+      logger.log(Level.FINER, Logging.format("Flushing messages", Action.Finished));
     }
   }
 }

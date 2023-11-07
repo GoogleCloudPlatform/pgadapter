@@ -338,12 +338,12 @@ java.util.logging.FileHandler.pattern=%h/log/pgadapter-%u.log
 java.util.logging.FileHandler.append=false
 io.grpc.internal.level = WARNING
 
-java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS] [%4$s] (%2$s): %5$s%6$s%n
+java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL] [%4$s] (%2$s): %5$s%6$s%n
 java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
 ```
 
-Start PGAdapter with `-Djava.util.logging.config.file=logging.properties` when running PGAdapter as
-a jar.
+Start PGAdapter with `-Djava.util.logging.config.file=logging.properties` when running PGAdapter
+as a jar.
 
 ### Logging in Docker
 
@@ -359,7 +359,7 @@ java.util.logging.FileHandler.pattern=/home/pgadapter/log/pgadapter.log
 java.util.logging.FileHandler.append=true
 io.grpc.internal.level = WARNING
 
-java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS] [%4$s] (%2$s): %5$s%6$s%n
+java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL] [%4$s] (%2$s): %5$s%6$s%n
 java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
 ```
 
