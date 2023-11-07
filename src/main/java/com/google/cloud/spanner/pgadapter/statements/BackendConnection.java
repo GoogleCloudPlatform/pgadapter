@@ -21,6 +21,7 @@ import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replace
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
+import com.google.cloud.Timestamp;
 import com.google.cloud.Tuple;
 import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
@@ -49,6 +50,7 @@ import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
+import com.google.cloud.spanner.connection.TransactionRetryListener;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -782,6 +784,32 @@ public class BackendConnection {
         Suppliers.memoize(
             () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
+    this.spannerConnection.addTransactionRetryListener(
+        new TransactionRetryListener() {
+          @Override
+          public void retryStarting(
+              Timestamp transactionStarted, long transactionId, int retryAttempt) {
+            logger.log(
+                Level.WARNING,
+                () ->
+                    String.format(
+                        "Transaction %d starting retry attempt %d", transactionId, retryAttempt));
+          }
+
+          @Override
+          public void retryFinished(
+              Timestamp transactionStarted,
+              long transactionId,
+              int retryAttempt,
+              RetryResult result) {
+            logger.log(
+                Level.WARNING,
+                () ->
+                    String.format(
+                        "Transaction %d finished retry attempt %d with result %s",
+                        transactionId, retryAttempt, result));
+          }
+        });
     this.databaseId = databaseId;
     this.ddlExecutor =
         new DdlExecutor(this, Suppliers.memoize(() -> wellKnownClient.get().getDdlReplacements()));
