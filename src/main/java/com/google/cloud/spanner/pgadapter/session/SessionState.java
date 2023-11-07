@@ -479,10 +479,10 @@ public class SessionState {
   public Duration getLogSlowStatementThreshold() {
     PGSetting setting = internalGet(toKey("spanner", "log_slow_statement_threshold"), false);
     if (setting == null) {
-      return Duration.ofSeconds(1L);
+      return Duration.ofSeconds(120L);
     }
     return tryGetFirstNonNull(
-        Duration.ofSeconds(1L),
+        Duration.ofSeconds(120L),
         () -> Duration.parse(setting.getSetting()),
         () -> Duration.parse(setting.getResetVal()),
         () -> Duration.parse(setting.getBootVal()));

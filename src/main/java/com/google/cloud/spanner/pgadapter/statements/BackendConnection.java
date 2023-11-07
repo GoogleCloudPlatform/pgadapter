@@ -790,7 +790,7 @@ public class BackendConnection {
           public void retryStarting(
               Timestamp transactionStarted, long transactionId, int retryAttempt) {
             logger.log(
-                Level.WARNING,
+                Level.FINE,
                 () ->
                     String.format(
                         "Transaction %d starting retry attempt %d", transactionId, retryAttempt));
@@ -803,7 +803,7 @@ public class BackendConnection {
               int retryAttempt,
               RetryResult result) {
             logger.log(
-                Level.WARNING,
+                Level.FINE,
                 () ->
                     String.format(
                         "Transaction %d finished retry attempt %d with result %s",
