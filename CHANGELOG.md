@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.26.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.25.0...v0.26.0) (2023-11-07)
+
+
+### Features
+
+* improve logging of statement execution ([#1167](https://github.com/GoogleCloudPlatform/pgadapter/issues/1167)) ([ddc4c04](https://github.com/GoogleCloudPlatform/pgadapter/commit/ddc4c04c56a1bba71af7c526971bfff0ff39e751))
+
+
+### Bug Fixes
+
+* replace fully-qualified column names ([#1158](https://github.com/GoogleCloudPlatform/pgadapter/issues/1158)) ([aeb2e32](https://github.com/GoogleCloudPlatform/pgadapter/commit/aeb2e32e073b392af6c90cb1cdd0980f8723e243))
+
+
+### Dependencies
+
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to d26b77d ([#1091](https://github.com/GoogleCloudPlatform/pgadapter/issues/1091)) ([f6c22b6](https://github.com/GoogleCloudPlatform/pgadapter/commit/f6c22b69ae38d7e06e710192154c8278744cd308))
+* update ycsb dependencies ([#1142](https://github.com/GoogleCloudPlatform/pgadapter/issues/1142)) ([7bb4af0](https://github.com/GoogleCloudPlatform/pgadapter/commit/7bb4af0fee07c8e38aac2ad9d58a41cbf70e9b69))
+
+
+### Documentation
+
+* add protocol hint to pgbench documentation ([#1140](https://github.com/GoogleCloudPlatform/pgadapter/issues/1140)) ([05bed1e](https://github.com/GoogleCloudPlatform/pgadapter/commit/05bed1e486fe78f2bfc85722a01ef94c2f2d2bac))
+
 ## [0.25.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.24.0...v0.25.0) (2023-10-14)
 
 
