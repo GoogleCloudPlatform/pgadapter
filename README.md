@@ -175,6 +175,14 @@ class PGProxyRunner {
 See [samples/java/jdbc](samples/java/jdbc) for a small sample application that adds
 PGAdapter as a compile-time dependency and runs it together with the main application.
 
+## Emulator
+See [this document](docs/emulator.md) for more information on how to connect PGAdapter to the Cloud
+Spanner Emulator.
+
+Connecting to the Cloud Spanner Emulator is supported with:
+1. PGAdapter version 0.26.0 and higher.
+2. Cloud Spanner Emulator 1.5.12 and higher.
+
 ### Options
 
 The following list contains the most frequently used startup options for PGAdapter.
