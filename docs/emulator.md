@@ -76,10 +76,10 @@ This script does the following:
 
 ```shell
 docker pull gcr.io/cloud-spanner-emulator/emulator
-docker run --name emulator -d -p 9010:9010 -p 9020:9020 gcr.io/cloud-spanner-emulator/emulator
+docker run -d -p 9010:9010 -p 9020:9020 gcr.io/cloud-spanner-emulator/emulator
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz \
   && tar -xzvf pgadapter.tar.gz
-java -jar pgadapter.jar -p test-project -i test-instance -r autoConfigEmulator=true > /dev/null 2>&1 &
+java -jar pgadapter.jar -p test-project -i test-instance -c "" -r autoConfigEmulator=true > /dev/null 2>&1 &
 sleep 2
 psql -h localhost -p 5432 -d test-database
 ```
