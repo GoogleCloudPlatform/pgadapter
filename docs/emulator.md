@@ -22,10 +22,10 @@ steps:
 
 ### Example: Running PGAdapter in a Docker Container
 
-The additional complexity when running PGAdapter in a Docker container is that PGAdapter must have
-network access to the Cloud Spanner Emulator. The easiest way to achieve this is by running both in
-Docker and connect them both to the same Docker network. This example uses Docker Compose to set up
-a Docker network and start both the emulator and PGAdapter.
+When running PGAdapter in a Docker container, PGAdapter must have network access to the Cloud
+Spanner Emulator. The easiest way to achieve this is by running both in Docker and connect them both
+to the same Docker network. This example uses Docker Compose to set up a Docker network and start
+both the emulator and PGAdapter.
 
 ```shell
 cat <<EOT > docker-compose.yml
