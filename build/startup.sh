@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ARGUMENTS=""
+ARGUMENTS="-p emulator-project -i test-instance -r autoConfigEmulator=true -c \"\" -x"
 JAVA_ARGUMENTS=""
 
 for var in "$@"
@@ -11,6 +11,8 @@ do
     ARGUMENTS="${ARGUMENTS} $var"
   fi
 done
+
+nohup sh -c "/home/emulator_main --host_port localhost:9010 &"
 
 cd /home/pgadapter
 COMMAND="java ${JAVA_ARGUMENTS} -jar pgadapter.jar ${ARGUMENTS}"
