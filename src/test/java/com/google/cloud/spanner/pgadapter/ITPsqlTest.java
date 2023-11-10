@@ -190,8 +190,8 @@ public class ITPsqlTest implements IntegrationTest {
                         + "select id, full_name\n"
                         + "from singers\n"
                         + (System.getenv("SPANNER_EMULATOR_HOST") == null
-                            ? ""
-                            : "order by last_name, id"))
+                            ? "order by last_name, id"
+                            : ""))
                 .add("create index idx_singers_last_name on singers (last_name)")
                 .add(
                     "create unique index idx_tracks_title on tracks (id, title) interleave in albums")
