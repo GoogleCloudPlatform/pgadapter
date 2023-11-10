@@ -811,7 +811,7 @@ public class OptionsMetadata {
     // Note that Credentials here is the credentials file, not the actual credentials
     String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
-    if (!shouldAuthenticate()) {
+    if (!shouldAuthenticate() && System.getenv("SPANNER_EMULATOR_HOST") == null) {
       String credentials = buildCredentialsFile();
       if (!Strings.isNullOrEmpty(credentials)) {
         url = String.format("%s;credentials=%s", url, credentials);

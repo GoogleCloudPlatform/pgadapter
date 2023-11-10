@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.hibernate;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
@@ -57,6 +58,10 @@ public class ITHibernateTest {
   @BeforeClass
   public static void setup()
       throws ClassNotFoundException, IOException, SQLException, InterruptedException {
+    assumeTrue(
+        "This test is not supported on the emulator",
+        System.getenv("SPANNER_EMULATOR_HOST") == null);
+
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
 

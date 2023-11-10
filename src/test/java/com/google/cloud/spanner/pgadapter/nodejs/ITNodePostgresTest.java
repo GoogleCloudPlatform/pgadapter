@@ -273,7 +273,9 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
-        client.singleUse().executeQuery(Statement.of("SELECT * FROM alltypes"))) {
+        client
+            .singleUse()
+            .executeQuery(Statement.of("SELECT * FROM alltypes ORDER BY col_bigint"))) {
       assertTrue(resultSet.next());
       assertEquals(1, resultSet.getLong("col_bigint"));
       assertTrue(resultSet.getBoolean("col_bool"));
@@ -358,11 +360,19 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     String output =
         runTest("testErrorInReadWriteTransaction", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals(
-        "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row [foo] in table users already exists\n"
-            + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
-            + "SELECT 1 returned: 1\n",
-        output);
+    if (isRunningOnEmulator()) {
+      assertEquals(
+          "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Failed to insert row with primary key ({pk#name:\"foo\"}) due to previously existing row\n"
+              + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
+              + "SELECT 1 returned: 1\n",
+          output);
+    } else {
+      assertEquals(
+          "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row [foo] in table users already exists\n"
+              + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
+              + "SELECT 1 returned: 1\n",
+          output);
+    }
   }
 
   @Test

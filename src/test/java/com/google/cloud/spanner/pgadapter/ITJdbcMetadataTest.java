@@ -378,6 +378,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataColumns() throws Exception {
+    skipOnEmulator("jsonb is not supported on the emulator in combination with the JDBC driver");
+
     runForAllVersions(
         (connection, version) -> {
           try {
@@ -495,6 +497,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataColumns_FilteredByName() throws Exception {
+    skipOnEmulator("jsonb is not supported on the emulator in combination with the JDBC driver");
+
     runForAllVersions(
         (connection, version) -> {
           try {
@@ -836,6 +840,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataTypeInfo() throws Exception {
+    skipOnEmulator("jsonb is not supported on the emulator in combination with the JDBC driver");
+
     runForAllVersions(
         (connection, version) -> {
           try {

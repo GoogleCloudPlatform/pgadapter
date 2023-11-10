@@ -290,6 +290,8 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testSelectWithParameters() throws SQLException {
+    skipOnEmulator("Casting jsonb to text is not supported on the emulator");
+
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
@@ -394,6 +396,8 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testInsertWithParameters() throws SQLException {
+    skipOnEmulator("jsonb[] is not fully supported on the emulator");
+
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement =
@@ -884,7 +888,9 @@ public class ITJdbcTest implements IntegrationTest {
 
       // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations'
       // when it tries to delete all data using a normal transaction.
-      connection.createStatement().execute("delete from all_types");
+      connection
+          .createStatement()
+          .execute("delete from all_types" + (isRunningOnEmulator() ? " where true" : ""));
     }
   }
 
@@ -1009,7 +1015,15 @@ public class ITJdbcTest implements IntegrationTest {
               if (resultSet.getLong(1) == 3L) {
                 assertNull(resultSet.getObject(col));
               } else {
-                assertNotNull(resultSet.getObject(col));
+                // JSONB (array) is currently not supported using the PG JDBC driver with the
+                // emulator, as the PG JDBC driver tries to dynamically load information about the
+                // type from teh pg_catalog tables.
+                if (!(resultSet.getMetaData().getColumnName(col).equals("col_jsonb")
+                    || resultSet.getMetaData().getColumnName(col).equals("col_array_jsonb"))) {
+                  assertNotNull(
+                      "Column " + resultSet.getMetaData().getColumnName(col),
+                      resultSet.getObject(col));
+                }
               }
             }
           }
@@ -1100,8 +1114,10 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(namespaces.next());
         assertEquals("public", namespaces.getString(1));
         assertTrue(namespaces.next());
-        assertEquals("pg_catalog", namespaces.getString(1));
-        assertTrue(namespaces.next());
+        if (!isRunningOnEmulator()) {
+          assertEquals("pg_catalog", namespaces.getString(1));
+          assertTrue(namespaces.next());
+        }
         assertEquals("information_schema", namespaces.getString(1));
         assertTrue(namespaces.next());
         assertEquals("spanner_sys", namespaces.getString(1));
