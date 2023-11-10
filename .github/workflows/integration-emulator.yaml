@@ -65,7 +65,7 @@ jobs:
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run integration tests
-        run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DexcludedIntegrationTests="$EXCLUDED_INTEGRATION_TESTS" -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
+        run: mvn verify -B -Dclirr.skip=true -DskipUnits=true -DskipITs=false
         env:
           POSTGRES_HOST: /pg
           POSTGRES_PORT: 5432
