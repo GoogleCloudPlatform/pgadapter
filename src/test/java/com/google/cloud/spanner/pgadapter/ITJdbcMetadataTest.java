@@ -1048,6 +1048,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataSchemas() throws Exception {
+    skipOnEmulator("Catalog name is not supported by emulator");
+
     runForAllVersions(
         (connection, version) -> {
           try {

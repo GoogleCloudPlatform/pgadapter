@@ -62,6 +62,8 @@ public class ITNodePostgresTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
+    NodeJSTest.installDependencies("node-postgres");
+
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());

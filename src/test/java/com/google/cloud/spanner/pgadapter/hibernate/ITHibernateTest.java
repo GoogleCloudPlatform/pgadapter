@@ -109,8 +109,10 @@ public class ITHibernateTest {
 
   @AfterClass
   public static void teardown() throws IOException {
-    try (FileWriter writer = new FileWriter(HIBERNATE_PROPERTIES_FILE)) {
-      writer.write(originalHibernateProperties);
+    if (originalHibernateProperties != null) {
+      try (FileWriter writer = new FileWriter(HIBERNATE_PROPERTIES_FILE)) {
+        writer.write(originalHibernateProperties);
+      }
     }
     testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
