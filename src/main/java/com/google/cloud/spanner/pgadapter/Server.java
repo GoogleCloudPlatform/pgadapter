@@ -14,10 +14,18 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.auth.Credentials;
+import com.google.cloud.opentelemetry.trace.TraceConfiguration;
+import com.google.cloud.opentelemetry.trace.TraceExporter;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.time.Duration;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 
@@ -31,11 +39,37 @@ public class Server {
   public static void main(String[] args) {
     try {
       OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
-      ProxyServer server = new ProxyServer(optionsMetadata);
+      OpenTelemetry openTelemetry = setupOpenTelemetry(optionsMetadata);
+      ProxyServer server = new ProxyServer(optionsMetadata, openTelemetry);
       server.startServer();
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }
+  }
+
+  static OpenTelemetry setupOpenTelemetry(OptionsMetadata optionsMetadata) throws IOException {
+    // TODO: Return no-op OpenTelemetry if it has been disabled.
+    // TODO: Register metric exporter.
+
+    TraceConfiguration.Builder builder =
+        TraceConfiguration.builder().setDeadline(Duration.ofMillis(30000));
+    String projectId = optionsMetadata.getTelemetryProjectId();
+    if (projectId != null) {
+      builder.setProjectId(projectId);
+    }
+    Credentials credentials = optionsMetadata.getTelemetryCredentials();
+    if (credentials != null) {
+      builder.setCredentials(credentials);
+    }
+    TraceConfiguration configuration = builder.build();
+    TraceExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
+    return AutoConfiguredOpenTelemetrySdk.builder()
+        .addTracerProviderCustomizer(
+            (sdkTracerProviderBuilder, configProperties) ->
+                sdkTracerProviderBuilder.addSpanProcessor(
+                    BatchSpanProcessor.builder(traceExporter).build()))
+        .build()
+        .getOpenTelemetrySdk();
   }
 
   static OptionsMetadata extractMetadata(String[] args, PrintStream out) {
@@ -60,7 +94,7 @@ public class Server {
     out.printf("Version: %s\n", getVersion());
   }
 
-  static String getVersion() {
+  public static String getVersion() {
     String version = Server.class.getPackage().getImplementationVersion();
     if (version != null) {
       return version;

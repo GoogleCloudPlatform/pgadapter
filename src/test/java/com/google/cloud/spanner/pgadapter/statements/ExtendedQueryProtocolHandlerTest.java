@@ -22,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -30,7 +31,9 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.DataOutputStream;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -43,8 +46,15 @@ import org.mockito.junit.MockitoRule;
 public class ExtendedQueryProtocolHandlerTest {
   @Rule public MockitoRule rule = MockitoJUnit.rule();
 
+  @Mock private ProxyServer server;
   @Mock private ConnectionHandler connectionHandler;
   @Mock private BackendConnection backendConnection;
+
+  @Before
+  public void setupMocks() {
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
+  }
 
   @Test
   public void testBuffer() {

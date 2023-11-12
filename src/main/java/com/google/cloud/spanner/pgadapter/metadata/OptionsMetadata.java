@@ -32,6 +32,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.DatabaseName;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -1234,6 +1236,26 @@ public class OptionsMetadata {
    */
   public String getDefaultConnectionUrl() {
     return defaultConnectionUrl;
+  }
+
+  public String getTelemetryProjectId() {
+    // TODO: Add separate command line argument for telemetry project id.
+    if (commandLine.hasOption(OPTION_PROJECT_ID)) {
+      return commandLine.getOptionValue(OPTION_PROJECT_ID);
+    }
+    return null;
+  }
+
+  public Credentials getTelemetryCredentials() throws IOException {
+    // TODO: Add separate command line argument for telemetry credentials.
+    if (credentials != null) {
+      return credentials;
+    }
+    if (commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
+      return GoogleCredentials.fromStream(
+          Files.newInputStream(Paths.get(commandLine.getOptionValue(OPTION_CREDENTIALS_FILE))));
+    }
+    return null;
   }
 
   public int getProxyPort() {

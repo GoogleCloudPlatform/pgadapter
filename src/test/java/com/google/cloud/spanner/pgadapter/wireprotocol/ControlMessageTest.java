@@ -33,6 +33,7 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -90,7 +91,7 @@ public final class ControlMessageTest {
             false,
             false,
             commandMetadata);
-    ProxyServer server = new ProxyServer(options);
+    ProxyServer server = new ProxyServer(options, OpenTelemetry.noop());
     when(connectionHandler.getServer()).thenReturn(server);
 
     ControlMessage controlMessage = ControlMessage.create(connectionHandler);

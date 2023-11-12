@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.Server.getVersion;
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
@@ -80,6 +81,12 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -110,6 +117,8 @@ import javax.annotation.Nullable;
 @InternalApi
 public class BackendConnection {
   private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
+
+  private final Tracer tracer;
 
   public static final String TRANSACTION_ABORTED_ERROR =
       "current transaction is aborted, commands ignored until end of transaction block";
@@ -191,13 +200,34 @@ public class BackendConnection {
       this.result = SettableFuture.create();
     }
 
+    @Override
+    public String toString() {
+      return getClass().getName();
+    }
+
     boolean isBatchingPossible() {
       return false;
     }
 
     abstract boolean isUpdate();
 
-    abstract void execute();
+    void execute() {
+      Span span = tracer.spanBuilder(toString()).startSpan();
+      if (statement != null) {
+        span.setAttribute(SemanticAttributes.DB_STATEMENT, statement.getSql());
+      }
+      try (Scope ignore = span.makeCurrent()) {
+        doExecute();
+      } catch (Throwable exception) {
+        span.setStatus(StatusCode.ERROR, exception.getMessage());
+        span.recordException(exception);
+        throw exception;
+      } finally {
+        span.end();
+      }
+    }
+
+    abstract void doExecute();
 
     void checkConnectionState() {
       // Only COMMIT or ROLLBACK is allowed if we are in an ABORTED transaction.
@@ -230,6 +260,11 @@ public class BackendConnection {
     }
 
     @Override
+    public String toString() {
+      return super.toString() + "{analyze=" + analyze + "}";
+    }
+
+    @Override
     boolean isBatchingPossible() {
       return !analyze;
     }
@@ -240,7 +275,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       Statement updatedStatement = statement;
       try {
         checkConnectionState();
@@ -406,32 +441,42 @@ public class BackendConnection {
     }
 
     private StatementResult executeOnSpannerWithLogging(Statement statement) {
-      logger.log(
-          Level.FINER,
-          Logging.format(
-              "Executing",
-              Action.Starting,
-              () -> String.format("Statement: %s", statement.getSql())));
-      Stopwatch stopwatch = Stopwatch.createStarted();
-      StatementResult result = spannerConnection.execute(statement);
-      Duration executionDuration = stopwatch.elapsed();
-      logger.log(
-          Level.FINER,
-          Logging.format(
-              "Executing",
-              Action.Finished,
-              () -> String.format("Statement: %s", statement.getSql())));
-      if (executionDuration.compareTo(sessionState.getLogSlowStatementThreshold()) >= 0) {
+      Span span = tracer.spanBuilder("executeOnSpanner").startSpan();
+      span.setAttribute(SemanticAttributes.DB_STATEMENT, statement.getSql());
+      try (Scope ignore = span.makeCurrent()) {
         logger.log(
-            Level.FINE,
+            Level.FINER,
             Logging.format(
                 "Executing",
-                () ->
-                    String.format(
-                        "Slow statement: %s\n" + "Duration: %s",
-                        statement.getSql(), executionDuration)));
+                Action.Starting,
+                () -> String.format("Statement: %s", statement.getSql())));
+        Stopwatch stopwatch = Stopwatch.createStarted();
+        StatementResult result = spannerConnection.execute(statement);
+        Duration executionDuration = stopwatch.elapsed();
+        logger.log(
+            Level.FINER,
+            Logging.format(
+                "Executing",
+                Action.Finished,
+                () -> String.format("Statement: %s", statement.getSql())));
+        if (executionDuration.compareTo(sessionState.getLogSlowStatementThreshold()) >= 0) {
+          logger.log(
+              Level.FINE,
+              Logging.format(
+                  "Executing",
+                  () ->
+                      String.format(
+                          "Slow statement: %s\n" + "Duration: %s",
+                          statement.getSql(), executionDuration)));
+        }
+        return result;
+      } catch (Throwable exception) {
+        span.setStatus(StatusCode.ERROR, exception.getMessage());
+        span.recordException(exception);
+        throw exception;
+      } finally {
+        span.end();
       }
-      return result;
     }
 
     /**
@@ -476,7 +521,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       checkConnectionState();
       try {
         if (transactionMode != TransactionMode.IMPLICIT) {
@@ -551,7 +596,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         // Execute the MutationWriter and the CopyDataReceiver both asynchronously and wait for both
@@ -595,7 +640,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         if (spannerConnection.isInTransaction()) {
@@ -641,7 +686,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         if (spannerConnection.isDdlBatchActive()) {
@@ -683,7 +728,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         spannerConnection.savepoint(savepointStatement.getSavepointName());
@@ -711,7 +756,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         spannerConnection.releaseSavepoint(releaseStatement.getSavepointName());
@@ -739,7 +784,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         spannerConnection.rollbackToSavepoint(rollbackToStatement.getSavepointName());
         result.set(NO_RESULT);
@@ -772,12 +817,14 @@ public class BackendConnection {
 
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
+      OpenTelemetry openTelemetry,
       Runnable closeAllPortals,
       DatabaseId databaseId,
       Connection spannerConnection,
       Supplier<WellKnownClient> wellKnownClient,
       OptionsMetadata optionsMetadata,
       Supplier<ImmutableList<LocalStatement>> localStatements) {
+    this.tracer = openTelemetry.getTracer(BackendConnection.class.getName(), getVersion());
     this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
     this.pgCatalog =

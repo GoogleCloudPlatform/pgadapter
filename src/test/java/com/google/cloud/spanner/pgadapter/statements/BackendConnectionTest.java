@@ -61,6 +61,7 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClie
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.common.collect.ImmutableList;
+import io.opentelemetry.api.OpenTelemetry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -72,6 +73,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class BackendConnectionTest {
+  private static final OpenTelemetry NOOP_OTEL = OpenTelemetry.noop();
   private final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   private static final NoResult NO_RESULT = new NoResult();
@@ -112,6 +114,7 @@ public class BackendConnectionTest {
     when(spannerConnection.runBatch()).thenThrow(expectedException);
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -148,6 +151,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -187,6 +191,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlyDmlStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -200,6 +205,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlyCopyStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -213,6 +219,7 @@ public class BackendConnectionTest {
 
     BackendConnection dmlAndCopyStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -227,6 +234,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlySelectStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -240,6 +248,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlyClientSideStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -255,6 +264,7 @@ public class BackendConnectionTest {
 
     BackendConnection onlyUnknownStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -268,6 +278,7 @@ public class BackendConnectionTest {
 
     BackendConnection dmlAndSelectStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -281,6 +292,7 @@ public class BackendConnectionTest {
 
     BackendConnection copyAndSelectStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -295,6 +307,7 @@ public class BackendConnectionTest {
 
     BackendConnection copyAndUnknownStatements =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -325,6 +338,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -362,6 +376,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -399,6 +414,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -426,6 +442,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -465,6 +482,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -494,6 +512,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -521,6 +540,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -549,6 +569,7 @@ public class BackendConnectionTest {
 
       BackendConnection backendConnection =
           new BackendConnection(
+              NOOP_OTEL,
               DO_NOTHING,
               DatabaseId.of("p", "i", "d"),
               connection,
@@ -573,6 +594,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -603,6 +625,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -631,6 +654,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -658,6 +682,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -695,6 +720,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -731,6 +757,7 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,

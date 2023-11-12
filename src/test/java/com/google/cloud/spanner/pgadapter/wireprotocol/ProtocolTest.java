@@ -66,6 +66,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCr
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.common.primitives.Bytes;
 import com.google.common.util.concurrent.SettableFuture;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -80,6 +81,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.json.simple.parser.JSONParser;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -107,6 +109,9 @@ public class ProtocolTest {
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private DataOutputStream outputStream;
   @Mock private ResultSet resultSet;
+
+  @Before
+  public void setupMocks() {}
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];
@@ -1098,6 +1103,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
@@ -1133,6 +1140,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
@@ -1224,6 +1233,7 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);
     when(intermediatePortalStatement.getCommandTag()).thenReturn("INSERT");

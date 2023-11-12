@@ -60,6 +60,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -85,6 +86,9 @@ import org.postgresql.core.Oid;
 public class StatementTest {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+
+  private static final OpenTelemetry NOOP_OTEL = OpenTelemetry.noop();
+
   private static final Runnable DO_NOTHING = () -> {};
 
   private static ParsedStatement parse(String sql) {
@@ -181,6 +185,7 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -272,6 +277,7 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -312,6 +318,7 @@ public class StatementTest {
             .build();
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -420,6 +427,7 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -487,6 +495,7 @@ public class StatementTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -560,6 +569,7 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -586,6 +596,7 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -640,6 +651,7 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
