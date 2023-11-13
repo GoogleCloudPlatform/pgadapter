@@ -194,7 +194,7 @@ public class ITDdlTest implements IntegrationTest {
                 + (isRunningOnEmulator() ? "" : " order by last_name"));
         statement.addBatch(
             "create view v_venues sql security invoker as select name, description from venues"
-                + (isRunningOnEmulator() ? "" : "order by name"));
+                + (isRunningOnEmulator() ? "" : " order by name"));
 
         assertArrayEquals(new int[] {0, 0, 0, 0, 0, 0, 0, 0, 0}, statement.executeBatch());
       }
