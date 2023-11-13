@@ -49,6 +49,7 @@ public class ExtendedQueryProtocolHandler {
   private final ConnectionHandler connectionHandler;
   private final BackendConnection backendConnection;
 
+  private final String connectionId;
   private final Tracer tracer;
   private Span span;
   private Scope scope;
@@ -56,6 +57,7 @@ public class ExtendedQueryProtocolHandler {
   /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
+    this.connectionId = connectionHandler.getTraceConnectionId().toString();
     this.tracer =
         connectionHandler
             .getServer()
@@ -64,6 +66,7 @@ public class ExtendedQueryProtocolHandler {
     this.backendConnection =
         new BackendConnection(
             connectionHandler.getServer().getOpenTelemetry(),
+            connectionHandler.getTraceConnectionId().toString(),
             connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
@@ -77,6 +80,7 @@ public class ExtendedQueryProtocolHandler {
   public ExtendedQueryProtocolHandler(
       ConnectionHandler connectionHandler, BackendConnection backendConnection) {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
+    this.connectionId = connectionHandler.getTraceConnectionId().toString();
     this.tracer =
         connectionHandler
             .getServer()
@@ -113,8 +117,11 @@ public class ExtendedQueryProtocolHandler {
     if (messages.isEmpty()) {
       span =
           tracer
-              .spanBuilder("QueryProtocol")
-              .setAttribute("query_protocol", message.isExtendedProtocol() ? "extended" : "simple")
+              .spanBuilder(ExtendedQueryProtocolHandler.class.getName())
+              .setNoParent()
+              .setAttribute(
+                  "pgadapter.query_protocol", message.isExtendedProtocol() ? "extended" : "simple")
+              .setAttribute("pgadapter.connection_id", connectionId)
               .startSpan();
       scope = span.makeCurrent();
     }

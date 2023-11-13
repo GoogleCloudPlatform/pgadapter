@@ -80,6 +80,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.json.simple.parser.JSONParser;
 import org.junit.Before;
 import org.junit.Rule;
@@ -1104,6 +1105,7 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
@@ -1141,6 +1143,7 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
@@ -1233,6 +1236,7 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);

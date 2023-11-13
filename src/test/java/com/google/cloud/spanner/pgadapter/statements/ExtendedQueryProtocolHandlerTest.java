@@ -33,6 +33,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
 import java.io.DataOutputStream;
+import java.util.UUID;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -53,6 +54,7 @@ public class ExtendedQueryProtocolHandlerTest {
   @Before
   public void setupMocks() {
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
   }
 
