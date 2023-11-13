@@ -446,6 +446,8 @@ public class ITPsqlTest implements IntegrationTest {
 
   @Test
   public void testSelectPgCatalogTables() throws IOException, InterruptedException {
+    skipOnEmulator("Not all pg_catalog tables are supported on the emulator yet");
+
     String sql =
         "select pg_type.typname\n"
             + "from pg_catalog.pg_type\n"
@@ -492,6 +494,8 @@ public class ITPsqlTest implements IntegrationTest {
 
   @Test
   public void testPrepareExecuteDeallocate() throws IOException, InterruptedException {
+    skipOnEmulator("Uses a cast that is not yet supported on the emulator");
+
     Tuple<String, String> result =
         runUsingPsql(
             ImmutableList.of(
@@ -564,6 +568,8 @@ public class ITPsqlTest implements IntegrationTest {
    */
   @Test
   public void testCopyBetweenPostgreSQLAndCloudSpanner() throws Exception {
+    skipOnEmulator("Uses a cast that is not yet supported on the emulator");
+
     int numRows = 100;
 
     truncatePostgreSQLAllTypesTable();
