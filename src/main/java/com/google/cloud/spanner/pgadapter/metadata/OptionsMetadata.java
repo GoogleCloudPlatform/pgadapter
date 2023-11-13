@@ -76,6 +76,8 @@ public class OptionsMetadata {
     private String credentialsFile;
     private Credentials credentials;
     private boolean requireAuthentication;
+    private boolean enableOpenTelemetry;
+    private Double openTelemetryTraceRatio;
     private boolean skipLocalhostCheck;
     private SslMode sslMode;
     private int port;
@@ -220,6 +222,20 @@ public class OptionsMetadata {
       return this;
     }
 
+    /** Enables OpenTelemetry tracing for PGAdapter. */
+    public Builder setEnableOpenTelemetry() {
+      this.enableOpenTelemetry = true;
+      return this;
+    }
+
+    /** Sets the trace sampling ratio for OpenTelemetry. */
+    public Builder setOpenTelemetryTraceRatio(double ratio) {
+      Preconditions.checkArgument(
+          ratio >= 0.0d && ratio <= 1.0d, "ration must be in the range [0.0, 1.0]");
+      this.openTelemetryTraceRatio = ratio;
+      return this;
+    }
+
     /**
      * PGAdapter by default only allows connections from localhost. Call this method to disable this
      * check. You should only allow connections from private networks, unless you are also using SSL
@@ -339,6 +355,13 @@ public class OptionsMetadata {
       if (requireAuthentication) {
         addOption(args, OPTION_AUTHENTICATE);
       }
+      if (enableOpenTelemetry) {
+        addOption(args, OPTION_ENABLE_OPEN_TELEMETRY);
+      }
+      if (openTelemetryTraceRatio != null) {
+        addLongOption(
+            args, OPTION_OPEN_TELEMETRY_TRACE_RATIO, String.valueOf(openTelemetryTraceRatio));
+      }
       if (skipLocalhostCheck) {
         addOption(args, OPTION_DISABLE_LOCALHOST_CHECK);
       }
@@ -456,6 +479,8 @@ public class OptionsMetadata {
   private static final String OPTION_CREDENTIALS_FILE = "c";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
+  private static final String OPTION_ENABLE_OPEN_TELEMETRY = "enable_otel";
+  private static final String OPTION_OPEN_TELEMETRY_TRACE_RATIO = "otel_trace_ratio";
   private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
@@ -496,6 +521,8 @@ public class OptionsMetadata {
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
+  private final boolean enableOpenTelemetry;
+  private final Double openTelemetryTraceRatio;
   private final SslMode sslMode;
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
@@ -573,6 +600,9 @@ public class OptionsMetadata {
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
+    this.enableOpenTelemetry = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY);
+    this.openTelemetryTraceRatio =
+        parseOpenTelemetryTraceRatio(commandLine.getOptionValue(OPTION_OPEN_TELEMETRY_TRACE_RATIO));
     this.sslMode = parseSslMode(commandLine.getOptionValue(OPTION_SSL));
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.disableDefaultLocalStatements =
@@ -644,6 +674,8 @@ public class OptionsMetadata {
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
+    this.enableOpenTelemetry = false;
+    this.openTelemetryTraceRatio = null;
     this.sslMode = SslMode.Disable;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
@@ -697,6 +729,26 @@ public class OptionsMetadata {
       // Catch and rethrow to give a better error message.
       throw new IllegalArgumentException(
           String.format("Invalid ddl-batching mode value specified: %s", value));
+    }
+  }
+
+  private Double parseOpenTelemetryTraceRatio(String value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      double ratio = Double.parseDouble(value);
+      if (ratio < 0.0d || ratio > 1.0d) {
+        throw new IllegalArgumentException(
+            String.format(
+                "OpenTelemetry trace ratio must be in the range [0.0, 1.0]. "
+                    + "Specified value is invalid: %s",
+                value));
+      }
+      return ratio;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid OpenTelemetry trace ratio: %s", value));
     }
   }
 
@@ -965,6 +1017,12 @@ public class OptionsMetadata {
         "authenticate",
         false,
         "Whether you wish the proxy to perform an authentication step.");
+    options.addOption(null, OPTION_ENABLE_OPEN_TELEMETRY, false, "Enable OpenTelemetry tracing.");
+    options.addOption(
+        null,
+        OPTION_OPEN_TELEMETRY_TRACE_RATIO,
+        true,
+        "OpenTelemetry trace sampling ration. Value must be in the range [0.0, 1.0].");
     options.addOption(
         OPTION_SSL,
         "sslmode",
@@ -1280,6 +1338,14 @@ public class OptionsMetadata {
 
   public boolean shouldAuthenticate() {
     return this.authenticate;
+  }
+
+  public boolean isEnableOpenTelemetry() {
+    return this.enableOpenTelemetry;
+  }
+
+  public Double getOpenTelemetryTraceRatio() {
+    return this.openTelemetryTraceRatio;
   }
 
   public SslMode getSslMode() {

@@ -86,6 +86,7 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.ByteArrayOutputStream;
@@ -95,11 +96,13 @@ import java.time.Duration;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -121,6 +124,8 @@ public class BackendConnection {
   private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
 
   private final Tracer tracer;
+
+  private final Deque<Context> statementContext = new ConcurrentLinkedDeque<>();
 
   private final String connectionId;
 
@@ -208,7 +213,7 @@ public class BackendConnection {
 
     @Override
     public String toString() {
-      return getClass().getName();
+      return getClass().getSimpleName().toLowerCase(Locale.ENGLISH);
     }
 
     boolean isBatchingPossible() {
@@ -220,6 +225,7 @@ public class BackendConnection {
     void execute() {
       Span span = createSpan(toString(), statement);
       try (Scope ignore = span.makeCurrent()) {
+        statementContext.push(Context.current());
         doExecute();
       } catch (Throwable exception) {
         span.setStatus(StatusCode.ERROR, exception.getMessage());
@@ -227,6 +233,7 @@ public class BackendConnection {
         throw exception;
       } finally {
         span.end();
+        statementContext.pop();
       }
     }
 
@@ -264,7 +271,7 @@ public class BackendConnection {
 
     @Override
     public String toString() {
-      return super.toString() + "{analyze=" + analyze + "}";
+      return analyze ? "analyze" : super.toString();
     }
 
     @Override
@@ -444,8 +451,9 @@ public class BackendConnection {
     }
 
     private StatementResult executeOnSpannerWithLogging(Statement statement) {
-      Span span = createSpan(BackendConnection.class.getName() + "#executeOnSpanner", statement);
+      Span span = createSpan("execute_on_spanner", statement);
       try (Scope ignore = span.makeCurrent()) {
+        statementContext.push(Context.current());
         logger.log(
             Level.FINER,
             Logging.format(
@@ -478,6 +486,7 @@ public class BackendConnection {
         throw exception;
       } finally {
         span.end();
+        statementContext.pop();
       }
     }
 
@@ -837,6 +846,10 @@ public class BackendConnection {
     this.spannerConnection = spannerConnection;
     this.spannerConnection.addTransactionRetryListener(
         new TransactionRetryListener() {
+          private Span span;
+
+          private Scope scope;
+
           @Override
           public void retryStarting(
               Timestamp transactionStarted, long transactionId, int retryAttempt) {
@@ -845,6 +858,9 @@ public class BackendConnection {
                 () ->
                     String.format(
                         "Transaction %d starting retry attempt %d", transactionId, retryAttempt));
+            span = createSpan("pgadapter.transaction_retry", null, statementContext.peek());
+            span.setAttribute("pgadapter.retry_attempt", retryAttempt);
+            scope = span.makeCurrent();
           }
 
           @Override
@@ -859,6 +875,9 @@ public class BackendConnection {
                     String.format(
                         "Transaction %d finished retry attempt %d with result %s",
                         transactionId, retryAttempt, result));
+            span.setAttribute("pgadapter.retry_result", result.name());
+            scope.close();
+            span.end();
           }
         });
     this.databaseId = databaseId;
@@ -887,6 +906,10 @@ public class BackendConnection {
   }
 
   private Span createSpan(String name, Statement statement) {
+    return createSpan(name, statement, null);
+  }
+
+  private Span createSpan(String name, Statement statement, Context parent) {
     SpanBuilder builder =
         tracer.spanBuilder(name).setAttribute("pgadapter.connection_id", connectionId);
     if (statement != null) {
@@ -894,6 +917,9 @@ public class BackendConnection {
     }
     if (currentTransactionId != null) {
       builder.setAttribute("pgadapter.transaction_id", currentTransactionId.toString());
+    }
+    if (parent != null) {
+      builder.setParent(parent);
     }
     builder.setAttribute(
         "pgadapter.connection_state", connectionState.name().toLowerCase(Locale.ENGLISH));
@@ -1391,8 +1417,9 @@ public class BackendConnection {
     Preconditions.checkArgument(fromIndex < getStatementCount() - 1);
     Preconditions.checkArgument(
         canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
-    Span span = createSpan(BackendConnection.class.getName() + "#executeBatchOnSpanner", null);
+    Span span = createSpan("execute_batch", null);
     try (Scope ignore = span.makeCurrent()) {
+      statementContext.push(Context.current());
       StatementType batchType = getStatementType(fromIndex);
       if (batchType == StatementType.UPDATE) {
         spannerConnection.startBatchDml();
@@ -1462,6 +1489,7 @@ public class BackendConnection {
       throw throwable;
     } finally {
       span.end();
+      statementContext.pop();
     }
   }
 

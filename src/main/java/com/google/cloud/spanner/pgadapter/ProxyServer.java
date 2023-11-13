@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static com.google.cloud.spanner.pgadapter.Server.getVersion;
 
 import com.google.api.core.AbstractApiService;
 import com.google.api.core.InternalApi;
@@ -29,8 +28,6 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
-import io.opentelemetry.api.metrics.LongUpDownCounter;
-import io.opentelemetry.api.metrics.Meter;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -62,8 +59,6 @@ public class ProxyServer extends AbstractApiService {
   private final OpenTelemetry openTelemetry;
   private final Properties properties;
   private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
-  private final Meter meter;
-  private final LongUpDownCounter numConnectionsCounter;
 
   /**
    * Latch that is closed when the TCP server has started. We need this to know the exact port that
@@ -116,16 +111,6 @@ public class ProxyServer extends AbstractApiService {
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
-    this.meter =
-        openTelemetry
-            .meterBuilder(ProxyServer.class.getName())
-            .setInstrumentationVersion(getVersion())
-            .build();
-    this.numConnectionsCounter =
-        meter
-            .upDownCounterBuilder("num-connections")
-            .setDescription("Number of active PostgreSQL connections")
-            .build();
     addConnectionProperties();
   }
 
@@ -351,7 +336,6 @@ public class ProxyServer extends AbstractApiService {
    */
   private void register(ConnectionHandler handler) {
     this.handlers.add(handler);
-    this.numConnectionsCounter.add(1L);
   }
 
   /**
@@ -361,7 +345,6 @@ public class ProxyServer extends AbstractApiService {
    */
   void deregister(ConnectionHandler handler) {
     this.handlers.remove(handler);
-    this.numConnectionsCounter.add(-1L);
   }
 
   public OptionsMetadata getOptions() {

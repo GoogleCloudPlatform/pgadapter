@@ -117,7 +117,7 @@ public class ExtendedQueryProtocolHandler {
     if (messages.isEmpty()) {
       span =
           tracer
-              .spanBuilder(ExtendedQueryProtocolHandler.class.getName())
+              .spanBuilder("query_protocol_handler")
               .setNoParent()
               .setAttribute(
                   "pgadapter.query_protocol", message.isExtendedProtocol() ? "extended" : "simple")

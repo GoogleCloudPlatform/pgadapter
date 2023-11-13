@@ -24,6 +24,7 @@ import com.google.devtools.cloudtrace.v2.TruncatableString;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -53,8 +54,10 @@ public class Server {
   }
 
   static OpenTelemetry setupOpenTelemetry(OptionsMetadata optionsMetadata) throws IOException {
-    // TODO: Return no-op OpenTelemetry if it has been disabled.
-    // TODO: Register metric exporter.
+    if (!optionsMetadata.isEnableOpenTelemetry()) {
+      return OpenTelemetry.noop();
+    }
+
     if (getOpenTelemetrySetting("otel.traces.exporter") == null) {
       System.setProperty("otel.traces.exporter", "none");
     }
@@ -90,19 +93,20 @@ public class Server {
                 .build()));
     TraceConfiguration configuration = builder.build();
     TraceExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
+    Sampler sampler;
+    if (optionsMetadata.getOpenTelemetryTraceRatio() == null) {
+      sampler = Sampler.parentBased(Sampler.alwaysOn());
+    } else {
+      sampler =
+          Sampler.parentBased(
+              Sampler.traceIdRatioBased(optionsMetadata.getOpenTelemetryTraceRatio()));
+    }
     return AutoConfiguredOpenTelemetrySdk.builder()
         .addTracerProviderCustomizer(
             (sdkTracerProviderBuilder, configProperties) ->
-                sdkTracerProviderBuilder.addSpanProcessor(
-                    BatchSpanProcessor.builder(traceExporter).build()))
-        //        .addMetricExporterCustomizer(
-        //            new BiFunction<MetricExporter, ConfigProperties, MetricExporter>() {
-        //              @Override
-        //              public MetricExporter apply(MetricExporter metricExporter,
-        //                  ConfigProperties configProperties) {
-        //                return LoggingMetricExporter.create();
-        //              }
-        //            })
+                sdkTracerProviderBuilder
+                    .setSampler(sampler)
+                    .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()))
         .build()
         .getOpenTelemetrySdk();
   }
