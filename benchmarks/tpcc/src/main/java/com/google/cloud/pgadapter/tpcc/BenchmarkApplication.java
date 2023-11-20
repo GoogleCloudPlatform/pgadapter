@@ -6,6 +6,7 @@ import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoader;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,15 +51,29 @@ public class BenchmarkApplication implements CommandLineRunner {
                 "jdbc:postgresql://localhost:%d/tpcc?preferQueryMode=simple",
                 server.getLocalPort());
     try {
-      // loadData(connectionUrl);
-      BenchmarkRunner runner = new BenchmarkRunner(connectionUrl);
-      ExecutorService executor = Executors.newFixedThreadPool(8);
-      executor.submit(runner);
+      if (tpccConfiguration.isLoadData()) {
+        loadData(connectionUrl);
+      }
 
-      Thread.sleep(5000L);
-      executor.shutdownNow();
-      if (!executor.awaitTermination(60L, TimeUnit.SECONDS)) {
-        throw new TimeoutException("Timed out while waiting for benchmark runners to shut down");
+      if (tpccConfiguration.isRunBenchmark()) {
+        Statistics statistics = new Statistics();
+        ExecutorService executor =
+            Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
+        for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
+          executor.submit(new BenchmarkRunner(statistics, connectionUrl, tpccConfiguration));
+        }
+
+        Stopwatch watch = Stopwatch.createStarted();
+        while (watch.elapsed().compareTo(tpccConfiguration.getBenchmarkDuration()) <= 0) {
+          //noinspection BusyWait
+          Thread.sleep(1_000L);
+          // System.out.println("\r\r\r\r\r");
+          System.out.print(statistics.toString(watch.elapsed()));
+        }
+        executor.shutdownNow();
+        if (!executor.awaitTermination(60L, TimeUnit.SECONDS)) {
+          throw new TimeoutException("Timed out while waiting for benchmark runners to shut down");
+        }
       }
     } finally {
       if (server != null) {
@@ -70,7 +85,7 @@ public class BenchmarkApplication implements CommandLineRunner {
 
   private void loadData(String connectionUrl) throws Exception {
     try (DataLoader loader = new DataLoader(connectionUrl, tpccConfiguration)) {
-      loader.loadData(tpccConfiguration.getFactor());
+      loader.loadData();
     }
   }
 

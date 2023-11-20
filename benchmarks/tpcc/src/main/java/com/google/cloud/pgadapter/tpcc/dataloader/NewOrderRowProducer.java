@@ -2,7 +2,7 @@ package com.google.cloud.pgadapter.tpcc.dataloader;
 
 import com.google.common.collect.ImmutableList;
 
-class NewOrderRowProducer extends AbstractRowProducer {
+class NewOrderRowProducer extends AbstractOrderedIdRowProducer {
   private static final String TABLE = "new_orders";
   private static final String COLUMNS = """
     no_o_id,

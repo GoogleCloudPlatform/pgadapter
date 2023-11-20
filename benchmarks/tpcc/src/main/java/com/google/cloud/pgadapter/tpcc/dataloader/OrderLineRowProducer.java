@@ -3,7 +3,7 @@ package com.google.cloud.pgadapter.tpcc.dataloader;
 import com.google.common.collect.ImmutableList;
 import java.util.Objects;
 
-class OrderLineRowProducer extends AbstractRowProducer {
+class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
   private static final String TABLE = "order_line";
   private static final String COLUMNS =
       """
