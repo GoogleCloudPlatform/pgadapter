@@ -17,6 +17,10 @@
     <java.version>17</java.version>
   </properties>
   <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+    </dependency>
     <!-- Add the PostgreSQL JDBC driver -->
     <dependency>
       <groupId>org.postgresql</groupId>
