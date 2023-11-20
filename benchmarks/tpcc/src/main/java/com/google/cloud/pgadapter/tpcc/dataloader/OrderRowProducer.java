@@ -1,9 +1,13 @@
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Objects;
+import java.util.stream.LongStream;
 
-class OrderRowProducer extends AbstractRowProducer {
+class OrderRowProducer extends AbstractOrderedIdRowProducer {
   private static final String TABLE = "orders";
   private static final String COLUMNS =
       """
@@ -21,13 +25,16 @@ class OrderRowProducer extends AbstractRowProducer {
 
   private final long districtId;
 
-  private final int customerCount;
+  private final ImmutableList<Long> customerIds;
 
   OrderRowProducer(long warehouseId, long districtId, int customerCount, long rowCount) {
     super(TABLE, COLUMNS, rowCount);
     this.warehouseId = warehouseId;
     this.districtId = districtId;
-    this.customerCount = customerCount;
+    ArrayList<Long> customerIds =
+        Lists.newArrayList(LongStream.range(0L, customerCount).iterator());
+    Collections.shuffle(customerIds);
+    this.customerIds = ImmutableList.copyOf(customerIds);
   }
 
   @Override
@@ -38,15 +45,15 @@ class OrderRowProducer extends AbstractRowProducer {
             getId(rowIndex),
             String.valueOf(districtId),
             String.valueOf(warehouseId),
-            getRandomCustomerId(),
+            getCustomerId(rowIndex),
             now(),
             getRandomCarrierId(rowIndex),
             getOrderLineCount(rowIndex),
             getAllLocal()));
   }
 
-  String getRandomCustomerId() {
-    return String.valueOf(Long.reverse(random.nextInt(customerCount)));
+  String getCustomerId(long rowIndex) {
+    return String.valueOf(Long.reverse(customerIds.get((int) rowIndex)));
   }
 
   String getRandomCarrierId(long rowIndex) {

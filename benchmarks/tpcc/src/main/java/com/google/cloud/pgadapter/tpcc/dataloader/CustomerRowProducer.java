@@ -1,5 +1,6 @@
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
+import com.google.cloud.pgadapter.tpcc.LastNameGenerator;
 import com.google.common.collect.ImmutableList;
 
 class CustomerRowProducer extends AbstractRowProducer {
@@ -49,7 +50,7 @@ class CustomerRowProducer extends AbstractRowProducer {
             String.valueOf(warehouseId),
             getRandomName(),
             getRandomString(2),
-            getRandomName(),
+            getLastName(rowIndex),
             getRandomStreet(1),
             getRandomStreet(2),
             getRandomCity(),
@@ -65,6 +66,10 @@ class CustomerRowProducer extends AbstractRowProducer {
             getPaymentCount(),
             getDeliveryCount(),
             getData()));
+  }
+
+  String getLastName(long rowIndex) {
+    return LastNameGenerator.generateLastName(this.random, rowIndex);
   }
 
   String getCredit() {

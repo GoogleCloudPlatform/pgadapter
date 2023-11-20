@@ -12,6 +12,7 @@ import java.io.PipedWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -24,14 +25,6 @@ import org.slf4j.LoggerFactory;
 
 public class DataLoader implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkApplication.class);
-
-  private static final int WAREHOUSE_COUNT = 1;
-
-  private static final int MAX_ITEMS = 1_000;
-
-  private static final int DISTRICTS_PER_WAREHOUSE = 10;
-
-  private static final int CUSTOMERS_PER_DISTRICT = 300;
 
   private final String connectionUrl;
 
@@ -54,8 +47,12 @@ public class DataLoader implements AutoCloseable {
     this.rowProducerExecutor.shutdown();
   }
 
-  public void loadData(int factor) throws Exception {
-    int warehouseCount = WAREHOUSE_COUNT * factor;
+  public void loadData() throws Exception {
+    if (tpccConfiguration.isTruncateBeforeLoad()) {
+      truncate();
+    }
+
+    int warehouseCount = tpccConfiguration.getWarehouses();
     ListenableFuture<Long> warehouseFuture =
         loadDataExecutor.submit(
             () -> {
@@ -64,7 +61,7 @@ public class DataLoader implements AutoCloseable {
               return rowCount;
             });
 
-    int itemCount = MAX_ITEMS * factor;
+    int itemCount = tpccConfiguration.getItemCount();
     ListenableFuture<Long> itemFuture =
         loadDataExecutor.submit(
             () -> {
@@ -82,7 +79,9 @@ public class DataLoader implements AutoCloseable {
           loadDataExecutor.submit(
               () -> {
                 long rowCount =
-                    loadTable(new DistrictRowProducer(warehouseId, DISTRICTS_PER_WAREHOUSE));
+                    loadTable(
+                        new DistrictRowProducer(
+                            warehouseId, tpccConfiguration.getDistrictsPerWarehouse()));
                 LOG.info("Loaded {} district records for warehouse {}", rowCount, warehouseId);
                 return rowCount;
               }));
@@ -91,17 +90,20 @@ public class DataLoader implements AutoCloseable {
     Futures.allAsList(districtFutures).get();
 
     List<ListenableFuture<Long>> customerFutures =
-        new ArrayList<>(warehouseCount * DISTRICTS_PER_WAREHOUSE);
+        new ArrayList<>(warehouseCount * tpccConfiguration.getDistrictsPerWarehouse());
     for (int warehouse = 0; warehouse < warehouseCount; warehouse++) {
       long warehouseId = Long.reverse(warehouse);
-      for (int district = 0; district < DISTRICTS_PER_WAREHOUSE; district++) {
+      for (int district = 0; district < tpccConfiguration.getDistrictsPerWarehouse(); district++) {
         long districtId = Long.reverse(district);
         customerFutures.add(
             loadDataExecutor.submit(
                 () -> {
                   long rowCount =
                       loadTable(
-                          new CustomerRowProducer(warehouseId, districtId, CUSTOMERS_PER_DISTRICT));
+                          new CustomerRowProducer(
+                              warehouseId,
+                              districtId,
+                              tpccConfiguration.getCustomersPerDistrict()));
                   LOG.info(
                       "Loaded {} customer records for warehouse {} and district {}",
                       rowCount,
@@ -115,19 +117,22 @@ public class DataLoader implements AutoCloseable {
     Futures.allAsList(customerFutures).get();
 
     List<ListenableFuture<Long>> historyFutures =
-        new ArrayList<>(warehouseCount * DISTRICTS_PER_WAREHOUSE);
+        new ArrayList<>(warehouseCount * tpccConfiguration.getDistrictsPerWarehouse());
     List<ListenableFuture<Long>> orderFutures =
-        new ArrayList<>(warehouseCount * DISTRICTS_PER_WAREHOUSE);
+        new ArrayList<>(warehouseCount * tpccConfiguration.getDistrictsPerWarehouse());
     for (int warehouse = 0; warehouse < warehouseCount; warehouse++) {
       long warehouseId = Long.reverse(warehouse);
-      for (int district = 0; district < DISTRICTS_PER_WAREHOUSE; district++) {
+      for (int district = 0; district < tpccConfiguration.getDistrictsPerWarehouse(); district++) {
         long districtId = Long.reverse(district);
         historyFutures.add(
             loadDataExecutor.submit(
                 () -> {
                   long rowCount =
                       loadTable(
-                          new HistoryRowProducer(warehouseId, districtId, CUSTOMERS_PER_DISTRICT));
+                          new HistoryRowProducer(
+                              warehouseId,
+                              districtId,
+                              tpccConfiguration.getCustomersPerDistrict()));
                   LOG.info(
                       "Loaded {} history records for warehouse {} and district {}",
                       rowCount,
@@ -143,8 +148,8 @@ public class DataLoader implements AutoCloseable {
                           new OrderRowProducer(
                               warehouseId,
                               districtId,
-                              CUSTOMERS_PER_DISTRICT,
-                              CUSTOMERS_PER_DISTRICT));
+                              tpccConfiguration.getCustomersPerDistrict(),
+                              tpccConfiguration.getCustomersPerDistrict()));
                   LOG.info(
                       "Loaded {} order records for warehouse {} and district {}",
                       rowCount,
@@ -163,7 +168,8 @@ public class DataLoader implements AutoCloseable {
       stockFutures.add(
           loadDataExecutor.submit(
               () -> {
-                long rowCount = loadTable(new StockRowProducer(warehouseId, MAX_ITEMS));
+                long rowCount =
+                    loadTable(new StockRowProducer(warehouseId, tpccConfiguration.getItemCount()));
                 LOG.info("Loaded {} stock records for warehouse {}", rowCount, warehouseId);
                 return rowCount;
               }));
@@ -176,14 +182,17 @@ public class DataLoader implements AutoCloseable {
     List<ListenableFuture<Long>> orderLineFutures = new ArrayList<>();
     for (int warehouse = 0; warehouse < warehouseCount; warehouse++) {
       long warehouseId = Long.reverse(warehouse);
-      for (int district = 0; district < DISTRICTS_PER_WAREHOUSE; district++) {
+      for (int district = 0; district < tpccConfiguration.getDistrictsPerWarehouse(); district++) {
         long districtId = Long.reverse(district);
         newOrderFutures.add(
             loadDataExecutor.submit(
                 () -> {
                   long rowCount =
                       loadTable(
-                          new NewOrderRowProducer(warehouseId, districtId, CUSTOMERS_PER_DISTRICT));
+                          new NewOrderRowProducer(
+                              warehouseId,
+                              districtId,
+                              tpccConfiguration.getCustomersPerDistrict()));
                   LOG.info(
                       "Loaded {} new_order records for warehouse {} and district {}",
                       rowCount,
@@ -197,7 +206,10 @@ public class DataLoader implements AutoCloseable {
                   long rowCount =
                       loadTable(
                           new OrderLineRowProducer(
-                              warehouseId, districtId, MAX_ITEMS, CUSTOMERS_PER_DISTRICT));
+                              warehouseId,
+                              districtId,
+                              tpccConfiguration.getItemCount(),
+                              tpccConfiguration.getCustomersPerDistrict()));
                   LOG.info(
                       "Loaded {} order_line records for warehouse {} and district {}",
                       rowCount,
@@ -231,6 +243,30 @@ public class DataLoader implements AutoCloseable {
               "copy \"%s\" (%s) from stdin (format csv, delimiter ',', quote '''')",
               rowProducer.getTable(), rowProducer.getColumns()),
           reader);
+    }
+  }
+
+  void truncate() throws SQLException {
+    try (Connection connection = createConnection();
+        Statement statement = connection.createStatement()) {
+      LOG.info("truncating new_orders");
+      statement.execute("truncate table new_orders");
+      LOG.info("truncating order_line");
+      statement.execute("truncate table order_line");
+      LOG.info("truncating orders");
+      statement.execute("truncate table orders");
+      LOG.info("truncating history");
+      statement.execute("truncate table history");
+      LOG.info("truncating customer");
+      statement.execute("truncate table customer");
+      LOG.info("truncating stock");
+      statement.execute("truncate table stock");
+      LOG.info("truncating district");
+      statement.execute("truncate table district");
+      LOG.info("truncating warehouse");
+      statement.execute("truncate table warehouse");
+      LOG.info("truncating item");
+      statement.execute("truncate table item");
     }
   }
 
