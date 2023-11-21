@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.Server.getVersion;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
@@ -38,6 +39,10 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.semconv.SemanticAttributes;
 import java.util.List;
 
 /**
@@ -59,7 +64,7 @@ public class SimpleQueryStatement {
       OptionsMetadata options, Statement originalStatement, ConnectionHandler connectionHandler) {
     this.connectionHandler = connectionHandler;
     this.options = options;
-    this.statements = parseStatements(originalStatement);
+    this.statements = parseStatements(connectionHandler, originalStatement);
   }
 
   public void execute() throws Exception {
@@ -132,19 +137,36 @@ public class SimpleQueryStatement {
   @VisibleForTesting
   static ParsedStatement translatePotentialMetadataCommand(
       ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
-    for (Command currentCommand :
-        Command.getCommands(
-            parsedStatement.getSqlWithoutComments(),
-            connectionHandler.getSpannerConnection(),
-            connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
-      if (currentCommand.is()) {
-        return PARSER.parse(Statement.of(currentCommand.translate()));
+    Tracer tracer =
+        connectionHandler
+            .getServer()
+            .getOpenTelemetry()
+            .getTracer(SimpleQueryStatement.class.getName(), getVersion());
+    Span span =
+        tracer
+            .spanBuilder("translatePotentialMetadataCommand")
+            .setAttribute(
+                "pgadapter.connection_id", connectionHandler.getTraceConnectionId().toString())
+            .setAttribute(SemanticAttributes.DB_STATEMENT, parsedStatement.getSqlWithoutComments())
+            .startSpan();
+    try (Scope ignore = span.makeCurrent()) {
+      for (Command currentCommand :
+          Command.getCommands(
+              parsedStatement.getSqlWithoutComments(),
+              connectionHandler.getSpannerConnection(),
+              connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
+        if (currentCommand.is()) {
+          return PARSER.parse(Statement.of(currentCommand.translate()));
+        }
       }
+      return parsedStatement;
+    } finally {
+      span.end();
     }
-    return parsedStatement;
   }
 
-  protected static ImmutableList<Statement> parseStatements(Statement statement) {
+  protected static ImmutableList<Statement> parseStatements(
+      ConnectionHandler connectionHandler, Statement statement) {
     Preconditions.checkNotNull(statement);
     ImmutableList.Builder<Statement> builder = ImmutableList.builder();
     SimpleParser parser = new SimpleParser(statement.getSql());

@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-
 import com.google.api.core.AbstractApiService;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;

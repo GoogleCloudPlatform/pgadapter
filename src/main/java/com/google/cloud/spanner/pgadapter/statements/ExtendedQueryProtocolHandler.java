@@ -109,22 +109,24 @@ public class ExtendedQueryProtocolHandler {
         && this.messages.get(this.messages.size() - 1).isExtendedProtocol();
   }
 
+  public void maybeStartSpan(boolean isExtendedProtocol) {
+    if (span == null) {
+      span =
+          tracer
+              .spanBuilder("query_protocol_handler")
+              .setNoParent()
+              .setAttribute("pgadapter.query_protocol", isExtendedProtocol ? "extended" : "simple")
+              .setAttribute("pgadapter.connection_id", connectionId)
+              .startSpan();
+      scope = span.makeCurrent();
+    }
+  }
+
   /**
    * Buffer an extended query protocol message for execution when the next flush/sync message is
    * received.
    */
   public void buffer(AbstractQueryProtocolMessage message) {
-    if (messages.isEmpty()) {
-      span =
-          tracer
-              .spanBuilder("query_protocol_handler")
-              .setNoParent()
-              .setAttribute(
-                  "pgadapter.query_protocol", message.isExtendedProtocol() ? "extended" : "simple")
-              .setAttribute("pgadapter.connection_id", connectionId)
-              .startSpan();
-      scope = span.makeCurrent();
-    }
     addEvent(
         "Received message: '" + message.getIdentifier() + "'",
         Attributes.of(SemanticAttributes.DB_STATEMENT, message.getSql()));
@@ -237,6 +239,7 @@ public class ExtendedQueryProtocolHandler {
     if (span != null) {
       scope.close();
       span.end();
+      span = null;
     }
   }
 
