@@ -62,6 +62,7 @@ import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -74,7 +75,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class BackendConnectionTest {
-  private static final OpenTelemetry NOOP_OTEL = OpenTelemetry.noop();
+  private static final Tracer NOOP_OTEL = OpenTelemetry.noop().getTracer("test");
   private final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   private static final NoResult NO_RESULT = new NoResult();

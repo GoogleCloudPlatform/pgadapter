@@ -61,6 +61,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -88,7 +89,7 @@ public class StatementTest {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
-  private static final OpenTelemetry NOOP_OTEL = OpenTelemetry.noop();
+  private static final Tracer NOOP_OTEL = OpenTelemetry.noop().getTracer("test");
 
   private static final Runnable DO_NOTHING = () -> {};
 
@@ -99,6 +100,7 @@ public class StatementTest {
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private Connection connection;
   @Mock private ConnectionHandler connectionHandler;
+  @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private BackendConnection backendConnection;
   @Mock private ProxyServer server;
@@ -464,7 +466,7 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getExtendedQueryProtocolHandler())
-        .thenReturn(mock(ExtendedQueryProtocolHandler.class));
+        .thenReturn(extendedQueryProtocolHandler);
     when(server.getOptions()).thenReturn(options);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);

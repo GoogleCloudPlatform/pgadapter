@@ -35,6 +35,7 @@ import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandle
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -61,6 +62,7 @@ public final class ControlMessageTest {
 
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private ConnectionHandler connectionHandler;
+  @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   @Mock private IntermediateStatement intermediateStatement;
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private Connection connection;
@@ -77,7 +79,7 @@ public final class ControlMessageTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getExtendedQueryProtocolHandler())
-        .thenReturn(mock(ExtendedQueryProtocolHandler.class));
+        .thenReturn(extendedQueryProtocolHandler);
     when(intermediateStatement.getStatementType()).thenReturn(StatementType.UPDATE);
     when(intermediateStatement.getCommandTag()).thenReturn("INSERT");
     when(intermediateStatement.getStatementResult()).thenReturn(new UpdateCount(1L));
@@ -97,6 +99,8 @@ public final class ControlMessageTest {
             commandMetadata);
     ProxyServer server = new ProxyServer(options, OpenTelemetry.noop());
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     ControlMessage controlMessage = ControlMessage.create(connectionHandler);
     controlMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L);
@@ -124,9 +128,9 @@ public final class ControlMessageTest {
 
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
-    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getExtendedQueryProtocolHandler())
-        .thenReturn(mock(ExtendedQueryProtocolHandler.class));
+        .thenReturn(extendedQueryProtocolHandler);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     ExecuteMessage executeMessage =
         new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
     IntermediateStatement intermediateStatement = mock(IntermediateStatement.class);
@@ -152,13 +156,12 @@ public final class ControlMessageTest {
   @Test
   public void testSendNoRowsAsResultSetFails() {
     OpenTelemetry otel = OpenTelemetry.noop();
-    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
-        mock(ExtendedQueryProtocolHandler.class);
-    when(extendedQueryProtocolHandler.getTracer()).thenReturn(otel.getTracer("test"));
+    Tracer tracer = otel.getTracer("test");
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
+    when(extendedQueryProtocolHandler.getTracer()).thenReturn(tracer);
     IntermediateStatement describedResult = mock(IntermediateStatement.class);
     StatementResult statementResult = mock(StatementResult.class);
     when(statementResult.getResultType()).thenReturn(ResultType.NO_RESULT);

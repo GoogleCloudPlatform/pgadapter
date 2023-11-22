@@ -51,8 +51,8 @@ public class ExtendedQueryProtocolHandler {
 
   private final String connectionId;
   private final Tracer tracer;
-  private Span span;
-  private Scope scope;
+  private volatile Span span;
+  private volatile Scope scope;
 
   /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
@@ -65,7 +65,7 @@ public class ExtendedQueryProtocolHandler {
             .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
     this.backendConnection =
         new BackendConnection(
-            connectionHandler.getServer().getOpenTelemetry(),
+            tracer,
             connectionHandler.getTraceConnectionId().toString(),
             connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
