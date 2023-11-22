@@ -72,7 +72,7 @@ public class Server {
     }
 
     TraceConfiguration.Builder builder =
-        TraceConfiguration.builder().setDeadline(Duration.ofMillis(30000));
+        TraceConfiguration.builder().setDeadline(Duration.ofSeconds(60L));
     String projectId = optionsMetadata.getTelemetryProjectId();
     if (projectId != null) {
       builder.setProjectId(projectId);
@@ -95,7 +95,7 @@ public class Server {
     TraceExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
     Sampler sampler;
     if (optionsMetadata.getOpenTelemetryTraceRatio() == null) {
-      sampler = Sampler.parentBased(Sampler.alwaysOn());
+      sampler = Sampler.parentBased(Sampler.traceIdRatioBased(0.05d));
     } else {
       sampler =
           Sampler.parentBased(
