@@ -162,7 +162,7 @@ public class PasswordMessage extends ControlMessage {
   }
 
   @Override
-  protected String getIdentifier() {
+  public String getIdentifier() {
     return String.valueOf(IDENTIFIER);
   }
 

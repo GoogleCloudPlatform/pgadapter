@@ -47,6 +47,10 @@ See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked qu
 See [Latency Comparisons](benchmarks/latency-comparison/README.md) for benchmark comparisons between
 using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers and client libraries.
 
+## Insights
+See [OpenTelemetry in PGAdapter](docs/open_telemetry.md) for how to use `OpenTelemetry` to collect
+and export traces to Google Cloud Trace.
+
 ## Usage
 PGAdapter can be started both as a Docker container, a standalone process as well as an
 in-process server (the latter is only supported for Java and other JVM-based applications).
@@ -174,6 +178,14 @@ class PGProxyRunner {
 
 See [samples/java/jdbc](samples/java/jdbc) for a small sample application that adds
 PGAdapter as a compile-time dependency and runs it together with the main application.
+
+## Emulator
+See [this document](docs/emulator.md) for more information on how to connect PGAdapter to the Cloud
+Spanner Emulator.
+
+Connecting to the Cloud Spanner Emulator is supported with:
+1. PGAdapter version 0.26.0 and higher.
+2. Cloud Spanner Emulator 1.5.12 and higher.
 
 ### Options
 

@@ -36,6 +36,7 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
     super(connection);
     this.handler = connection.getExtendedQueryProtocolHandler();
     this.queryMode = QueryMode.EXTENDED;
+    this.handler.maybeStartSpan(false);
   }
 
   AbstractQueryProtocolMessage(
@@ -43,6 +44,7 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
     super(connection, length, manuallyCreatedToken);
     this.handler = connection.getExtendedQueryProtocolHandler();
     this.queryMode = QueryMode.SIMPLE;
+    this.handler.maybeStartSpan(true);
   }
 
   @Override
