@@ -5,7 +5,7 @@ line argument when starting PGAdapter.
 
 Optionally, you can also set a trace sample ratio to limit the number of traces that will be
 collected and set with the `-otel_trace_ratio=<ratio>` command line argument. If you omit this
-argument, all traces will be collected and exported. The ratio must be in the range `[0.0, 1.0]`.
+argument, PGAdapter will use a `0.05` trace ratio. The ratio must be in the range `[0.0, 1.0]`.
 
 Example:
 
