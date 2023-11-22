@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.Server.getVersion;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
@@ -64,7 +63,7 @@ public class SimpleQueryStatement {
       OptionsMetadata options, Statement originalStatement, ConnectionHandler connectionHandler) {
     this.connectionHandler = connectionHandler;
     this.options = options;
-    this.statements = parseStatements(connectionHandler, originalStatement);
+    this.statements = parseStatements(originalStatement);
   }
 
   public void execute() throws Exception {
@@ -137,11 +136,7 @@ public class SimpleQueryStatement {
   @VisibleForTesting
   static ParsedStatement translatePotentialMetadataCommand(
       ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
-    Tracer tracer =
-        connectionHandler
-            .getServer()
-            .getOpenTelemetry()
-            .getTracer(SimpleQueryStatement.class.getName(), getVersion());
+    Tracer tracer = connectionHandler.getExtendedQueryProtocolHandler().getTracer();
     Span span =
         tracer
             .spanBuilder("translatePotentialMetadataCommand")
@@ -165,8 +160,7 @@ public class SimpleQueryStatement {
     }
   }
 
-  protected static ImmutableList<Statement> parseStatements(
-      ConnectionHandler connectionHandler, Statement statement) {
+  protected static ImmutableList<Statement> parseStatements(Statement statement) {
     Preconditions.checkNotNull(statement);
     ImmutableList.Builder<Statement> builder = ImmutableList.builder();
     SimpleParser parser = new SimpleParser(statement.getSql());

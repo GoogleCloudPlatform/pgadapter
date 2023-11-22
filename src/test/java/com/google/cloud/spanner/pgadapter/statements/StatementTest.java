@@ -126,7 +126,7 @@ public class StatementTest {
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
+    verify(backendConnection).execute(eq("SELECT"), eq(parse(sql)), eq(Statement.of(sql)), any());
     assertTrue(intermediateStatement.containsResultSet());
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(StatementType.QUERY, intermediateStatement.getStatementType());
@@ -155,7 +155,7 @@ public class StatementTest {
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
+    verify(backendConnection).execute(eq("UPDATE"), eq(parse(sql)), eq(Statement.of(sql)), any());
     assertFalse(intermediateStatement.containsResultSet());
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(StatementType.UPDATE, intermediateStatement.getStatementType());
@@ -235,7 +235,7 @@ public class StatementTest {
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
+    verify(backendConnection).execute(eq("CREATE"), eq(parse(sql)), eq(Statement.of(sql)), any());
     assertFalse(intermediateStatement.containsResultSet());
     assertEquals(0, intermediateStatement.getUpdateCount());
     assertTrue(intermediateStatement.isExecuted());
@@ -463,6 +463,8 @@ public class StatementTest {
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(mock(ExtendedQueryProtocolHandler.class));
     when(server.getOptions()).thenReturn(options);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);

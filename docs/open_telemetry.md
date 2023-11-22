@@ -47,12 +47,19 @@ following spans:
    session.
 2. `execute` / `analyze` / `execute_batch`: PGAdapter will translate the incoming messages into
    `execute`, `analyze`, and `execute_batch` actions on Cloud Spanner. One span of
-   `query_protocol_handler` normally consists of one of these actions.
+   `query_protocol_handler` normally consists of one or more of these actions.
 3. `execute_on_spanner`: This span contains the time when PGAdapter hands off the execution of a
    statement to the Cloud Spanner Java client, and is roughly identical to the end-to-end
-   execution of the statement. Note that an `execute_on_spanner` span inside a `execute_batch` span
-   only buffers the statement client-side. The actual RPC execution time is recorded in the
-   `execute_batch` span.
+   execution of the statement.
+4. `execute_batch`: This span indicates a batch of DML or DDL statements that are being received
+   and buffered by PGAdapter. The statements will be sent as one batch to Cloud Spanner for
+   execution. The actual execution of the batch is recorded in the `execute_batch_on_spanner` span.
+5. `send_result_set`: This span is only recorded for queries that send rows back to the client. It
+   shows the time that it took for PGAdapter to receive all rows from Cloud Spanner and send these
+   to the client. This span will be longer for queries that return a large number of rows. The time
+   it takes to send the results to the client also depends on how quickly the client application can
+   consume the rows that are being sent, and on the network speed between PGAdapter and Cloud
+   Spanner.
 
 ### Examples
 
@@ -79,6 +86,8 @@ A typical execution of a query consists of the following spans:
 2. `execute`: The front-end query protocol handler requests the backend connection to Cloud Spanner
    to execute the query that it constructed from the messages it received.
 3. `execute_on_spanner`: This the actual RPC invocation on Cloud Spanner.
+4. `send_result_set`: Shows the time it takes to receive all rows from Cloud Spanner and the time it
+   takes to send these to the client application.
 
 ![PGAdapter Cloud Trace - Query example](img/query_trace_sample.png?raw=true "PGAdapter Cloud Trace - Query example")
 
@@ -126,10 +135,12 @@ statements consists of the following spans:
    to create a DML batch, buffer the DML statements on the client, and then execute the statements
    on Cloud Spanner. The total time of this span is the time it took to buffer all the statements on
    the client and to execute the batch on Cloud Spanner.  
-4. `execute_on_spanner`: For each DML statement, an `execute_on_spanner` span is created within the
-   DML batch. These statements are not executed on spanner, but buffered in the Spanner client until
-   all the DML statements have been collected. The DML statements are then sent to Cloud Spanner as
-   one Batch DML request. These spans contain the actual SQL statements that are executed.
+4. `buffer`: For each DML statement, a `buffer` span is created within the DML batch. These
+   statements are not yet executed on spanner, but buffered in the Spanner client until
+   all the DML statements have been collected.
+5. `execute_batch_on_spanner`: Once all DML statements have been collected, PGAdapter creates one
+   batch and sends this as one request to Cloud Spanner. This span shows the time it takes to
+   execute this batch request on Cloud Spanner.
 
 ![PGAdapter Cloud Trace - Batch DML example](img/dml_batch_trace_sample.png?raw=true "PGAdapter Cloud Trace - Batch DML example")
 

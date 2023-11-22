@@ -89,6 +89,10 @@ public class ExtendedQueryProtocolHandler {
     this.backendConnection = Preconditions.checkNotNull(backendConnection);
   }
 
+  public Tracer getTracer() {
+    return tracer;
+  }
+
   /** Returns the backend PG connection for this query handler. */
   public BackendConnection getBackendConnection() {
     return backendConnection;

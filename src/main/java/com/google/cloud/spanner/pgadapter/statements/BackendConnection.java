@@ -249,29 +249,33 @@ public class BackendConnection {
   }
 
   private final class Execute extends BufferedStatement<StatementResult> {
+    private final String command;
     private final Function<Statement, Statement> statementBinder;
     private final boolean analyze;
 
     Execute(
+        String command,
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder) {
-      this(parsedStatement, statement, statementBinder, false);
+      this(command, parsedStatement, statement, statementBinder, false);
     }
 
     Execute(
+        String command,
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder,
         boolean analyze) {
       super(parsedStatement, statement);
+      this.command = command;
       this.statementBinder = statementBinder;
       this.analyze = analyze;
     }
 
     @Override
     public String toString() {
-      return analyze ? "analyze" : super.toString();
+      return (analyze ? "analyze" : super.toString()) + " (" + command + ")";
     }
 
     @Override
@@ -451,7 +455,14 @@ public class BackendConnection {
     }
 
     private StatementResult executeOnSpannerWithLogging(Statement statement) {
-      Span span = createSpan("execute_on_spanner", statement);
+      String spanName =
+          spannerConnection.isDmlBatchActive() || spannerConnection.isDdlBatchActive()
+              ? "buffer"
+              : "execute_on_spanner";
+      if (command != null) {
+        spanName += " (" + command + ")";
+      }
+      Span span = createSpan(spanName, statement);
       try (Scope ignore = span.makeCurrent()) {
         statementContext.push(Context.current());
         logger.log(
@@ -932,17 +943,18 @@ public class BackendConnection {
    * execution has finished.
    */
   public Future<StatementResult> execute(
+      String command,
       ParsedStatement parsedStatement,
       Statement statement,
       Function<Statement, Statement> statementBinder) {
-    Execute execute = new Execute(parsedStatement, statement, statementBinder);
+    Execute execute = new Execute(command, parsedStatement, statement, statementBinder);
     bufferedStatements.add(execute);
     return execute.result;
   }
 
   public ListenableFuture<StatementResult> analyze(
-      ParsedStatement parsedStatement, Statement statement) {
-    Execute execute = new Execute(parsedStatement, statement, Function.identity(), true);
+      String command, ParsedStatement parsedStatement, Statement statement) {
+    Execute execute = new Execute(command, parsedStatement, statement, Function.identity(), true);
     bufferedStatements.add(execute);
     return execute.result;
   }
@@ -1462,7 +1474,8 @@ public class BackendConnection {
         bufferedStatements.get(fromIndex).result.setException(exception);
         throw exception;
       }
-      try {
+      Span runBatchSpan = createSpan("execute_batch_on_spanner", null);
+      try (Scope ignoreRunBatchSpan = runBatchSpan.makeCurrent()) {
         long[] counts = spannerConnection.runBatch();
         if (batchType == StatementType.DDL) {
           counts = extractDdlUpdateCounts(statementResults, counts);
@@ -1478,10 +1491,14 @@ public class BackendConnection {
         updateBatchResultCount(fromIndex, counts);
         Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
         failedExecute.result.setException(batchUpdateException);
+        runBatchSpan.recordException(batchUpdateException);
         throw batchUpdateException;
       } catch (Throwable exception) {
         bufferedStatements.get(fromIndex).result.setException(exception);
+        runBatchSpan.recordException(exception);
         throw exception;
+      } finally {
+        runBatchSpan.end();
       }
       return index - fromIndex;
     } catch (Throwable throwable) {

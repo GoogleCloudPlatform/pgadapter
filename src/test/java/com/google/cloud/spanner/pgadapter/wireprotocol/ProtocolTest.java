@@ -189,6 +189,8 @@ public class ProtocolTest {
     String expectedSQL = "SELECT * FROM users";
 
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(server.getOptions()).thenReturn(options);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -209,6 +211,8 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -730,6 +734,8 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
@@ -803,6 +809,8 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
@@ -1750,6 +1758,8 @@ public class ProtocolTest {
   public void testGetPortalMetadataBeforeFlushFails() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(intermediatePortalStatement.containsResultSet()).thenReturn(true);
     when(intermediatePortalStatement.describeAsync(backendConnection))
         .thenReturn(SettableFuture.create());

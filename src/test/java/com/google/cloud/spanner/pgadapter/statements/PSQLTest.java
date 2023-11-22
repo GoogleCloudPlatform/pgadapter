@@ -26,6 +26,8 @@ import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.CommandMetadataParser;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
+import io.opentelemetry.api.OpenTelemetry;
+import java.util.UUID;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Before;
@@ -51,6 +53,8 @@ public class PSQLTest {
 
   @Mock private ConnectionHandler connectionHandler;
 
+  @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
+
   @Mock private Connection connection;
 
   @Mock private ProxyServer server;
@@ -59,9 +63,15 @@ public class PSQLTest {
 
   @Before
   public void setup() throws Exception {
+    OpenTelemetry otel = OpenTelemetry.noop();
+
     final JSONObject defaultCommands = new CommandMetadataParser().defaultCommands();
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    Mockito.when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
+    Mockito.when(extendedQueryProtocolHandler.getTracer()).thenReturn(otel.getTracer("test"));
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.getCommandMetadataJSON()).thenReturn(defaultCommands);
   }
