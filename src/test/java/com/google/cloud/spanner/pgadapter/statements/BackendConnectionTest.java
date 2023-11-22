@@ -61,6 +61,9 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClie
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.common.collect.ImmutableList;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -72,6 +75,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class BackendConnectionTest {
+  private static final Tracer NOOP_OTEL = OpenTelemetry.noop().getTracer("test");
   private final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   private static final NoResult NO_RESULT = new NoResult();
@@ -112,6 +116,8 @@ public class BackendConnectionTest {
     when(spannerConnection.runBatch()).thenThrow(expectedException);
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -120,10 +126,12 @@ public class BackendConnectionTest {
             ImmutableList::of);
 
     backendConnection.execute(
+        "CREATE",
         PARSER.parse(Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)")),
         Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)"),
         Function.identity());
     backendConnection.execute(
+        "CREATE",
         PARSER.parse(Statement.of("CREATE TABLE bar (id bigint primary key, value text)")),
         Statement.of("CREATE TABLE bar (id bigint primary key, value text)"),
         Function.identity());
@@ -148,6 +156,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -187,19 +197,25 @@ public class BackendConnectionTest {
 
     BackendConnection onlyDmlStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList::of);
-    onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
-    onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
+    onlyDmlStatements.execute(
+        "INSERT", parsedUpdateStatement, updateStatement, Function.identity());
+    onlyDmlStatements.execute(
+        "INSERT", parsedUpdateStatement, updateStatement, Function.identity());
     assertTrue(onlyDmlStatements.hasUpdateStatementsAfter(0));
     assertTrue(onlyDmlStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyCopyStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -213,13 +229,16 @@ public class BackendConnectionTest {
 
     BackendConnection dmlAndCopyStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList::of);
-    dmlAndCopyStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
+    dmlAndCopyStatements.execute(
+        "INSERT", parsedUpdateStatement, updateStatement, Function.identity());
     dmlAndCopyStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
     assertTrue(dmlAndCopyStatements.hasUpdateStatementsAfter(0));
@@ -227,19 +246,25 @@ public class BackendConnectionTest {
 
     BackendConnection onlySelectStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList::of);
-    onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
-    onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
+    onlySelectStatements.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    onlySelectStatements.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
     assertFalse(onlySelectStatements.hasUpdateStatementsAfter(0));
     assertFalse(onlySelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyClientSideStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -247,40 +272,50 @@ public class BackendConnectionTest {
             mock(OptionsMetadata.class),
             ImmutableList::of);
     onlyClientSideStatements.execute(
-        parsedClientSideStatement, clientSideStatement, Function.identity());
+        "SET", parsedClientSideStatement, clientSideStatement, Function.identity());
     onlyClientSideStatements.execute(
-        parsedClientSideStatement, clientSideStatement, Function.identity());
+        "SET", parsedClientSideStatement, clientSideStatement, Function.identity());
     assertFalse(onlyClientSideStatements.hasUpdateStatementsAfter(0));
     assertFalse(onlyClientSideStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyUnknownStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList::of);
-    onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
-    onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
+    onlyUnknownStatements.execute(
+        "", parsedUnknownStatement, unknownStatement, Function.identity());
+    onlyUnknownStatements.execute(
+        "", parsedUnknownStatement, unknownStatement, Function.identity());
     assertFalse(onlyUnknownStatements.hasUpdateStatementsAfter(0));
     assertFalse(onlyUnknownStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection dmlAndSelectStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList::of);
-    dmlAndSelectStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
-    dmlAndSelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
+    dmlAndSelectStatements.execute(
+        "INSERT", parsedUpdateStatement, updateStatement, Function.identity());
+    dmlAndSelectStatements.execute(
+        "INSERT", parsedSelectStatement, selectStatement, Function.identity());
     assertTrue(dmlAndSelectStatements.hasUpdateStatementsAfter(0));
     assertFalse(dmlAndSelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection copyAndSelectStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -289,12 +324,15 @@ public class BackendConnectionTest {
             ImmutableList::of);
     copyAndSelectStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
-    copyAndSelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
+    copyAndSelectStatements.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
     assertTrue(copyAndSelectStatements.hasUpdateStatementsAfter(0));
     assertFalse(copyAndSelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection copyAndUnknownStatements =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
@@ -303,7 +341,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     copyAndUnknownStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
-    copyAndUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
+    copyAndUnknownStatements.execute(
+        "", parsedUnknownStatement, unknownStatement, Function.identity());
     assertTrue(copyAndUnknownStatements.hasUpdateStatementsAfter(0));
     assertFalse(copyAndUnknownStatements.hasUpdateStatementsAfter(1));
   }
@@ -325,6 +364,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -333,6 +374,7 @@ public class BackendConnectionTest {
             () -> localStatements);
     Future<StatementResult> resultFuture =
         backendConnection.execute(
+            "SHOW",
             parsedListDatabasesStatement,
             Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL),
             Function.identity());
@@ -362,6 +404,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -369,7 +413,7 @@ public class BackendConnectionTest {
             mock(OptionsMetadata.class),
             () -> localStatements);
     Future<StatementResult> resultFuture =
-        backendConnection.execute(parsedStatement, statement, Function.identity());
+        backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     verify(listDatabasesStatement, never()).execute(backendConnection);
@@ -399,6 +443,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -406,7 +452,7 @@ public class BackendConnectionTest {
             mock(OptionsMetadata.class),
             () -> EMPTY_LOCAL_STATEMENTS);
     Future<StatementResult> resultFuture =
-        backendConnection.execute(parsedStatement, statement, Function.identity());
+        backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     ExecutionException executionException =
@@ -426,6 +472,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -433,7 +481,7 @@ public class BackendConnectionTest {
             mock(OptionsMetadata.class),
             () -> EMPTY_LOCAL_STATEMENTS);
     Future<StatementResult> resultFuture =
-        backendConnection.execute(parsedStatement, statement, Function.identity());
+        backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     ExecutionException executionException =
@@ -465,6 +513,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -472,8 +522,8 @@ public class BackendConnectionTest {
             mock(OptionsMetadata.class),
             () -> EMPTY_LOCAL_STATEMENTS);
     Future<StatementResult> resultFuture1 =
-        backendConnection.execute(parsedStatement1, statement1, Function.identity());
-    backendConnection.execute(parsedStatement2, statement2, Function.identity());
+        backendConnection.execute("CREATE", parsedStatement1, statement1, Function.identity());
+    backendConnection.execute("CREATE", parsedStatement2, statement2, Function.identity());
     backendConnection.flush();
 
     // The error will be set on the first statement in the batch, as the error occurs before
@@ -494,6 +544,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -501,7 +553,7 @@ public class BackendConnectionTest {
             options,
             () -> EMPTY_LOCAL_STATEMENTS);
 
-    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     verify(connection)
@@ -521,6 +573,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -528,7 +582,7 @@ public class BackendConnectionTest {
             options,
             () -> EMPTY_LOCAL_STATEMENTS);
 
-    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     verify(connection).execute(statement);
@@ -549,6 +603,8 @@ public class BackendConnectionTest {
 
       BackendConnection backendConnection =
           new BackendConnection(
+              NOOP_OTEL,
+              UUID.randomUUID().toString(),
               DO_NOTHING,
               DatabaseId.of("p", "i", "d"),
               connection,
@@ -556,7 +612,7 @@ public class BackendConnectionTest {
               mock(OptionsMetadata.class),
               () -> EMPTY_LOCAL_STATEMENTS);
 
-      backendConnection.execute(parsedStatement, statement, Function.identity());
+      backendConnection.execute("INSERT", parsedStatement, statement, Function.identity());
       backendConnection.flush();
 
       verify(connection).execute(statement);
@@ -573,6 +629,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -582,8 +640,8 @@ public class BackendConnectionTest {
 
     // Describing and executing the same statement in one pipelined operation should not start an
     // implicit transaction.
-    backendConnection.analyze(parsedStatement, statement);
-    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.analyze("SELECT", parsedStatement, statement);
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.sync();
 
     verify(connection).analyzeQuery(statement, QueryAnalyzeMode.PLAN);
@@ -603,6 +661,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -612,8 +672,8 @@ public class BackendConnectionTest {
 
     // Describing and executing different queries in one pipelined operation should start an
     // implicit read-only transaction.
-    backendConnection.analyze(parsedStatement1, statement1);
-    backendConnection.execute(parsedStatement2, statement2, Function.identity());
+    backendConnection.analyze("SELECT", parsedStatement1, statement1);
+    backendConnection.execute("SELECT", parsedStatement2, statement2, Function.identity());
     backendConnection.sync();
 
     verify(connection).analyzeQuery(statement1, QueryAnalyzeMode.PLAN);
@@ -631,6 +691,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -640,8 +702,8 @@ public class BackendConnectionTest {
 
     // Executing the same query twice in one pipelined operation should start an
     // implicit read-only transaction.
-    backendConnection.execute(parsedStatement, statement, Function.identity());
-    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.sync();
 
     verify(connection, times(2)).execute(statement);
@@ -658,6 +720,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -665,7 +729,7 @@ public class BackendConnectionTest {
             mock(OptionsMetadata.class),
             () -> EMPTY_LOCAL_STATEMENTS);
 
-    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.executeCopyOut(parsedStatement, statement);
     backendConnection.sync();
 
@@ -695,6 +759,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -703,7 +769,7 @@ public class BackendConnectionTest {
             () -> EMPTY_LOCAL_STATEMENTS);
 
     backendConnection.execute(truncateStatement);
-    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.sync();
 
     verify(connection).execute(statement);
@@ -731,6 +797,8 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -738,7 +806,7 @@ public class BackendConnectionTest {
             mock(OptionsMetadata.class),
             () -> EMPTY_LOCAL_STATEMENTS);
 
-    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute("VACUUM", parsedStatement, statement, Function.identity());
     backendConnection.execute(vacuumStatement);
     backendConnection.sync();
 

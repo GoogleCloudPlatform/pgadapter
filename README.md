@@ -47,6 +47,10 @@ See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked qu
 See [Latency Comparisons](benchmarks/latency-comparison/README.md) for benchmark comparisons between
 using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers and client libraries.
 
+## Insights
+See [OpenTelemetry in PGAdapter](docs/open_telemetry.md) for how to use `OpenTelemetry` to collect
+and export traces to Google Cloud Trace.
+
 ## Usage
 PGAdapter can be started both as a Docker container, a standalone process as well as an
 in-process server (the latter is only supported for Java and other JVM-based applications).

@@ -78,7 +78,7 @@ public class SkipMessage extends ControlMessage {
   }
 
   @Override
-  protected String getIdentifier() {
+  public String getIdentifier() {
     return "";
   }
 }
