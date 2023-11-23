@@ -32,11 +32,12 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Map;
-import org.postgresql.util.ReaderInputStream;
 
 /**
  * PGAdapter will convert a password message into gRPC authentication in the following ways:
@@ -142,7 +143,8 @@ public class PasswordMessage extends ControlMessage {
 
     // Try to parse the password field as a JSON string that contains a credentials object.
     try {
-      return GoogleCredentials.fromStream(new ReaderInputStream(new StringReader(password)));
+      return GoogleCredentials.fromStream(
+          new ByteArrayInputStream(password.getBytes(StandardCharsets.UTF_8)));
     } catch (IOException ioException) {
       // Ignore and fallthrough..
     }
