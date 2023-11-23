@@ -122,7 +122,7 @@ public final class ITQueryTest implements IntegrationTest {
     testEnv.consumeStartUpMessages(in);
 
     // Send query.
-    String payload = "SELECT id, name, age, data FROM users\0";
+    String payload = "SELECT id, name, age, data FROM users order by id\0";
     byte[] messageMetadata = {'Q', 0, 0, 0, (byte) (payload.length() + 4)};
     byte[] message = Bytes.concat(messageMetadata, payload.getBytes());
     out.write(message, 0, message.length);

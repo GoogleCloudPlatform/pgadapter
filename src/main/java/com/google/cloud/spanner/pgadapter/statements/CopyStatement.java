@@ -326,6 +326,7 @@ public class CopyStatement extends IntermediatePortalStatement {
                   .mapToObj(i -> String.format("$%d", i))
                   .collect(Collectors.joining(", ", "(", ")"));
     }
+    sql += " ORDER BY ordinal_position";
     Statement.Builder builder =
         Statement.newBuilder(sql)
             .bind("p1")

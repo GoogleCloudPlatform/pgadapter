@@ -108,7 +108,7 @@ public abstract class WireMessage {
    *
    * @return Message Identifier (int for Bootstrap, char otherwise).
    */
-  protected abstract String getIdentifier();
+  public abstract String getIdentifier();
 
   @Override
   public String toString() {
