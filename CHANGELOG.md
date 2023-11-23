@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.27.0...v0.27.1) (2023-11-23)
+
+
+### Bug Fixes
+
+* re-instante public constructor for ProxyServer ([#1216](https://github.com/GoogleCloudPlatform/pgadapter/issues/1216)) ([a8ce633](https://github.com/GoogleCloudPlatform/pgadapter/commit/a8ce6332aeefa4612956bab629721eeb87315d87))
+
 ## [0.27.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.26.0...v0.27.0) (2023-11-23)
 
 
