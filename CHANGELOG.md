@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.27.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.26.0...v0.27.0) (2023-11-23)
+
+
+### Features
+
+* add OpenTelemetry tracing ([#1182](https://github.com/GoogleCloudPlatform/pgadapter/issues/1182)) ([26217a3](https://github.com/GoogleCloudPlatform/pgadapter/commit/26217a3a937d3004813ceeedcca8fe452d1a70d9))
+* support PostgreSQL JDBC 42.7.0 ([#1208](https://github.com/GoogleCloudPlatform/pgadapter/issues/1208)) ([425d530](https://github.com/GoogleCloudPlatform/pgadapter/commit/425d530d6a54ee18bdef672ae067d5a9772da972))
+
+
+### Documentation
+
+* document emulator usage ([#1178](https://github.com/GoogleCloudPlatform/pgadapter/issues/1178)) ([539ea4d](https://github.com/GoogleCloudPlatform/pgadapter/commit/539ea4d44d0de70078ee0f8eab93ac5642362a41))
+
 ## [0.26.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.25.0...v0.26.0) (2023-11-07)
 
 
