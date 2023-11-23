@@ -110,6 +110,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testQuery() throws SQLException {
+    skipOnEmulator("Equality operator for numeric is not supported on the emulator");
+
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
@@ -146,6 +148,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testParameterMetaData() throws SQLException {
+    skipOnEmulator("Equality operator for numeric is not supported on the emulator");
+
     for (String sql :
         new String[] {
           "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
@@ -375,6 +379,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testResultSetMetaData() throws SQLException {
+    skipOnEmulator("Equality operator for numeric is not supported on the emulator");
+
     ImmutableList<String> columnNames =
         ImmutableList.of(
             "col_bigint",
@@ -427,6 +433,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testSelectWithParameters() throws SQLException {
+    skipOnEmulator("Equality operator for numeric is not supported on the emulator");
+
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "

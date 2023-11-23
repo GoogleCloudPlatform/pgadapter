@@ -189,6 +189,7 @@ public class PgAdapterTestEnv {
   private void startPGAdapterServer(
       String databaseId, Iterable<String> additionalPGAdapterOptions) {
     if (PG_ADAPTER_ADDRESS == null) {
+      additionalPGAdapterOptions = maybeAddAutoConfigEmulator(additionalPGAdapterOptions);
       String credentials = getCredentials();
       ImmutableList.Builder<String> argsListBuilder =
           ImmutableList.<String>builder().add("-p", getProjectId(), "-i", getInstanceId());
@@ -211,6 +212,39 @@ public class PgAdapterTestEnv {
       server = new ProxyServer(new OptionsMetadata(args));
       server.startServer();
     }
+  }
+
+  private Iterable<String> maybeAddAutoConfigEmulator(Iterable<String> additionalPGAdapterOptions) {
+    if (System.getenv("SPANNER_EMULATOR_HOST") == null) {
+      return additionalPGAdapterOptions;
+    }
+    List<String> result = new ArrayList<>();
+    Iterables.addAll(result, additionalPGAdapterOptions);
+    boolean foundExistingOption = false;
+    for (int index = 0; index < result.size(); index++) {
+      String option = result.get(index);
+      if ("-r".equals(option)) {
+        foundExistingOption = true;
+        // Append to the existing property.
+        if (index < result.size() - 1) {
+          String value = result.get(index + 1);
+          result.remove(index + 1);
+          if (value == null) {
+            result.add(index + 1, "autoConfigEmulator=true");
+          } else {
+            result.add(index + 1, value + ";autoConfigEmulator=true");
+          }
+        } else {
+          result.add("autoConfigEmulator=true");
+        }
+        break;
+      }
+    }
+    if (!foundExistingOption) {
+      result.add("-r");
+      result.add("autoConfigEmulator=true");
+    }
+    return result;
   }
 
   public void stopPGAdapterServer() {

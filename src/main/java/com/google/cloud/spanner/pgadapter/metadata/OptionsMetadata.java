@@ -66,6 +66,7 @@ public class OptionsMetadata {
    * </ol>
    */
   public static class Builder {
+    private Map<String, String> environment = System.getenv();
     private String project;
     private String instance;
     private String database;
@@ -88,6 +89,11 @@ public class OptionsMetadata {
     private boolean usePlainText;
 
     Builder() {}
+
+    Builder setEnvironment(Map<String, String> environment) {
+      this.environment = Preconditions.checkNotNull(environment);
+      return this;
+    }
 
     /**
      * (Optional) The Google Cloud project ID that PGAdapter should connect to.
@@ -509,6 +515,7 @@ public class OptionsMetadata {
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
 
+  private final Map<String, String> environment;
   private final String osName;
   private final CommandLine commandLine;
   private final Credentials credentials;
@@ -543,26 +550,29 @@ public class OptionsMetadata {
    * of calling this method directly.
    */
   public OptionsMetadata(String[] args) {
-    this(System.getProperty("os.name", ""), args);
+    this(System.getenv(), System.getProperty("os.name", ""), args);
   }
 
   private OptionsMetadata(Builder builder) {
     this(
+        builder.environment,
         System.getProperty("os.name", ""),
         builder.toCommandLineArguments(),
         builder.credentials,
         builder.sessionPoolOptions);
   }
 
-  OptionsMetadata(String osName, String[] args) {
-    this(osName, args, null, null);
+  OptionsMetadata(Map<String, String> environment, String osName, String[] args) {
+    this(environment, osName, args, null, null);
   }
 
   OptionsMetadata(
+      Map<String, String> environment,
       String osName,
       String[] args,
       @Nullable Credentials credentials,
       @Nullable SessionPoolOptions sessionPoolOptions) {
+    this.environment = Preconditions.checkNotNull(environment);
     this.osName = osName;
     this.commandLine = buildOptions(args);
     this.credentials = credentials;
@@ -637,6 +647,7 @@ public class OptionsMetadata {
       boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
     this(
+        System.getenv(),
         System.getProperty("os.name", ""),
         defaultConnectionUrl,
         proxyPort,
@@ -650,6 +661,7 @@ public class OptionsMetadata {
 
   @VisibleForTesting
   OptionsMetadata(
+      Map<String, String> environment,
       String osName,
       String defaultConnectionUrl,
       int proxyPort,
@@ -659,6 +671,7 @@ public class OptionsMetadata {
       boolean requiresMatcher,
       boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
+    this.environment = Preconditions.checkNotNull(environment);
     this.osName = osName;
     this.commandLine = null;
     this.credentials = null;
@@ -865,7 +878,7 @@ public class OptionsMetadata {
     // Note that Credentials here is the credentials file, not the actual credentials
     String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
-    if (!shouldAuthenticate()) {
+    if (!shouldAuthenticate() && environment.get("SPANNER_EMULATOR_HOST") == null) {
       String credentials = buildCredentialsFile();
       if (!Strings.isNullOrEmpty(credentials)) {
         url = String.format("%s;credentials=%s", url, credentials);
