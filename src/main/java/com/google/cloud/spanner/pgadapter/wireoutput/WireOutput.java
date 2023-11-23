@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
 import java.io.DataOutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -64,7 +65,7 @@ public abstract class WireOutput {
    * efficient for responses that contain multiple parts, such as query results.
    */
   public void send(boolean flush) throws Exception {
-    logger.log(Level.FINE, this::toString);
+    logger.log(Level.FINEST, Logging.format("Send", this::toString));
     this.outputStream.writeByte(this.getIdentifier());
     if (this.isCompoundResponse()) {
       this.outputStream.writeInt(this.length);

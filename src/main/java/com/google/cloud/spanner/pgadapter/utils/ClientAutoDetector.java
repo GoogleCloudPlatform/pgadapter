@@ -300,7 +300,8 @@ public class ClientAutoDetector {
             && parameters.get("options").contains("spanner.well_known_client")) {
           return false;
         }
-        return parameters.get("DateStyle").equals("ISO");
+        return parameters.get("DateStyle").equals("ISO, MDY")
+            || parameters.get("DateStyle").equals("ISO");
       }
 
       @Override

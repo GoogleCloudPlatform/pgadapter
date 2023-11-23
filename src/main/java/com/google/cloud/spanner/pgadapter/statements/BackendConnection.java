@@ -21,6 +21,7 @@ import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replace
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
+import com.google.cloud.Timestamp;
 import com.google.cloud.Tuple;
 import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
@@ -49,6 +50,7 @@ import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
+import com.google.cloud.spanner.connection.TransactionRetryListener;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -60,11 +62,14 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
+import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -75,21 +80,34 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanBuilder;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.time.Duration;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -101,6 +119,16 @@ import javax.annotation.Nullable;
  */
 @InternalApi
 public class BackendConnection {
+  private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
+
+  private final Tracer tracer;
+
+  private final Deque<Context> statementContext = new ConcurrentLinkedDeque<>();
+
+  private final String connectionId;
+
+  private UUID currentTransactionId;
+
   public static final String TRANSACTION_ABORTED_ERROR =
       "current transaction is aborted, commands ignored until end of transaction block";
 
@@ -181,13 +209,33 @@ public class BackendConnection {
       this.result = SettableFuture.create();
     }
 
+    @Override
+    public String toString() {
+      return getClass().getSimpleName().toLowerCase(Locale.ENGLISH);
+    }
+
     boolean isBatchingPossible() {
       return false;
     }
 
     abstract boolean isUpdate();
 
-    abstract void execute();
+    void execute() {
+      Span span = createSpan(toString(), statement);
+      try (Scope ignore = span.makeCurrent()) {
+        statementContext.push(Context.current());
+        doExecute();
+      } catch (Throwable exception) {
+        span.setStatus(StatusCode.ERROR, exception.getMessage());
+        span.recordException(exception);
+        throw exception;
+      } finally {
+        span.end();
+        statementContext.pop();
+      }
+    }
+
+    abstract void doExecute();
 
     void checkConnectionState() {
       // Only COMMIT or ROLLBACK is allowed if we are in an ABORTED transaction.
@@ -199,24 +247,33 @@ public class BackendConnection {
   }
 
   private final class Execute extends BufferedStatement<StatementResult> {
+    private final String command;
     private final Function<Statement, Statement> statementBinder;
     private final boolean analyze;
 
     Execute(
+        String command,
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder) {
-      this(parsedStatement, statement, statementBinder, false);
+      this(command, parsedStatement, statement, statementBinder, false);
     }
 
     Execute(
+        String command,
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder,
         boolean analyze) {
       super(parsedStatement, statement);
+      this.command = command;
       this.statementBinder = statementBinder;
       this.analyze = analyze;
+    }
+
+    @Override
+    public String toString() {
+      return (analyze ? "analyze" : super.toString()) + " (" + command + ")";
     }
 
     @Override
@@ -230,7 +287,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       Statement updatedStatement = statement;
       try {
         checkConnectionState();
@@ -387,12 +444,59 @@ public class BackendConnection {
           && new SimpleParser(statement.getSql()).peekKeyword("insert")) {
         try {
           spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.TRANSACTIONAL);
-          return spannerConnection.execute(statement);
+          return executeOnSpannerWithLogging(statement);
         } finally {
           spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.PARTITIONED_NON_ATOMIC);
         }
       }
-      return spannerConnection.execute(statement);
+      return executeOnSpannerWithLogging(statement);
+    }
+
+    private StatementResult executeOnSpannerWithLogging(Statement statement) {
+      String spanName =
+          spannerConnection.isDmlBatchActive() || spannerConnection.isDdlBatchActive()
+              ? "buffer"
+              : "execute_on_spanner";
+      if (command != null) {
+        spanName += " (" + command + ")";
+      }
+      Span span = createSpan(spanName, statement);
+      try (Scope ignore = span.makeCurrent()) {
+        statementContext.push(Context.current());
+        logger.log(
+            Level.FINER,
+            Logging.format(
+                "Executing",
+                Action.Starting,
+                () -> String.format("Statement: %s", statement.getSql())));
+        Stopwatch stopwatch = Stopwatch.createStarted();
+        StatementResult result = spannerConnection.execute(statement);
+        Duration executionDuration = stopwatch.elapsed();
+        logger.log(
+            Level.FINER,
+            Logging.format(
+                "Executing",
+                Action.Finished,
+                () -> String.format("Statement: %s", statement.getSql())));
+        if (executionDuration.compareTo(sessionState.getLogSlowStatementThreshold()) >= 0) {
+          logger.log(
+              Level.FINE,
+              Logging.format(
+                  "Executing",
+                  () ->
+                      String.format(
+                          "Slow statement: %s\n" + "Duration: %s",
+                          statement.getSql(), executionDuration)));
+        }
+        return result;
+      } catch (Throwable exception) {
+        span.setStatus(StatusCode.ERROR, exception.getMessage());
+        span.recordException(exception);
+        throw exception;
+      } finally {
+        span.end();
+        statementContext.pop();
+      }
     }
 
     /**
@@ -437,7 +541,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       checkConnectionState();
       try {
         if (transactionMode != TransactionMode.IMPLICIT) {
@@ -512,7 +616,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         // Execute the MutationWriter and the CopyDataReceiver both asynchronously and wait for both
@@ -556,7 +660,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         if (spannerConnection.isInTransaction()) {
@@ -602,7 +706,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         if (spannerConnection.isDdlBatchActive()) {
@@ -644,7 +748,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         spannerConnection.savepoint(savepointStatement.getSavepointName());
@@ -672,7 +776,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         checkConnectionState();
         spannerConnection.releaseSavepoint(releaseStatement.getSavepointName());
@@ -700,7 +804,7 @@ public class BackendConnection {
     }
 
     @Override
-    void execute() {
+    void doExecute() {
       try {
         spannerConnection.rollbackToSavepoint(rollbackToStatement.getSavepointName());
         result.set(NO_RESULT);
@@ -733,18 +837,58 @@ public class BackendConnection {
 
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
+      Tracer tracer,
+      String connectionId,
       Runnable closeAllPortals,
       DatabaseId databaseId,
       Connection spannerConnection,
       Supplier<WellKnownClient> wellKnownClient,
       OptionsMetadata optionsMetadata,
       Supplier<ImmutableList<LocalStatement>> localStatements) {
+    this.tracer = tracer;
+    this.connectionId = connectionId;
     this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
     this.pgCatalog =
         Suppliers.memoize(
             () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
+    this.spannerConnection.addTransactionRetryListener(
+        new TransactionRetryListener() {
+          private Span span;
+
+          private Scope scope;
+
+          @Override
+          public void retryStarting(
+              Timestamp transactionStarted, long transactionId, int retryAttempt) {
+            logger.log(
+                Level.FINE,
+                () ->
+                    String.format(
+                        "Transaction %d starting retry attempt %d", transactionId, retryAttempt));
+            span = createSpan("pgadapter.transaction_retry", null, statementContext.peek());
+            span.setAttribute("pgadapter.retry_attempt", retryAttempt);
+            scope = span.makeCurrent();
+          }
+
+          @Override
+          public void retryFinished(
+              Timestamp transactionStarted,
+              long transactionId,
+              int retryAttempt,
+              RetryResult result) {
+            logger.log(
+                Level.FINE,
+                () ->
+                    String.format(
+                        "Transaction %d finished retry attempt %d with result %s",
+                        transactionId, retryAttempt, result));
+            span.setAttribute("pgadapter.retry_result", result.name());
+            scope.close();
+            span.end();
+          }
+        });
     this.databaseId = databaseId;
     this.ddlExecutor =
         new DdlExecutor(this, Suppliers.memoize(() -> wellKnownClient.get().getDdlReplacements()));
@@ -770,23 +914,45 @@ public class BackendConnection {
     return this.connectionState;
   }
 
+  private Span createSpan(String name, Statement statement) {
+    return createSpan(name, statement, null);
+  }
+
+  private Span createSpan(String name, Statement statement, Context parent) {
+    SpanBuilder builder =
+        tracer.spanBuilder(name).setAttribute("pgadapter.connection_id", connectionId);
+    if (statement != null) {
+      builder.setAttribute(SemanticAttributes.DB_STATEMENT, statement.getSql());
+    }
+    if (currentTransactionId != null) {
+      builder.setAttribute("pgadapter.transaction_id", currentTransactionId.toString());
+    }
+    if (parent != null) {
+      builder.setParent(parent);
+    }
+    builder.setAttribute(
+        "pgadapter.connection_state", connectionState.name().toLowerCase(Locale.ENGLISH));
+    return builder.startSpan();
+  }
+
   /**
    * Buffers the given statement for execution on the backend connection when the next flush/sync
    * message is received. The returned future will contain the result of the statement when
    * execution has finished.
    */
   public Future<StatementResult> execute(
+      String command,
       ParsedStatement parsedStatement,
       Statement statement,
       Function<Statement, Statement> statementBinder) {
-    Execute execute = new Execute(parsedStatement, statement, statementBinder);
+    Execute execute = new Execute(command, parsedStatement, statement, statementBinder);
     bufferedStatements.add(execute);
     return execute.result;
   }
 
   public ListenableFuture<StatementResult> analyze(
-      ParsedStatement parsedStatement, Statement statement) {
-    Execute execute = new Execute(parsedStatement, statement, Function.identity(), true);
+      String command, ParsedStatement parsedStatement, Statement statement) {
+    Execute execute = new Execute(command, parsedStatement, statement, Function.identity(), true);
     bufferedStatements.add(execute);
     return execute.result;
   }
@@ -969,6 +1135,7 @@ public class BackendConnection {
           if (isBegin(index)) {
             transactionMode = TransactionMode.EXPLICIT;
             connectionState = ConnectionState.TRANSACTION;
+            currentTransactionId = UUID.randomUUID();
           } else if (isCommit(index) || isRollback(index)) {
             if (isCommit(index)) {
               sessionState.commit();
@@ -978,6 +1145,7 @@ public class BackendConnection {
             closeAllPortals.run();
             transactionMode = TransactionMode.IMPLICIT;
             connectionState = ConnectionState.IDLE;
+            currentTransactionId = null;
           }
           index++;
         }
@@ -1053,6 +1221,7 @@ public class BackendConnection {
     }
     transactionMode = TransactionMode.IMPLICIT;
     connectionState = ConnectionState.TRANSACTION;
+    currentTransactionId = UUID.randomUUID();
   }
 
   /** Ends the current implicit transaction (if any). */
@@ -1076,6 +1245,7 @@ public class BackendConnection {
       }
     } finally {
       connectionState = ConnectionState.IDLE;
+      currentTransactionId = null;
     }
   }
 
@@ -1257,69 +1427,85 @@ public class BackendConnection {
     Preconditions.checkArgument(fromIndex < getStatementCount() - 1);
     Preconditions.checkArgument(
         canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
-    StatementType batchType = getStatementType(fromIndex);
-    if (batchType == StatementType.UPDATE) {
-      spannerConnection.startBatchDml();
-    } else if (batchType == StatementType.DDL) {
-      spannerConnection.startBatchDdl();
-    }
-    List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
-    int index = fromIndex;
-    try {
-      while (index < getStatementCount()) {
-        if (!bufferedStatements.get(index).isBatchingPossible()) {
-          break;
-        }
-        StatementType statementType = getStatementType(index);
-        if (canBeBatchedTogether(batchType, statementType)) {
-          // Send DDL statements to the DdlExecutor instead of executing them directly on the
-          // connection, so we can support certain DDL constructs that are currently not supported
-          // by the backend, such as IF [NOT] EXISTS.
-          if (batchType == StatementType.DDL) {
-            statementResults.add(
-                ddlExecutor.execute(
-                    bufferedStatements.get(index).parsedStatement,
-                    bufferedStatements.get(index).statement));
-          } else {
-            Execute execute = (Execute) bufferedStatements.get(index);
-            execute.analyzeOrExecute(execute.bindStatement(execute.statement, null));
+    Span span = createSpan("execute_batch", null);
+    try (Scope ignore = span.makeCurrent()) {
+      statementContext.push(Context.current());
+      StatementType batchType = getStatementType(fromIndex);
+      if (batchType == StatementType.UPDATE) {
+        spannerConnection.startBatchDml();
+      } else if (batchType == StatementType.DDL) {
+        spannerConnection.startBatchDdl();
+      }
+      List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
+      int index = fromIndex;
+      try {
+        while (index < getStatementCount()) {
+          if (!bufferedStatements.get(index).isBatchingPossible()) {
+            break;
           }
-          index++;
-        } else {
-          // End the batch here, as the statement type on this index can not be batched together
-          // with the other statements in the batch.
-          break;
+          StatementType statementType = getStatementType(index);
+          if (canBeBatchedTogether(batchType, statementType)) {
+            // Send DDL statements to the DdlExecutor instead of executing them directly on the
+            // connection, so we can support certain DDL constructs that are currently not supported
+            // by the backend, such as IF [NOT] EXISTS.
+            if (batchType == StatementType.DDL) {
+              statementResults.add(
+                  ddlExecutor.execute(
+                      bufferedStatements.get(index).parsedStatement,
+                      bufferedStatements.get(index).statement));
+            } else {
+              Execute execute = (Execute) bufferedStatements.get(index);
+              execute.analyzeOrExecute(execute.bindStatement(execute.statement, null));
+            }
+            index++;
+          } else {
+            // End the batch here, as the statement type on this index can not be batched together
+            // with the other statements in the batch.
+            break;
+          }
         }
+      } catch (Exception exception) {
+        // This should normally not happen, as we are not sending any statements to Cloud Spanner
+        // yet,
+        // but is done as safety precaution to ensure that there is always at least one result.
+        // Register the exception on the first statement in the batch.
+        bufferedStatements.get(fromIndex).result.setException(exception);
+        throw exception;
       }
-    } catch (Exception exception) {
-      // This should normally not happen, as we are not sending any statements to Cloud Spanner yet,
-      // but is done as safety precaution to ensure that there is always at least one result.
-      // Register the exception on the first statement in the batch.
-      bufferedStatements.get(fromIndex).result.setException(exception);
-      throw exception;
+      Span runBatchSpan = createSpan("execute_batch_on_spanner", null);
+      try (Scope ignoreRunBatchSpan = runBatchSpan.makeCurrent()) {
+        long[] counts = spannerConnection.runBatch();
+        if (batchType == StatementType.DDL) {
+          counts = extractDdlUpdateCounts(statementResults, counts);
+        }
+        updateBatchResultCount(fromIndex, counts);
+      } catch (SpannerBatchUpdateException batchUpdateException) {
+        long[] counts;
+        if (batchType == StatementType.DDL) {
+          counts = extractDdlUpdateCounts(statementResults, batchUpdateException.getUpdateCounts());
+        } else {
+          counts = batchUpdateException.getUpdateCounts();
+        }
+        updateBatchResultCount(fromIndex, counts);
+        Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
+        failedExecute.result.setException(batchUpdateException);
+        runBatchSpan.recordException(batchUpdateException);
+        throw batchUpdateException;
+      } catch (Throwable exception) {
+        bufferedStatements.get(fromIndex).result.setException(exception);
+        runBatchSpan.recordException(exception);
+        throw exception;
+      } finally {
+        runBatchSpan.end();
+      }
+      return index - fromIndex;
+    } catch (Throwable throwable) {
+      span.recordException(throwable);
+      throw throwable;
+    } finally {
+      span.end();
+      statementContext.pop();
     }
-    try {
-      long[] counts = spannerConnection.runBatch();
-      if (batchType == StatementType.DDL) {
-        counts = extractDdlUpdateCounts(statementResults, counts);
-      }
-      updateBatchResultCount(fromIndex, counts);
-    } catch (SpannerBatchUpdateException batchUpdateException) {
-      long[] counts;
-      if (batchType == StatementType.DDL) {
-        counts = extractDdlUpdateCounts(statementResults, batchUpdateException.getUpdateCounts());
-      } else {
-        counts = batchUpdateException.getUpdateCounts();
-      }
-      updateBatchResultCount(fromIndex, counts);
-      Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
-      failedExecute.result.setException(batchUpdateException);
-      throw batchUpdateException;
-    } catch (Throwable exception) {
-      bufferedStatements.get(fromIndex).result.setException(exception);
-      throw exception;
-    }
-    return index - fromIndex;
   }
 
   /** Extracts the update count for a list of DDL statements. */

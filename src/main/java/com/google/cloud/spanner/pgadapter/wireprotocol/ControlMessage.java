@@ -41,6 +41,8 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.Partition
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
+import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
@@ -54,6 +56,10 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.grpc.Context;
 import io.grpc.MethodDescriptor;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -247,50 +253,55 @@ public abstract class ControlMessage extends WireMessage {
    */
   void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
-    String command = statement.getCommandTag();
-    if (Strings.isNullOrEmpty(command)) {
-      new EmptyQueryResponse(this.outputStream).send(false);
-      return;
-    }
-    if (statement.getStatementResult() == null) {
-      return;
-    }
-    switch (statement.getStatementType()) {
-      case DDL:
-      case UNKNOWN:
-        new CommandCompleteResponse(this.outputStream, command).send(false);
-        break;
-      case CLIENT_SIDE:
-        if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
+    logger.log(Level.FINER, Logging.format("Send result", Action.Starting));
+    try {
+      String command = statement.getCommandTag();
+      if (Strings.isNullOrEmpty(command)) {
+        new EmptyQueryResponse(this.outputStream).send(false);
+        return;
+      }
+      if (statement.getStatementResult() == null) {
+        return;
+      }
+      switch (statement.getStatementType()) {
+        case DDL:
+        case UNKNOWN:
           new CommandCompleteResponse(this.outputStream, command).send(false);
           break;
-        }
-        // fallthrough to QUERY
-      case QUERY:
-      case UPDATE:
-        if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
-          SendResultSetState state = sendResultSet(statement, mode, maxRows);
-          statement.setHasMoreData(state.hasMoreRows());
-          if (state.hasMoreRows() && mode == QueryMode.EXTENDED) {
-            new PortalSuspendedResponse(this.outputStream).send(false);
-          } else {
-            if (!state.hasMoreRows() && mode == QueryMode.EXTENDED) {
-              statement.close();
-            }
-            new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
-                .send(false);
+        case CLIENT_SIDE:
+          if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
+            new CommandCompleteResponse(this.outputStream, command).send(false);
+            break;
           }
-        } else {
-          // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
-          // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
-          // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
-          // always 0.
-          command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
-          new CommandCompleteResponse(this.outputStream, command).send(false);
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
+          // fallthrough to QUERY
+        case QUERY:
+        case UPDATE:
+          if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
+            SendResultSetState state = sendResultSet(statement, mode, maxRows);
+            statement.setHasMoreData(state.hasMoreRows());
+            if (state.hasMoreRows() && mode == QueryMode.EXTENDED) {
+              new PortalSuspendedResponse(this.outputStream).send(false);
+            } else {
+              if (!state.hasMoreRows() && mode == QueryMode.EXTENDED) {
+                statement.close();
+              }
+              new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
+                  .send(false);
+            }
+          } else {
+            // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
+            // inserted. oid used to be the object ID of the inserted row if rows was 1 and the
+            // target table had OIDs, but OIDs system columns are not supported anymore; therefore
+            // oid is always 0.
+            command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
+            new CommandCompleteResponse(this.outputStream, command).send(false);
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
+      }
+    } finally {
+      logger.log(Level.FINER, Logging.format("Send result", Action.Finished));
     }
   }
 
@@ -306,34 +317,47 @@ public abstract class ControlMessage extends WireMessage {
    */
   SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
-    StatementResult statementResult = describedResult.getStatementResult();
-    Preconditions.checkArgument(
-        statementResult.getResultType() == ResultType.RESULT_SET,
-        "The statement result must be a result set");
-    long rows;
-    boolean hasData;
-    if (statementResult instanceof PartitionQueryResult) {
-      hasData = false;
-      PartitionQueryResult partitionQueryResult = (PartitionQueryResult) statementResult;
-      sendPrefix(describedResult, ((PartitionQueryResult) statementResult).getMetadataResultSet());
-      rows =
-          sendPartitionedQuery(
-              describedResult,
-              mode,
-              partitionQueryResult.getBatchTransactionId(),
-              partitionQueryResult.getPartitions());
-    } else {
-      hasData = describedResult.isHasMoreData();
-      ResultSet resultSet = describedResult.getStatementResult().getResultSet();
-      sendPrefix(describedResult, resultSet);
-      SendResultSetRunnable runnable =
-          SendResultSetRunnable.forResultSet(describedResult, resultSet, maxRows, mode, hasData);
-      rows = runnable.call();
-      hasData = runnable.hasData;
-    }
+    Tracer tracer = connection.getExtendedQueryProtocolHandler().getTracer();
+    Span span =
+        tracer
+            .spanBuilder("send_result_set")
+            .setAttribute("pgadapter.connection_id", connection.getTraceConnectionId().toString())
+            .setAttribute(SemanticAttributes.DB_STATEMENT, describedResult.getSql())
+            .startSpan();
+    try (Scope ignore = span.makeCurrent()) {
+      StatementResult statementResult = describedResult.getStatementResult();
+      Preconditions.checkArgument(
+          statementResult.getResultType() == ResultType.RESULT_SET,
+          "The statement result must be a result set");
+      long rows;
+      boolean hasData;
+      if (statementResult instanceof PartitionQueryResult) {
+        hasData = false;
+        PartitionQueryResult partitionQueryResult = (PartitionQueryResult) statementResult;
+        sendPrefix(
+            describedResult, ((PartitionQueryResult) statementResult).getMetadataResultSet());
+        rows =
+            sendPartitionedQuery(
+                describedResult,
+                mode,
+                partitionQueryResult.getBatchTransactionId(),
+                partitionQueryResult.getPartitions());
+      } else {
+        hasData = describedResult.isHasMoreData();
+        ResultSet resultSet = describedResult.getStatementResult().getResultSet();
+        sendPrefix(describedResult, resultSet);
+        SendResultSetRunnable runnable =
+            SendResultSetRunnable.forResultSet(describedResult, resultSet, maxRows, mode, hasData);
+        rows = runnable.call();
+        hasData = runnable.hasData;
+      }
 
-    sendSuffix(describedResult);
-    return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
+      sendSuffix(describedResult);
+      return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
+    } finally {
+      logger.log(Level.FINER, Logging.format("Send result", Action.Finished));
+      span.end();
+    }
   }
 
   private void sendPrefix(IntermediateStatement describedResult, ResultSet resultSet)
