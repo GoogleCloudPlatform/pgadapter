@@ -68,6 +68,7 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.OpenTelemetry;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -1036,7 +1037,7 @@ public abstract class AbstractMockServerTest {
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
         .setCredentials(NoCredentials.getInstance());
     optionsConfigurator.accept(builder);
-    pgServer = new ProxyServer(builder.build());
+    pgServer = new ProxyServer(builder.build(), OpenTelemetry.noop());
     pgServer.startServer();
   }
 

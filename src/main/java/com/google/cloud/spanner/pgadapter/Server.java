@@ -53,7 +53,8 @@ public class Server {
     }
   }
 
-  static OpenTelemetry setupOpenTelemetry(OptionsMetadata optionsMetadata) throws IOException {
+  /** Creates an {@link OpenTelemetry} object from the given options. */
+  static OpenTelemetry setupOpenTelemetry(OptionsMetadata optionsMetadata) {
     if (!optionsMetadata.isEnableOpenTelemetry()) {
       return OpenTelemetry.noop();
     }
@@ -77,38 +78,42 @@ public class Server {
     if (projectId != null) {
       builder.setProjectId(projectId);
     }
-    Credentials credentials = optionsMetadata.getTelemetryCredentials();
-    if (credentials != null) {
-      builder.setCredentials(credentials);
+    try {
+      Credentials credentials = optionsMetadata.getTelemetryCredentials();
+      if (credentials != null) {
+        builder.setCredentials(credentials);
+      }
+      builder.setFixedAttributes(
+          ImmutableMap.of(
+              "service.name",
+              AttributeValue.newBuilder()
+                  .setStringValue(
+                      TruncatableString.newBuilder()
+                          .setValue(
+                              Objects.requireNonNull(getOpenTelemetrySetting("otel.service.name")))
+                          .build())
+                  .build()));
+      TraceConfiguration configuration = builder.build();
+      TraceExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
+      Sampler sampler;
+      if (optionsMetadata.getOpenTelemetryTraceRatio() == null) {
+        sampler = Sampler.parentBased(Sampler.traceIdRatioBased(0.05d));
+      } else {
+        sampler =
+            Sampler.parentBased(
+                Sampler.traceIdRatioBased(optionsMetadata.getOpenTelemetryTraceRatio()));
+      }
+      return AutoConfiguredOpenTelemetrySdk.builder()
+          .addTracerProviderCustomizer(
+              (sdkTracerProviderBuilder, configProperties) ->
+                  sdkTracerProviderBuilder
+                      .setSampler(sampler)
+                      .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()))
+          .build()
+          .getOpenTelemetrySdk();
+    } catch (IOException exception) {
+      throw new RuntimeException(exception);
     }
-    builder.setFixedAttributes(
-        ImmutableMap.of(
-            "service.name",
-            AttributeValue.newBuilder()
-                .setStringValue(
-                    TruncatableString.newBuilder()
-                        .setValue(
-                            Objects.requireNonNull(getOpenTelemetrySetting("otel.service.name")))
-                        .build())
-                .build()));
-    TraceConfiguration configuration = builder.build();
-    TraceExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
-    Sampler sampler;
-    if (optionsMetadata.getOpenTelemetryTraceRatio() == null) {
-      sampler = Sampler.parentBased(Sampler.traceIdRatioBased(0.05d));
-    } else {
-      sampler =
-          Sampler.parentBased(
-              Sampler.traceIdRatioBased(optionsMetadata.getOpenTelemetryTraceRatio()));
-    }
-    return AutoConfiguredOpenTelemetrySdk.builder()
-        .addTracerProviderCustomizer(
-            (sdkTracerProviderBuilder, configProperties) ->
-                sdkTracerProviderBuilder
-                    .setSampler(sampler)
-                    .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()))
-        .build()
-        .getOpenTelemetrySdk();
   }
 
   static String getOpenTelemetrySetting(String systemProperty) {
