@@ -42,7 +42,7 @@ public class PGExceptionFactoryTest {
         PGExceptionFactory.newPGException("Table not found: foo"),
         toPGException(
             SpannerExceptionFactory.newSpannerException(
-                ErrorCode.NOT_FOUND, "Table not found: foo")));
+                ErrorCode.FAILED_PRECONDITION, "Table not found: foo")));
     assertEquals(
         PGExceptionFactory.newPGException("Table not found: foo"),
         toPGException(
@@ -50,7 +50,7 @@ public class PGExceptionFactoryTest {
                 new ApiException(
                     "Table not found: foo",
                     /* cause= */ null,
-                    GrpcStatusCode.of(Code.NOT_FOUND),
+                    GrpcStatusCode.of(Code.FAILED_PRECONDITION),
                     /* retryable= */ false))));
     assertEquals(
         SQLState.SerializationFailure,

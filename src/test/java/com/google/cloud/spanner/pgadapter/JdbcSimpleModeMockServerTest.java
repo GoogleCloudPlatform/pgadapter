@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -441,7 +442,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     // that the type is available.
     assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest jsonbRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
-    assertEquals(jsonbRequest.getSql(), SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL.getSql());
+    assertEquals(SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL.getSql(), jsonbRequest.getSql());
 
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
     assertEquals(QueryMode.NORMAL, request.getQueryMode());
@@ -756,6 +757,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(0, requests.size());
   }
 
+  @Ignore("https://github.com/pgjdbc/pgjdbc/issues/3007")
   @Test
   public void testImplicitBatchOfClientSideStatements() throws SQLException {
     String sql = "set statement_timeout = '10s'; " + "show statement_timeout; ";

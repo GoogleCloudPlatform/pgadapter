@@ -39,7 +39,7 @@ import org.junit.runners.JUnit4;
 
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
-public class ITSpringDataJpaSampleTest {
+public class ITSpringDataJpaSampleTest implements IntegrationTest {
   private static final String SPRING_DATA_JPA_SAMPLE_DIRECTORY = "samples/java/spring-data-jpa";
   private static final String APPLICATION_PROPERTIES_FILE =
       SPRING_DATA_JPA_SAMPLE_DIRECTORY + "/src/main/resources/application.properties";
@@ -48,6 +48,10 @@ public class ITSpringDataJpaSampleTest {
 
   @BeforeClass
   public static void setup() throws ClassNotFoundException, IOException, SQLException {
+    assumeTrue(
+        "Sample test is not made compatible with emulator",
+        System.getenv("SPANNER_EMULATOR_HOST") == null);
+
     assumeFalse("Spring Data sample requires at least Java 9", OptionsMetadata.isJava8());
     assumeTrue("This test only works on the default Spanner URL", testEnv.getSpannerUrl() == null);
 

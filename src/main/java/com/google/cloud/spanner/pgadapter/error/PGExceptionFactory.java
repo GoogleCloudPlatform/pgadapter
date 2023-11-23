@@ -85,19 +85,22 @@ public class PGExceptionFactory {
           .setSQLState(SQLState.SerializationFailure)
           .build();
     }
-    if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
-        && RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
+    if (spannerException.getErrorCode() == ErrorCode.NOT_FOUND
+        || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+            && RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.UndefinedTable)
           .build();
-    } else if (spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+    } else if ((spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+            || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
         && CANNOT_DROP_TABLE_WITH_INDICES_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.FeatureNotSupported)
           .setHints(
               "Execute 'set spanner.support_drop_cascade=true' to enable dropping tables with indices")
           .build();
-    } else if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+    } else if ((spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+            || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
         && ONLY_RESTRICT_BEHAVIOR.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.FeatureNotSupported)

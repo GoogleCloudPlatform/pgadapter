@@ -60,6 +60,8 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -67,6 +69,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -85,6 +88,9 @@ import org.postgresql.core.Oid;
 public class StatementTest {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+
+  private static final Tracer NOOP_OTEL = OpenTelemetry.noop().getTracer("test");
+
   private static final Runnable DO_NOTHING = () -> {};
 
   private static ParsedStatement parse(String sql) {
@@ -94,6 +100,7 @@ public class StatementTest {
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private Connection connection;
   @Mock private ConnectionHandler connectionHandler;
+  @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private BackendConnection backendConnection;
   @Mock private ProxyServer server;
@@ -121,7 +128,7 @@ public class StatementTest {
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
+    verify(backendConnection).execute(eq("SELECT"), eq(parse(sql)), eq(Statement.of(sql)), any());
     assertTrue(intermediateStatement.containsResultSet());
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(StatementType.QUERY, intermediateStatement.getStatementType());
@@ -150,7 +157,7 @@ public class StatementTest {
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
+    verify(backendConnection).execute(eq("UPDATE"), eq(parse(sql)), eq(Statement.of(sql)), any());
     assertFalse(intermediateStatement.containsResultSet());
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(StatementType.UPDATE, intermediateStatement.getStatementType());
@@ -181,6 +188,8 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -228,7 +237,7 @@ public class StatementTest {
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
+    verify(backendConnection).execute(eq("CREATE"), eq(parse(sql)), eq(Statement.of(sql)), any());
     assertFalse(intermediateStatement.containsResultSet());
     assertEquals(0, intermediateStatement.getUpdateCount());
     assertTrue(intermediateStatement.isExecuted());
@@ -272,6 +281,8 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -312,6 +323,8 @@ public class StatementTest {
             .build();
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -420,6 +433,8 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -450,6 +465,8 @@ public class StatementTest {
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(server.getOptions()).thenReturn(options);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -487,6 +504,8 @@ public class StatementTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -560,6 +579,8 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
             connection,
@@ -586,6 +607,8 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,
@@ -640,6 +663,8 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
+            NOOP_OTEL,
+            UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
             connection,

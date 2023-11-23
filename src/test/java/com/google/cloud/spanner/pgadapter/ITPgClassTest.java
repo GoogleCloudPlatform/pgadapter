@@ -171,6 +171,8 @@ public class ITPgClassTest implements IntegrationTest {
 
   @Test
   public void testPgIndex() throws SQLException {
+    skipOnEmulator("pg_index replacement query is not supported on the emulator");
+
     String sql =
         "select indexrelid, indrelid, indnatts, indnkeyatts, indisunique, "
             + "indnullsnotdistinct, indisprimary, indpred "
@@ -609,7 +611,10 @@ public class ITPgClassTest implements IntegrationTest {
           assertEquals(expected.confupdtype, resultSet.getString("confupdtype"));
           assertEquals(expected.confdeltype, resultSet.getString("confdeltype"));
           assertEquals(expected.confmatchtype, resultSet.getString("confmatchtype"));
-          assertArrayEquals(expected.conkey, (Long[]) resultSet.getArray("conkey").getArray());
+          // TODO: Remove check when we array_agg with order by is supported.
+          if (!isRunningOnEmulator()) {
+            assertArrayEquals(expected.conkey, (Long[]) resultSet.getArray("conkey").getArray());
+          }
           assertArrayEquals(
               expected.confkey,
               resultSet.getArray("confkey") == null

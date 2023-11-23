@@ -113,8 +113,6 @@ public class ITDdlTest implements IntegrationTest {
           assertThrows(
               PSQLException.class,
               () -> connection.createStatement().execute("drop table parent cascade"));
-      System.out.println(exception.getErrorCode());
-      System.out.println(exception.getMessage());
       assertEquals(SQLState.FeatureNotSupported.toString(), exception.getSQLState());
       assertNotNull(exception.getServerErrorMessage());
       assertEquals(
@@ -192,9 +190,11 @@ public class ITDdlTest implements IntegrationTest {
         statement.addBatch("create index idx_concerts_start_time on concerts (start_time)");
         statement.addBatch("create unique index idx_tracks_title on tracks (id, title)");
         statement.addBatch(
-            "create view v_singers sql security invoker as select first_name, last_name from singers order by last_name");
+            "create view v_singers sql security invoker as select first_name, last_name from singers"
+                + (isRunningOnEmulator() ? "" : " order by last_name"));
         statement.addBatch(
-            "create view v_venues sql security invoker as select name, description from venues order by name");
+            "create view v_venues sql security invoker as select name, description from venues"
+                + (isRunningOnEmulator() ? "" : " order by name"));
 
         assertArrayEquals(new int[] {0, 0, 0, 0, 0, 0, 0, 0, 0}, statement.executeBatch());
       }
