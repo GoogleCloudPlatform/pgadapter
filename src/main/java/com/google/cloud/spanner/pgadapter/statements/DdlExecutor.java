@@ -113,8 +113,8 @@ class DdlExecutor {
     }
   }
 
-  private Tuple<ParsedStatement, Statement> replace(
-      ParsedStatement parsedStatement, Statement statement) {
+  @VisibleForTesting
+  Tuple<ParsedStatement, Statement> replace(ParsedStatement parsedStatement, Statement statement) {
     if (!ddlStatementReplacements.get().isEmpty()) {
       String replaced = applyReplacers(statement.getSql());
       if (!replaced.equals(statement.getSql())) {
