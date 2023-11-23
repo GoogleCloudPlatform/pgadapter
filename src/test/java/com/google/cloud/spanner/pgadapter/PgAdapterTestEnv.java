@@ -43,6 +43,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Bytes;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
@@ -209,7 +210,7 @@ public class PgAdapterTestEnv {
       }
       argsListBuilder.addAll(additionalPGAdapterOptions);
       String[] args = argsListBuilder.build().toArray(new String[0]);
-      server = new ProxyServer(new OptionsMetadata(args));
+      server = new ProxyServer(new OptionsMetadata(args), OpenTelemetry.noop());
       server.startServer();
     }
   }
