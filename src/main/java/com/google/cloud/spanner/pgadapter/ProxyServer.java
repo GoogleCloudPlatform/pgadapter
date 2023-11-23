@@ -80,8 +80,13 @@ public class ProxyServer extends AbstractApiService {
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
-  ProxyServer(OptionsMetadata optionsMetadata) {
-    this(optionsMetadata, OpenTelemetry.noop());
+  /**
+   * Instantiates the ProxyServer from CLI-gathered metadata.
+   *
+   * @param optionsMetadata Resulting metadata from CLI.
+   */
+  public ProxyServer(OptionsMetadata optionsMetadata) {
+    this(optionsMetadata, Server.setupOpenTelemetry(optionsMetadata));
   }
 
   /**
