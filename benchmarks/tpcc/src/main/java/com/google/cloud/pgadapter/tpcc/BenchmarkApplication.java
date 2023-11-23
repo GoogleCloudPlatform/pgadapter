@@ -95,6 +95,8 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setProject(spannerConfiguration.getProject())
             .setInstance(spannerConfiguration.getInstance())
             .setDatabase(spannerConfiguration.getDatabase())
+            .setEnableOpenTelemetry()
+            .setOpenTelemetryTraceRatio(0.2)
             .disableUnixDomainSockets();
     if (!Strings.isNullOrEmpty(pgAdapterConfiguration.getCredentials())) {
       builder.setCredentialsFile(pgAdapterConfiguration.getCredentials());
