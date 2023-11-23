@@ -19,14 +19,14 @@ class Statistics {
   String toString(Duration runtime) {
     return String.format(
         """
-            \r\r\r\r\r\r\r
-            New orders: %d (%.2f/s)
-            Payments: %d (%.2f/s)
-            Order status: %d (%.2f/s)
-            Delivery: %d (%.2f/s)
-            Stock level: %d (%.2f/s)
-            Aborted: %d (%.2f/s)
-            Total: %d (%.2f/s)
+            
+            \rNew orders: %d (%.2f/s) \t
+            \rPayments: %d (%.2f/s) \t
+            \rOrder status: %d (%.2f/s) \t
+            \rDelivery: %d (%.2f/s) \t
+            \rStock level: %d (%.2f/s) \t
+            \rAborted: %d (%.1f%% - %.2f/s) \t
+            \rTotal: %d (%.2f/s) \t
             """,
         getNewOrder(),
         getNewOrderPerSecond(runtime),
@@ -39,6 +39,7 @@ class Statistics {
         getStockLevel(),
         getStockLevelPerSecond(runtime),
         getAborted(),
+        ((double) getAborted() / getTotal()) * 100,
         getAbortedPerSecond(runtime),
         getTotal(),
         getTotalPerSecond(runtime));
