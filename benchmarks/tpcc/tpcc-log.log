@@ -1,0 +1,44 @@
+2024-02-21T15:01:31.365+11:00  INFO 1682 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : Starting BenchmarkApplication using Java 17.0.2 with PID 1682 (/Users/hengfeng/src/github/pgadapter/benchmarks/tpcc/target/classes started by hengfeng in /Users/hengfeng/src/github/pgadapter/benchmarks/tpcc)
+2024-02-21T15:01:31.368+11:00  INFO 1682 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : No active profile set, falling back to 1 default profile: "default"
+2024-02-21T15:01:31.617+11:00  INFO 1682 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : Started BenchmarkApplication in 0.375 seconds (process running for 0.556)
+2024-02-21T15:01:31.848+11:00  INFO 1682 --- [main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2024-02-21T15:01:31.859+11:00 ERROR 1682 --- [main] o.s.boot.SpringApplication               : Application run failed
+
+java.lang.IllegalStateException: Failed to execute CommandLineRunner
+	at org.springframework.boot.SpringApplication.callRunner(SpringApplication.java:774) ~[spring-boot-3.1.5.jar:3.1.5]
+	at org.springframework.boot.SpringApplication.lambda$callRunners$3(SpringApplication.java:755) ~[spring-boot-3.1.5.jar:3.1.5]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183) ~[na:na]
+	at java.base/java.util.stream.SortedOps$SizedRefSortingSink.end(SortedOps.java:357) ~[na:na]
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:510) ~[na:na]
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499) ~[na:na]
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150) ~[na:na]
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173) ~[na:na]
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234) ~[na:na]
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596) ~[na:na]
+	at org.springframework.boot.SpringApplication.callRunners(SpringApplication.java:750) ~[spring-boot-3.1.5.jar:3.1.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:323) ~[spring-boot-3.1.5.jar:3.1.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1306) ~[spring-boot-3.1.5.jar:3.1.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1295) ~[spring-boot-3.1.5.jar:3.1.5]
+	at com.google.cloud.pgadapter.tpcc.BenchmarkApplication.main(BenchmarkApplication.java:30) ~[classes/:na]
+Caused by: java.lang.RuntimeException: java.nio.file.NoSuchFileException: /Users/loite/Downloads/appdev-soda-spanner-staging.json
+	at com.google.cloud.spanner.pgadapter.Server.setupOpenTelemetry(Server.java:115) ~[google-cloud-spanner-pgadapter-0.27.2-SNAPSHOT.jar:0.27.2-SNAPSHOT]
+	at com.google.cloud.spanner.pgadapter.ProxyServer.<init>(ProxyServer.java:89) ~[google-cloud-spanner-pgadapter-0.27.2-SNAPSHOT.jar:0.27.2-SNAPSHOT]
+	at com.google.cloud.pgadapter.tpcc.BenchmarkApplication.startPGAdapter(BenchmarkApplication.java:179) ~[classes/:na]
+	at com.google.cloud.pgadapter.tpcc.BenchmarkApplication.run(BenchmarkApplication.java:53) ~[classes/:na]
+	at org.springframework.boot.SpringApplication.callRunner(SpringApplication.java:771) ~[spring-boot-3.1.5.jar:3.1.5]
+	... 14 common frames omitted
+Caused by: java.nio.file.NoSuchFileException: /Users/loite/Downloads/appdev-soda-spanner-staging.json
+	at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92) ~[na:na]
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:106) ~[na:na]
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111) ~[na:na]
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:218) ~[na:na]
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:380) ~[na:na]
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:432) ~[na:na]
+	at java.base/java.nio.file.spi.FileSystemProvider.newInputStream(FileSystemProvider.java:422) ~[na:na]
+	at java.base/java.nio.file.Files.newInputStream(Files.java:160) ~[na:na]
+	at com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.getTelemetryCredentials(OptionsMetadata.java:1341) ~[google-cloud-spanner-pgadapter-0.27.2-SNAPSHOT.jar:0.27.2-SNAPSHOT]
+	at com.google.cloud.spanner.pgadapter.Server.setupOpenTelemetry(Server.java:82) ~[google-cloud-spanner-pgadapter-0.27.2-SNAPSHOT.jar:0.27.2-SNAPSHOT]
+	... 18 common frames omitted
+
