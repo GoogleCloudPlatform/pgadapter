@@ -16,18 +16,24 @@ class Statistics {
 
   private final AtomicLong aborted = new AtomicLong();
 
-  String toString(Duration runtime) {
-    return String.format(
+  private final AtomicLong failed = new AtomicLong();
+
+  void print(Duration runtime) {
+    System.out.print("\033[2J\033[1;1H");
+    System.out.printf(
         """
-            
-            \rNew orders: %d (%.2f/s) \t
-            \rPayments: %d (%.2f/s) \t
-            \rOrder status: %d (%.2f/s) \t
-            \rDelivery: %d (%.2f/s) \t
-            \rStock level: %d (%.2f/s) \t
-            \rAborted: %d (%.1f%% - %.2f/s) \t
-            \rTotal: %d (%.2f/s) \t
-            """,
+                \rNew orders:   %d (%.2f/s)
+                \rPayments:     %d (%.2f/s)
+                \rOrder status: %d (%.2f/s)
+                \rDelivery:     %d (%.2f/s)
+                \rStock level:  %d (%.2f/s)
+                \r
+                \rAborted:      %d (%.1f%% - %.2f/s)
+                \rFailed:       %d (%.1f%% - %.2f/s)
+                \rSuccessful:   %d (%.1f%% - %.2f/s)
+                \r
+                \rTotal:        %d (%.2f/s)
+                """,
         getNewOrder(),
         getNewOrderPerSecond(runtime),
         getPayment(),
@@ -39,8 +45,14 @@ class Statistics {
         getStockLevel(),
         getStockLevelPerSecond(runtime),
         getAborted(),
-        ((double) getAborted() / getTotal()) * 100,
+        getTotal() == 0 ? 0d : ((double) getAborted() / getTotal()) * 100,
         getAbortedPerSecond(runtime),
+        getFailed(),
+        getTotal() == 0 ? 0d : ((double) getFailed() / getTotal()) * 100,
+        getFailedPerSecond(runtime),
+        getSuccessful(),
+        getTotal() == 0 ? 0d : ((double) getSuccessful() / getTotal()) * 100,
+        getSuccessfulPerSecond(runtime),
         getTotal(),
         getTotalPerSecond(runtime));
   }
@@ -117,11 +129,37 @@ class Statistics {
     aborted.incrementAndGet();
   }
 
+  long getFailed() {
+    return failed.get();
+  }
+
+  double getFailedPerSecond(Duration runtime) {
+    return ((double) failed.get()) / runtime.getSeconds();
+  }
+
+  void incFailed() {
+    failed.incrementAndGet();
+  }
+
   long getTotal() {
-    return getNewOrder() + getPayment() + getDelivery() + getOrderStatus() + getStockLevel();
+    return getNewOrder()
+        + getPayment()
+        + getDelivery()
+        + getOrderStatus()
+        + getStockLevel()
+        + getAborted()
+        + getFailed();
   }
 
   double getTotalPerSecond(Duration runtime) {
     return ((double) getTotal()) / runtime.getSeconds();
+  }
+
+  long getSuccessful() {
+    return getNewOrder() + getPayment() + getDelivery() + getOrderStatus() + getStockLevel();
+  }
+
+  double getSuccessfulPerSecond(Duration runtime) {
+    return ((double) getTotal() - getAborted() - getFailed()) / runtime.getSeconds();
   }
 }

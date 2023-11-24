@@ -52,10 +52,12 @@ public class BenchmarkApplication implements CommandLineRunner {
                 server.getLocalPort());
     try {
       if (tpccConfiguration.isLoadData()) {
+        LOG.info("Starting data load");
         loadData(connectionUrl);
       }
 
       if (tpccConfiguration.isRunBenchmark()) {
+        LOG.info("Starting benchmark");
         Statistics statistics = new Statistics();
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
@@ -67,8 +69,7 @@ public class BenchmarkApplication implements CommandLineRunner {
         while (watch.elapsed().compareTo(tpccConfiguration.getBenchmarkDuration()) <= 0) {
           //noinspection BusyWait
           Thread.sleep(1_000L);
-          // System.out.println("\r\r\r\r\r");
-          System.out.print(statistics.toString(watch.elapsed()));
+          statistics.print(watch.elapsed());
         }
         executor.shutdownNow();
         if (!executor.awaitTermination(60L, TimeUnit.SECONDS)) {
