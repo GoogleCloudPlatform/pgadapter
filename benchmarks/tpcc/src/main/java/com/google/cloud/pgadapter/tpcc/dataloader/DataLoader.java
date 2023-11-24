@@ -30,15 +30,19 @@ public class DataLoader implements AutoCloseable {
 
   private final TpccConfiguration tpccConfiguration;
 
-  private final ListeningExecutorService loadDataExecutor =
-      MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(16));
+  private final ListeningExecutorService loadDataExecutor;
 
-  private final ListeningExecutorService rowProducerExecutor =
-      MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(16));
+  private final ListeningExecutorService rowProducerExecutor;
 
   public DataLoader(String connectionUrl, TpccConfiguration tpccConfiguration) {
     this.connectionUrl = connectionUrl;
     this.tpccConfiguration = tpccConfiguration;
+    this.loadDataExecutor =
+        MoreExecutors.listeningDecorator(
+            Executors.newFixedThreadPool(tpccConfiguration.getLoadDataThreads()));
+    this.rowProducerExecutor =
+        MoreExecutors.listeningDecorator(
+            Executors.newFixedThreadPool(tpccConfiguration.getLoadDataThreads()));
   }
 
   @Override

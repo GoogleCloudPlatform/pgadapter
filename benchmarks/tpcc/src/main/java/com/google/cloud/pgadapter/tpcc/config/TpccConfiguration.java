@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Configuration;
 public class TpccConfiguration {
   private boolean loadData;
 
+  private int loadDataThreads;
+
   private boolean truncateBeforeLoad;
 
   private boolean runBenchmark;
@@ -31,6 +33,14 @@ public class TpccConfiguration {
 
   public void setLoadData(boolean loadData) {
     this.loadData = loadData;
+  }
+
+  public int getLoadDataThreads() {
+    return loadDataThreads;
+  }
+
+  public void setLoadDataThreads(int loadDataThreads) {
+    this.loadDataThreads = loadDataThreads;
   }
 
   public boolean isTruncateBeforeLoad() {

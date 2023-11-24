@@ -45,6 +45,7 @@ class BenchmarkRunner implements Runnable {
     } catch (InterruptedException interruptedException) {
       LOG.info("Stopping benchmark runner due to interruption");
     } catch (Throwable throwable) {
+      throwable.printStackTrace();
       LOG.error("Benchmark runner failed", throwable);
       failed = true;
     }
@@ -76,17 +77,19 @@ class BenchmarkRunner implements Runnable {
           if (Thread.interrupted()) {
             break;
           }
-        } catch (PSQLException psqlException) {
-          if (psqlException.getServerErrorMessage() != null
+        } catch (Throwable exception) {
+          if ((exception instanceof PSQLException psqlException)
+              && psqlException.getServerErrorMessage() != null
               && Objects.equals(
                   psqlException.getServerErrorMessage().getSQLState(),
                   PSQLState.SERIALIZATION_FAILURE.getState())) {
             LOG.debug("Transaction aborted by Cloud Spanner");
             statistics.incAborted();
-            statement.execute("rollback");
           } else {
-            throw psqlException;
+            LOG.warn("Transaction failed", exception);
+            statistics.incFailed();
           }
+          statement.execute("rollback");
         }
       }
     }
