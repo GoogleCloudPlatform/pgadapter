@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
 
 class Statistics {
+  private final int numThreads;
+
   private final AtomicLong newOrder = new AtomicLong();
 
   private final AtomicLong payment = new AtomicLong();
@@ -18,10 +20,16 @@ class Statistics {
 
   private final AtomicLong failed = new AtomicLong();
 
+  Statistics(int numThreads) {
+    this.numThreads = numThreads;
+  }
+
   void print(Duration runtime) {
     System.out.print("\033[2J\033[1;1H");
     System.out.printf(
         """
+                \rNum threads:    %d
+                \r
                 \rNew orders:   %d (%.2f/s)
                 \rPayments:     %d (%.2f/s)
                 \rOrder status: %d (%.2f/s)
@@ -34,6 +42,7 @@ class Statistics {
                 \r
                 \rTotal:        %d (%.2f/s)
                 """,
+        numThreads,
         getNewOrder(),
         getNewOrderPerSecond(runtime),
         getPayment(),
