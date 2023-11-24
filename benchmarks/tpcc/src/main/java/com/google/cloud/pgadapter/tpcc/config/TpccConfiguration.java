@@ -27,6 +27,9 @@ public class TpccConfiguration {
 
   private int itemCount;
 
+  /** --- Optimizations --- */
+  private boolean useReadOnlyTransactions;
+
   public boolean isLoadData() {
     return loadData;
   }
@@ -105,5 +108,13 @@ public class TpccConfiguration {
 
   public void setItemCount(int itemCount) {
     this.itemCount = itemCount;
+  }
+
+  public boolean isUseReadOnlyTransactions() {
+    return useReadOnlyTransactions;
+  }
+
+  public void setUseReadOnlyTransactions(boolean useReadOnlyTransactions) {
+    this.useReadOnlyTransactions = useReadOnlyTransactions;
   }
 }

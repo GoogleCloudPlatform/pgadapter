@@ -23,7 +23,11 @@ public class BenchmarkApplication implements CommandLineRunner {
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkApplication.class);
 
   public static void main(String[] args) {
-    SpringApplication.run(BenchmarkApplication.class, args);
+    try {
+      SpringApplication.run(BenchmarkApplication.class, args);
+    } catch (Throwable exception) {
+      exception.printStackTrace();
+    }
   }
 
   private final SpannerConfiguration spannerConfiguration;
@@ -58,7 +62,7 @@ public class BenchmarkApplication implements CommandLineRunner {
 
       if (tpccConfiguration.isRunBenchmark()) {
         LOG.info("Starting benchmark");
-        Statistics statistics = new Statistics(tpccConfiguration.getBenchmarkThreads());
+        Statistics statistics = new Statistics(tpccConfiguration);
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
