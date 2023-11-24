@@ -99,6 +99,9 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setEnableOpenTelemetry()
             .setOpenTelemetryTraceRatio(0.2)
             .disableUnixDomainSockets();
+    if (pgAdapterConfiguration.isDisableInternalRetries()) {
+      builder.setDisableInternalRetries();
+    }
     if (!Strings.isNullOrEmpty(pgAdapterConfiguration.getCredentials())) {
       builder.setCredentialsFile(pgAdapterConfiguration.getCredentials());
     }

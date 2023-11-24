@@ -82,7 +82,9 @@ class BenchmarkRunner implements Runnable {
               && psqlException.getServerErrorMessage() != null
               && Objects.equals(
                   psqlException.getServerErrorMessage().getSQLState(),
-                  PSQLState.SERIALIZATION_FAILURE.getState())) {
+                  PSQLState.SERIALIZATION_FAILURE.getState())
+              && Objects.requireNonNull(psqlException.getServerErrorMessage().getMessage())
+                  .contains("concurrent modification")) {
             LOG.debug("Transaction aborted by Cloud Spanner");
             statistics.incAborted();
           } else {
