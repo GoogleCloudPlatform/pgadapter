@@ -58,7 +58,7 @@ public class BenchmarkApplication implements CommandLineRunner {
 
       if (tpccConfiguration.isRunBenchmark()) {
         LOG.info("Starting benchmark");
-        Statistics statistics = new Statistics();
+        Statistics statistics = new Statistics(tpccConfiguration.getBenchmarkThreads());
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
