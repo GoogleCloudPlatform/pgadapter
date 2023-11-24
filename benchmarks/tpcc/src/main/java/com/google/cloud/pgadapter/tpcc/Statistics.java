@@ -28,21 +28,23 @@ class Statistics {
     System.out.print("\033[2J\033[1;1H");
     System.out.printf(
         """
-                \rNum threads:    %d
+                \rNum threads:  %d\t
+                \rDuration:     %s\t
                 \r
-                \rNew orders:   %d (%.2f/s)
-                \rPayments:     %d (%.2f/s)
-                \rOrder status: %d (%.2f/s)
-                \rDelivery:     %d (%.2f/s)
-                \rStock level:  %d (%.2f/s)
+                \rNew orders:   %d (%.2f/s)\t
+                \rPayments:     %d (%.2f/s)\t
+                \rOrder status: %d (%.2f/s)\t
+                \rDelivery:     %d (%.2f/s)\t
+                \rStock level:  %d (%.2f/s)\t
                 \r
-                \rAborted:      %d (%.1f%% - %.2f/s)
-                \rFailed:       %d (%.1f%% - %.2f/s)
-                \rSuccessful:   %d (%.1f%% - %.2f/s)
+                \rAborted:      %d (%.1f%% - %.2f/s)\t
+                \rFailed:       %d (%.1f%% - %.2f/s)\t
+                \rSuccessful:   %d (%.1f%% - %.2f/s)\t
                 \r
-                \rTotal:        %d (%.2f/s)
+                \rTotal:        %d (%.2f/s)\t
                 """,
         numThreads,
+        runtime,
         getNewOrder(),
         getNewOrderPerSecond(runtime),
         getPayment(),
