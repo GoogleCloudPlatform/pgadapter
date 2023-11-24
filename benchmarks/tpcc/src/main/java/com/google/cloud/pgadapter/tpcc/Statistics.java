@@ -1,10 +1,11 @@
 package com.google.cloud.pgadapter.tpcc;
 
+import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
 
 class Statistics {
-  private final int numThreads;
+  private final TpccConfiguration tpccConfiguration;
 
   private final AtomicLong newOrder = new AtomicLong();
 
@@ -20,8 +21,8 @@ class Statistics {
 
   private final AtomicLong failed = new AtomicLong();
 
-  Statistics(int numThreads) {
-    this.numThreads = numThreads;
+  Statistics(TpccConfiguration tpccConfiguration) {
+    this.tpccConfiguration = tpccConfiguration;
   }
 
   void print(Duration runtime) {
@@ -30,6 +31,7 @@ class Statistics {
         """
                 \rNum threads:  %d\t
                 \rDuration:     %s\t
+                \rRead-only tx: %s\t
                 \r
                 \rNew orders:   %d (%.2f/s)\t
                 \rPayments:     %d (%.2f/s)\t
@@ -43,8 +45,9 @@ class Statistics {
                 \r
                 \rTotal:        %d (%.2f/s)\t
                 """,
-        numThreads,
+        tpccConfiguration.getBenchmarkThreads(),
         runtime,
+        tpccConfiguration.isUseReadOnlyTransactions(),
         getNewOrder(),
         getNewOrderPerSecond(runtime),
         getPayment(),

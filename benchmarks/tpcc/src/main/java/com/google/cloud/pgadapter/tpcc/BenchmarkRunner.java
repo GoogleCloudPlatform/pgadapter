@@ -411,6 +411,9 @@ class BenchmarkRunner implements Runnable {
     String first, middle, last;
 
     statement.execute("begin transaction");
+    if (tpccConfiguration.isUseReadOnlyTransactions()) {
+      statement.execute("set transaction read only");
+    }
     if (byName) {
       row =
           queryRow(
@@ -541,6 +544,9 @@ class BenchmarkRunner implements Runnable {
     int level = random.nextInt(10, 21);
 
     statement.execute("begin transaction");
+    if (tpccConfiguration.isUseReadOnlyTransactions()) {
+      statement.execute("set transaction read only");
+    }
     String stockLevelQueries = "case1";
     Object[] row;
 
