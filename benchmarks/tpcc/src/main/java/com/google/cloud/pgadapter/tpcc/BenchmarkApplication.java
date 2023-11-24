@@ -97,6 +97,9 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setInstance(spannerConfiguration.getInstance())
             .setDatabase(spannerConfiguration.getDatabase())
             .disableUnixDomainSockets();
+    if (pgAdapterConfiguration.isDisableInternalRetries()) {
+      builder.setDisableInternalRetries();
+    }
     if (!Strings.isNullOrEmpty(pgAdapterConfiguration.getCredentials())) {
       builder.setCredentialsFile(pgAdapterConfiguration.getCredentials());
     }

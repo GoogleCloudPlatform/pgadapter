@@ -10,6 +10,8 @@ public class PGAdapterConfiguration {
 
   private String credentials;
 
+  private boolean disableInternalRetries;
+
   private String host;
 
   private int port;
@@ -22,6 +24,14 @@ public class PGAdapterConfiguration {
 
   public void setInProcess(boolean inProcess) {
     this.inProcess = inProcess;
+  }
+
+  public boolean isDisableInternalRetries() {
+    return disableInternalRetries;
+  }
+
+  public void setDisableInternalRetries(boolean disableInternalRetries) {
+    this.disableInternalRetries = disableInternalRetries;
   }
 
   public String getCredentials() {
