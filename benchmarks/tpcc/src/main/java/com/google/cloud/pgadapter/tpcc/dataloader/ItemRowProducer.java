@@ -13,8 +13,8 @@ class ItemRowProducer extends AbstractRowProducer {
     i_data
     """;
 
-  ItemRowProducer(long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  ItemRowProducer(DataLoadStatus status, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incItem);
   }
 
   @Override

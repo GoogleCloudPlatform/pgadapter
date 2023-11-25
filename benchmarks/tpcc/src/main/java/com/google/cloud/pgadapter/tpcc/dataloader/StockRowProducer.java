@@ -27,8 +27,8 @@ class StockRowProducer extends AbstractRowProducer {
 
   private final long warehouseId;
 
-  StockRowProducer(long warehouseId, long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  StockRowProducer(DataLoadStatus status, long warehouseId, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incStock);
     this.warehouseId = warehouseId;
   }
 
