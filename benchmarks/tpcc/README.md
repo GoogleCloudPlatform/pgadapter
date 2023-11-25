@@ -24,12 +24,13 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.benchmark-duration=PT600s
-  --tpcc.benchmark-threads=32
-  --tpcc.use-read-only-transactions=false
-  --tpcc.lock-scanned-ranges=false
+  --tpcc.benchmark-threads=64
+  --tpcc.use-read-only-transactions=true
+  --tpcc.lock-scanned-ranges=true
   --spanner.project=appdev-soda-spanner-staging
   --spanner.instance=knut-test-ycsb
   --spanner.database=tpcc
   --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
+  --pgadapter.disable-internal-retries=true
   "
 ```
