@@ -23,8 +23,10 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
 
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
-  --tpcc.benchmark-threads=8
-  --tpcc.use-read-only-transactions=true
+  --tpcc.benchmark-duration=PT600s
+  --tpcc.benchmark-threads=32
+  --tpcc.use-read-only-transactions=false
+  --tpcc.lock-scanned-ranges=false
   --spanner.project=appdev-soda-spanner-staging
   --spanner.instance=knut-test-ycsb
   --spanner.database=tpcc

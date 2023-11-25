@@ -140,7 +140,6 @@ class BenchmarkRunner implements Runnable {
 
     Object[] row;
     statement.execute("begin transaction");
-    // TODO: This should use FOR UPDATE.
     row =
         queryRow(
             statement,
@@ -153,7 +152,6 @@ class BenchmarkRunner implements Runnable {
     String credit = (String) row[2];
     BigDecimal warehouseTax = (BigDecimal) row[3];
 
-    // TODO: This should use FOR UPDATE.
     row =
         queryRow(statement, "execute get_next_order_id_and_tax (%d, %d)", warehouseId, districtId);
     long districtNextOrderId = (long) row[0];
@@ -625,11 +623,17 @@ class BenchmarkRunner implements Runnable {
     try (Statement statement = connection.createStatement()) {
       statement.execute(
           "PREPARE select_customer_info as "
+              + (tpccConfiguration.isLockScannedRanges()
+                  ? "/*@ lock_scanned_ranges=exclusive */"
+                  : "")
               + "SELECT c_discount, c_last, c_credit, w_tax "
               + "FROM customer , warehouse "
               + "WHERE w_id = $1 AND c_w_id = w_id AND c_d_id = $2 AND c_id = $3");
       statement.execute(
           "PREPARE get_next_order_id_and_tax as "
+              + (tpccConfiguration.isLockScannedRanges()
+                  ? "/*@ lock_scanned_ranges=exclusive */"
+                  : "")
               + "SELECT d_next_o_id, d_tax "
               + "FROM district "
               + "WHERE d_w_id = $1 AND d_id = $2");
@@ -655,6 +659,9 @@ class BenchmarkRunner implements Runnable {
           "PREPARE select_item as SELECT i_price, i_name, i_data FROM item WHERE i_id = $1");
       statement.execute(
           "PREPARE select_stock as "
+              + (tpccConfiguration.isLockScannedRanges()
+                  ? "/*@ lock_scanned_ranges=exclusive */"
+                  : "")
               + "SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10 "
               + "FROM stock "
               + "WHERE s_i_id = $1 AND s_w_id= $2");
