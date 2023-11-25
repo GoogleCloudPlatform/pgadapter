@@ -29,25 +29,27 @@ class Statistics {
     System.out.print("\033[2J\033[1;1H");
     System.out.printf(
         """
-                \rNum threads:  %d\t
-                \rDuration:     %s\t
-                \rRead-only tx: %s\t
+                \rNum threads:    %d\t
+                \rDuration:       %s\t
+                \rRead-only tx:   %s\t
+                \rExclusive lock: %s\t
                 \r
-                \rNew orders:   %d (%.2f/s)\t
-                \rPayments:     %d (%.2f/s)\t
-                \rOrder status: %d (%.2f/s)\t
-                \rDelivery:     %d (%.2f/s)\t
-                \rStock level:  %d (%.2f/s)\t
+                \rNew orders:     %d (%.2f/s)\t
+                \rPayments:       %d (%.2f/s)\t
+                \rOrder status:   %d (%.2f/s)\t
+                \rDelivery:       %d (%.2f/s)\t
+                \rStock level:    %d (%.2f/s)\t
                 \r
-                \rAborted:      %d (%.1f%% - %.2f/s)\t
-                \rFailed:       %d (%.1f%% - %.2f/s)\t
-                \rSuccessful:   %d (%.1f%% - %.2f/s)\t
+                \rAborted:        %d (%.1f%% - %.2f/s)\t
+                \rFailed:         %d (%.1f%% - %.2f/s)\t
+                \rSuccessful:     %d (%.1f%% - %.2f/s)\t
                 \r
-                \rTotal:        %d (%.2f/s)\t
+                \rTotal:          %d (%.2f/s)\t
                 """,
         tpccConfiguration.getBenchmarkThreads(),
         runtime,
         tpccConfiguration.isUseReadOnlyTransactions(),
+        tpccConfiguration.isLockScannedRanges(),
         getNewOrder(),
         getNewOrderPerSecond(runtime),
         getPayment(),
