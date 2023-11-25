@@ -34,8 +34,8 @@ class CustomerRowProducer extends AbstractRowProducer {
 
   private final long districtId;
 
-  CustomerRowProducer(long warehouseId, long districtId, long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  CustomerRowProducer(DataLoadStatus status, long warehouseId, long districtId, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incCustomer);
     this.warehouseId = warehouseId;
     this.districtId = districtId;
   }

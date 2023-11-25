@@ -14,8 +14,8 @@ class NewOrderRowProducer extends AbstractOrderedIdRowProducer {
 
   private final long districtId;
 
-  NewOrderRowProducer(long warehouseId, long districtId, long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  NewOrderRowProducer(DataLoadStatus status, long warehouseId, long districtId, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incNewOrder);
     this.warehouseId = warehouseId;
     this.districtId = districtId;
   }

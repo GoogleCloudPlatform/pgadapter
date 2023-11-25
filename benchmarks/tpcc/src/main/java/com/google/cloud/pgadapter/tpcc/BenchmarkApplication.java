@@ -3,6 +3,7 @@ package com.google.cloud.pgadapter.tpcc;
 import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
+import com.google.cloud.pgadapter.tpcc.dataloader.DataLoadStatus;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoader;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -10,6 +11,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
@@ -57,7 +59,17 @@ public class BenchmarkApplication implements CommandLineRunner {
     try {
       if (tpccConfiguration.isLoadData()) {
         LOG.info("Starting data load");
-        loadData(connectionUrl);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        DataLoadStatus status = new DataLoadStatus(tpccConfiguration);
+        Future<Long> loadDataFuture = executor.submit(() -> loadData(status, connectionUrl));
+        executor.shutdown();
+        Stopwatch watch = Stopwatch.createStarted();
+        while (!loadDataFuture.isDone()) {
+          //noinspection BusyWait
+          Thread.sleep(1_000L);
+          status.print(watch.elapsed());
+        }
+        System.out.printf("Finished loading %d rows\n", loadDataFuture.get());
       }
 
       if (tpccConfiguration.isRunBenchmark()) {
@@ -88,9 +100,9 @@ public class BenchmarkApplication implements CommandLineRunner {
     }
   }
 
-  private void loadData(String connectionUrl) throws Exception {
-    try (DataLoader loader = new DataLoader(connectionUrl, tpccConfiguration)) {
-      loader.loadData();
+  private long loadData(DataLoadStatus status, String connectionUrl) throws Exception {
+    try (DataLoader loader = new DataLoader(status, connectionUrl, tpccConfiguration)) {
+      return loader.loadData();
     }
   }
 

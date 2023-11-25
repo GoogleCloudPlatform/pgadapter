@@ -17,12 +17,14 @@ abstract class AbstractRowProducer {
   private final String table;
   private final String columns;
   private final long rowCount;
+  private final Runnable rowCounterIncrementer;
   final Random random = new Random();
 
-  AbstractRowProducer(String table, String columns, long rowCount) {
+  AbstractRowProducer(String table, String columns, long rowCount, Runnable rowCounterIncrementer) {
     this.table = table;
     this.columns = columns;
     this.rowCount = rowCount;
+    this.rowCounterIncrementer = rowCounterIncrementer;
   }
 
   String getTable() {
@@ -41,6 +43,7 @@ abstract class AbstractRowProducer {
               String row = createRow(rowIndex);
               if (row != null) {
                 writer.write(row + "\n");
+                rowCounterIncrementer.run();
               }
             }
             return rowCount;

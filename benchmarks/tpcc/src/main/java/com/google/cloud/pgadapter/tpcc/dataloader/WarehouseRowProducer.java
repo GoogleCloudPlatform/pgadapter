@@ -7,8 +7,8 @@ class WarehouseRowProducer extends AbstractRowProducer {
   private static final String COLUMNS =
       "w_id, w_name, w_street_1, w_street_2, w_city, w_state, w_zip, w_tax, w_ytd";
 
-  WarehouseRowProducer(long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  WarehouseRowProducer(DataLoadStatus status, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incWarehouse);
   }
 
   @Override

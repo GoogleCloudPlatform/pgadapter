@@ -20,8 +20,8 @@ class DistrictRowProducer extends AbstractRowProducer {
 
   private final long warehouseId;
 
-  DistrictRowProducer(long warehouseId, long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  DistrictRowProducer(DataLoadStatus status, long warehouseId, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incDistrict);
     this.warehouseId = warehouseId;
   }
 

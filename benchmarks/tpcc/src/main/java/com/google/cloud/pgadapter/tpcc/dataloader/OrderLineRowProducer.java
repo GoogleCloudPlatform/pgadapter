@@ -25,8 +25,9 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
 
   private final int itemCount;
 
-  OrderLineRowProducer(long warehouseId, long districtId, int itemCount, long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  OrderLineRowProducer(
+      DataLoadStatus status, long warehouseId, long districtId, int itemCount, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incOrderLine);
     this.warehouseId = warehouseId;
     this.districtId = districtId;
     this.itemCount = itemCount;

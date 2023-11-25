@@ -27,8 +27,9 @@ class OrderRowProducer extends AbstractOrderedIdRowProducer {
 
   private final ImmutableList<Long> customerIds;
 
-  OrderRowProducer(long warehouseId, long districtId, int customerCount, long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  OrderRowProducer(
+      DataLoadStatus status, long warehouseId, long districtId, int customerCount, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incOrders);
     this.warehouseId = warehouseId;
     this.districtId = districtId;
     ArrayList<Long> customerIds =

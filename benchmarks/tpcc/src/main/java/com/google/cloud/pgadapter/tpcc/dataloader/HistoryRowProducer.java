@@ -20,8 +20,8 @@ class HistoryRowProducer extends AbstractRowProducer {
 
   private final long districtId;
 
-  HistoryRowProducer(long warehouseId, long districtId, long rowCount) {
-    super(TABLE, COLUMNS, rowCount);
+  HistoryRowProducer(DataLoadStatus status, long warehouseId, long districtId, long rowCount) {
+    super(TABLE, COLUMNS, rowCount, status::incHistory);
     this.warehouseId = warehouseId;
     this.districtId = districtId;
   }
