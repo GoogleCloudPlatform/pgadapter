@@ -21,16 +21,41 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
 ```
 
 
+Load data:
+
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.benchmark-duration=PT600s
-  --tpcc.benchmark-threads=64
-  --tpcc.use-read-only-transactions=true
-  --tpcc.lock-scanned-ranges=true
+  --tpcc.benchmark-threads=1
+  --tpcc.load-data=true
+  --tpcc.truncate-before-load=false
+  --tpcc.run-benchmark=false
+  --tpcc.use-read-only-transactions=false
+  --tpcc.lock-scanned-ranges=false
   --spanner.project=appdev-soda-spanner-staging
   --spanner.instance=knut-test-ycsb
-  --spanner.database=tpcc
+  --spanner.database=tpcc2
   --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
-  --pgadapter.disable-internal-retries=true
+  --pgadapter.disable-internal-retries=false
+  "
+```
+
+
+Run benchmark:
+
+```shell
+mvn spring-boot:run -Dspring-boot.run.arguments="
+  --tpcc.benchmark-duration=PT600s
+  --tpcc.benchmark-threads=1
+  --tpcc.load-data=false
+  --tpcc.truncate-before-load=false
+  --tpcc.run-benchmark=true
+  --tpcc.use-read-only-transactions=false
+  --tpcc.lock-scanned-ranges=false
+  --spanner.project=appdev-soda-spanner-staging
+  --spanner.instance=knut-test-ycsb
+  --spanner.database=tpcc2
+  --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
+  --pgadapter.disable-internal-retries=false
   "
 ```
