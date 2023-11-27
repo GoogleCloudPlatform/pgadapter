@@ -1,5 +1,6 @@
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
+import com.google.cloud.pgadapter.tpcc.dataloader.OrderRowProducer.DistrictId;
 import com.google.common.collect.ImmutableList;
 import java.util.Objects;
 
@@ -7,9 +8,10 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
   private static final String TABLE = "order_line";
   private static final String COLUMNS =
       """
-    ol_o_id,
-    ol_d_id,
-    ol_w_id,
+    o_id,
+    c_id,
+    d_id,
+    w_id,
     ol_number,
     ol_i_id,
     ol_supply_w_id,
@@ -25,12 +27,15 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
 
   private final int itemCount;
 
+  private final ImmutableList<Long> customerIds;
+
   OrderLineRowProducer(
       DataLoadStatus status, long warehouseId, long districtId, int itemCount, long rowCount) {
     super(TABLE, COLUMNS, rowCount, status::incOrderLine);
     this.warehouseId = warehouseId;
     this.districtId = districtId;
     this.itemCount = itemCount;
+    this.customerIds = OrderRowProducer.CUSTOMER_IDS.get(new DistrictId(warehouseId, districtId));
   }
 
   @Override
@@ -45,6 +50,7 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
               ",",
               ImmutableList.of(
                   getId(rowIndex),
+                  getCustomerId(rowIndex),
                   String.valueOf(districtId),
                   String.valueOf(warehouseId),
                   String.valueOf(line),
@@ -56,6 +62,10 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
                   getData())));
     }
     return builder.toString();
+  }
+
+  String getCustomerId(long rowIndex) {
+    return String.valueOf(Long.reverse(customerIds.get((int) rowIndex)));
   }
 
   int getOrderLineCount(long rowIndex) {

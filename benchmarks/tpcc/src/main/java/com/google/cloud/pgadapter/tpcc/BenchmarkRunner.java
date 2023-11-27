@@ -167,7 +167,8 @@ class BenchmarkRunner implements Runnable {
             districtNextOrderId, districtId, warehouseId, customerId, orderLineCount, allLocal));
     statement.execute(
         String.format(
-            "execute insert_new_order (%d,%d,%d)", districtNextOrderId, districtId, warehouseId));
+            "execute insert_new_order (%d,%d,%d,%d)",
+            districtNextOrderId, customerId, districtId, warehouseId));
 
     for (int line = 0; line < orderLineCount; line++) {
       long orderLineSupplyWarehouseId = supplyWarehouses[line];
@@ -220,8 +221,9 @@ class BenchmarkRunner implements Runnable {
               .multiply(discountFactor);
       statement.execute(
           String.format(
-              "execute insert_order_line (%d,%d,%d,%d,%d,%d,%d,%s,'%s')",
+              "execute insert_order_line (%d,%d,%d,%d,%d,%d,%d,%d,%s,'%s')",
               districtNextOrderId,
+              customerId,
               districtId,
               warehouseId,
               line,
@@ -497,9 +499,11 @@ class BenchmarkRunner implements Runnable {
               warehouseId);
       if (row != null) {
         long newOrderId = (long) row[0];
+        long customerId = (long) row[1];
         statement.execute(
             String.format(
-                "execute delete_new_order (%d, %d, %d)", newOrderId, districtId, warehouseId));
+                "execute delete_new_order (%d, %d, %d, %d)",
+                newOrderId, customerId, districtId, warehouseId));
         row =
             queryRow(
                 statement,
@@ -507,7 +511,7 @@ class BenchmarkRunner implements Runnable {
                 newOrderId,
                 districtId,
                 warehouseId);
-        long customerId = (long) row[0];
+        // long customerId = (long) row[0];
         statement.execute(
             String.format(
                 "execute update_order (%d, %d, %d, %d)",
@@ -627,8 +631,8 @@ class BenchmarkRunner implements Runnable {
                   ? "/*@ lock_scanned_ranges=exclusive */"
                   : "")
               + "SELECT c_discount, c_last, c_credit, w_tax "
-              + "FROM customer , warehouse "
-              + "WHERE w_id = $1 AND c_w_id = w_id AND c_d_id = $2 AND c_id = $3");
+              + "FROM customer c, warehouse w "
+              + "WHERE w.w_id = $1 AND c.w_id = w.w_id AND c.d_id = $2 AND c.c_id = $3");
       statement.execute(
           "PREPARE get_next_order_id_and_tax as "
               + (tpccConfiguration.isLockScannedRanges()
@@ -636,25 +640,25 @@ class BenchmarkRunner implements Runnable {
                   : "")
               + "SELECT d_next_o_id, d_tax "
               + "FROM district "
-              + "WHERE d_w_id = $1 AND d_id = $2");
+              + "WHERE w_id = $1 AND d_id = $2");
       statement.execute(
           "PREPARE get_next_order_id as "
               + "SELECT d_next_o_id "
               + "FROM district "
-              + "WHERE d_id = $1 AND d_w_id= $2");
+              + "WHERE d_id = $1 AND w_id= $2");
       statement.execute(
           "PREPARE update_next_order_id as "
               + "UPDATE district "
               + "SET d_next_o_id = $1 "
-              + "WHERE d_id = $2 AND d_w_id= $3");
+              + "WHERE d_id = $2 AND w_id= $3");
       statement.execute(
           "PREPARE insert_order (bigint,bigint,bigint,bigint,bigint,bigint) as "
-              + "INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local) "
+              + "INSERT INTO orders (o_id, d_id, w_id, c_id, o_entry_d, o_ol_cnt, o_all_local) "
               + "VALUES ($1,$2,$3,$4,NOW(),$5,$6)");
       statement.execute(
           "PREPARE insert_new_order as "
-              + "INSERT INTO new_orders (no_o_id, no_d_id, no_w_id) "
-              + "VALUES ($1,$2,$3)");
+              + "INSERT INTO new_orders (o_id, c_id, d_id, w_id) "
+              + "VALUES ($1,$2,$3,$4)");
       statement.execute(
           "PREPARE select_item as SELECT i_price, i_name, i_data FROM item WHERE i_id = $1");
       statement.execute(
@@ -664,16 +668,16 @@ class BenchmarkRunner implements Runnable {
                   : "")
               + "SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10 "
               + "FROM stock "
-              + "WHERE s_i_id = $1 AND s_w_id= $2");
+              + "WHERE s_i_id = $1 AND w_id= $2");
       statement.execute(
           "PREPARE update_stock as "
               + "UPDATE stock "
               + "SET s_quantity = $1 "
-              + "WHERE s_i_id = $2 AND s_w_id= $3");
+              + "WHERE s_i_id = $2 AND w_id= $3");
       statement.execute(
           "PREPARE insert_order_line as "
-              + "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) "
-              + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)");
+              + "INSERT INTO order_line (o_id, c_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) "
+              + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)");
       statement.execute(
           "PREPARE update_warehouse as "
               + "UPDATE warehouse "
@@ -688,22 +692,22 @@ class BenchmarkRunner implements Runnable {
           "PREPARE update_district as "
               + "UPDATE district "
               + "SET d_ytd = d_ytd + $1 "
-              + "WHERE d_w_id = $2 AND d_id= $3");
+              + "WHERE w_id = $2 AND d_id= $3");
       statement.execute(
           "PREPARE select_district as "
               + "SELECT d_street_1, d_street_2, d_city, d_state, d_zip, d_name "
               + "FROM district "
-              + "WHERE d_w_id = $1 AND d_id = $2");
+              + "WHERE w_id = $1 AND d_id = $2");
       statement.execute(
           "PREPARE count_customer as "
               + "SELECT count(c_id) namecnt "
               + "FROM customer "
-              + "WHERE c_w_id = $1 AND c_d_id= $2 AND c_last=$3");
+              + "WHERE w_id = $1 AND d_id= $2 AND c_last=$3");
       statement.execute(
           "PREPARE select_customer as "
               + "SELECT c_id "
               + "FROM customer "
-              + "WHERE c_w_id = $1 AND c_d_id= $2 AND c_last=$3 "
+              + "WHERE w_id = $1 AND d_id= $2 AND c_last=$3 "
               + "ORDER BY c_first");
       statement.execute(
           "PREPARE select_customer_details as "
@@ -712,102 +716,102 @@ class BenchmarkRunner implements Runnable {
                   : "")
               + "SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_since "
               + "FROM customer "
-              + "WHERE c_w_id = $1 AND c_d_id= $2 AND c_id=$3");
+              + "WHERE w_id = $1 AND d_id= $2 AND c_id=$3");
       statement.execute(
           "PREPARE select_customer_c_data as "
               + "SELECT c_data "
               + "FROM customer "
-              + "WHERE c_w_id = $1 AND c_d_id=$2 AND c_id= $3");
+              + "WHERE w_id = $1 AND d_id=$2 AND c_id= $3");
       statement.execute(
           "PREPARE update_customer_1_ as "
               + "UPDATE customer "
               + "SET c_balance=$1, c_ytd_payment=$2, c_data=$3 "
-              + "WHERE c_w_id = $4 AND c_d_id=$5 AND c_id=$6");
+              + "WHERE w_id = $4 AND d_id=$5 AND c_id=$6");
       statement.execute(
           "PREPARE update_customer_2_ as "
               + "UPDATE customer "
               + "SET c_balance=$1, c_ytd_payment=$2 "
-              + "WHERE c_w_id = $3 AND c_d_id=$4 AND c_id=$5");
+              + "WHERE w_id = $3 AND d_id=$4 AND c_id=$5");
       statement.execute(
           "PREPARE insert_history (bigint,bigint,bigint,bigint,bigint,bigint,varchar) as "
-              + "INSERT INTO history (h_c_d_id, h_c_w_id, h_c_id, h_d_id,  h_w_id, h_date, h_amount, h_data) "
+              + "INSERT INTO history (d_id, w_id, c_id, h_d_id,  h_w_id, h_date, h_amount, h_data) "
               + "VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7)");
       statement.execute(
           "PREPARE select_customer_balance_1_ as "
               + "SELECT c_balance, c_first, c_middle, c_id "
-              + "FROM customer WHERE c_w_id = $1 AND c_d_id= $2 AND c_last=$3 "
+              + "FROM customer WHERE w_id = $1 AND d_id= $2 AND c_last=$3 "
               + "ORDER BY c_first");
       statement.execute(
           "PREPARE select_customer_balance_2_ as "
               + "SELECT c_balance, c_first, c_middle, c_last "
               + "FROM customer "
-              + "WHERE c_w_id = $1 AND c_d_id=$2 AND c_id=$3");
+              + "WHERE w_id = $1 AND d_id=$2 AND c_id=$3");
       statement.execute(
           "PREPARE select_order as "
               + "SELECT o_id, o_carrier_id, o_entry_d "
               + "FROM orders "
-              + "WHERE o_w_id = $1 AND o_d_id = $2 AND o_c_id = $3 "
+              + "WHERE w_id = $1 AND d_id = $2 AND c_id = $3 "
               + "ORDER BY o_id DESC");
       statement.execute(
           "PREPARE select_order_line as "
               + "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d "
               + "FROM order_line "
-              + "WHERE ol_w_id = $1 AND ol_d_id = $2  AND ol_o_id = $3");
+              + "WHERE w_id = $1 AND d_id = $2  AND o_id = $3");
       statement.execute(
           "PREPARE select_new_order as "
               + (tpccConfiguration.isLockScannedRanges()
                   ? "/*@ lock_scanned_ranges=exclusive */"
                   : "")
-              + "SELECT no_o_id "
+              + "SELECT o_id, c_id "
               + "FROM new_orders "
-              + "WHERE no_d_id = $1 AND no_w_id = $2 "
-              + "ORDER BY no_o_id ASC "
+              + "WHERE d_id = $1 AND w_id = $2 "
+              + "ORDER BY o_id ASC "
               + "LIMIT 1");
       statement.execute(
           "PREPARE delete_new_order as "
               + "DELETE "
               + "FROM new_orders "
-              + "WHERE no_o_id = $1 AND no_d_id = $2 AND no_w_id = $3");
+              + "WHERE o_id = $1 AND c_id = $2 AND d_id = $3 AND w_id = $4");
       statement.execute(
           "PREPARE select_order_customer as "
-              + "SELECT o_c_id "
+              + "SELECT c_id "
               + "FROM orders "
-              + "WHERE o_id = $1 AND o_d_id = $2 AND o_w_id = $3");
+              + "WHERE o_id = $1 AND d_id = $2 AND w_id = $3");
       statement.execute(
           "PREPARE update_order as "
               + "UPDATE orders "
               + "SET o_carrier_id = $1 "
-              + "WHERE o_id = $2 AND o_d_id = $3 AND o_w_id = $4");
+              + "WHERE o_id = $2 AND d_id = $3 AND w_id = $4");
       statement.execute(
           "PREPARE update_order_line as "
               + "UPDATE order_line "
               + "SET ol_delivery_d = NOW() "
-              + "WHERE ol_o_id = $1 AND ol_d_id = $2 AND ol_w_id = $3");
+              + "WHERE o_id = $1 AND c_id = $2 AND d_id = $3 AND w_id = $4");
       statement.execute(
           "PREPARE sum_order_line as "
               + "SELECT SUM(ol_amount) sm "
               + "FROM order_line "
-              + "WHERE ol_o_id = $1 AND ol_d_id = $2 AND ol_w_id = $3");
+              + "WHERE o_id = $1 AND c_id = $2 AND d_id = $3 AND w_id = $4");
       statement.execute(
           "PREPARE update_customer_bal as "
               + "UPDATE customer "
               + "SET c_balance = c_balance + $1, c_delivery_cnt = c_delivery_cnt + 1 "
-              + "WHERE c_id = $2 AND c_d_id = $3 AND c_w_id = $4");
+              + "WHERE c_id = $2 AND d_id = $3 AND w_id = $4");
       statement.execute(
           "PREPARE count_order_line as "
               + "SELECT COUNT(DISTINCT (s_i_id)) "
-              + "FROM order_line, stock "
-              + "WHERE ol_w_id = $1 "
-              + "AND ol_d_id = $2 "
-              + "AND ol_o_id < $3 "
-              + "AND ol_o_id >= $4 "
-              + "AND s_w_id= $5 "
+              + "FROM order_line ol, stock s "
+              + "WHERE ol.w_id = $1 "
+              + "AND ol.d_id = $2 "
+              + "AND ol.o_id < $3 "
+              + "AND ol.o_id >= $4 "
+              + "AND s.w_id= $5 "
               + "AND s_i_id=ol_i_id "
               + "AND s_quantity < $6");
       statement.execute(
           "PREPARE select_stock_count as "
               + "SELECT count(*) FROM stock "
-              + "WHERE s_w_id = $1 AND s_i_id = $2 "
+              + "WHERE w_id = $1 AND s_i_id = $2 "
               + "AND s_quantity < $3");
     }
   }

@@ -7,7 +7,7 @@ class StockRowProducer extends AbstractRowProducer {
   private static final String COLUMNS =
       """
     s_i_id,
-    s_w_id,
+    w_id,
     s_quantity,
     s_dist_01,
     s_dist_02,

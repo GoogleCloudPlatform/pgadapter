@@ -170,27 +170,15 @@ public class DataLoadStatus {
   }
 
   long getTotal() {
-    return /* warehouse */ tpccConfiguration.getWarehouses()
-        + /* district */ (long) tpccConfiguration.getDistrictsPerWarehouse()
-            * tpccConfiguration.getWarehouses()
-        + /* customer */ (long) tpccConfiguration.getCustomersPerDistrict()
-            * tpccConfiguration.getDistrictsPerWarehouse()
-            * tpccConfiguration.getWarehouses()
-        + /* orders   */ (long) tpccConfiguration.getCustomersPerDistrict()
-            * tpccConfiguration.getDistrictsPerWarehouse()
-            * tpccConfiguration.getWarehouses()
-        + /* order_line */ (long) tpccConfiguration.getCustomersPerDistrict()
-            * tpccConfiguration.getDistrictsPerWarehouse()
-            * tpccConfiguration.getWarehouses()
-            * 10L
-        + /* new_order */ (long) tpccConfiguration.getCustomersPerDistrict()
-            * tpccConfiguration.getDistrictsPerWarehouse()
-            * tpccConfiguration.getWarehouses()
-        + /* history */ (long) tpccConfiguration.getCustomersPerDistrict()
-            * tpccConfiguration.getDistrictsPerWarehouse()
-            * tpccConfiguration.getWarehouses()
-        + /* item */ (long) tpccConfiguration.getItemCount()
-        + /* stock */ (long) tpccConfiguration.getWarehouses() * tpccConfiguration.getItemCount();
+    return tpccConfiguration.getWarehouses()
+        + getTotalDistricts()
+        + getTotalCustomers()
+        + getTotalOrders()
+        + getTotalOrderLines()
+        + getTotalNewOrder()
+        + getTotalHistory()
+        + tpccConfiguration.getItemCount()
+        + getTotalStock();
   }
 
   long getTotalDistricts() {
@@ -212,14 +200,14 @@ public class DataLoadStatus {
   long getTotalOrderLines() {
     return (long) tpccConfiguration.getCustomersPerDistrict()
         * tpccConfiguration.getDistrictsPerWarehouse()
-        * tpccConfiguration.getWarehouses()
-        * 10L;
+        * tpccConfiguration.getWarehouses();
   }
 
   long getTotalNewOrder() {
-    return (long) tpccConfiguration.getCustomersPerDistrict()
-        * tpccConfiguration.getDistrictsPerWarehouse()
-        * tpccConfiguration.getWarehouses();
+    return (((long) tpccConfiguration.getCustomersPerDistrict()
+            * tpccConfiguration.getDistrictsPerWarehouse()
+            * tpccConfiguration.getWarehouses())
+        / 3);
   }
 
   long getTotalHistory() {
