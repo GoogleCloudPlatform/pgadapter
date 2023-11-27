@@ -7,7 +7,7 @@ class DistrictRowProducer extends AbstractRowProducer {
   private static final String COLUMNS =
       """
       d_id,
-      d_w_id,
+      w_id,
       d_name,
       d_street_1,
       d_street_2,

@@ -70,10 +70,10 @@ create table IF NOT EXISTS history (
 ) interleave in parent customer;
 
 create table IF NOT EXISTS orders (
-    o_id int not null,
     w_id int not null,
-    c_id int not null,
     d_id int not null,
+    c_id int not null,
+    o_id int not null,
     o_entry_d timestamptz,
     o_carrier_id int,
     o_ol_cnt int,

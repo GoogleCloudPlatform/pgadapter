@@ -219,7 +219,7 @@ public class DataLoader implements AutoCloseable {
                       districtId);
                   return rowCount;
                 }));
-        totalRowCount += tpccConfiguration.getCustomersPerDistrict();
+        totalRowCount += tpccConfiguration.getCustomersPerDistrict() / 3;
 
         orderLineFutures.add(
             loadDataExecutor.submit(
@@ -239,7 +239,7 @@ public class DataLoader implements AutoCloseable {
                       districtId);
                   return rowCount;
                 }));
-        totalRowCount += tpccConfiguration.getCustomersPerDistrict() * 10L;
+        totalRowCount += tpccConfiguration.getCustomersPerDistrict();
       }
     }
 

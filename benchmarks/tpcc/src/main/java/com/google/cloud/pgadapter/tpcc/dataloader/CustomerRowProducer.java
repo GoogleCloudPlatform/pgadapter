@@ -8,8 +8,8 @@ class CustomerRowProducer extends AbstractRowProducer {
   private static final String COLUMNS =
       """
     c_id,
-    c_d_id,
-    c_w_id,
+    d_id,
+    w_id,
     c_first,
     c_middle,
     c_last,

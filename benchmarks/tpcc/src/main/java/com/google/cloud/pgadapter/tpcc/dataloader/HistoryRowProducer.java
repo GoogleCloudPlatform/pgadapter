@@ -6,9 +6,9 @@ class HistoryRowProducer extends AbstractRowProducer {
   private static final String TABLE = "history";
   private static final String COLUMNS =
       """
-    h_c_id,
-    h_c_d_id,
-    h_c_w_id,
+    c_id,
+    d_id,
+    w_id,
     h_d_id,
     h_w_id,
     h_date,
