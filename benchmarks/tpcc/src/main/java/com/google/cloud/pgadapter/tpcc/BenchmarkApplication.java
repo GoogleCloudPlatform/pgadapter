@@ -113,6 +113,11 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setInstance(spannerConfiguration.getInstance())
             .setDatabase(spannerConfiguration.getDatabase())
             .disableUnixDomainSockets();
+    if (pgAdapterConfiguration.isEnableOpenTelemetry()) {
+      builder
+          .setEnableOpenTelemetry()
+          .setOpenTelemetryTraceRatio(pgAdapterConfiguration.getOpenTelemetrySampleRate());
+    }
     if (pgAdapterConfiguration.isDisableInternalRetries()) {
       builder.setDisableInternalRetries();
     }

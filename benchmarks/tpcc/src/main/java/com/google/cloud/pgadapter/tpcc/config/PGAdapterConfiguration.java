@@ -10,6 +10,10 @@ public class PGAdapterConfiguration {
 
   private String credentials;
 
+  private boolean enableOpenTelemetry;
+
+  private double openTelemetrySampleRate;
+
   private boolean disableInternalRetries;
 
   private String host;
@@ -24,6 +28,22 @@ public class PGAdapterConfiguration {
 
   public void setInProcess(boolean inProcess) {
     this.inProcess = inProcess;
+  }
+
+  public boolean isEnableOpenTelemetry() {
+    return enableOpenTelemetry;
+  }
+
+  public void setEnableOpenTelemetry(boolean enableOpenTelemetry) {
+    this.enableOpenTelemetry = enableOpenTelemetry;
+  }
+
+  public double getOpenTelemetrySampleRate() {
+    return openTelemetrySampleRate;
+  }
+
+  public void setOpenTelemetrySampleRate(double openTelemetrySampleRate) {
+    this.openTelemetrySampleRate = openTelemetrySampleRate;
   }
 
   public boolean isDisableInternalRetries() {
