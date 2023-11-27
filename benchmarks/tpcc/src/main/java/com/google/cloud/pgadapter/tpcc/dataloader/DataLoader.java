@@ -193,8 +193,10 @@ public class DataLoader implements AutoCloseable {
       }
     }
 
-    // Wait for all orders to have loaded before continuing with new_orders and order_lines.
+    // Wait for all orders and stock to have loaded before continuing with new_orders and
+    // order_lines.
     Futures.allAsList(orderFutures).get();
+    Futures.allAsList(stockFutures).get();
 
     List<ListenableFuture<Long>> newOrderFutures = new ArrayList<>();
     List<ListenableFuture<Long>> orderLineFutures = new ArrayList<>();
@@ -245,7 +247,6 @@ public class DataLoader implements AutoCloseable {
 
     // Wait for all remaining data loaders to finish.
     Futures.allAsList(historyFutures).get();
-    Futures.allAsList(stockFutures).get();
     Futures.allAsList(newOrderFutures).get();
     Futures.allAsList(orderLineFutures).get();
 
