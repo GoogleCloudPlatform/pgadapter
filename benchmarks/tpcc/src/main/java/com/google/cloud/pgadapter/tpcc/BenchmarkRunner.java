@@ -514,16 +514,18 @@ class BenchmarkRunner implements Runnable {
         // long customerId = (long) row[0];
         statement.execute(
             String.format(
-                "execute update_order (%d, %d, %d, %d)",
-                carrierId, newOrderId, districtId, warehouseId));
+                "execute update_order (%d, %d, %d, %d, %d)",
+                carrierId, newOrderId, customerId, districtId, warehouseId));
         statement.execute(
             String.format(
-                "execute update_order_line (%d, %d, %d)", newOrderId, districtId, warehouseId));
+                "execute update_order_line (%d, %d, %d, %d)",
+                newOrderId, customerId, districtId, warehouseId));
         row =
             queryRow(
                 statement,
-                "execute sum_order_line (%d, %d, %d)",
+                "execute sum_order_line (%d, %d, %d, %d)",
                 newOrderId,
+                customerId,
                 districtId,
                 warehouseId);
         BigDecimal sumOrderLineAmount = (BigDecimal) row[0];
@@ -781,7 +783,7 @@ class BenchmarkRunner implements Runnable {
           "PREPARE update_order as "
               + "UPDATE orders "
               + "SET o_carrier_id = $1 "
-              + "WHERE o_id = $2 AND d_id = $3 AND w_id = $4");
+              + "WHERE o_id = $2 AND c_id = $3 AND d_id = $4 AND w_id = $5");
       statement.execute(
           "PREPARE update_order_line as "
               + "UPDATE order_line "

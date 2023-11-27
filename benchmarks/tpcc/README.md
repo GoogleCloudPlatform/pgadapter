@@ -26,6 +26,7 @@ Load data:
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.benchmark-duration=PT600s
+  --tpcc.warehouses=10
   --tpcc.benchmark-threads=1
   --tpcc.load-data=true
   --tpcc.truncate-before-load=false
@@ -46,6 +47,7 @@ Run benchmark:
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.benchmark-duration=PT600s
+  --tpcc.warehouses=10
   --tpcc.benchmark-threads=1
   --tpcc.load-data=false
   --tpcc.truncate-before-load=false
@@ -55,6 +57,8 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --spanner.project=appdev-soda-spanner-staging
   --spanner.instance=knut-test-ycsb
   --spanner.database=tpcc2
+  --pgadapter.enable-open-telemetry=true
+  --pgadatper.open-telemetry-sample-ratio=1.0
   --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
   --pgadapter.disable-internal-retries=false
   "
