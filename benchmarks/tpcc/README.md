@@ -52,7 +52,7 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.load-data=false
   --tpcc.truncate-before-load=false
   --tpcc.run-benchmark=true
-  --tpcc.use-read-only-transactions=false
+  --tpcc.use-read-only-transactions=true
   --tpcc.lock-scanned-ranges=false
   --spanner.project=appdev-soda-spanner-staging
   --spanner.instance=knut-test-ycsb
@@ -60,6 +60,6 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --pgadapter.enable-open-telemetry=true
   --pgadatper.open-telemetry-sample-ratio=1.0
   --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
-  --pgadapter.disable-internal-retries=false
+  --pgadapter.disable-internal-retries=true
   "
 ```
