@@ -12,7 +12,7 @@ do
   fi
 done
 
-nohup sh -c "/emulator/emulator_main --host_port localhost:9010 &"
+nohup sh -c "/emulator/gateway_main --hostname \"0.0.0.0\" &"
 
 cd /home/pgadapter
 COMMAND="java ${JAVA_ARGUMENTS} -jar pgadapter.jar ${ARGUMENTS}"
