@@ -34,7 +34,7 @@ jobs:
       # Configure docker to use the gcloud command-line tool as a credential helper
       - run: gcloud auth configure-docker gcr.io
 
-      # Build and Publish the Docker image
+      # Build and Publish the Docker images
       - name: Build and Publish
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
@@ -51,6 +51,13 @@ jobs:
             . -f build/distroless/Dockerfile \
             -t "$GCR_HOSTNAME"/"$IMAGE"-distroless:"$TAG" \
             -t "$GCR_HOSTNAME"/"$IMAGE"-distroless:latest \
+            --push \
+            --build-arg GITHUB_SHA="$GITHUB_SHA" \
+            --build-arg GITHUB_REF="$GITHUB_REF"
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            . -f build/emulator/Dockerfile \
+            -t "$GCR_HOSTNAME"/"$IMAGE"-emulator:"$TAG" \
+            -t "$GCR_HOSTNAME"/"$IMAGE"-emulator:latest \
             --push \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
             --build-arg GITHUB_REF="$GITHUB_REF"
