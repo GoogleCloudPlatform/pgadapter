@@ -83,7 +83,7 @@ jobs:
           java-version: 17
       - run: java -version
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '^1.17.7'
       - run: go version
