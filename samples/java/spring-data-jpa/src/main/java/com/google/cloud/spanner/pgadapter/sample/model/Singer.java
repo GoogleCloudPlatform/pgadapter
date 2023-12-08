@@ -17,9 +17,12 @@ package com.google.cloud.spanner.pgadapter.sample.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.sql.Clob;
 import java.util.List;
+import org.hibernate.annotations.Nationalized;
 
 @Table(name = "singers")
 @Entity

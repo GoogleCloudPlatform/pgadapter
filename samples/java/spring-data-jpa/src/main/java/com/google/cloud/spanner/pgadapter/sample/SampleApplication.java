@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter.sample;
 
 import com.google.cloud.spanner.pgadapter.sample.model.Concert;
+import com.google.cloud.spanner.pgadapter.sample.model.LobTest;
 import com.google.cloud.spanner.pgadapter.sample.repository.ConcertRepository;
+import com.google.cloud.spanner.pgadapter.sample.repository.LobTestRepository;
 import com.google.cloud.spanner.pgadapter.sample.service.AlbumService;
 import com.google.cloud.spanner.pgadapter.sample.service.ConcertService;
 import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
@@ -65,6 +67,7 @@ public class SampleApplication implements CommandLineRunner {
   private final TrackService trackService;
   private final VenueService venueService;
   private final ConcertService concertService;
+
   /**
    * The {@link StaleReadService} is a generic service that can be used to execute workloads using
    * stale reads. Stale reads can perform better than strong reads. See <a
@@ -74,6 +77,8 @@ public class SampleApplication implements CommandLineRunner {
   private final StaleReadService staleReadService;
 
   private final ConcertRepository concertRepository;
+  
+  private final LobTestRepository lobTestRepository;
 
   public SampleApplication(
       SingerService singerService,
@@ -82,7 +87,8 @@ public class SampleApplication implements CommandLineRunner {
       VenueService venueService,
       ConcertService concertService,
       StaleReadService staleReadService,
-      ConcertRepository concertRepository) {
+      ConcertRepository concertRepository,
+      LobTestRepository lobTestRepository) {
     this.singerService = singerService;
     this.albumService = albumService;
     this.trackService = trackService;
@@ -90,6 +96,7 @@ public class SampleApplication implements CommandLineRunner {
     this.concertService = concertService;
     this.staleReadService = staleReadService;
     this.concertRepository = concertRepository;
+    this.lobTestRepository = lobTestRepository;
   }
 
   public static void main(String[] args) {
@@ -98,6 +105,11 @@ public class SampleApplication implements CommandLineRunner {
 
   @Override
   public void run(String... args) {
+    LobTest test = new LobTest();
+    test.setLobBytea(new byte[] {1,2,3});
+    // test.setLobOid(new byte[] {1,2,3});
+    lobTestRepository.save(test);
+    
     // First clear the current tables.
     log.info("Deleting all existing data");
     concertService.deleteAllConcerts();
@@ -107,19 +119,19 @@ public class SampleApplication implements CommandLineRunner {
     // Generate some random data.
     singerService.generateRandomSingers(10);
     log.info("Created 10 singers");
-    albumService.generateRandomAlbums(30);
-    log.info("Created 30 albums");
-    trackService.generateRandomTracks(30, 15);
-    log.info("Created 20 tracks each for 30 albums");
-    venueService.generateRandomVenues(20);
-    log.info("Created 20 venues");
-    concertService.generateRandomConcerts(50);
-    log.info("Created 50 concerts");
-
-    // Print some of the randomly inserted data.
-    printData();
-    // Show how to do a stale read.
-    staleRead();
+//    albumService.generateRandomAlbums(30);
+//    log.info("Created 30 albums");
+//    trackService.generateRandomTracks(30, 15);
+//    log.info("Created 20 tracks each for 30 albums");
+//    venueService.generateRandomVenues(20);
+//    log.info("Created 20 venues");
+//    concertService.generateRandomConcerts(50);
+//    log.info("Created 50 concerts");
+//
+//    // Print some of the randomly inserted data.
+//    printData();
+//    // Show how to do a stale read.
+//    staleRead();
   }
 
   void printData() {

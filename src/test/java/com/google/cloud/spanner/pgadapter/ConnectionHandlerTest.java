@@ -48,6 +48,9 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.opencensus.trace.AttributeValue;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -56,6 +59,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -65,6 +70,17 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ConnectionHandlerTest {
+  
+  @Test
+  public void testCast() {
+    Long foo = null;
+    Map<String, Object> map = Collections.singletonMap("foo", foo);
+    String bar = (String) map.get("foo");
+    assertNull(bar);
+    AttributeValue.stringAttributeValue(null);
+    AttributesBuilder builder = Attributes.builder();
+    builder.put("key", (String) null);
+  }
 
   @Test
   public void testRegisterStatement() {

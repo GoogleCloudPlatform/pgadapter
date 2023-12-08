@@ -10,6 +10,7 @@ create table singers (
              WHEN last_name IS NULL THEN first_name
              ELSE first_name || ' ' || last_name
             END) stored,
+    description text,
     active boolean,
     created_at timestamptz,
     updated_at timestamptz
