@@ -63,6 +63,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.PGProperty;
+import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
@@ -324,6 +325,41 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
       assertEquals(
           "ERROR: prepared statement my_prepared_statement does not exist",
           sqlException.getMessage());
+    }
+  }
+
+  @Test
+  public void testPrepareInvalidStatement() throws SQLException {
+    // Register an error for an invalid statement.
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of("SELECT"),
+            Status.INVALID_ARGUMENT
+                .withDescription("Statement must produce at least one output column")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      // Try to create a prepared statement using the invalid SELECT statement.
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection.createStatement().execute("prepare my_prepared_statement as SELECT"));
+      assertTrue(
+          exception.getMessage().contains("Statement must produce at least one output column"));
+
+      // Verify that we can create a prepared statement with the same name without having to drop it
+      // first.
+      connection.createStatement().execute("prepare my_prepared_statement as SELECT 1");
+      // Verify that we can now use the prepared statement.
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertTrue(statement.execute("execute my_prepared_statement"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
     }
   }
 
