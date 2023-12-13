@@ -320,7 +320,7 @@ public class ArrayParser extends Parser<List<?>> {
       arrayStream.write(IntegerParser.binaryParse(1)); // Set null flag
       arrayStream.write(IntegerParser.binaryParse(Parser.toOid(this.arrayElementType))); // Set type
       arrayStream.write(IntegerParser.binaryParse(this.item.size())); // Set array length
-      arrayStream.write(IntegerParser.binaryParse(0)); // Lower bound (?)
+      arrayStream.write(IntegerParser.binaryParse(1)); // Lower bound of 1 by default
       for (Object currentItem : this.item) {
         if (currentItem == null) {
           arrayStream.write(IntegerParser.binaryParse(-1));
