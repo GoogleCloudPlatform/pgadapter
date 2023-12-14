@@ -10,7 +10,7 @@
    },
    "dependencies": {
       "typeorm": "0.3.17",
-      "reflect-metadata": "^0.1.13",
+      "reflect-metadata": "^0.2.0",
       "pg": "^8.9.0",
       "yargs": "^17.5.1"
    },
