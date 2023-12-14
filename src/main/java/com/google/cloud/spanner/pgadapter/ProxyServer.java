@@ -325,7 +325,9 @@ public class ProxyServer extends AbstractApiService {
     socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
-    handler.start();
+    Thread thread = Thread.startVirtualThread(handler);
+    handler.setThread(thread);
+    // handler.start();
   }
 
   /** Returns an immutable copy of the current connection handlers at this server. */
