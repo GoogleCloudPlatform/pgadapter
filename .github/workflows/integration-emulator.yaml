@@ -40,7 +40,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: 17
+          java-version: 21
       - run: java -version
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -65,7 +65,15 @@ jobs:
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run integration tests
-        run: mvn verify -B -Dclirr.skip=true -DskipUnits=true -DskipITs=false
+        run: mvn clean verify -B -Dclirr.skip=true -DskipUnits=true -DskipITs=false
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
+          SPANNER_EMULATOR_HOST: localhost:9010
+      - name: Run integration tests using JDK21 build
+        run: mvn clean verify -Pjdk21 -B -Dclirr.skip=true -DskipUnits=true -DskipITs=false
         env:
           POSTGRES_HOST: /pg
           POSTGRES_PORT: 5432

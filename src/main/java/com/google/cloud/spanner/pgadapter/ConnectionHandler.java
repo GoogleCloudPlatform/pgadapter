@@ -169,6 +169,10 @@ public class ConnectionHandler implements Runnable {
     this.spannerConnection = spannerConnection;
   }
 
+  void start() {
+    thread.start();
+  }
+
   String getName() {
     return name;
   }

@@ -80,6 +80,8 @@ public class ProxyServer extends AbstractApiService {
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
+  private final ConnectionThreadBuilder connectionThreadBuilder;
+
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
    *
@@ -115,7 +117,20 @@ public class ProxyServer extends AbstractApiService {
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
+    this.connectionThreadBuilder = createConnectionThreadBuilder();
     addConnectionProperties();
+  }
+
+  static ConnectionThreadBuilder createConnectionThreadBuilder() {
+    try {
+      //noinspection unchecked
+      Class<? extends ConnectionThreadBuilder> clazz =
+          (Class<? extends ConnectionThreadBuilder>)
+              Class.forName("com.google.cloud.spanner.pgadapter.ConnectionThreadBuilderJdk21");
+      return clazz.getConstructor().newInstance();
+    } catch (Exception ignore) {
+      return new ConnectionThreadBuilderJdk8();
+    }
   }
 
   private void addConnectionProperties() {
@@ -325,9 +340,9 @@ public class ProxyServer extends AbstractApiService {
     socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
-    Thread thread = Thread.startVirtualThread(handler);
+    Thread thread = connectionThreadBuilder.createConnectionHandlerThread(handler);
     handler.setThread(thread);
-    // handler.start();
+    handler.start();
   }
 
   /** Returns an immutable copy of the current connection handlers at this server. */

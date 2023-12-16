@@ -122,12 +122,17 @@ public class OptionsMetadataTest {
   public void testBuildConnectionUrlWithFullPath() {
     assertEquals(
         "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;credentials=credentials.json",
-        new OptionsMetadata(new String[] {"-c", "credentials.json"})
+        new OptionsMetadata(
+                ImmutableMap.of(),
+                System.getProperty("os.name", ""),
+                new String[] {"-c", "credentials.json"})
             .buildConnectionURL(
                 "projects/test-project/instances/test-instance/databases/test-database"));
     assertEquals(
         "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;credentials=credentials.json",
         new OptionsMetadata(
+                ImmutableMap.of(),
+                System.getProperty("os.name", ""),
                 new String[] {
                   "-p", "test-project", "-i", "test-instance", "-c", "credentials.json"
                 })
@@ -139,7 +144,11 @@ public class OptionsMetadataTest {
     SpannerException spannerException =
         assertThrows(
             SpannerException.class,
-            () -> new OptionsMetadata(new String[] {"-i", "my-instance", "-d", "my-db"}));
+            () ->
+                new OptionsMetadata(
+                    ImmutableMap.of(),
+                    System.getProperty("os.name", ""),
+                    new String[] {"-i", "my-instance", "-d", "my-db"}));
     assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
   }
 
@@ -155,7 +164,10 @@ public class OptionsMetadataTest {
   @Test
   public void testBuildConnectionUrlWithDefaultProjectId() {
     OptionsMetadata useDefaultProjectIdOptions =
-        new OptionsMetadata(new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name", ""),
+            new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
           @Override
           String getDefaultProjectId() {
             return "custom-test-project";
@@ -165,7 +177,10 @@ public class OptionsMetadataTest {
         "cloudspanner:/projects/custom-test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;credentials=credentials.json",
         useDefaultProjectIdOptions.buildConnectionURL("test-database"));
     OptionsMetadata noProjectIdOptions =
-        new OptionsMetadata(new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name", ""),
+            new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
           @Override
           String getDefaultProjectId() {
             return null;
@@ -180,7 +195,10 @@ public class OptionsMetadataTest {
   @Test
   public void testBuildConnectionUrlWithDefaultCredentials() {
     OptionsMetadata useDefaultCredentials =
-        new OptionsMetadata(new String[] {"-p", "test-project", "-i", "test-instance"}) {
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name", ""),
+            new String[] {"-p", "test-project", "-i", "test-instance"}) {
           @Override
           void tryGetDefaultCredentials() {}
         };
@@ -188,7 +206,10 @@ public class OptionsMetadataTest {
         "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter",
         useDefaultCredentials.buildConnectionURL("test-database"));
     OptionsMetadata noDefaultCredentialsOptions =
-        new OptionsMetadata(new String[] {"-p", "test-project", "-i", "test-instance"}) {
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name", ""),
+            new String[] {"-p", "test-project", "-i", "test-instance"}) {
           @Override
           void tryGetDefaultCredentials() throws IOException {
             throw new IOException("test exception");
@@ -206,7 +227,11 @@ public class OptionsMetadataTest {
     SpannerException exception =
         assertThrows(
             SpannerException.class,
-            () -> new OptionsMetadata(new String[] {"-c", "credentials.json", "-a"}));
+            () ->
+                new OptionsMetadata(
+                    ImmutableMap.of(),
+                    System.getProperty("os.name", ""),
+                    new String[] {"-c", "credentials.json", "-a"}));
     assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
   }
 
@@ -218,7 +243,11 @@ public class OptionsMetadataTest {
 
   @Test
   public void testCredentials() {
-    OptionsMetadata options = new OptionsMetadata(new String[] {"-c", "credentials.json"});
+    OptionsMetadata options =
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name", ""),
+            new String[] {"-c", "credentials.json"});
     assertFalse(options.shouldAuthenticate());
     assertEquals("credentials.json", options.buildCredentialsFile());
   }
