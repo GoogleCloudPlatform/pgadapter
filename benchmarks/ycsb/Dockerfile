@@ -22,7 +22,7 @@ FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
 
 RUN apt update && apt -y install postgresql-client
 RUN apt -y install wget
-RUN apt -y install python
+# RUN apt -y install python
 
 ADD https://download.java.net/java/GA/jdk21.0.1/415e3f918a1f4062a0074a2794853d0d/12/GPL/openjdk-21.0.1_linux-x64_bin.tar.gz /openjdk.tar.gz
 RUN tar xvfz /openjdk.tar.gz
