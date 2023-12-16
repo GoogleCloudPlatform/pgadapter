@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euox pipefail
 
+export JAVA_HOME=/usr/local/jdk-21.0.1
+export PATH=$PATH:$JAVA_HOME/bin
+
 echo "Starting Task #${CLOUD_RUN_TASK_INDEX}, Attempt #${CLOUD_RUN_TASK_ATTEMPT}..."
 EXECUTED_AT=`date +"%Y-%m-%dT%T"`
 
