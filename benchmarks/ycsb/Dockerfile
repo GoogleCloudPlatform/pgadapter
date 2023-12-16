@@ -26,7 +26,6 @@ RUN apt -y install wget
 
 ADD https://download.java.net/java/GA/jdk21.0.1/415e3f918a1f4062a0074a2794853d0d/12/GPL/openjdk-21.0.1_linux-x64_bin.tar.gz /openjdk.tar.gz
 RUN tar xvfz /openjdk.tar.gz
-RUN sudo mv jdk-21.0.1 /usr/local/
 
 COPY --from=build target/pgadapter /
 
