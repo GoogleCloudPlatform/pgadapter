@@ -157,19 +157,16 @@ This option is only available for Java/JVM-based applications.
 
 ```java
 class PGProxyRunner {
-    public static void main() {
-      String[] arguments =
-              new String[] {
-                      "-p",
-                      "my-project",
-                      "-i",
-                      "my-instance",
-                      "-d",
-                      "my-database",
-                      "-c",
-                      "/path/to/credentials.json"
-              };
-      ProxyServer server = new ProxyServer(new OptionsMetadata(arguments));
+  public static void main(String[] args) {
+      OptionsMetadata.Builder builder =
+          OptionsMetadata.newBuilder()
+              .setProject("my-project")
+              .setInstance("my-instance")
+              .setDatabase("my-database")
+              .setCredentialsFile("/path/to/credentials.json")
+              // Start PGAdapter on any available port.
+              .setPort(0);
+      ProxyServer server = new ProxyServer(builder.build());
       server.startServer();
       server.awaitRunning();
     }

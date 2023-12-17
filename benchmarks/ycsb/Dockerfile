@@ -18,7 +18,9 @@ RUN mvn package -Passembly -Pjdk21 -DskipTests
 
 
 # Docker image for the YCSB runner.
-FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+# We pin the version to 455.0.0, because YCSB requires Python 2.x, and this is the last
+# version of the gcloud-cli Docker image that supports Python 2.x.
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:455.0.0-slim
 
 RUN apt update && apt -y install postgresql-client
 RUN apt -y install wget
