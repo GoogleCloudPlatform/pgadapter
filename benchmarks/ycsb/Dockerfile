@@ -23,7 +23,7 @@ FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
 RUN apt update && apt -y install postgresql-client
 RUN apt -y install default-jre
 RUN apt -y install wget
-RUN apt -y install python
+RUN apt -y install python-is-python3
 
 COPY --from=build target/pgadapter /
 
