@@ -26,6 +26,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.Table;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.utils.RegexQueryPartReplacer;
 import com.google.common.base.Suppliers;
@@ -254,6 +255,12 @@ public class DdlExecutorTest {
         applyReplacers(
             ddlExecutorWithReplacements,
             "create table databasechangelog_replaced (id bigint primary key)"));
+  }
+
+  @Test
+  public void testTableComparison() {
+    assertEquals(1, new Table("public", "foo", "bar").compareTo(new Table("public", "baz", "foo")));
+    assertEquals(-1, new Table("public", "foo", "bar").compareTo(new Table("public", "bar", null)));
   }
 
   private String applyReplacers(DdlExecutor ddlExecutor, String sql) {
