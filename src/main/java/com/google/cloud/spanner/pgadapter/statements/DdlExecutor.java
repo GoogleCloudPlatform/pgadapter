@@ -383,7 +383,7 @@ class DdlExecutor {
     }
   }
 
-  private static final class Table implements Comparable<Table> {
+  static final class Table implements Comparable<Table> {
     private final String schema;
     private final String name;
     private final String parent;

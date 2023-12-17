@@ -123,7 +123,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           directory: ./target/site/jacoco-merged-test-coverage-report
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           flags: all_tests
           name: codecov-umbrella
           path_to_write_report: ./coverage/codecov_report.txt
