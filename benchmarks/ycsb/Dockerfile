@@ -25,7 +25,8 @@ RUN apt -y install default-jre
 RUN apt -y install wget
 RUN apt -y install python-is-python3
 
-COPY --from=build target/pgadapter /
+RUN mkdir "/pgadapter"
+COPY --from=build target/pgadapter /pgadapter
 
 ADD https://github.com/brianfrankcooper/YCSB/releases/download/0.17.0/ycsb-0.17.0.tar.gz /ycsb-0.17.0.tar.gz
 RUN tar xfvz ycsb-0.17.0.tar.gz

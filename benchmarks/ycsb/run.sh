@@ -10,6 +10,7 @@ if [[ "$DATABASES" != *"$SPANNER_DATABASE"* ]]; then
 fi
 SPANNER_PROJECT=$(gcloud --quiet config get project)
 
+cd pgadapter
 java -jar pgadapter.jar -p $SPANNER_PROJECT -i $SPANNER_INSTANCE -enable_otel -r="minSessions=1000;maxSessions=1000;numChannels=20" &
 sleep 6
 export PGDATABASE=$SPANNER_DATABASE
