@@ -1026,6 +1026,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataCatalogs() throws Exception {
+    skipOnEmulator("The emulator does not support pg_catalog.pg_database");
+
     runForAllVersions(
         (connection, version) -> {
           try {
