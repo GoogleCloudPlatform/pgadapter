@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgDescription.PG_DESCRIPTION_CTE_FORMAT;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Statement;
@@ -48,11 +50,17 @@ public class PgCatalog {
               new TableOrIndexName(null, "pg_namespace"),
               new TableOrIndexName(null, "pg_namespace"))
           .put(
-              new TableOrIndexName("pg_collation", "pg_collation"),
+              new TableOrIndexName("pg_catalog", "pg_collation"),
               new TableOrIndexName(null, "pg_collation"))
           .put(
               new TableOrIndexName(null, "pg_collation"),
               new TableOrIndexName(null, "pg_collation"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_description"),
+              new TableOrIndexName(null, "pg_description"))
+          .put(
+              new TableOrIndexName(null, "pg_description"),
+              new TableOrIndexName(null, "pg_description"))
           .put(
               new TableOrIndexName("pg_catalog", "pg_class"),
               new TableOrIndexName(null, "pg_class"))
@@ -73,12 +81,18 @@ public class PgCatalog {
           .put(
               new TableOrIndexName(null, "pg_constraint"),
               new TableOrIndexName(null, "pg_constraint"))
-          .put(new TableOrIndexName("pg_index", "pg_index"), new TableOrIndexName(null, "pg_index"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_index"),
+              new TableOrIndexName(null, "pg_index"))
           .put(new TableOrIndexName(null, "pg_index"), new TableOrIndexName(null, "pg_index"))
           .put(new TableOrIndexName("pg_catalog", "pg_proc"), new TableOrIndexName(null, "pg_proc"))
           .put(new TableOrIndexName(null, "pg_proc"), new TableOrIndexName(null, "pg_proc"))
           .put(new TableOrIndexName("pg_catalog", "pg_enum"), new TableOrIndexName(null, "pg_enum"))
           .put(new TableOrIndexName(null, "pg_enum"), new TableOrIndexName(null, "pg_enum"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_language"),
+              new TableOrIndexName(null, "pg_language"))
+          .put(new TableOrIndexName(null, "pg_language"), new TableOrIndexName(null, "pg_language"))
           .put(
               new TableOrIndexName("pg_catalog", "pg_range"),
               new TableOrIndexName(null, "pg_range"))
@@ -98,6 +112,9 @@ public class PgCatalog {
           .put(
               new TableOrIndexName("information_schema", "sequences"),
               new TableOrIndexName(null, "pg_information_schema_sequences"))
+          //          .put(
+          //              new TableOrIndexName("information_schema", "columns"),
+          //              new TableOrIndexName("information_schema", "columns"))
           .put(
               new TableOrIndexName("pg_catalog", "pg_extension"),
               new TableOrIndexName(null, "pg_extension"))
@@ -137,6 +154,7 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_collation"), new PgCollation())
           .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
           .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
+          .put(new TableOrIndexName(null, "pg_language"), new EmptyPgLanguage())
           .put(new TableOrIndexName(null, "pg_range"), new PgRange())
           .put(new TableOrIndexName(null, "pg_sequence"), new PgSequence())
           .put(new TableOrIndexName(null, "pg_sequences"), new PgSequences())
@@ -161,6 +179,7 @@ public class PgCatalog {
     ImmutableMap.Builder<TableOrIndexName, PgCatalogTable> pgCatalogTablesBuilder =
         ImmutableMap.<TableOrIndexName, PgCatalogTable>builder()
             .putAll(DEFAULT_PG_CATALOG_TABLES)
+            .put(new TableOrIndexName(null, "pg_description"), new PgDescription())
             .put(new TableOrIndexName(null, "pg_class"), new PgClass())
             .put(new TableOrIndexName(null, "pg_attribute"), new PgAttribute())
             .put(new TableOrIndexName(null, "pg_attrdef"), new PgAttrdef())
@@ -168,6 +187,7 @@ public class PgCatalog {
             .put(new TableOrIndexName(null, "pg_index"), new PgIndex())
             .put(new TableOrIndexName(null, "pg_type"), new PgType())
             .put(new TableOrIndexName(null, "pg_settings"), new PgSettings());
+    //            .put(new TableOrIndexName("information_schema", "columns"), new PgType());
     wellKnownClient
         .getPgCatalogTables()
         .forEach((k, v) -> pgCatalogTablesBuilder.put(TableOrIndexName.parse(k), v));
@@ -180,6 +200,10 @@ public class PgCatalog {
                 RegexQueryPartReplacer.replace(
                     Pattern.compile("version\\(\\)"),
                     () -> "'" + sessionState.getServerVersion() + "'"))
+            .add(
+                RegexQueryPartReplacer.replace(
+                    Pattern.compile("current_setting\\s*\\(\\s*'server_version_num'\\s*\\)"),
+                    () -> "'" + sessionState.getServerVersionNum() + "'"))
             .addAll(wellKnownClient.getQueryPartReplacements())
             .build();
   }
@@ -283,7 +307,6 @@ public class PgCatalog {
     return null;
   }
 
-  @InternalApi
   public interface PgCatalogTable {
     String getTableExpression();
 
@@ -320,6 +343,35 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_COLLATION_CTE;
+    }
+  }
+
+  // This is defined outside the PgDescription class, because Java 8 does not allow static
+  // initialization inside inner classes.
+  public static final String PG_DESCRIPTION_CTE =
+      String.format(PG_DESCRIPTION_CTE_FORMAT, "0::bigint", "0::bigint");
+  public static final String PG_DESCRIPTION_CTE_EMULATED =
+      String.format(PG_DESCRIPTION_CTE_FORMAT, "''::varchar", "''::varchar");
+
+  public class PgDescription implements PgCatalogTable {
+    static final String PG_DESCRIPTION_CTE_FORMAT =
+        "pg_description as (\n"
+            + "  select * from (\n"
+            + "    select %s as objoid, %s as classoid, 0::bigint as objsubid,\n"
+            + "           ''::text as description\n"
+            + "  ) t where false\n"
+            + ")";
+
+    @Override
+    public ImmutableSet<TableOrIndexName> getDependencies() {
+      return ImmutableSet.of(new TableOrIndexName(null, "pg_type"));
+    }
+
+    @Override
+    public String getTableExpression() {
+      return sessionState.isEmulatePgClassTables()
+          ? PG_DESCRIPTION_CTE_EMULATED
+          : PG_DESCRIPTION_CTE;
     }
   }
 
@@ -829,6 +881,22 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_ENUM_CTE;
+    }
+  }
+
+  @InternalApi
+  public static class EmptyPgLanguage implements PgCatalogTable {
+    private static final String PG_LANGUAGE_CTE =
+        "pg_language as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, ''::varchar as lanname, 0::bigint as lanowner, false as lanispl, "
+            + "false as lanpltrusted, 0::bigint as lanplcallfoid, 0::bigint as laninline, 0::bigint as lanvalidator, "
+            + "null::bigint[] as lanacl\n"
+            + ") l where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_LANGUAGE_CTE;
     }
   }
 

@@ -29,24 +29,50 @@ public interface NodeJSTest {
 
   static void installDependencies(String directory) throws IOException, InterruptedException {
     String currentPath = new java.io.File(".").getCanonicalPath();
-    String testFilePath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
+    String testDirectoryPath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
+    installDependencies(new File(testDirectoryPath));
+  }
+
+  static void installDependencies(File testDirectory) throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
-    builder.command("npm", "install");
-    builder.directory(new File(testFilePath));
+    builder.command("npm", "install", "--silent");
+    builder.directory(testDirectory);
 
     Process process = builder.start();
-    int res = process.waitFor();
-    assertEquals(0, res);
+    InputStream errorStream = process.getErrorStream();
+    process.waitFor();
+
+    String errors = readAll(errorStream);
+    assertEquals("", errors);
+    assertEquals(errors, 0, process.exitValue());
   }
 
   static String runTest(String directory, String testName, String host, int port, String database)
       throws IOException, InterruptedException {
     String currentPath = new java.io.File(".").getCanonicalPath();
     String testFilePath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
+    return runTest(new File(testFilePath), "start", testName, host, port, database, "");
+  }
+
+  static String runTest(
+      File directory,
+      String scriptName,
+      String testName,
+      String host,
+      int port,
+      String database,
+      String extraDatabaseUrlParameters)
+      throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(
-        "npm", "--silent", "start", testName, host, String.format("%d", port), database);
-    builder.directory(new File(testFilePath));
+        "npm", "--silent", scriptName, testName, host, String.format("%d", port), database);
+    builder.directory(directory);
+    builder
+        .environment()
+        .put(
+            "DATABASE_URL",
+            String.format(
+                "postgresql://localhost:%d/%s%s", port, database, extraDatabaseUrlParameters));
 
     Process process = builder.start();
     InputStream inputStream = process.getInputStream();
@@ -57,7 +83,7 @@ public interface NodeJSTest {
     String errors = readAll(errorStream);
     assertEquals("", errors);
     assertTrue(finished);
-    assertEquals(0, process.exitValue());
+    assertEquals(errors, 0, process.exitValue());
 
     return output;
   }

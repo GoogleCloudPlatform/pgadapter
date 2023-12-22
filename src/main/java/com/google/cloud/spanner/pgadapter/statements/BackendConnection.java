@@ -340,6 +340,7 @@ public class BackendConnection {
           if (analyze) {
             result.set(NO_RESULT);
           } else {
+
             result.set(ddlExecutor.execute(parsedStatement, statement));
           }
         } else {

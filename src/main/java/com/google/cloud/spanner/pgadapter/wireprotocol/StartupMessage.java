@@ -21,7 +21,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPasswordResponse;
-import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
@@ -74,10 +73,7 @@ public class StartupMessage extends BootstrapMessage {
       @Nullable Credentials credentials)
       throws Exception {
     connection.connectToSpanner(database, credentials);
-    for (Entry<String, String> parameter :
-        Iterables.concat(
-            connection.getWellKnownClient().getDefaultParameters(parameters).entrySet(),
-            parameters.entrySet())) {
+    for (Entry<String, String> parameter : parameters.entrySet()) {
       connection
           .getExtendedQueryProtocolHandler()
           .getBackendConnection()
@@ -93,6 +89,13 @@ public class StartupMessage extends BootstrapMessage {
                   .getSessionState()
                   .tryGet("spanner", "well_known_client"));
       connection.setWellKnownClient(wellKnownClient);
+    }
+    for (Entry<String, String> parameter :
+        connection.getWellKnownClient().getDefaultParameters(parameters).entrySet()) {
+      connection
+          .getExtendedQueryProtocolHandler()
+          .getBackendConnection()
+          .initSessionSetting(parameter.getKey(), parameter.getValue());
     }
     if (connection.getWellKnownClient() != WellKnownClient.UNSPECIFIED) {
       connection
