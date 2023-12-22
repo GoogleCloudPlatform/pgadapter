@@ -141,7 +141,7 @@
     <dependency>
       <groupId>com.google.cloud.opentelemetry</groupId>
       <artifactId>exporter-trace</artifactId>
-      <version>0.26.0</version>
+      <version>0.23.0</version>
     </dependency>
     <dependency>
       <groupId>org.jetbrains.kotlin</groupId>
