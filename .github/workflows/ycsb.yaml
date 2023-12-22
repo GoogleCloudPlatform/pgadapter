@@ -28,7 +28,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
       - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v0'
+        uses: 'google-github-actions/setup-gcloud@v2'
         with:
           export_default_credentials: true
           install_components: 'beta'
