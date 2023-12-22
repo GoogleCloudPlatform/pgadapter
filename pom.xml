@@ -76,7 +76,7 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-spanner-bom</artifactId>
-        <version>6.51.0</version>
+        <version>6.55.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
