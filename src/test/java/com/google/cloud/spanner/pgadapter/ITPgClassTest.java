@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.ITJdbcMetadataTest.getDdlStatem
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
@@ -171,8 +172,6 @@ public class ITPgClassTest implements IntegrationTest {
 
   @Test
   public void testPgIndex() throws SQLException {
-    skipOnEmulator("pg_index replacement query is not supported on the emulator");
-
     String sql =
         "select indexrelid, indrelid, indnatts, indnkeyatts, indisunique, "
             + "indnullsnotdistinct, indisprimary, indpred "
@@ -282,7 +281,12 @@ public class ITPgClassTest implements IntegrationTest {
               resultSet.getBoolean("indnullsnotdistinct"));
           assertEquals(
               expected.indexrelid, expected.indisprimary, resultSet.getBoolean("indisprimary"));
-          assertEquals(expected.indexrelid, expected.indpred, resultSet.getString("indpred"));
+          // TODO: Remove when the emulator supports indpred.
+          if (isRunningOnEmulator()) {
+            assertNull(expected.indexrelid, resultSet.getString("indpred"));
+          } else {
+            assertEquals(expected.indexrelid, expected.indpred, resultSet.getString("indpred"));
+          }
           index++;
         }
         assertEquals(index, expectedRows.size());
