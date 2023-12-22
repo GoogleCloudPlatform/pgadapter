@@ -290,8 +290,6 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testSelectWithParameters() throws SQLException {
-    skipOnEmulator("Casting jsonb to text is not supported on the emulator");
-
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
@@ -396,8 +394,6 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testInsertWithParameters() throws SQLException {
-    skipOnEmulator("jsonb[] is not fully supported on the emulator");
-
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement =
@@ -1120,10 +1116,8 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(namespaces.next());
         assertEquals("public", namespaces.getString(1));
         assertTrue(namespaces.next());
-        if (!isRunningOnEmulator()) {
-          assertEquals("pg_catalog", namespaces.getString(1));
-          assertTrue(namespaces.next());
-        }
+        assertEquals("pg_catalog", namespaces.getString(1));
+        assertTrue(namespaces.next());
         assertEquals("information_schema", namespaces.getString(1));
         assertTrue(namespaces.next());
         assertEquals("spanner_sys", namespaces.getString(1));
