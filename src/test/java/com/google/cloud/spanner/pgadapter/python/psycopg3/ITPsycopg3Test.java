@@ -448,7 +448,7 @@ public class ITPsycopg3Test implements IntegrationTest {
 
     String result = execute("batch_execution_error");
     assertTrue(result, result.contains("Executing batch failed with error"));
-    if (isRunningOnEmulator()) {
+    if (IntegrationTest.isRunningOnEmulator()) {
       assertTrue(
           result,
           result.contains(
@@ -563,7 +563,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_jsonb: None\n";
 
     String result = execute("binary_copy_out");
-    if (isRunningOnEmulator()) {
+    if (IntegrationTest.isRunningOnEmulator()) {
       assertEquals(row2 + row1, result);
     } else {
       assertEquals(row1 + row2, result);
@@ -619,7 +619,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_jsonb: None\n";
 
     String result = execute("text_copy_out");
-    if (isRunningOnEmulator()) {
+    if (IntegrationTest.isRunningOnEmulator()) {
       assertEquals(row2 + row1, result);
     } else {
       assertEquals(row1 + row2, result);

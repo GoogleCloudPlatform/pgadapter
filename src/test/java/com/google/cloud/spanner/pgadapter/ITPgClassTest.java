@@ -282,7 +282,7 @@ public class ITPgClassTest implements IntegrationTest {
           assertEquals(
               expected.indexrelid, expected.indisprimary, resultSet.getBoolean("indisprimary"));
           // TODO: Remove when the emulator supports indpred.
-          if (isRunningOnEmulator()) {
+          if (IntegrationTest.isRunningOnEmulator()) {
             assertNull(expected.indexrelid, resultSet.getString("indpred"));
           } else {
             assertEquals(expected.indexrelid, expected.indpred, resultSet.getString("indpred"));
@@ -616,7 +616,7 @@ public class ITPgClassTest implements IntegrationTest {
           assertEquals(expected.confdeltype, resultSet.getString("confdeltype"));
           assertEquals(expected.confmatchtype, resultSet.getString("confmatchtype"));
           // TODO: Remove check when we array_agg with order by is supported.
-          if (!isRunningOnEmulator()) {
+          if (!IntegrationTest.isRunningOnEmulator()) {
             assertArrayEquals(expected.conkey, (Long[]) resultSet.getArray("conkey").getArray());
           }
           assertArrayEquals(

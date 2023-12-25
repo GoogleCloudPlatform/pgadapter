@@ -886,7 +886,9 @@ public class ITJdbcTest implements IntegrationTest {
       // when it tries to delete all data using a normal transaction.
       connection
           .createStatement()
-          .execute("delete from all_types" + (isRunningOnEmulator() ? " where true" : ""));
+          .execute(
+              "delete from all_types"
+                  + (IntegrationTest.isRunningOnEmulator() ? " where true" : ""));
     }
   }
 
