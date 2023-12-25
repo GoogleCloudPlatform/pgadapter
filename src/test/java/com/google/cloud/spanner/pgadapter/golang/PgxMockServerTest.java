@@ -253,6 +253,16 @@ public class PgxMockServerTest extends AbstractMockServerTest {
           Oid.TIMESTAMPTZ,
           Oid.VARCHAR,
           Oid.JSONB,
+          Oid.INT8_ARRAY,
+          Oid.BOOL_ARRAY,
+          Oid.BYTEA_ARRAY,
+          Oid.FLOAT8_ARRAY,
+          Oid.INT4_ARRAY,
+          Oid.NUMERIC_ARRAY,
+          Oid.DATE_ARRAY,
+          Oid.TIMESTAMPTZ_ARRAY,
+          Oid.VARCHAR_ARRAY,
+          Oid.JSONB_ARRAY,
         }) {
       for (int format : new int[] {0, 1}) {
         String res = pgxTest.TestQueryAllDataTypes(createConnString(), oid, format);
@@ -261,8 +271,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
         // pgx by default always uses prepared statements. As this statement does not contain any
         // parameters, we don't need to describe the parameter types, so it is 'only' sent twice to
-        // the
-        // backend.
+        // the backend.
         assertEquals(2, requests.size());
         ExecuteSqlRequest describeRequest = requests.get(0);
         assertEquals(sql, describeRequest.getSql());

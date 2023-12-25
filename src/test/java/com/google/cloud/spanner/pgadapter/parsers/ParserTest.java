@@ -266,7 +266,7 @@ public class ParserTest {
     // https://github.com/GoogleCloudPlatform/pgadapter/pull/36
     // has been merged.
     byte[] byteResult = {
-      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4, 19, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0,
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4, 19, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0,
       3, 100, 101, 102, 0, 0, 0, 3, 106, 104, 105
     };
     byte[] stringResult = {
@@ -296,7 +296,7 @@ public class ParserTest {
     // https://github.com/GoogleCloudPlatform/pgadapter/pull/36
     // has been merged.
     byte[] byteResult = {
-      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
       1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 3
     };
     byte[] stringResult = {'{', '1', ',', '2', ',', '3', '}'};
