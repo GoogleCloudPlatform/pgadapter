@@ -40,13 +40,13 @@ jobs:
 
       # Upload the jar to Google Cloud Storage
       - id: 'upload-versioned-file'
-        uses: 'google-github-actions/upload-cloud-storage@v1'
+        uses: 'google-github-actions/upload-cloud-storage@v2'
         with:
           path: ${{ env.uber_jar }}
           destination: 'pgadapter-jar-releases'
           parent: false
       - id: 'overwrite-current-file'
-        uses: 'google-github-actions/upload-cloud-storage@v1'
+        uses: 'google-github-actions/upload-cloud-storage@v2'
         with:
           path: ${{ env.uber_jar_current }}
           destination: 'pgadapter-jar-releases'

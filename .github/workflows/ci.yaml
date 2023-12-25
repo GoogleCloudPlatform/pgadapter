@@ -54,7 +54,7 @@ jobs:
       with:
         credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
     - id: 'setup-gcloud'
-      uses: google-github-actions/setup-gcloud@v1
+      uses: google-github-actions/setup-gcloud@v2
       with:
         project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
     - name: "Install gcloud alpha component"
@@ -83,7 +83,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
       - id: 'setup-gcloud'
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
       - name: "Install gcloud alpha component"
@@ -112,7 +112,7 @@ jobs:
       with:
         credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
     - id: 'setup-gcloud'
-      uses: google-github-actions/setup-gcloud@v1
+      uses: google-github-actions/setup-gcloud@v2
       with:
         project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
     - name: "Install gcloud alpha component"
@@ -141,7 +141,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
       - id: 'setup-gcloud'
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
       - name: "Install gcloud alpha component"
@@ -170,7 +170,7 @@ jobs:
       with:
         credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
     - id: 'setup-gcloud'
-      uses: google-github-actions/setup-gcloud@v1
+      uses: google-github-actions/setup-gcloud@v2
       with:
         project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
     - name: "Install gcloud alpha component"
@@ -199,7 +199,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
       - id: 'setup-gcloud'
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
       - name: "Install gcloud alpha component"
@@ -228,7 +228,7 @@ jobs:
       with:
         credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
     - id: 'setup-gcloud'
-      uses: google-github-actions/setup-gcloud@v1
+      uses: google-github-actions/setup-gcloud@v2
       with:
         project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
     - name: "Install gcloud alpha component"
@@ -257,7 +257,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
       - id: 'setup-gcloud'
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
       - name: "Install gcloud alpha component"

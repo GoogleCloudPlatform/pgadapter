@@ -43,11 +43,11 @@ jobs:
           java-version: 21
       - run: java -version
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '^1.17.7'
       - run: go version
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.9'
       - uses: actions/setup-node@v4

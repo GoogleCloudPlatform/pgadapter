@@ -177,8 +177,6 @@ public class ITPgxTest implements IntegrationTest {
 
   @Test
   public void testPrepareSelectStatement() {
-    skipOnEmulator("jsonb comparison is not yet supported on the emulator");
-
     assertNull(pgxTest.TestPrepareSelectStatement(createConnString()));
   }
 
