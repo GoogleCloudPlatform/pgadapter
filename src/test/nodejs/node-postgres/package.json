@@ -5,13 +5,13 @@
   "type": "commonjs",
   "devDependencies": {
     "@types/node": "^20.1.4",
-    "ts-node": "10.9.1",
-    "typescript": "5.3.2"
+    "ts-node": "10.9.2",
+    "typescript": "5.3.3"
   },
   "dependencies": {
     "pg": "^8.9.0",
     "pg-copy-streams": "^6.0.4",
-    "reflect-metadata": "^0.1.13",
+    "reflect-metadata": "^0.2.1",
     "yargs": "^17.5.1"
   },
   "scripts": {

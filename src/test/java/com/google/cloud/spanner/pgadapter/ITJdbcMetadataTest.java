@@ -378,8 +378,6 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataColumns() throws Exception {
-    skipOnEmulator("jsonb is not supported on the emulator in combination with the JDBC driver");
-
     runForAllVersions(
         (connection, version) -> {
           try {
@@ -497,8 +495,6 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataColumns_FilteredByName() throws Exception {
-    skipOnEmulator("jsonb is not supported on the emulator in combination with the JDBC driver");
-
     runForAllVersions(
         (connection, version) -> {
           try {
@@ -840,8 +836,6 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataTypeInfo() throws Exception {
-    skipOnEmulator("jsonb is not supported on the emulator in combination with the JDBC driver");
-
     runForAllVersions(
         (connection, version) -> {
           try {
@@ -1048,27 +1042,26 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataSchemas() throws Exception {
-    skipOnEmulator("Catalog name is not supported by emulator");
-
     runForAllVersions(
         (connection, version) -> {
           try {
+            String expectedCatalog = isRunningOnEmulator() ? "" : database.getId().getDatabase();
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet schemas = metadata.getSchemas()) {
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
               assertEquals("information_schema", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
               assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
               assertEquals("spanner_sys", schemas.getString("TABLE_SCHEM"));
 
               assertFalse(schemas.next());
@@ -1076,7 +1069,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
             try (ResultSet schemas = metadata.getSchemas(null, "public")) {
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertFalse(schemas.next());
