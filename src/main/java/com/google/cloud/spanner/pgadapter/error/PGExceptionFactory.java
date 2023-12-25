@@ -28,9 +28,13 @@ public class PGExceptionFactory {
   private static final Pattern RELATION_NOT_FOUND_PATTERN =
       Pattern.compile("relation .+ does not exist");
   private static final Pattern CANNOT_DROP_TABLE_WITH_INDICES_PATTERN =
-      Pattern.compile("Cannot drop table test with indices");
+      Pattern.compile("Cannot drop table .+ with indices");
   private static final Pattern ONLY_RESTRICT_BEHAVIOR =
       Pattern.compile("Only <RESTRICT> behavior is supported by <DROP> statement\\.");
+  private static final Pattern PK_VIOLATION_PATTERN =
+      Pattern.compile("Row .* in table .+ already exists");
+  private static final Pattern UNIQUE_INDEX_VIOLATION_PATTERN =
+      Pattern.compile("Unique index violation on index .+ at index key .+");
 
   private PGExceptionFactory() {}
 
@@ -90,6 +94,12 @@ public class PGExceptionFactory {
             && RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.UndefinedTable)
+          .build();
+    } else if (spannerException.getErrorCode() == ErrorCode.ALREADY_EXISTS
+        && (PK_VIOLATION_PATTERN.matcher(spannerException.getMessage()).find()
+            || UNIQUE_INDEX_VIOLATION_PATTERN.matcher(spannerException.getMessage()).find())) {
+      return PGException.newBuilder(extractMessage(spannerException))
+          .setSQLState(SQLState.UniqueViolation)
           .build();
     } else if ((spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
             || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
