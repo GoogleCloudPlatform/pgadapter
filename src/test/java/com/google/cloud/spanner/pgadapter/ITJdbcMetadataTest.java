@@ -1026,6 +1026,9 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataCatalogs() throws Exception {
+    skipOnEmulator(
+        "information_schema.information_schema_catalog_name is not supported on the emulator");
+
     runForAllVersions(
         (connection, version) -> {
           try {
