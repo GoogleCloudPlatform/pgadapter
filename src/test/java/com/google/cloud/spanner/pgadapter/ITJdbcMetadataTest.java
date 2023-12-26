@@ -1048,7 +1048,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
     runForAllVersions(
         (connection, version) -> {
           try {
-            String expectedCatalog = isRunningOnEmulator() ? "" : database.getId().getDatabase();
+            String expectedCatalog =
+                IntegrationTest.isRunningOnEmulator() ? "" : database.getId().getDatabase();
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet schemas = metadata.getSchemas()) {
               assertTrue(schemas.next());

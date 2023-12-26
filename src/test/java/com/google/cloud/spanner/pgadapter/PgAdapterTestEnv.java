@@ -179,16 +179,24 @@ public class PgAdapterTestEnv {
   }
 
   public void startPGAdapterServer(Iterable<String> additionalPGAdapterOptions) {
-    startPGAdapterServer(null, additionalPGAdapterOptions);
+    startPGAdapterServer(null, additionalPGAdapterOptions, OpenTelemetry.noop());
   }
 
   public void startPGAdapterServerWithDefaultDatabase(
       DatabaseId databaseId, Iterable<String> additionalPGAdapterOptions) {
-    startPGAdapterServer(databaseId.getDatabase(), additionalPGAdapterOptions);
+    startPGAdapterServer(
+        databaseId.getDatabase(), additionalPGAdapterOptions, OpenTelemetry.noop());
+  }
+
+  public void startPGAdapterServerWithDefaultDatabase(
+      DatabaseId databaseId,
+      Iterable<String> additionalPGAdapterOptions,
+      OpenTelemetry openTelemetry) {
+    startPGAdapterServer(databaseId.getDatabase(), additionalPGAdapterOptions, openTelemetry);
   }
 
   private void startPGAdapterServer(
-      String databaseId, Iterable<String> additionalPGAdapterOptions) {
+      String databaseId, Iterable<String> additionalPGAdapterOptions, OpenTelemetry openTelemetry) {
     if (PG_ADAPTER_ADDRESS == null) {
       additionalPGAdapterOptions = maybeAddAutoConfigEmulator(additionalPGAdapterOptions);
       String credentials = getCredentials();
@@ -210,7 +218,7 @@ public class PgAdapterTestEnv {
       }
       argsListBuilder.addAll(additionalPGAdapterOptions);
       String[] args = argsListBuilder.build().toArray(new String[0]);
-      server = new ProxyServer(new OptionsMetadata(args), OpenTelemetry.noop());
+      server = new ProxyServer(new OptionsMetadata(args), openTelemetry);
       server.startServer();
     }
   }
