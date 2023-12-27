@@ -320,7 +320,9 @@ public class ArrayParser extends Parser<List<?>> {
       arrayStream.write(IntegerParser.binaryParse(1)); // Set null flag
       arrayStream.write(IntegerParser.binaryParse(Parser.toOid(this.arrayElementType))); // Set type
       arrayStream.write(IntegerParser.binaryParse(this.item.size())); // Set array length
-      arrayStream.write(IntegerParser.binaryParse(0)); // Lower bound (?)
+      // Use lower bound 1 for all arrays. This is the only possible value in the text format, as
+      // it does not have a field for the lower bound. It is also the default that is used by PG.
+      arrayStream.write(IntegerParser.binaryParse(1)); // Lower bound.
       for (Object currentItem : this.item) {
         if (currentItem == null) {
           arrayStream.write(IntegerParser.binaryParse(-1));

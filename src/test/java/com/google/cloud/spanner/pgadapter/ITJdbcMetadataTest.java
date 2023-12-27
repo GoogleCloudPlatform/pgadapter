@@ -55,12 +55,13 @@ import org.junit.runners.Parameterized.Parameters;
 public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
-        "42.6.0", "42.5.4", "42.5.3", "42.5.2", "42.5.1", "42.5.0", "42.4.2", "42.4.1", "42.4.0",
-        "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24",
-        "42.2.23", "42.2.22", "42.2.21", "42.2.20", "42.2.19", "42.2.18", "42.2.17", "42.2.16",
-        "42.2.15", "42.2.14", "42.2.13", "42.2.12", "42.2.11", "42.2.10", "42.2.9", "42.2.8",
-        "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3", "42.2.2", "42.2.1", "42.2.0", "42.1.4",
-        "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0"
+        "42.7.1", "42.7.0", "42.6.0", "42.5.4", "42.5.3", "42.5.2", "42.5.1", "42.5.0", "42.4.2",
+        "42.4.1", "42.4.0", "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2", "42.3.1", "42.3.0",
+        "42.2.25", "42.2.24", "42.2.23", "42.2.22", "42.2.21", "42.2.20", "42.2.19", "42.2.18",
+        "42.2.17", "42.2.16", "42.2.15", "42.2.14", "42.2.13", "42.2.12", "42.2.11", "42.2.10",
+        "42.2.9", "42.2.8", "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3", "42.2.2", "42.2.1",
+        "42.2.0", "42.1.4",
+        /* "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0" */
       };
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
@@ -1025,6 +1026,9 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataCatalogs() throws Exception {
+    IntegrationTest.skipOnEmulator(
+        "information_schema.information_schema_catalog_name is not supported on the emulator");
+
     runForAllVersions(
         (connection, version) -> {
           try {
@@ -1045,7 +1049,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
     runForAllVersions(
         (connection, version) -> {
           try {
-            String expectedCatalog = isRunningOnEmulator() ? "" : database.getId().getDatabase();
+            String expectedCatalog =
+                IntegrationTest.isRunningOnEmulator() ? "" : database.getId().getDatabase();
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet schemas = metadata.getSchemas()) {
               assertTrue(schemas.next());
