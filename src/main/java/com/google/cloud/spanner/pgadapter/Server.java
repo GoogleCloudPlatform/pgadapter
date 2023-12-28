@@ -24,6 +24,7 @@ import com.google.devtools.cloudtrace.v2.TruncatableString;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.io.File;
 import java.io.FileReader;
@@ -94,7 +95,7 @@ public class Server {
                           .build())
                   .build()));
       TraceConfiguration configuration = builder.build();
-      TraceExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
+      SpanExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
       Sampler sampler;
       if (optionsMetadata.getOpenTelemetryTraceRatio() == null) {
         sampler = Sampler.parentBased(Sampler.traceIdRatioBased(0.05d));

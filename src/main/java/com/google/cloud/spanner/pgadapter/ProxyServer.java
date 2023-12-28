@@ -27,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -322,6 +323,9 @@ public class ProxyServer extends AbstractApiService {
                   serverSocket, e));
     } finally {
       logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocket));
+      if (openTelemetry instanceof Closeable) {
+        ((Closeable) openTelemetry).close();
+      }
       stoppedLatch.countDown();
     }
   }
