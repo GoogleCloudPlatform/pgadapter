@@ -58,6 +58,47 @@ public class PGExceptionFactoryTest {
                 SpannerExceptionFactory.newSpannerException(
                     ErrorCode.ABORTED, "The transaction was aborted"))
             .getSQLState());
+    assertEquals(
+        SQLState.UniqueViolation,
+        toPGException(
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.ALREADY_EXISTS, "Row [1] in table \"test\" already exists."))
+            .getSQLState());
+    assertEquals(
+        SQLState.UniqueViolation,
+        toPGException(
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.ALREADY_EXISTS,
+                    "Failed to insert row with primary key [1] due to previously existing row"))
+            .getSQLState());
+    assertEquals(
+        SQLState.UniqueViolation,
+        toPGException(
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.ALREADY_EXISTS,
+                    "Unique index violation on index my_unique_index at index key [1]"))
+            .getSQLState());
+    assertEquals(
+        SQLState.UniqueViolation,
+        toPGException(
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.ALREADY_EXISTS,
+                    "UNIQUE violation on index my_unique_index duplicate key: [1]"))
+            .getSQLState());
+    assertEquals(
+        SQLState.ForeignKeyViolation,
+        toPGException(
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.FAILED_PRECONDITION,
+                    "Foreign key constraint my_foreign_key is violated on table \"test\". Cannot find referenced values in \"referenced_table\""))
+            .getSQLState());
+    assertEquals(
+        SQLState.ForeignKeyViolation,
+        toPGException(
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.FAILED_PRECONDITION,
+                    "Foreign key my_foreign_key constraint violation on table \"test\". Cannot find referenced key [1] in table \"referenced_table\""))
+            .getSQLState());
   }
 
   @Test

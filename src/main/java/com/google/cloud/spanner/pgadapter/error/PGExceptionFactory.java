@@ -34,7 +34,7 @@ public class PGExceptionFactory {
   private static final Pattern ONLY_RESTRICT_BEHAVIOR =
       Pattern.compile("Only <RESTRICT> behavior is supported by <DROP> statement\\.");
   private static final Pattern PK_VIOLATION_PATTERN =
-      Pattern.compile("Row .* in table .+ already exists");
+      Pattern.compile("Row .+ in table .+ already exists");
   private static final Pattern PK_VIOLATION_PATTERN_EMULATOR =
       Pattern.compile("Failed to insert row with primary key .+ due to previously existing row");
   private static final Pattern UNIQUE_INDEX_VIOLATION_PATTERN =
