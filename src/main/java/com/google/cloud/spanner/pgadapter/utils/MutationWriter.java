@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.ProxyServer.createThreadFactory;
+
 import com.google.api.core.ApiFuture;
 import com.google.api.core.ApiFutures;
 import com.google.api.core.InternalApi;
@@ -64,6 +66,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -97,6 +100,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
 
   private static final Logger logger = Logger.getLogger(MutationWriter.class.getName());
 
+  private static final ThreadFactory THREAD_FACTORY = createThreadFactory("copy-worker");
+
   private final CopyTransactionMode transactionMode;
   private long rowCount;
   private final Connection connection;
@@ -117,7 +122,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final AtomicBoolean rollback = new AtomicBoolean(false);
   private final CountDownLatch closedLatch = new CountDownLatch(1);
   private final ListeningExecutorService executorService =
-      MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
+      MoreExecutors.listeningDecorator(Executors.newCachedThreadPool(THREAD_FACTORY));
 
   private final Object lock = new Object();
 

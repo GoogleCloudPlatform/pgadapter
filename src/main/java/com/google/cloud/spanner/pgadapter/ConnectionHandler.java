@@ -63,7 +63,6 @@ import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -84,9 +83,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -122,7 +119,6 @@ public class ConnectionHandler implements Runnable {
   private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
       new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
-  private final String name;
   private Thread thread;
   private final int connectionId;
   private final int secret;
@@ -157,18 +153,11 @@ public class ConnectionHandler implements Runnable {
   /** Constructor only for testing. */
   @VisibleForTesting
   ConnectionHandler(ProxyServer server, Socket socket, Connection spannerConnection) {
-    this.name = "ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet();
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
     this.connectionId = incrementingConnectionId.incrementAndGet();
     CONNECTION_HANDLERS.put(this.connectionId, this);
-    logger.log(
-        Level.INFO,
-        () ->
-            String.format(
-                "Connection handler with ID %s created for client %s",
-                getName(), socket.getInetAddress().getHostAddress()));
     this.spannerConnection = spannerConnection;
   }
 
@@ -177,7 +166,7 @@ public class ConnectionHandler implements Runnable {
   }
 
   String getName() {
-    return name;
+    return thread.getName();
   }
 
   Thread getThread() {
@@ -186,6 +175,12 @@ public class ConnectionHandler implements Runnable {
 
   void setThread(Thread thread) {
     this.thread = thread;
+    logger.log(
+        Level.INFO,
+        () ->
+            String.format(
+                "Connection handler with ID %s created for client %s",
+                getName(), socket.getInetAddress().getHostAddress()));
   }
 
   void createSSLSocket() throws IOException {
@@ -198,7 +193,6 @@ public class ConnectionHandler implements Runnable {
     OptionsMetadata options = getServer().getOptions();
     String uri = buildConnectionURL(database, options, getServer().getProperties());
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
-    connectionOptionsBuilder.setThreadFactory(Thread.ofVirtual().factory());
     if (credentials != null) {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);

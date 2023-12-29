@@ -18,7 +18,7 @@ COPY java.header ./
 RUN mvn dependency:go-offline
 
 # Build from source.
-RUN mvn package -Passembly -Pjdk21 -DskipTests
+RUN mvn package -Passembly -DskipTests
 
 ################################################################################
 #                                   RELEASE                                    #

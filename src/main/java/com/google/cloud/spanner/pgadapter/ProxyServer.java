@@ -26,10 +26,13 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentelemetry.api.OpenTelemetry;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -41,6 +44,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -81,7 +85,7 @@ public class ProxyServer extends AbstractApiService {
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
-  private final ConnectionThreadBuilder connectionThreadBuilder;
+  private final ThreadFactory threadFactory;
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -118,19 +122,32 @@ public class ProxyServer extends AbstractApiService {
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
-    this.connectionThreadBuilder = createConnectionThreadBuilder();
+    this.threadFactory = createThreadFactory("ConnectionHandler");
     addConnectionProperties();
   }
 
-  static ConnectionThreadBuilder createConnectionThreadBuilder() {
+  public static ThreadFactory createThreadFactory(String baseNameFormat) {
+    ThreadFactory virtualThreadFactory = tryCreateVirtualThreadFactory(baseNameFormat);
+    if (virtualThreadFactory != null) {
+      return virtualThreadFactory;
+    }
+
+    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(baseNameFormat + "-%d").build();
+  }
+
+  static ThreadFactory tryCreateVirtualThreadFactory(String baseNameFormat) {
     try {
-      //noinspection unchecked
-      Class<? extends ConnectionThreadBuilder> clazz =
-          (Class<? extends ConnectionThreadBuilder>)
-              Class.forName("com.google.cloud.spanner.pgadapter.ConnectionThreadBuilderJdk21");
-      return clazz.getConstructor().newInstance();
-    } catch (Exception ignore) {
-      return new ConnectionThreadBuilderJdk8();
+      Class<?> threadBuilderClass = Class.forName("java.lang.Thread$Builder");
+      Method ofVirtualMethod = Thread.class.getDeclaredMethod("ofVirtual");
+      Object virtualBuilder = ofVirtualMethod.invoke(null);
+      Method nameMethod = threadBuilderClass.getDeclaredMethod("name", String.class, long.class);
+      virtualBuilder = nameMethod.invoke(virtualBuilder, baseNameFormat + "-", 0);
+      Method factoryMethod = threadBuilderClass.getDeclaredMethod("factory");
+      return (ThreadFactory) factoryMethod.invoke(virtualBuilder);
+    } catch (ClassNotFoundException | NoSuchMethodException ignore) {
+      return null;
+    } catch (InvocationTargetException | IllegalAccessException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -344,7 +361,8 @@ public class ProxyServer extends AbstractApiService {
     socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
-    Thread thread = connectionThreadBuilder.createConnectionHandlerThread(handler);
+    // Thread thread = connectionThreadBuilder.createConnectionHandlerThread(handler);
+    Thread thread = threadFactory.newThread(handler);
     handler.setThread(thread);
     handler.start();
   }
