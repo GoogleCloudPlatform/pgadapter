@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.28.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.27.1...v0.28.0) (2023-12-29)
+
+
+### Features
+
+* translate integrity constraint error codes ([#1266](https://github.com/GoogleCloudPlatform/pgadapter/issues/1266)) ([9d1ed5a](https://github.com/GoogleCloudPlatform/pgadapter/commit/9d1ed5a59b4198d31c39eefd30f7db15c15f4747))
+
+
+### Bug Fixes
+
+* support pg_database ([#1308](https://github.com/GoogleCloudPlatform/pgadapter/issues/1308)) ([55d1aac](https://github.com/GoogleCloudPlatform/pgadapter/commit/55d1aacc8fd2ae80051e17c1fee0881f06285576))
+* update ycsb service account ([#1309](https://github.com/GoogleCloudPlatform/pgadapter/issues/1309)) ([771028b](https://github.com/GoogleCloudPlatform/pgadapter/commit/771028bc5498e88fcc4c4582d8647d1dac6fc2f5))
+* use array lower bound 1 by default ([#1302](https://github.com/GoogleCloudPlatform/pgadapter/issues/1302)) ([78e01fa](https://github.com/GoogleCloudPlatform/pgadapter/commit/78e01fa93980923801b9688df93fda0ea8f495b0))
+
+
+### Dependencies
+
+* use libraries bom for google cloud deps ([#1301](https://github.com/GoogleCloudPlatform/pgadapter/issues/1301)) ([4575b29](https://github.com/GoogleCloudPlatform/pgadapter/commit/4575b29943de6ba3f9765a817dc5dcf33a438075))
+
+
+### Documentation
+
+* simplify the in-process sample ([#1273](https://github.com/GoogleCloudPlatform/pgadapter/issues/1273)) ([f8b3c9f](https://github.com/GoogleCloudPlatform/pgadapter/commit/f8b3c9f15339c9172caf614763f55944e095d201))
+
 ## [0.27.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.27.0...v0.27.1) (2023-11-23)
 
 
