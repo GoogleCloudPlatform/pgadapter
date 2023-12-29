@@ -77,36 +77,14 @@ public class ITErrorsTest implements IntegrationTest {
 
   @Test
   public void testTableNotFound() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
-      PSQLException exception =
-          assertThrows(
-              PSQLException.class,
-              () ->
-                  connection
-                      .createStatement()
-                      .executeUpdate("insert into my_non_existing_table (id, ref) values (1, 1)"));
-      assertNotNull(exception.getServerErrorMessage());
-      assertEquals(
-          SQLState.UndefinedTable.toString(), exception.getServerErrorMessage().getSQLState());
-      assertEquals(SQLState.UndefinedTable.toString(), exception.getSQLState());
-    }
+    verifyExpectedSQLState(
+        "insert into my_non_existing_table (id, ref) values (1, 1)", SQLState.UndefinedTable);
   }
 
   @Test
   public void testColumnNotFound() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
-      PSQLException exception =
-          assertThrows(
-              PSQLException.class,
-              () ->
-                  connection
-                      .createStatement()
-                      .executeUpdate("insert into my_other_table (id, ref) values (1, 1)"));
-      assertNotNull(exception.getServerErrorMessage());
-      assertEquals(
-          SQLState.UndefinedColumn.toString(), exception.getServerErrorMessage().getSQLState());
-      assertEquals(SQLState.UndefinedColumn.toString(), exception.getSQLState());
-    }
+    verifyExpectedSQLState(
+        "insert into my_other_table (id, ref) values (1, 1)", SQLState.UndefinedColumn);
   }
 
   @Test
@@ -117,18 +95,9 @@ public class ITErrorsTest implements IntegrationTest {
           connection
               .createStatement()
               .executeUpdate("insert into my_table (id, value) values (1, 'One')"));
-      PSQLException exception =
-          assertThrows(
-              PSQLException.class,
-              () ->
-                  connection
-                      .createStatement()
-                      .executeUpdate("insert into my_table (id, value) values (1, 'Other one')"));
-      assertNotNull(exception.getServerErrorMessage());
-      assertEquals(
-          SQLState.UniqueViolation.toString(), exception.getServerErrorMessage().getSQLState());
-      assertEquals(SQLState.UniqueViolation.toString(), exception.getSQLState());
     }
+    verifyExpectedSQLState(
+        "insert into my_table (id, value) values (1, 'Other one')", SQLState.UniqueViolation);
   }
 
   @Test
@@ -139,34 +108,24 @@ public class ITErrorsTest implements IntegrationTest {
           connection
               .createStatement()
               .executeUpdate("insert into my_table (id, value) values (1, 'One')"));
-      PSQLException exception =
-          assertThrows(
-              PSQLException.class,
-              () ->
-                  connection
-                      .createStatement()
-                      .executeUpdate("insert into my_table (id, value) values (2, 'One')"));
-      assertNotNull(exception.getServerErrorMessage());
-      assertEquals(
-          SQLState.UniqueViolation.toString(), exception.getServerErrorMessage().getSQLState());
-      assertEquals(SQLState.UniqueViolation.toString(), exception.getSQLState());
     }
+    verifyExpectedSQLState(
+        "insert into my_table (id, value) values (2, 'One')", SQLState.UniqueViolation);
   }
 
   @Test
   public void testForeignKeyConstraintViolation() throws SQLException {
+    verifyExpectedSQLState(
+        "insert into my_other_table (id, my_table_id) values (1, 1)", SQLState.ForeignKeyViolation);
+  }
+
+  private void verifyExpectedSQLState(String sql, SQLState expectedSQLState) throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       PSQLException exception =
-          assertThrows(
-              PSQLException.class,
-              () ->
-                  connection
-                      .createStatement()
-                      .executeUpdate("insert into my_other_table (id, my_table_id) values (1, 1)"));
+          assertThrows(PSQLException.class, () -> connection.createStatement().executeUpdate(sql));
       assertNotNull(exception.getServerErrorMessage());
-      assertEquals(
-          SQLState.ForeignKeyViolation.toString(), exception.getServerErrorMessage().getSQLState());
-      assertEquals(SQLState.ForeignKeyViolation.toString(), exception.getSQLState());
+      assertEquals(expectedSQLState.toString(), exception.getServerErrorMessage().getSQLState());
+      assertEquals(expectedSQLState.toString(), exception.getSQLState());
     }
   }
 }
