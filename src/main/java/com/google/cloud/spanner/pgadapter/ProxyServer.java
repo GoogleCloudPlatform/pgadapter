@@ -41,7 +41,6 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -137,9 +136,6 @@ public class ProxyServer extends AbstractApiService {
   }
 
   static ThreadFactory tryCreateVirtualThreadFactory(String baseNameFormat) {
-    if (Objects.equals("true", System.getProperty("pgadapter.disable_virtual_threads"))) {
-      return null;
-    }
     try {
       Class<?> threadBuilderClass = Class.forName("java.lang.Thread$Builder");
       Method ofVirtualMethod = Thread.class.getDeclaredMethod("ofVirtual");
