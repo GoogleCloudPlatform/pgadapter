@@ -107,7 +107,7 @@ jobs:
       - name: Run unit tests
         run: mvn test -B -Ptest-all
       - name: Run unit tests without virtual threads
-        run: mvn test -B
+        run: mvn test -B -Dpgadapter.disable_virtual_threads=true
       - name: Auth
         uses: google-github-actions/auth@v2
         with:
