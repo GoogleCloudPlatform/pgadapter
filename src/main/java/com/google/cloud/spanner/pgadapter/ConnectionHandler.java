@@ -63,6 +63,7 @@ import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -83,7 +84,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -195,6 +198,7 @@ public class ConnectionHandler implements Runnable {
     OptionsMetadata options = getServer().getOptions();
     String uri = buildConnectionURL(database, options, getServer().getProperties());
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
+    connectionOptionsBuilder.setThreadFactory(Thread.ofVirtual().factory());
     if (credentials != null) {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
