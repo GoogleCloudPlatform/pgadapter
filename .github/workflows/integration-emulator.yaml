@@ -12,6 +12,10 @@ env:
 jobs:
   integration-test-emulator:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [8, 11, 17, 21]
     # Add a PostgreSQL Docker container and the emulator.
     services:
       postgres:
@@ -40,7 +44,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: 21
+          java-version: ${{matrix.java}}
       - run: java -version
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -66,14 +70,6 @@ jobs:
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run integration tests
         run: mvn clean verify -B -Dclirr.skip=true -DskipUnits=true -DskipITs=false
-        env:
-          POSTGRES_HOST: /pg
-          POSTGRES_PORT: 5432
-          POSTGRES_USER: postgres
-          POSTGRES_DATABASE: pgadapter
-          SPANNER_EMULATOR_HOST: localhost:9010
-      - name: Run integration tests using JDK21 build
-        run: mvn clean verify -Pjdk21 -B -Dclirr.skip=true -DskipUnits=true -DskipITs=false
         env:
           POSTGRES_HOST: /pg
           POSTGRES_PORT: 5432
