@@ -44,6 +44,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -86,6 +88,8 @@ public class ProxyServer extends AbstractApiService {
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
   private final ThreadFactory threadFactory;
+
+  private final ExecutorService createConnectionHandlerExecutor = Executors.newSingleThreadExecutor();
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -136,6 +140,10 @@ public class ProxyServer extends AbstractApiService {
   }
 
   static ThreadFactory tryCreateVirtualThreadFactory(String baseNameFormat) {
+    if ("true".equals(System.getProperty("pgadapter.disable_virtual_threads"))) {
+      return null;
+    }
+
     try {
       Class<?> threadBuilderClass = Class.forName("java.lang.Thread$Builder");
       Method ofVirtualMethod = Thread.class.getDeclaredMethod("ofVirtual");
@@ -252,6 +260,7 @@ public class ProxyServer extends AbstractApiService {
       SpannerPool.closeSpannerPool();
     } catch (Throwable ignore) {
     }
+    createConnectionHandlerExecutor.shutdown();
     notifyStopped();
   }
 
@@ -328,7 +337,16 @@ public class ProxyServer extends AbstractApiService {
     awaitRunning();
     try {
       while (isRunning()) {
-        createConnectionHandler(serverSocket.accept());
+        Socket socket = serverSocket.accept();
+        // Hand off the creation of the connection handler to a worker thread to ensure that we
+        // continue to listen for new incoming connection requests as quickly as possible.
+        createConnectionHandlerExecutor.submit(() -> {
+          try {
+            createConnectionHandler(socket);
+          } catch (SocketException socketException) {
+            logger.log(Level.WARNING, () -> String.format("Failed to create connection on socket %s: %s.", socket, socketException));
+          }
+        });
       }
     } catch (SocketException e) {
       // This is a normal exception, as this will occur when Server#stopServer() is called.
@@ -361,7 +379,6 @@ public class ProxyServer extends AbstractApiService {
     socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
-    // Thread thread = connectionThreadBuilder.createConnectionHandlerThread(handler);
     Thread thread = threadFactory.newThread(handler);
     handler.setThread(thread);
     handler.start();

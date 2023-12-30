@@ -313,6 +313,11 @@ public class OptionsMetadata {
       return this;
     }
 
+    Builder disableDebugMode() {
+      this.debugMode = false;
+      return this;
+    }
+
     Builder setEndpoint(String endpoint) {
       this.endpoint = endpoint;
       return this;

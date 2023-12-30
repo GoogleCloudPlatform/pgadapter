@@ -103,6 +103,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
+      <version>6.55.1-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
