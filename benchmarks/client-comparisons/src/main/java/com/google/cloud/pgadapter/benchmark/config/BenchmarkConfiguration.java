@@ -1,6 +1,7 @@
 package com.google.cloud.pgadapter.benchmark.config;
 
 import java.time.Duration;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -20,6 +21,8 @@ public class BenchmarkConfiguration {
   private int recordCount;
 
   private int iterations;
+
+  private List<Integer> parallelism;
 
   /** --- Optimizations --- */
   private boolean useReadOnlyTransactions;
@@ -80,6 +83,14 @@ public class BenchmarkConfiguration {
 
   public void setIterations(int iterations) {
     this.iterations = iterations;
+  }
+
+  public List<Integer> getParallelism() {
+    return parallelism;
+  }
+
+  public void setParallelism(List<Integer> parallelism) {
+    this.parallelism = parallelism;
   }
 
   public boolean isUseReadOnlyTransactions() {

@@ -45,6 +45,7 @@ class Statistics {
     setName(name);
     setParallelism(parallelism);
     setTotalOperations(totalOperations);
+    operations.set(0L);
   }
 
   String getName() {

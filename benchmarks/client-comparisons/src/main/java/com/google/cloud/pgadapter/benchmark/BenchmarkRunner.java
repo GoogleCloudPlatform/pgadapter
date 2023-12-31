@@ -46,8 +46,9 @@ class BenchmarkRunner implements Runnable {
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
       this.identifiers = loadIdentifiers(connection);
 
-      benchmarkSelectOneRowAutoCommit(1);
-      benchmarkSelectOneRowAutoCommit(2);
+      for (int parallelism : benchmarkConfiguration.getParallelism()) {
+        benchmarkSelectOneRowAutoCommit(parallelism);
+      }
 
     } catch (Throwable throwable) {
       LOG.error("Benchmark runner failed", throwable);
