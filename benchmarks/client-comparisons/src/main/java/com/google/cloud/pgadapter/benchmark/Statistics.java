@@ -2,6 +2,7 @@ package com.google.cloud.pgadapter.benchmark;
 
 import com.google.cloud.pgadapter.benchmark.config.BenchmarkConfiguration;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -17,25 +18,30 @@ class Statistics {
 
   private final AtomicLong operations = new AtomicLong();
 
+  private final AtomicReference<Instant> startTime = new AtomicReference<>(Instant.now());
+
   Statistics(BenchmarkConfiguration tpccConfiguration) {
     this.tpccConfiguration = tpccConfiguration;
   }
 
-  void print(Duration runtime) {
+  void print(Duration totalRuntime) {
+    Duration runtime = getRuntime();
     System.out.print("\033[2J\033[1;1H");
     System.out.printf(
         """
                 \rBenchmark:      %s\t
                 \rNum iterations: %d\t
-                \rDuration:       %s\t
+                \rTotal runtime:  %s\t
                 \rParallelism:    %d\t
                 \r
+                \rRuntime:        %s\t
                 \rOperations:     %d/%d (%.2f/s)\t
                 """,
         getName(),
         tpccConfiguration.getIterations(),
-        runtime,
+        totalRuntime,
         getParallelism(),
+        runtime,
         getOperations(),
         getTotalOperations(),
         getOperationsPerSecond(runtime));
@@ -46,6 +52,11 @@ class Statistics {
     setParallelism(parallelism);
     setTotalOperations(totalOperations);
     operations.set(0L);
+    startTime.set(Instant.now());
+  }
+
+  Duration getRuntime() {
+    return Duration.between(startTime.get(), Instant.now());
   }
 
   String getName() {
