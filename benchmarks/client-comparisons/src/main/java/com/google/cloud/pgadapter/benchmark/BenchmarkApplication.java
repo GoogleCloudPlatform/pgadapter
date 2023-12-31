@@ -81,7 +81,8 @@ public class BenchmarkApplication implements CommandLineRunner {
         LOG.info("Starting benchmark");
         Statistics statistics = new Statistics(benchmarkConfiguration);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        BenchmarkRunner runner = new BenchmarkRunner(statistics, connectionUrl, benchmarkConfiguration);
+        BenchmarkRunner runner =
+            new BenchmarkRunner(statistics, connectionUrl, benchmarkConfiguration);
         executor.submit(runner);
         executor.shutdown();
 

@@ -54,6 +54,9 @@ class BenchmarkRunner implements Runnable {
 
       for (int parallelism : benchmarkConfiguration.getParallelism()) {
         benchmarkSelectOneRowAutoCommit(parallelism);
+        benchmarkSelect100RowsRowAutoCommit(parallelism);
+        benchmarkSelectOneRowTransaction(parallelism);
+        benchmarkSelect100RowsRowTransaction(parallelism);
       }
 
     } catch (Throwable throwable) {
@@ -73,30 +76,65 @@ class BenchmarkRunner implements Runnable {
     return result;
   }
 
+  private void benchmarkSelect100RowsRowAutoCommit(int parallelism) throws Exception {
+    benchmarkSelect(
+        "Select100RowsAutoCommit",
+        parallelism,
+        "select * from benchmark_all_types where id>=? limit 100",
+        true);
+  }
+
   private void benchmarkSelectOneRowAutoCommit(int parallelism) throws Exception {
+    benchmarkSelect(
+        "SelectOneRowAutoCommit",
+        parallelism,
+        "select * from benchmark_all_types where id=?",
+        true);
+  }
+
+  private void benchmarkSelect100RowsRowTransaction(int parallelism) throws Exception {
+    benchmarkSelect(
+        "Select100RowsTransaction",
+        parallelism,
+        "select * from benchmark_all_types where id>=? limit 100",
+        false);
+  }
+
+  private void benchmarkSelectOneRowTransaction(int parallelism) throws Exception {
+    benchmarkSelect(
+        "SelectOneRowTransaction",
+        parallelism,
+        "select * from benchmark_all_types where id=?",
+        false);
+  }
+
+  private void benchmarkSelect(String name, int parallelism, String sql, boolean autoCommit)
+      throws Exception {
     int totalOperations = parallelism * benchmarkConfiguration.getIterations();
-    statistics.reset("SelectOneRowAutoCommit", parallelism, totalOperations);
+    statistics.reset(name, parallelism, totalOperations);
 
     ConcurrentLinkedQueue<Duration> durations = new ConcurrentLinkedQueue<>();
 
     ExecutorService executor = Executors.newFixedThreadPool(parallelism);
     for (int task = 0; task < parallelism; task++) {
-      executor.submit(() -> runQuery(benchmarkConfiguration.getIterations(), durations));
+      executor.submit(
+          () -> runQuery(sql, autoCommit, benchmarkConfiguration.getIterations(), durations));
     }
     executor.shutdown();
     assertTrue(executor.awaitTermination(1L, TimeUnit.HOURS));
     assertEquals(totalOperations, durations.size());
-    BenchmarkResult result = new BenchmarkResult("SelectOneRowAutoCommit", parallelism, durations);
+    BenchmarkResult result = new BenchmarkResult(name, parallelism, durations);
     results.add(result);
   }
 
-  private void runQuery(int iterations, ConcurrentLinkedQueue<Duration> durations) {
+  private void runQuery(
+      String sql, boolean autoCommit, int iterations, ConcurrentLinkedQueue<Duration> durations) {
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
+      connection.setAutoCommit(autoCommit);
       for (int n = 0; n < iterations; n++) {
         String id = identifiers.get(ThreadLocalRandom.current().nextInt(identifiers.size()));
         Stopwatch watch = Stopwatch.createStarted();
-        try (PreparedStatement statement =
-            connection.prepareStatement("select * from benchmark_all_types where id=?")) {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
           statement.setString(1, id);
           try (ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
@@ -108,11 +146,13 @@ class BenchmarkRunner implements Runnable {
             }
           }
         }
+        if (!autoCommit) {
+          connection.commit();
+        }
         statistics.incOperations();
         durations.add(watch.elapsed());
       }
     } catch (SQLException exception) {
-      exception.printStackTrace();
       throw new RuntimeException(exception);
     }
   }
