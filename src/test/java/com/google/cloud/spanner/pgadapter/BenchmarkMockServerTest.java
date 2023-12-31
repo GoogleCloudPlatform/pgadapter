@@ -36,6 +36,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -55,7 +56,9 @@ import org.junit.runners.Parameterized.Parameters;
 public class BenchmarkMockServerTest extends AbstractMockServerTest {
   static {
     try {
-      LogManager.getLogManager().readConfiguration(BenchmarkMockServerTest.class.getResourceAsStream("/logging.properties"));
+      LogManager.getLogManager()
+          .readConfiguration(
+              BenchmarkMockServerTest.class.getResourceAsStream("/logging.properties"));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -71,7 +74,11 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
     final Duration p95;
     final Duration p99;
 
-    BenchmarkResult(String name, int parallelism, boolean disableVirtualThreads, ConcurrentLinkedQueue<Duration> durations) {
+    BenchmarkResult(
+        String name,
+        int parallelism,
+        boolean disableVirtualThreads,
+        ConcurrentLinkedQueue<Duration> durations) {
       this.name = name;
       this.parallelism = parallelism;
       this.disableVirtualThreads = disableVirtualThreads;
@@ -86,7 +93,9 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
 
     @Override
     public String toString() {
-      return String.format("name: %s\nparallelism: %d\nvirtual: %s\navg: %s\np50: %s\np90: %s\np95: %s\np99: %s\n\n", name, parallelism, !disableVirtualThreads, avg, p50, p90, p95, p99);
+      return String.format(
+          "name: %s\nparallelism: %d\nvirtual: %s\navg: %s\np50: %s\np90: %s\np95: %s\np99: %s\n\n",
+          name, parallelism, !disableVirtualThreads, avg, p50, p90, p95, p99);
     }
   }
 
@@ -101,7 +110,7 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
     ImmutableList.Builder<Object[]> builder = ImmutableList.builder();
     for (int parallelism : new int[] {1, 2, 4, 8, 16, 32, 50, 100, 150, 200, 300, 400}) {
       for (boolean disableVirtualThreads : new boolean[] {false, true}) {
-        builder.add(new Object[]{disableVirtualThreads, parallelism});
+        builder.add(new Object[] {disableVirtualThreads, parallelism});
       }
     }
     return builder.build();
@@ -115,10 +124,9 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
 
   private static final String SELECT_SINGLE_ROW_SQL = "select * from random where id=?";
 
-
   @BeforeClass
   public static void setupBenchmarkServer() throws Exception {
-    assumeTrue(System.getProperty("pgadapter.benchmark") == null);
+    assumeTrue(Objects.equals("true", System.getProperty("pgadapter.benchmark")));
 
     doStartMockSpannerAndPgAdapterServers(
         createMockSpannerThatReturnsOneQueryPartition(),
@@ -126,7 +134,8 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
         TestOptionsMetadataBuilder::disableDebugMode,
         OpenTelemetry.noop());
 
-    mockSpanner.setExecuteStreamingSqlExecutionTime(SimulatedExecutionTime.ofMinimumAndRandomTime(3, 3));
+    mockSpanner.setExecuteStreamingSqlExecutionTime(
+        SimulatedExecutionTime.ofMinimumAndRandomTime(3, 3));
     setupResults();
   }
 
@@ -134,7 +143,7 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
     String spannerSql = SELECT_SINGLE_ROW_SQL.replace("?", "$1");
     RandomResultSetGenerator generator = new RandomResultSetGenerator(1, Dialect.POSTGRESQL);
 
-    for (int i=0; i < NUM_RESULTS; i++) {
+    for (int i = 0; i < NUM_RESULTS; i++) {
       String id = UUID.randomUUID().toString();
       Statement spannerStatement = Statement.newBuilder(spannerSql).bind("p1").to(id).build();
       mockSpanner.putStatementResult(StatementResult.query(spannerStatement, generator.generate()));
@@ -160,9 +169,7 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
   }
 
   private String createUrl() {
-    return String.format(
-        "jdbc:postgresql://localhost:%d/db",
-        pgServer.getLocalPort());
+    return String.format("jdbc:postgresql://localhost:%d/db", pgServer.getLocalPort());
   }
 
   @Test
@@ -176,7 +183,9 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
     executor.shutdown();
     assertTrue(executor.awaitTermination(1L, TimeUnit.HOURS));
     assertEquals(parallelism * NUM_ITERATIONS, durations.size());
-    BenchmarkResult result = new BenchmarkResult("SelectOneRowAutoCommit", parallelism, disableVirtualThreads, durations);
+    BenchmarkResult result =
+        new BenchmarkResult(
+            "SelectOneRowAutoCommit", parallelism, disableVirtualThreads, durations);
     System.out.print(result);
   }
 
@@ -190,7 +199,8 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
           try (ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
               for (int col = 1; col <= resultSet.getMetaData().getColumnCount(); col++) {
-                assertEquals(resultSet.getString(col),
+                assertEquals(
+                    resultSet.getString(col),
                     resultSet.getString(resultSet.getMetaData().getColumnLabel(col)));
               }
             }
@@ -203,6 +213,4 @@ public class BenchmarkMockServerTest extends AbstractMockServerTest {
       throw new RuntimeException(exception);
     }
   }
-
-
 }

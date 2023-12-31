@@ -89,7 +89,8 @@ public class ProxyServer extends AbstractApiService {
 
   private final ThreadFactory threadFactory;
 
-  private final ExecutorService createConnectionHandlerExecutor = Executors.newSingleThreadExecutor();
+  private final ExecutorService createConnectionHandlerExecutor =
+      Executors.newSingleThreadExecutor();
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -340,13 +341,19 @@ public class ProxyServer extends AbstractApiService {
         Socket socket = serverSocket.accept();
         // Hand off the creation of the connection handler to a worker thread to ensure that we
         // continue to listen for new incoming connection requests as quickly as possible.
-        createConnectionHandlerExecutor.submit(() -> {
-          try {
-            createConnectionHandler(socket);
-          } catch (SocketException socketException) {
-            logger.log(Level.WARNING, () -> String.format("Failed to create connection on socket %s: %s.", socket, socketException));
-          }
-        });
+        createConnectionHandlerExecutor.submit(
+            () -> {
+              try {
+                createConnectionHandler(socket);
+              } catch (SocketException socketException) {
+                logger.log(
+                    Level.WARNING,
+                    () ->
+                        String.format(
+                            "Failed to create connection on socket %s: %s.",
+                            socket, socketException));
+              }
+            });
       }
     } catch (SocketException e) {
       // This is a normal exception, as this will occur when Server#stopServer() is called.
