@@ -34,11 +34,17 @@ class BenchmarkRunner implements Runnable {
 
   private boolean failed;
 
+  private final List<BenchmarkResult> results = new ArrayList<>();
+
   BenchmarkRunner(
       Statistics statistics, String connectionUrl, BenchmarkConfiguration benchmarkConfiguration) {
     this.statistics = statistics;
     this.connectionUrl = connectionUrl;
     this.benchmarkConfiguration = benchmarkConfiguration;
+  }
+
+  List<BenchmarkResult> getResults() {
+    return this.results;
   }
 
   @Override
@@ -81,7 +87,7 @@ class BenchmarkRunner implements Runnable {
     assertTrue(executor.awaitTermination(1L, TimeUnit.HOURS));
     assertEquals(totalOperations, durations.size());
     BenchmarkResult result = new BenchmarkResult("SelectOneRowAutoCommit", parallelism, durations);
-    System.out.print(result);
+    results.add(result);
   }
 
   private void runQuery(int iterations, ConcurrentLinkedQueue<Duration> durations) {

@@ -81,7 +81,8 @@ public class BenchmarkApplication implements CommandLineRunner {
         LOG.info("Starting benchmark");
         Statistics statistics = new Statistics(benchmarkConfiguration);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        executor.submit(new BenchmarkRunner(statistics, connectionUrl, benchmarkConfiguration));
+        BenchmarkRunner runner = new BenchmarkRunner(statistics, connectionUrl, benchmarkConfiguration);
+        executor.submit(runner);
         executor.shutdown();
 
         Stopwatch watch = Stopwatch.createStarted();
@@ -94,6 +95,10 @@ public class BenchmarkApplication implements CommandLineRunner {
         executor.shutdownNow();
         if (!executor.awaitTermination(60L, TimeUnit.SECONDS)) {
           throw new TimeoutException("Timed out while waiting for benchmark runner to shut down");
+        }
+
+        for (BenchmarkResult result : runner.getResults()) {
+          System.out.println(result);
         }
       }
     } finally {
