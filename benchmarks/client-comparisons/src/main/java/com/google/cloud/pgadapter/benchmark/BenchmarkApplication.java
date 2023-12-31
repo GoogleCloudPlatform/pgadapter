@@ -122,6 +122,7 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setProject(spannerConfiguration.getProject())
             .setInstance(spannerConfiguration.getInstance())
             .setDatabase(spannerConfiguration.getDatabase())
+            .setNumChannels(pgAdapterConfiguration.getNumChannels())
             .disableUnixDomainSockets();
     if (pgAdapterConfiguration.isEnableOpenTelemetry()) {
       builder
