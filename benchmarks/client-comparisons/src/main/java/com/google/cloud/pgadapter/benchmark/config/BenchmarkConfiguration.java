@@ -24,6 +24,8 @@ public class BenchmarkConfiguration {
 
   private List<Integer> parallelism;
 
+  private List<String> benchmarks;
+
   /** --- Optimizations --- */
   private boolean useReadOnlyTransactions;
 
@@ -87,6 +89,14 @@ public class BenchmarkConfiguration {
 
   public List<Integer> getParallelism() {
     return parallelism;
+  }
+
+  public List<String> getBenchmarks() {
+    return benchmarks;
+  }
+
+  public void setBenchmarks(List<String> benchmarks) {
+    this.benchmarks = benchmarks;
   }
 
   public void setParallelism(List<Integer> parallelism) {

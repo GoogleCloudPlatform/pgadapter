@@ -12,7 +12,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,7 +24,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 class BenchmarkRunner implements Runnable {
+  @FunctionalInterface
+  interface BenchmarkMethod {
+    void run(String name, int parallelism) throws Exception;
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkRunner.class);
+
+  private final Map<String, BenchmarkMethod> benchmarks = new LinkedHashMap<>();
 
   private final Statistics statistics;
 
@@ -41,6 +50,19 @@ class BenchmarkRunner implements Runnable {
     this.statistics = statistics;
     this.connectionUrl = connectionUrl;
     this.benchmarkConfiguration = benchmarkConfiguration;
+    this.benchmarks.put("SelectOneRowAutoCommit", this::benchmarkSelectOneRowAutoCommit);
+    this.benchmarks.put("Select100RowsAutoCommit", this::benchmarkSelect100RowsRowAutoCommit);
+    this.benchmarks.put("SelectOneRowTransaction", this::benchmarkSelectOneRowTransaction);
+    this.benchmarks.put("Select100RowsTransaction", this::benchmarkSelect100RowsRowTransaction);
+    for (String benchmark : benchmarkConfiguration.getBenchmarks()) {
+      if (!this.benchmarks.containsKey(benchmark)) {
+        throw new IllegalArgumentException(
+            "Unknown benchmark: "
+                + benchmark
+                + "\nPossible values:\n"
+                + String.join("\n", this.benchmarks.keySet()));
+      }
+    }
   }
 
   List<BenchmarkResult> getResults() {
@@ -53,10 +75,9 @@ class BenchmarkRunner implements Runnable {
       this.identifiers = loadIdentifiers(connection);
 
       for (int parallelism : benchmarkConfiguration.getParallelism()) {
-        benchmarkSelectOneRowAutoCommit(parallelism);
-        benchmarkSelect100RowsRowAutoCommit(parallelism);
-        benchmarkSelectOneRowTransaction(parallelism);
-        benchmarkSelect100RowsRowTransaction(parallelism);
+        for (String benchmarkName : benchmarkConfiguration.getBenchmarks()) {
+          benchmarks.get(benchmarkName).run(benchmarkName, parallelism);
+        }
       }
 
     } catch (Throwable throwable) {
@@ -76,36 +97,22 @@ class BenchmarkRunner implements Runnable {
     return result;
   }
 
-  private void benchmarkSelect100RowsRowAutoCommit(int parallelism) throws Exception {
-    benchmarkSelect(
-        "Select100RowsAutoCommit",
-        parallelism,
-        "select * from benchmark_all_types where id>=? limit 100",
-        true);
+  private void benchmarkSelectOneRowAutoCommit(String name, int parallelism) throws Exception {
+    benchmarkSelect(name, parallelism, "select * from benchmark_all_types where id=?", true);
   }
 
-  private void benchmarkSelectOneRowAutoCommit(int parallelism) throws Exception {
+  private void benchmarkSelect100RowsRowAutoCommit(String name, int parallelism) throws Exception {
     benchmarkSelect(
-        "SelectOneRowAutoCommit",
-        parallelism,
-        "select * from benchmark_all_types where id=?",
-        true);
+        name, parallelism, "select * from benchmark_all_types where id>=? limit 100", true);
   }
 
-  private void benchmarkSelect100RowsRowTransaction(int parallelism) throws Exception {
-    benchmarkSelect(
-        "Select100RowsTransaction",
-        parallelism,
-        "select * from benchmark_all_types where id>=? limit 100",
-        false);
+  private void benchmarkSelectOneRowTransaction(String name, int parallelism) throws Exception {
+    benchmarkSelect(name, parallelism, "select * from benchmark_all_types where id=?", false);
   }
 
-  private void benchmarkSelectOneRowTransaction(int parallelism) throws Exception {
+  private void benchmarkSelect100RowsRowTransaction(String name, int parallelism) throws Exception {
     benchmarkSelect(
-        "SelectOneRowTransaction",
-        parallelism,
-        "select * from benchmark_all_types where id=?",
-        false);
+        name, parallelism, "select * from benchmark_all_types where id>=? limit 100", false);
   }
 
   private void benchmarkSelect(String name, int parallelism, String sql, boolean autoCommit)
