@@ -42,6 +42,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     this.name = name;
     this.statistics = statistics;
     this.benchmarkConfiguration = benchmarkConfiguration;
+    this.benchmarks.put("SelectOneValueAutoCommit", this::benchmarkSelectOneValueAutoCommit);
     this.benchmarks.put("SelectOneRowAutoCommit", this::benchmarkSelectOneRowAutoCommit);
     this.benchmarks.put("Select100RowsAutoCommit", this::benchmarkSelect100RowsRowAutoCommit);
     this.benchmarks.put("SelectOneRowTransaction", this::benchmarkSelectOneRowTransaction);
@@ -85,6 +86,14 @@ abstract class AbstractBenchmarkRunner implements Runnable {
   abstract List<String> loadIdentifiers();
 
   abstract String getParameterName(int index);
+
+  void benchmarkSelectOneValueAutoCommit(String name, int parallelism) throws Exception {
+    benchmarkSelect(
+        name,
+        parallelism,
+        "select col_varchar from benchmark_all_types where id=" + getParameterName(1),
+        true);
+  }
 
   void benchmarkSelectOneRowAutoCommit(String name, int parallelism) throws Exception {
     benchmarkSelect(

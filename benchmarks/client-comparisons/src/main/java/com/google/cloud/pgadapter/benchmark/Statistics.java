@@ -1,6 +1,8 @@
 package com.google.cloud.pgadapter.benchmark;
 
 import com.google.cloud.pgadapter.benchmark.config.BenchmarkConfiguration;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,7 +38,9 @@ class Statistics {
                 \rNum iterations: %d\t
                 \rTotal runtime:  %s\t
                 \rParallelism:    %d\t
-                \r
+                \rNum GCs:        %d\t
+                \rGC time:        %s\t
+
                 \rRuntime:        %s\t
                 \rOperations:     %d/%d (%.2f/s)\t
                 """,
@@ -45,6 +49,8 @@ class Statistics {
         tpccConfiguration.getIterations(),
         totalRuntime,
         getParallelism(),
+        getGarbageCollections(),
+        getGarbageCollectionTime(),
         runtime,
         getOperations(),
         getTotalOperations(),
@@ -106,5 +112,20 @@ class Statistics {
 
   void incOperations() {
     operations.incrementAndGet();
+  }
+
+  long getGarbageCollections() {
+    return ManagementFactory.getGarbageCollectorMXBeans().stream()
+        .map(GarbageCollectorMXBean::getCollectionCount)
+        .reduce(Long::sum)
+        .orElse(0L);
+  }
+
+  Duration getGarbageCollectionTime() {
+    return ManagementFactory.getGarbageCollectorMXBeans().stream()
+        .map(GarbageCollectorMXBean::getCollectionTime)
+        .reduce(Long::sum)
+        .map(Duration::ofMillis)
+        .orElse(Duration.ZERO);
   }
 }
