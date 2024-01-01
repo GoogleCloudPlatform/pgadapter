@@ -14,13 +14,19 @@ public class BenchmarkConfiguration {
 
   private boolean truncateBeforeLoad;
 
-  private boolean runBenchmark;
+  private boolean runPgadapterBenchmark;
+
+  private boolean runJdbcBenchmark;
+
+  private boolean runSpannerBenchmark;
 
   private Duration benchmarkDuration;
 
   private int recordCount;
 
   private int iterations;
+
+  private Duration maxRandomWait;
 
   private List<Integer> parallelism;
 
@@ -55,12 +61,28 @@ public class BenchmarkConfiguration {
     this.truncateBeforeLoad = truncateBeforeLoad;
   }
 
-  public boolean isRunBenchmark() {
-    return runBenchmark;
+  public boolean isRunPgadapterBenchmark() {
+    return runPgadapterBenchmark;
   }
 
-  public void setRunBenchmark(boolean runBenchmark) {
-    this.runBenchmark = runBenchmark;
+  public void setRunPgadapterBenchmark(boolean runPgadapterBenchmark) {
+    this.runPgadapterBenchmark = runPgadapterBenchmark;
+  }
+
+  public boolean isRunJdbcBenchmark() {
+    return runJdbcBenchmark;
+  }
+
+  public void setRunJdbcBenchmark(boolean runJdbcBenchmark) {
+    this.runJdbcBenchmark = runJdbcBenchmark;
+  }
+
+  public boolean isRunSpannerBenchmark() {
+    return runSpannerBenchmark;
+  }
+
+  public void setRunSpannerBenchmark(boolean runSpannerBenchmark) {
+    this.runSpannerBenchmark = runSpannerBenchmark;
   }
 
   public Duration getBenchmarkDuration() {
@@ -85,6 +107,14 @@ public class BenchmarkConfiguration {
 
   public void setIterations(int iterations) {
     this.iterations = iterations;
+  }
+
+  public Duration getMaxRandomWait() {
+    return maxRandomWait;
+  }
+
+  public void setMaxRandomWait(Duration maxRandomWait) {
+    this.maxRandomWait = maxRandomWait;
   }
 
   public List<Integer> getParallelism() {

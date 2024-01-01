@@ -10,7 +10,9 @@ import java.util.concurrent.atomic.AtomicReference;
 class Statistics {
   private final BenchmarkConfiguration tpccConfiguration;
 
-  private final AtomicReference<String> name = new AtomicReference<>("(unknown)");
+  private final AtomicReference<String> runnerName = new AtomicReference<>("(unknown)");
+
+  private final AtomicReference<String> benchmarkName = new AtomicReference<>("(unknown)");
 
   private final AtomicInteger totalOperations = new AtomicInteger();
 
@@ -29,6 +31,7 @@ class Statistics {
     System.out.print("\033[2J\033[1;1H");
     System.out.printf(
         """
+                \rRunner:         %s\t
                 \rBenchmark:      %s\t
                 \rNum iterations: %d\t
                 \rTotal runtime:  %s\t
@@ -37,7 +40,8 @@ class Statistics {
                 \rRuntime:        %s\t
                 \rOperations:     %d/%d (%.2f/s)\t
                 """,
-        getName(),
+        getRunnerName(),
+        getBenchmarkName(),
         tpccConfiguration.getIterations(),
         totalRuntime,
         getParallelism(),
@@ -47,8 +51,9 @@ class Statistics {
         getOperationsPerSecond(runtime));
   }
 
-  void reset(String name, int parallelism, int totalOperations) {
-    setName(name);
+  void reset(String runnerName, String benchmarkName, int parallelism, int totalOperations) {
+    setRunnerName(runnerName);
+    setBenchmarkName(benchmarkName);
     setParallelism(parallelism);
     setTotalOperations(totalOperations);
     operations.set(0L);
@@ -59,12 +64,20 @@ class Statistics {
     return Duration.between(startTime.get(), Instant.now());
   }
 
-  String getName() {
-    return name.get();
+  String getRunnerName() {
+    return runnerName.get();
   }
 
-  private void setName(String name) {
-    this.name.set(name);
+  private void setRunnerName(String name) {
+    this.runnerName.set(name);
+  }
+
+  String getBenchmarkName() {
+    return benchmarkName.get();
+  }
+
+  private void setBenchmarkName(String name) {
+    this.benchmarkName.set(name);
   }
 
   int getTotalOperations() {

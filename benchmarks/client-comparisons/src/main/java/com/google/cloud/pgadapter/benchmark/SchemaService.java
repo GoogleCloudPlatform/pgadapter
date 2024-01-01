@@ -39,7 +39,7 @@ class SchemaService {
         }
       }
 
-      URL url = BenchmarkRunner.class.getResource("/schema.sql");
+      URL url = JdbcBenchmarkRunner.class.getResource("/schema.sql");
       Path path = Paths.get(Objects.requireNonNull(url).getPath());
       String ddl = Files.readString(path);
       LOG.info("Executing schema statements");

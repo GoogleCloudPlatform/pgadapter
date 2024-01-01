@@ -9,6 +9,8 @@ import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -52,21 +54,32 @@ public class BenchmarkApplication implements CommandLineRunner {
   @Override
   public void run(String... args) throws Exception {
     ProxyServer server = pgAdapterConfiguration.isInProcess() ? startPGAdapter() : null;
-    String connectionUrl =
+    String pgAdapterConnectionUrl =
         server == null
             ? pgAdapterConfiguration.getConnectionUrl()
             : String.format(
                 "jdbc:postgresql://localhost:%d/%s",
                 server.getLocalPort(), spannerConfiguration.getDatabase());
+    String spannerConnectionUrl =
+        String.format(
+            "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d"
+                + (pgAdapterConfiguration.getCredentials() == null
+                    ? ""
+                    : ";credentials=" + pgAdapterConfiguration.getCredentials()),
+            spannerConfiguration.getProject(),
+            spannerConfiguration.getInstance(),
+            spannerConfiguration.getDatabase(),
+            pgAdapterConfiguration.getNumChannels());
     try {
-      SchemaService schemaService = new SchemaService(connectionUrl);
+      SchemaService schemaService = new SchemaService(pgAdapterConnectionUrl);
       schemaService.createSchema();
 
       if (benchmarkConfiguration.isLoadData()) {
         LOG.info("Starting data load");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         DataLoadStatus status = new DataLoadStatus(benchmarkConfiguration);
-        Future<Long> loadDataFuture = executor.submit(() -> loadData(status, connectionUrl));
+        Future<Long> loadDataFuture =
+            executor.submit(() -> loadData(status, pgAdapterConnectionUrl));
         executor.shutdown();
         Stopwatch watch = Stopwatch.createStarted();
         while (!loadDataFuture.isDone()) {
@@ -77,13 +90,46 @@ public class BenchmarkApplication implements CommandLineRunner {
         System.out.printf("Finished loading %d rows\n", loadDataFuture.get());
       }
 
-      if (benchmarkConfiguration.isRunBenchmark()) {
-        LOG.info("Starting benchmark");
+      if (benchmarkConfiguration.isRunPgadapterBenchmark()
+          || benchmarkConfiguration.isRunJdbcBenchmark()
+          || benchmarkConfiguration.isRunSpannerBenchmark()) {
+        List<AbstractBenchmarkRunner> runners = new ArrayList<>();
+        LOG.info("Starting benchmarks");
         Statistics statistics = new Statistics(benchmarkConfiguration);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        BenchmarkRunner runner =
-            new BenchmarkRunner(statistics, connectionUrl, benchmarkConfiguration);
-        executor.submit(runner);
+
+        if (benchmarkConfiguration.isRunPgadapterBenchmark()) {
+          JdbcBenchmarkRunner runner =
+              new JdbcBenchmarkRunner(
+                  "PGAdapter Benchmarks",
+                  statistics,
+                  pgAdapterConnectionUrl,
+                  benchmarkConfiguration);
+          executor.submit(runner);
+          runners.add(runner);
+        }
+        if (benchmarkConfiguration.isRunJdbcBenchmark()) {
+          JdbcBenchmarkRunner runner =
+              new JdbcBenchmarkRunner(
+                  "Spanner JDBC Driver Benchmarks",
+                  statistics,
+                  spannerConnectionUrl,
+                  benchmarkConfiguration);
+          executor.submit(runner);
+          runners.add(runner);
+        }
+        if (benchmarkConfiguration.isRunSpannerBenchmark()) {
+          SpannerBenchmarkRunner runner =
+              new SpannerBenchmarkRunner(
+                  "Spanner Java Client Library Benchmarks",
+                  statistics,
+                  spannerConfiguration,
+                  pgAdapterConfiguration,
+                  benchmarkConfiguration);
+          executor.submit(runner);
+          runners.add(runner);
+        }
+
         executor.shutdown();
 
         Stopwatch watch = Stopwatch.createStarted();
@@ -98,8 +144,11 @@ public class BenchmarkApplication implements CommandLineRunner {
           throw new TimeoutException("Timed out while waiting for benchmark runner to shut down");
         }
 
-        for (BenchmarkResult result : runner.getResults()) {
-          System.out.println(result);
+        for (AbstractBenchmarkRunner runner : runners) {
+          System.out.println(runner.getName());
+          for (BenchmarkResult result : runner.getResults()) {
+            System.out.println(result);
+          }
         }
       }
     } finally {
