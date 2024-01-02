@@ -140,8 +140,7 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
                         benchmarkConfiguration.getParallelism().stream()
                             .max(Integer::compare)
                             .orElse(400))
-                    .build())
-            .setUseVirtualThreads(spannerConfiguration.isUseVirtualThreads());
+                    .build());
     if (!Strings.isNullOrEmpty(pgAdapterConfiguration.getCredentials())) {
       builder.setCredentials(
           GoogleCredentials.fromStream(
