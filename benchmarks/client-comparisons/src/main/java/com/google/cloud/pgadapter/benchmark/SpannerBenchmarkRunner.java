@@ -9,6 +9,7 @@ import com.google.cloud.pgadapter.benchmark.config.SpannerConfiguration;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
@@ -128,7 +129,19 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
     SpannerOptions.Builder builder =
         SpannerOptions.newBuilder()
             .setProjectId(spannerConfiguration.getProject())
-            .setNumChannels(pgAdapterConfiguration.getNumChannels());
+            .setNumChannels(pgAdapterConfiguration.getNumChannels())
+            .setSessionPoolOption(
+                SessionPoolOptions.newBuilder()
+                    .setMinSessions(
+                        benchmarkConfiguration.getParallelism().stream()
+                            .max(Integer::compare)
+                            .orElse(100))
+                    .setMaxSessions(
+                        benchmarkConfiguration.getParallelism().stream()
+                            .max(Integer::compare)
+                            .orElse(400))
+                    .build())
+            .setUseVirtualThreads(spannerConfiguration.isUseVirtualThreads());
     if (!Strings.isNullOrEmpty(pgAdapterConfiguration.getCredentials())) {
       builder.setCredentials(
           GoogleCredentials.fromStream(

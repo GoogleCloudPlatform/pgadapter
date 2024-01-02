@@ -92,7 +92,8 @@ public class BenchmarkApplication implements CommandLineRunner {
 
       if (benchmarkConfiguration.isRunPgadapterBenchmark()
           || benchmarkConfiguration.isRunJdbcBenchmark()
-          || benchmarkConfiguration.isRunSpannerBenchmark()) {
+          || benchmarkConfiguration.isRunSpannerBenchmark()
+          || benchmarkConfiguration.isRunGapicBenchmark()) {
         List<AbstractBenchmarkRunner> runners = new ArrayList<>();
         LOG.info("Starting benchmarks");
         Statistics statistics = new Statistics(benchmarkConfiguration);
@@ -126,6 +127,17 @@ public class BenchmarkApplication implements CommandLineRunner {
                   spannerConfiguration,
                   pgAdapterConfiguration,
                   benchmarkConfiguration);
+          executor.submit(runner);
+          runners.add(runner);
+        }
+        if (benchmarkConfiguration.isRunGapicBenchmark()) {
+          GapicBenchmarkRunner runner =
+              new GapicBenchmarkRunner(
+                  "Generated Client Benchmarks",
+                  statistics,
+                  benchmarkConfiguration,
+                  pgAdapterConfiguration,
+                  spannerConfiguration);
           executor.submit(runner);
           runners.add(runner);
         }

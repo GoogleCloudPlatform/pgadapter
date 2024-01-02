@@ -36,6 +36,11 @@
     <!-- Add PGAdapter as a dependency, so we can start it in-process -->
     <dependency>
       <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner</artifactId>
+      <version>6.55.1-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
       <version>0.27.2-SNAPSHOT</version>
     </dependency>

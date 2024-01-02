@@ -20,6 +20,8 @@ public class BenchmarkConfiguration {
 
   private boolean runSpannerBenchmark;
 
+  private boolean runGapicBenchmark;
+
   private Duration benchmarkDuration;
 
   private int recordCount;
@@ -83,6 +85,14 @@ public class BenchmarkConfiguration {
 
   public void setRunSpannerBenchmark(boolean runSpannerBenchmark) {
     this.runSpannerBenchmark = runSpannerBenchmark;
+  }
+
+  public boolean isRunGapicBenchmark() {
+    return runGapicBenchmark;
+  }
+
+  public void setRunGapicBenchmark(boolean runGapicBenchmark) {
+    this.runGapicBenchmark = runGapicBenchmark;
   }
 
   public Duration getBenchmarkDuration() {
