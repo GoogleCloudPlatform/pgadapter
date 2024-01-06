@@ -15,6 +15,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.Duration;
@@ -54,6 +55,7 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
                   spannerConfiguration.getProject(),
                   spannerConfiguration.getInstance(),
                   spannerConfiguration.getDatabase()));
+      Uninterruptibles.sleepUninterruptibly(Duration.ofMillis(2000L));
       super.run();
     } catch (IOException exception) {
       throw new RuntimeException(exception);
@@ -130,16 +132,19 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
         SpannerOptions.newBuilder()
             .setProjectId(spannerConfiguration.getProject())
             .setNumChannels(pgAdapterConfiguration.getNumChannels())
+            .setUseVirtualThreads(spannerConfiguration.isUseVirtualThreads())
             .setSessionPoolOption(
                 SessionPoolOptions.newBuilder()
                     .setMinSessions(
-                        benchmarkConfiguration.getParallelism().stream()
-                            .max(Integer::compare)
-                            .orElse(100))
+                        2
+                            * benchmarkConfiguration.getParallelism().stream()
+                                .max(Integer::compare)
+                                .orElse(100))
                     .setMaxSessions(
-                        benchmarkConfiguration.getParallelism().stream()
-                            .max(Integer::compare)
-                            .orElse(400))
+                        2
+                            * benchmarkConfiguration.getParallelism().stream()
+                                .max(Integer::compare)
+                                .orElse(400))
                     .build());
     if (!Strings.isNullOrEmpty(pgAdapterConfiguration.getCredentials())) {
       builder.setCredentials(

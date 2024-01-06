@@ -71,8 +71,8 @@ public class BenchmarkApplication implements CommandLineRunner {
             spannerConfiguration.getDatabase(),
             pgAdapterConfiguration.getNumChannels());
     try {
-      SchemaService schemaService = new SchemaService(pgAdapterConnectionUrl);
-      schemaService.createSchema();
+      //      SchemaService schemaService = new SchemaService(pgAdapterConnectionUrl);
+      //      schemaService.createSchema();
 
       if (benchmarkConfiguration.isLoadData()) {
         LOG.info("Starting data load");
