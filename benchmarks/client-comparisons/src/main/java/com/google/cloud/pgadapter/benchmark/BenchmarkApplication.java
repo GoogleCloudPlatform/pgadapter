@@ -5,6 +5,7 @@ import com.google.cloud.pgadapter.benchmark.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.benchmark.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.benchmark.dataloader.DataLoadStatus;
 import com.google.cloud.pgadapter.benchmark.dataloader.DataLoader;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Stopwatch;
@@ -62,17 +63,19 @@ public class BenchmarkApplication implements CommandLineRunner {
                 server.getLocalPort(), spannerConfiguration.getDatabase());
     String spannerConnectionUrl =
         String.format(
-            "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d"
+            "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d;minSessions=%d;maxSessions=%d"
                 + (pgAdapterConfiguration.getCredentials() == null
                     ? ""
                     : ";credentials=" + pgAdapterConfiguration.getCredentials()),
             spannerConfiguration.getProject(),
             spannerConfiguration.getInstance(),
             spannerConfiguration.getDatabase(),
-            pgAdapterConfiguration.getNumChannels());
+            pgAdapterConfiguration.getNumChannels(),
+            benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(100),
+            benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(400));
     try {
-      //      SchemaService schemaService = new SchemaService(pgAdapterConnectionUrl);
-      //      schemaService.createSchema();
+      SchemaService schemaService = new SchemaService(pgAdapterConnectionUrl);
+      schemaService.createSchema();
 
       if (benchmarkConfiguration.isLoadData()) {
         LOG.info("Starting data load");
@@ -184,6 +187,17 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setInstance(spannerConfiguration.getInstance())
             .setDatabase(spannerConfiguration.getDatabase())
             .setNumChannels(pgAdapterConfiguration.getNumChannels())
+            .setSessionPoolOptions(
+                SessionPoolOptions.newBuilder()
+                    .setMinSessions(
+                        benchmarkConfiguration.getParallelism().stream()
+                            .max(Integer::compare)
+                            .orElse(100))
+                    .setMaxSessions(
+                        benchmarkConfiguration.getParallelism().stream()
+                            .max(Integer::compare)
+                            .orElse(400))
+                    .build())
             .disableUnixDomainSockets();
     if (pgAdapterConfiguration.isEnableOpenTelemetry()) {
       builder

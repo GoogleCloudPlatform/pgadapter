@@ -1,6 +1,6 @@
 package com.google.cloud.pgadapter.benchmark;
 
-import static com.google.cloud.spanner.connection.ThreadFactoryUtil.createVirtualOrDaemonThreadFactory;
+import static com.google.cloud.spanner.ThreadFactoryUtil.createVirtualOrDaemonThreadFactory;
 import static org.junit.Assert.assertEquals;
 
 import com.google.api.gax.core.FixedCredentialsProvider;
