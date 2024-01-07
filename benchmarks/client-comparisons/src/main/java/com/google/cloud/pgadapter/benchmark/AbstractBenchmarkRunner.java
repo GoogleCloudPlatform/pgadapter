@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,12 +140,17 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     //            parallelism, createVirtualOrDaemonThreadFactory("benchmark-worker"));
     ExecutorService executor = Executors.newFixedThreadPool(parallelism);
 
+    List<Future<?>> futures = new ArrayList<>(parallelism);
     for (int task = 0; task < parallelism; task++) {
-      executor.submit(
-          () -> runQuery(sql, autoCommit, benchmarkConfiguration.getIterations(), durations));
+      futures.add(
+          executor.submit(
+              () -> runQuery(sql, autoCommit, benchmarkConfiguration.getIterations(), durations)));
     }
     executor.shutdown();
     assertTrue(executor.awaitTermination(1L, TimeUnit.HOURS));
+    for (Future<?> future : futures) {
+      future.get();
+    }
     assertEquals(totalOperations, durations.size());
     BenchmarkResult result = new BenchmarkResult(benchmarkName, parallelism, durations);
     results.add(result);

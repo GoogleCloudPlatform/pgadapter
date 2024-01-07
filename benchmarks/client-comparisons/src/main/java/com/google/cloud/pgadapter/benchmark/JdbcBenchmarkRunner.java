@@ -3,6 +3,7 @@ package com.google.cloud.pgadapter.benchmark;
 import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.pgadapter.benchmark.config.BenchmarkConfiguration;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.common.base.Stopwatch;
 import java.lang.reflect.Array;
@@ -107,7 +108,7 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
     } catch (SQLException exception) {
       throw new RuntimeException(exception);
     } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     }
   }
 }

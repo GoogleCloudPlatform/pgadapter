@@ -11,6 +11,7 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Stopwatch;
@@ -113,7 +114,7 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
         durations.add(watch.elapsed());
       }
     } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     }
   }
 

@@ -198,6 +198,7 @@ public class BenchmarkApplication implements CommandLineRunner {
                             .max(Integer::compare)
                             .orElse(400))
                     .build())
+            .setDisableVirtualThreads(!spannerConfiguration.isUseVirtualThreads())
             .disableUnixDomainSockets();
     if (pgAdapterConfiguration.isEnableOpenTelemetry()) {
       builder

@@ -127,12 +127,15 @@ public class ProxyServer extends AbstractApiService {
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
-    this.threadFactory = createThreadFactory("ConnectionHandler");
+    this.threadFactory =
+        createThreadFactory("ConnectionHandler", optionsMetadata.useVirtualThreads());
     addConnectionProperties();
   }
 
-  public static ThreadFactory createThreadFactory(String baseNameFormat) {
-    ThreadFactory virtualThreadFactory = tryCreateVirtualThreadFactory(baseNameFormat);
+  public static ThreadFactory createThreadFactory(
+      String baseNameFormat, boolean tryVirtualThreads) {
+    ThreadFactory virtualThreadFactory =
+        tryVirtualThreads ? tryCreateVirtualThreadFactory(baseNameFormat) : null;
     if (virtualThreadFactory != null) {
       return virtualThreadFactory;
     }

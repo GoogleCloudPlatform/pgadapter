@@ -10,6 +10,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.pgadapter.benchmark.config.BenchmarkConfiguration;
 import com.google.cloud.pgadapter.benchmark.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.benchmark.config.SpannerConfiguration;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.v1.SpannerClient;
 import com.google.cloud.spanner.v1.SpannerSettings;
 import com.google.common.base.Stopwatch;
@@ -163,9 +164,8 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
       }
       client.deleteSession(session.getName());
     } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     } catch (Exception exception) {
-      exception.printStackTrace();
       throw new RuntimeException(exception);
     }
   }
@@ -186,7 +186,8 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
             .setEndpoint(SpannerSettings.getDefaultEndpoint())
             .setExecutor(
                 Executors.newCachedThreadPool(
-                    createVirtualOrDaemonThreadFactory("grpc-virtual-executor")))
+                    createVirtualOrDaemonThreadFactory(
+                        "grpc-virtual-executor", spannerConfiguration.isUseVirtualThreads())))
             .setChannelPoolSettings(
                 ChannelPoolSettings.builder()
                     .setInitialChannelCount(pgAdapterConfiguration.getNumChannels())

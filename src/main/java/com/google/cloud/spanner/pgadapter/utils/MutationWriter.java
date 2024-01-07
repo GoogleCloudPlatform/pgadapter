@@ -100,7 +100,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
 
   private static final Logger logger = Logger.getLogger(MutationWriter.class.getName());
 
-  private static final ThreadFactory THREAD_FACTORY = createThreadFactory("copy-worker");
+  private static final ThreadFactory THREAD_FACTORY = createThreadFactory("copy-worker", true);
 
   private final CopyTransactionMode transactionMode;
   private long rowCount;

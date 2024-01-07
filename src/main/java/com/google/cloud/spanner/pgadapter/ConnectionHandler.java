@@ -264,6 +264,7 @@ public class ConnectionHandler implements Runnable {
     // only used to determine what dialect the database should have that is being created on the
     // emulator when 'autoConfigEmulator=true'.
     uri = uri + ";dialect=postgresql";
+    uri = uri + ";useVirtualThreads=" + options.useVirtualThreads();
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
           uri
