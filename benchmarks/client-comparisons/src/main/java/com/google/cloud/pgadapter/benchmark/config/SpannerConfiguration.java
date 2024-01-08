@@ -14,6 +14,10 @@ public class SpannerConfiguration {
   private String database;
 
   private boolean useVirtualThreads;
+  private long randomizePositionTransactionsPerSecondThreshold;
+  private boolean optimizeSessionPoolFuture;
+  private boolean optimizeUnbalancedCheck;
+  private boolean useStickySessionClient;
 
   private final Supplier<DatabaseId> databaseIdSupplier =
       Suppliers.memoize(() -> DatabaseId.of(project, instance, database));
@@ -52,5 +56,43 @@ public class SpannerConfiguration {
 
   public void setUseVirtualThreads(boolean useVirtualThreads) {
     this.useVirtualThreads = useVirtualThreads;
+  }
+
+  public long getRandomizePositionTransactionsPerSecondThreshold() {
+    return randomizePositionTransactionsPerSecondThreshold;
+  }
+
+  public void setRandomizePositionTransactionsPerSecondThreshold(
+      long randomizePositionTransactionsPerSecondThreshold) {
+    this.randomizePositionTransactionsPerSecondThreshold =
+        randomizePositionTransactionsPerSecondThreshold;
+  }
+
+  public boolean isOptimizeSessionPoolFuture() {
+    return optimizeSessionPoolFuture;
+  }
+
+  public void setOptimizeSessionPoolFuture(boolean optimizeSessionPoolFuture) {
+    this.optimizeSessionPoolFuture = optimizeSessionPoolFuture;
+  }
+
+  public boolean isOptimizeUnbalancedCheck() {
+    return optimizeUnbalancedCheck;
+  }
+
+  public void setOptimizeUnbalancedCheck(boolean optimizeUnbalancedCheck) {
+    this.optimizeUnbalancedCheck = optimizeUnbalancedCheck;
+  }
+
+  public Supplier<DatabaseId> getDatabaseIdSupplier() {
+    return databaseIdSupplier;
+  }
+
+  public boolean isUseStickySessionClient() {
+    return useStickySessionClient;
+  }
+
+  public void setUseStickySessionClient(boolean useStickySessionClient) {
+    this.useStickySessionClient = useStickySessionClient;
   }
 }

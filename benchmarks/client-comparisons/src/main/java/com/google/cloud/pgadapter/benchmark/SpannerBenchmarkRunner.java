@@ -146,6 +146,11 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
                             * benchmarkConfiguration.getParallelism().stream()
                                 .max(Integer::compare)
                                 .orElse(400))
+                    .setOptimizeSessionPoolFuture(
+                        spannerConfiguration.isOptimizeSessionPoolFuture())
+                    .setOptimizeUnbalancedCheck(spannerConfiguration.isOptimizeUnbalancedCheck())
+                    .setRandomizePositionTransactionsPerSecondThreshold(
+                        spannerConfiguration.getRandomizePositionTransactionsPerSecondThreshold())
                     .build());
     if (!Strings.isNullOrEmpty(pgAdapterConfiguration.getCredentials())) {
       builder.setCredentials(

@@ -63,7 +63,7 @@ public class BenchmarkApplication implements CommandLineRunner {
                 server.getLocalPort(), spannerConfiguration.getDatabase());
     String spannerConnectionUrl =
         String.format(
-            "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d;minSessions=%d;maxSessions=%d"
+            "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d;minSessions=%d;maxSessions=%d;useVirtualThreads=%s;useStickySessions=%s"
                 + (pgAdapterConfiguration.getCredentials() == null
                     ? ""
                     : ";credentials=" + pgAdapterConfiguration.getCredentials()),
@@ -72,10 +72,14 @@ public class BenchmarkApplication implements CommandLineRunner {
             spannerConfiguration.getDatabase(),
             pgAdapterConfiguration.getNumChannels(),
             benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(100),
-            benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(400));
+            benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(400),
+            spannerConfiguration.isUseVirtualThreads(),
+            spannerConfiguration.isUseStickySessionClient());
     try {
+      System.out.println("Checking schema");
       SchemaService schemaService = new SchemaService(pgAdapterConnectionUrl);
       schemaService.createSchema();
+      System.out.println("Checked schema, starting benchmark");
 
       if (benchmarkConfiguration.isLoadData()) {
         LOG.info("Starting data load");
