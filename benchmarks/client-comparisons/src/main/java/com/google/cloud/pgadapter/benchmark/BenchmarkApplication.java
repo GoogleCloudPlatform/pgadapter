@@ -81,8 +81,12 @@ public class BenchmarkApplication implements CommandLineRunner {
             spannerConfiguration.getInstance(),
             spannerConfiguration.getDatabase(),
             pgAdapterConfiguration.getNumChannels(),
-            benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(100),
-            benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(400),
+            Math.max(
+                100,
+                benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(100)),
+            Math.max(
+                400,
+                benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(400)),
             spannerConfiguration.isUseVirtualThreads(),
             spannerConfiguration.isUseStickySessionClient());
     try {

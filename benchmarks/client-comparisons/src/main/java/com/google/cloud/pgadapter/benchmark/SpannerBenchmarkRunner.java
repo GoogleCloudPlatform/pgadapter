@@ -137,15 +137,17 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
             .setSessionPoolOption(
                 SessionPoolOptions.newBuilder()
                     .setMinSessions(
-                        2
-                            * benchmarkConfiguration.getParallelism().stream()
+                        Math.max(
+                            100,
+                            benchmarkConfiguration.getParallelism().stream()
                                 .max(Integer::compare)
-                                .orElse(100))
+                                .orElse(100)))
                     .setMaxSessions(
-                        2
-                            * benchmarkConfiguration.getParallelism().stream()
+                        Math.max(
+                            400,
+                            benchmarkConfiguration.getParallelism().stream()
                                 .max(Integer::compare)
-                                .orElse(400))
+                                .orElse(400)))
                     .setOptimizeSessionPoolFuture(
                         spannerConfiguration.isOptimizeSessionPoolFuture())
                     .setOptimizeUnbalancedCheck(spannerConfiguration.isOptimizeUnbalancedCheck())
