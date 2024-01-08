@@ -10,6 +10,13 @@ import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -54,6 +61,9 @@ public class BenchmarkApplication implements CommandLineRunner {
 
   @Override
   public void run(String... args) throws Exception {
+    String name = args == null || args.length == 0 ? "(no name)" : args[0];
+    Timestamp executedAt = Timestamp.from(Instant.now());
+    System.out.println("Running benchmark with name " + name + ", executed at " + executedAt);
     ProxyServer server = pgAdapterConfiguration.isInProcess() ? startPGAdapter() : null;
     String pgAdapterConnectionUrl =
         server == null
@@ -163,10 +173,26 @@ public class BenchmarkApplication implements CommandLineRunner {
           throw new TimeoutException("Timed out while waiting for benchmark runner to shut down");
         }
 
-        for (AbstractBenchmarkRunner runner : runners) {
-          System.out.println(runner.getName());
-          for (BenchmarkResult result : runner.getResults()) {
-            System.out.println(result);
+        try (Connection connection = DriverManager.getConnection(spannerConnectionUrl);
+            PreparedStatement statement =
+                connection.prepareStatement(
+                    "insert into benchmark_results (name, executed_at, parallelism, avg, p50, p90, p95, p99) values (?, ?, ?, ?, ?, ?, ?, ?)")) {
+          for (AbstractBenchmarkRunner runner : runners) {
+            System.out.println(runner.getName());
+            for (BenchmarkResult result : runner.getResults()) {
+              System.out.println(result);
+              int param = 0;
+              statement.setString(++param, name + " - " + runner.getName() + " - " + result.name);
+              statement.setTimestamp(++param, executedAt);
+              statement.setInt(++param, result.parallelism);
+              statement.setBigDecimal(++param, toBigDecimalSeconds(result.avg));
+              statement.setBigDecimal(++param, toBigDecimalSeconds(result.p50));
+              statement.setBigDecimal(++param, toBigDecimalSeconds(result.p90));
+              statement.setBigDecimal(++param, toBigDecimalSeconds(result.p95));
+              statement.setBigDecimal(++param, toBigDecimalSeconds(result.p99));
+              statement.addBatch();
+            }
+            statement.executeBatch();
           }
         }
       }
@@ -176,6 +202,10 @@ public class BenchmarkApplication implements CommandLineRunner {
         server.awaitTerminated();
       }
     }
+  }
+
+  static BigDecimal toBigDecimalSeconds(Duration duration) {
+    return BigDecimal.valueOf(duration.getSeconds()).add(BigDecimal.valueOf(duration.getNano(), 9));
   }
 
   private long loadData(DataLoadStatus status, String connectionUrl) throws Exception {
