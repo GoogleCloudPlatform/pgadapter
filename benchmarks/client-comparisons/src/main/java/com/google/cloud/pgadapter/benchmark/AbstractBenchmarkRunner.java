@@ -93,6 +93,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     benchmarkSelect(
         name,
         parallelism,
+        benchmarkConfiguration.getIterations(),
         "select col_varchar from benchmark_all_types where id=" + getParameterName(1),
         true);
   }
@@ -101,6 +102,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     benchmarkSelect(
         name,
         parallelism,
+        benchmarkConfiguration.getIterations(),
         "select * from benchmark_all_types where id=" + getParameterName(1),
         true);
   }
@@ -109,6 +111,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     benchmarkSelect(
         name,
         parallelism,
+        benchmarkConfiguration.getIterations() / 10,
         "select * from benchmark_all_types where id>=" + getParameterName(1) + " limit 100",
         true);
   }
@@ -117,6 +120,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     benchmarkSelect(
         name,
         parallelism,
+        benchmarkConfiguration.getIterations(),
         "select * from benchmark_all_types where id=" + getParameterName(1),
         false);
   }
@@ -125,13 +129,15 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     benchmarkSelect(
         name,
         parallelism,
+        benchmarkConfiguration.getIterations() / 10,
         "select * from benchmark_all_types where id>=" + getParameterName(1) + " limit 100",
         false);
   }
 
-  void benchmarkSelect(String benchmarkName, int parallelism, String sql, boolean autoCommit)
+  void benchmarkSelect(
+      String benchmarkName, int parallelism, int iterations, String sql, boolean autoCommit)
       throws Exception {
-    int totalOperations = parallelism * benchmarkConfiguration.getIterations();
+    int totalOperations = parallelism * iterations;
     statistics.reset(this.name, benchmarkName, parallelism, totalOperations);
 
     ConcurrentLinkedQueue<Duration> durations = new ConcurrentLinkedQueue<>();
@@ -142,9 +148,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
     List<Future<?>> futures = new ArrayList<>(parallelism);
     for (int task = 0; task < parallelism; task++) {
-      futures.add(
-          executor.submit(
-              () -> runQuery(sql, autoCommit, benchmarkConfiguration.getIterations(), durations)));
+      futures.add(executor.submit(() -> runQuery(sql, autoCommit, iterations, durations)));
     }
     executor.shutdown();
     assertTrue(executor.awaitTermination(1L, TimeUnit.HOURS));
