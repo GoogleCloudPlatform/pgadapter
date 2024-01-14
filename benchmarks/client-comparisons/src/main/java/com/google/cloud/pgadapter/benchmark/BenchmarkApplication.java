@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -33,6 +34,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class BenchmarkApplication implements CommandLineRunner {
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkApplication.class);
+
+  private static final String NO_NAME = "(no name)";
 
   public static void main(String[] args) {
     try {
@@ -61,7 +64,7 @@ public class BenchmarkApplication implements CommandLineRunner {
 
   @Override
   public void run(String... args) throws Exception {
-    String name = args == null || args.length == 0 ? "(no name)" : args[0];
+    String name = args == null || args.length == 0 ? NO_NAME : args[0];
     Timestamp executedAt = Timestamp.from(Instant.now());
     System.out.println("Running benchmark with name " + name + ", executed at " + executedAt);
     ProxyServer server = pgAdapterConfiguration.isInProcess() ? startPGAdapter() : null;
@@ -180,26 +183,33 @@ public class BenchmarkApplication implements CommandLineRunner {
           throw new TimeoutException("Timed out while waiting for benchmark runner to shut down");
         }
 
-        try (Connection connection = DriverManager.getConnection(spannerConnectionUrl);
-            PreparedStatement statement =
-                connection.prepareStatement(
-                    "insert into benchmark_results (name, executed_at, parallelism, avg, p50, p90, p95, p99) values (?, ?, ?, ?, ?, ?, ?, ?)")) {
-          for (AbstractBenchmarkRunner runner : runners) {
-            System.out.println(runner.getName());
-            for (BenchmarkResult result : runner.getResults()) {
-              System.out.println(result);
-              int param = 0;
-              statement.setString(++param, name + " - " + runner.getName() + " - " + result.name);
-              statement.setTimestamp(++param, executedAt);
-              statement.setInt(++param, result.parallelism);
-              statement.setBigDecimal(++param, toBigDecimalSeconds(result.avg));
-              statement.setBigDecimal(++param, toBigDecimalSeconds(result.p50));
-              statement.setBigDecimal(++param, toBigDecimalSeconds(result.p90));
-              statement.setBigDecimal(++param, toBigDecimalSeconds(result.p95));
-              statement.setBigDecimal(++param, toBigDecimalSeconds(result.p99));
-              statement.addBatch();
+        for (AbstractBenchmarkRunner runner : runners) {
+          System.out.println(runner.getName());
+          for (BenchmarkResult result : runner.getResults()) {
+            System.out.println(result);
+          }
+        }
+
+        if (!Objects.equals(NO_NAME, name)) {
+          try (Connection connection = DriverManager.getConnection(spannerConnectionUrl);
+              PreparedStatement statement =
+                  connection.prepareStatement(
+                      "insert into benchmark_results (name, executed_at, parallelism, avg, p50, p90, p95, p99) values (?, ?, ?, ?, ?, ?, ?, ?)")) {
+            for (AbstractBenchmarkRunner runner : runners) {
+              for (BenchmarkResult result : runner.getResults()) {
+                int param = 0;
+                statement.setString(++param, name + " - " + runner.getName() + " - " + result.name);
+                statement.setTimestamp(++param, executedAt);
+                statement.setInt(++param, result.parallelism);
+                statement.setBigDecimal(++param, toBigDecimalSeconds(result.avg));
+                statement.setBigDecimal(++param, toBigDecimalSeconds(result.p50));
+                statement.setBigDecimal(++param, toBigDecimalSeconds(result.p90));
+                statement.setBigDecimal(++param, toBigDecimalSeconds(result.p95));
+                statement.setBigDecimal(++param, toBigDecimalSeconds(result.p99));
+                statement.addBatch();
+              }
+              statement.executeBatch();
             }
-            statement.executeBatch();
           }
         }
       }
@@ -239,6 +249,7 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setNumChannels(pgAdapterConfiguration.getNumChannels())
             .setSessionPoolOptions(
                 SessionPoolOptions.newBuilder()
+                    .setTrackStackTraceOfSessionCheckout(false)
                     .setMinSessions(
                         benchmarkConfiguration.getParallelism().stream()
                             .max(Integer::compare)
