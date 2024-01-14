@@ -222,6 +222,15 @@ public class BenchmarkApplication implements CommandLineRunner {
   }
 
   private ProxyServer startPGAdapter() {
+    int parallelism = Runtime.getRuntime().availableProcessors() * 3;
+    int maxPoolSize = Math.max(256, parallelism * 3);
+    if (!System.getProperties().containsKey("jdk.virtualThreadScheduler.parallelism")) {
+      System.setProperty("jdk.virtualThreadScheduler.parallelism", String.valueOf(parallelism));
+    }
+    if (!System.getProperties().containsKey("jdk.virtualThreadScheduler.maxPoolSize")) {
+      System.setProperty("jdk.virtualThreadScheduler.maxPoolSize", String.valueOf(maxPoolSize));
+    }
+
     OptionsMetadata.Builder builder =
         OptionsMetadata.newBuilder()
             .setProject(spannerConfiguration.getProject())
