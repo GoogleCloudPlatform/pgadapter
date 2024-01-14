@@ -6,6 +6,7 @@ import static org.junit.Assert.assertEquals;
 import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.api.gax.grpc.ChannelPoolSettings;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
+import com.google.api.gax.rpc.ServerStream;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.pgadapter.benchmark.config.BenchmarkConfiguration;
 import com.google.cloud.pgadapter.benchmark.config.PGAdapterConfiguration;
@@ -22,6 +23,7 @@ import com.google.spanner.v1.CreateSessionRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.PartialResultSet;
 import com.google.spanner.v1.ResultSet;
+import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.Session;
 import com.google.spanner.v1.TransactionOptions;
 import com.google.spanner.v1.TransactionOptions.ReadWrite;
@@ -150,13 +152,21 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
                           .build())
                   .build());
         }
-        ResultSet resultSet = client.executeSql(builder.build());
-        consumeResultSet(resultSet);
+        ResultSetMetadata metadata;
+        if (spannerConfiguration.isUseStreamingSql()) {
+          ServerStream<PartialResultSet> stream =
+              client.executeStreamingSqlCallable().call(builder.build());
+          metadata = consumeStream(stream);
+        } else {
+          ResultSet resultSet = client.executeSql(builder.build());
+          consumeResultSet(resultSet);
+          metadata = resultSet.getMetadata();
+        }
         if (!autoCommit) {
           client.commit(
               CommitRequest.newBuilder()
                   .setSession(session.getName())
-                  .setTransactionId(resultSet.getMetadata().getTransaction().getId())
+                  .setTransactionId(metadata.getTransaction().getId())
                   .build());
         }
         statistics.incOperations();
@@ -178,6 +188,21 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
         col++;
       }
     }
+  }
+
+  private ResultSetMetadata consumeStream(ServerStream<PartialResultSet> stream) {
+    ResultSetMetadata metadata = ResultSetMetadata.getDefaultInstance();
+    for (PartialResultSet partialResultSet : stream) {
+      if (partialResultSet.hasMetadata()) {
+        metadata = partialResultSet.getMetadata();
+      }
+      int col = 0;
+      for (Value value : partialResultSet.getValuesList()) {
+        assertEquals(value, partialResultSet.getValues(col));
+        col++;
+      }
+    }
+    return metadata;
   }
 
   SpannerClient createClient() throws Exception {

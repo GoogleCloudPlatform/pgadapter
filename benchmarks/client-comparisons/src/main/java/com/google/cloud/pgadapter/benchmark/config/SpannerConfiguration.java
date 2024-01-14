@@ -18,6 +18,7 @@ public class SpannerConfiguration {
   private boolean optimizeSessionPoolFuture;
   private boolean optimizeUnbalancedCheck;
   private boolean useStickySessionClient;
+  private boolean useStreamingSql;
 
   private final Supplier<DatabaseId> databaseIdSupplier =
       Suppliers.memoize(() -> DatabaseId.of(project, instance, database));
@@ -94,5 +95,13 @@ public class SpannerConfiguration {
 
   public void setUseStickySessionClient(boolean useStickySessionClient) {
     this.useStickySessionClient = useStickySessionClient;
+  }
+
+  public boolean isUseStreamingSql() {
+    return useStreamingSql;
+  }
+
+  public void setUseStreamingSql(boolean useStreamingSql) {
+    this.useStreamingSql = useStreamingSql;
   }
 }
