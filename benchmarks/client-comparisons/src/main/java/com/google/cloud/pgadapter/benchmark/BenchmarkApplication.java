@@ -73,7 +73,7 @@ public class BenchmarkApplication implements CommandLineRunner {
                 server.getLocalPort(), spannerConfiguration.getDatabase());
     String spannerConnectionUrl =
         String.format(
-            "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d;minSessions=%d;maxSessions=%d;useVirtualThreads=%s;useStickySessions=%s"
+            "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d;minSessions=%d;maxSessions=%d;useVirtualThreads=%s;useStickySessions=%s;optimizeSessionPool=%s"
                 + (pgAdapterConfiguration.getCredentials() == null
                     ? ""
                     : ";credentials=" + pgAdapterConfiguration.getCredentials()),
@@ -88,7 +88,10 @@ public class BenchmarkApplication implements CommandLineRunner {
                 400,
                 benchmarkConfiguration.getParallelism().stream().max(Integer::compare).orElse(400)),
             spannerConfiguration.isUseVirtualThreads(),
-            spannerConfiguration.isUseStickySessionClient());
+            spannerConfiguration.isUseStickySessionClient(),
+            spannerConfiguration.isOptimizeUnbalancedCheck()
+                && spannerConfiguration.isOptimizeSessionPoolFuture()
+                && spannerConfiguration.getRandomizePositionTransactionsPerSecondThreshold() > 0L);
     try {
       System.out.println("Checking schema");
       SchemaService schemaService = new SchemaService(pgAdapterConnectionUrl);
@@ -235,6 +238,11 @@ public class BenchmarkApplication implements CommandLineRunner {
                         benchmarkConfiguration.getParallelism().stream()
                             .max(Integer::compare)
                             .orElse(400))
+                    .setOptimizeSessionPoolFuture(
+                        spannerConfiguration.isOptimizeSessionPoolFuture())
+                    .setOptimizeUnbalancedCheck(spannerConfiguration.isOptimizeUnbalancedCheck())
+                    .setRandomizePositionTransactionsPerSecondThreshold(
+                        spannerConfiguration.getRandomizePositionTransactionsPerSecondThreshold())
                     .build())
             .setDisableVirtualThreads(!spannerConfiguration.isUseVirtualThreads())
             .disableUnixDomainSockets();
