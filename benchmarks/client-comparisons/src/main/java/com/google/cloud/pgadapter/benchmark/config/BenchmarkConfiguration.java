@@ -32,6 +32,8 @@ public class BenchmarkConfiguration {
 
   private List<Integer> parallelism;
 
+  private int virtualThreadsFactor;
+
   private List<String> benchmarks;
 
   /** --- Optimizations --- */
@@ -141,6 +143,14 @@ public class BenchmarkConfiguration {
 
   public void setParallelism(List<Integer> parallelism) {
     this.parallelism = parallelism;
+  }
+
+  public int getVirtualThreadsFactor() {
+    return virtualThreadsFactor;
+  }
+
+  public void setVirtualThreadsFactor(int virtualThreadsFactor) {
+    this.virtualThreadsFactor = virtualThreadsFactor;
   }
 
   public boolean isUseReadOnlyTransactions() {

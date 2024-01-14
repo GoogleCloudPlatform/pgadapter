@@ -67,6 +67,7 @@ public class BenchmarkApplication implements CommandLineRunner {
     String name = args == null || args.length == 0 ? NO_NAME : args[0];
     Timestamp executedAt = Timestamp.from(Instant.now());
     System.out.println("Running benchmark with name " + name + ", executed at " + executedAt);
+    configureVirtualThreads();
     ProxyServer server = pgAdapterConfiguration.isInProcess() ? startPGAdapter() : null;
     String pgAdapterConnectionUrl =
         server == null
@@ -231,16 +232,23 @@ public class BenchmarkApplication implements CommandLineRunner {
     }
   }
 
-  private ProxyServer startPGAdapter() {
-    int parallelism = Runtime.getRuntime().availableProcessors() * 3;
-    int maxPoolSize = Math.max(256, parallelism * 3);
-    if (!System.getProperties().containsKey("jdk.virtualThreadScheduler.parallelism")) {
-      System.setProperty("jdk.virtualThreadScheduler.parallelism", String.valueOf(parallelism));
+  private void configureVirtualThreads() {
+    if (benchmarkConfiguration.getVirtualThreadsFactor() > 1) {
+      int parallelism =
+          Runtime.getRuntime().availableProcessors()
+              * benchmarkConfiguration.getVirtualThreadsFactor();
+      int maxPoolSize =
+          Math.max(256, parallelism * benchmarkConfiguration.getVirtualThreadsFactor());
+      if (!System.getProperties().containsKey("jdk.virtualThreadScheduler.parallelism")) {
+        System.setProperty("jdk.virtualThreadScheduler.parallelism", String.valueOf(parallelism));
+      }
+      if (!System.getProperties().containsKey("jdk.virtualThreadScheduler.maxPoolSize")) {
+        System.setProperty("jdk.virtualThreadScheduler.maxPoolSize", String.valueOf(maxPoolSize));
+      }
     }
-    if (!System.getProperties().containsKey("jdk.virtualThreadScheduler.maxPoolSize")) {
-      System.setProperty("jdk.virtualThreadScheduler.maxPoolSize", String.valueOf(maxPoolSize));
-    }
+  }
 
+  private ProxyServer startPGAdapter() {
     OptionsMetadata.Builder builder =
         OptionsMetadata.newBuilder()
             .setProject(spannerConfiguration.getProject())

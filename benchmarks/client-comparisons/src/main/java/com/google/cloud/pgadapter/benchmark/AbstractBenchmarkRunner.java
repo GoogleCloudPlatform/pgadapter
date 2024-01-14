@@ -1,5 +1,6 @@
 package com.google.cloud.pgadapter.benchmark;
 
+import static com.google.cloud.spanner.ThreadFactoryUtil.createVirtualOrDaemonThreadFactory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -135,10 +136,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
     ConcurrentLinkedQueue<Duration> durations = new ConcurrentLinkedQueue<>();
 
-    //    ExecutorService executor =
-    //        Executors.newFixedThreadPool(
-    //            parallelism, createVirtualOrDaemonThreadFactory("benchmark-worker"));
-    ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+    ExecutorService executor =
+        Executors.newFixedThreadPool(
+            parallelism, createVirtualOrDaemonThreadFactory("benchmark-worker", false));
 
     List<Future<?>> futures = new ArrayList<>(parallelism);
     for (int task = 0; task < parallelism; task++) {
