@@ -46,9 +46,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     this.benchmarkConfiguration = benchmarkConfiguration;
     this.benchmarks.put("SelectOneValueAutoCommit", this::benchmarkSelectOneValueAutoCommit);
     this.benchmarks.put("SelectOneRowAutoCommit", this::benchmarkSelectOneRowAutoCommit);
-    this.benchmarks.put("Select100RowsAutoCommit", this::benchmarkSelect100RowsRowAutoCommit);
+    this.benchmarks.put("Select100RowsAutoCommit", this::benchmarkSelect100RowsAutoCommit);
     this.benchmarks.put("SelectOneRowTransaction", this::benchmarkSelectOneRowTransaction);
-    this.benchmarks.put("Select100RowsTransaction", this::benchmarkSelect100RowsRowTransaction);
+    this.benchmarks.put("Select10RowsTransaction", this::benchmarkSelect10RowsTransaction);
     for (String benchmark : benchmarkConfiguration.getBenchmarks()) {
       if (!this.benchmarks.containsKey(benchmark)) {
         throw new IllegalArgumentException(
@@ -107,13 +107,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         true);
   }
 
-  void benchmarkSelect100RowsRowAutoCommit(String name, int parallelism) throws Exception {
-    benchmarkSelect(
-        name,
-        parallelism,
-        benchmarkConfiguration.getIterations() / 10,
-        "select * from benchmark_all_types where id>=" + getParameterName(1) + " limit 100",
-        true);
+  void benchmarkSelect100RowsAutoCommit(String name, int parallelism) throws Exception {
+    benchmarkSelectNRows(name, parallelism, benchmarkConfiguration.getIterations(), 100, true);
   }
 
   void benchmarkSelectOneRowTransaction(String name, int parallelism) throws Exception {
@@ -125,13 +120,19 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         false);
   }
 
-  void benchmarkSelect100RowsRowTransaction(String name, int parallelism) throws Exception {
+  void benchmarkSelect10RowsTransaction(String name, int parallelism) throws Exception {
+    benchmarkSelectNRows(name, parallelism, benchmarkConfiguration.getIterations(), 10, false);
+  }
+
+  void benchmarkSelectNRows(
+      String name, int parallelism, int iterations, int numRows, boolean autoCommit)
+      throws Exception {
     benchmarkSelect(
         name,
         parallelism,
-        benchmarkConfiguration.getIterations() / 100,
-        "select * from benchmark_all_types where id>=" + getParameterName(1) + " limit 100",
-        false);
+        iterations,
+        "select * from benchmark_all_types where id>=" + getParameterName(1) + " limit " + numRows,
+        autoCommit);
   }
 
   void benchmarkSelect(
