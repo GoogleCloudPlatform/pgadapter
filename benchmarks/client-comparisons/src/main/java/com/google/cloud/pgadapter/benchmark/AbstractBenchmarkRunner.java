@@ -129,7 +129,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     benchmarkSelect(
         name,
         parallelism,
-        benchmarkConfiguration.getIterations() / 10,
+        benchmarkConfiguration.getIterations() / 100,
         "select * from benchmark_all_types where id>=" + getParameterName(1) + " limit 100",
         false);
   }
