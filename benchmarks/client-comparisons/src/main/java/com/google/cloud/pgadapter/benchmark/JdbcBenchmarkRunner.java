@@ -76,9 +76,10 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
           if (numRows == 1) {
             statement.setString(1, getRandomId());
           } else {
-            statement.setArray(1, connection.createArrayOf("varchar", getRandomIds(numRows)));
+            statement.setArray(1, connection.createArrayOf("text", getRandomIds(numRows)));
           }
           try (ResultSet resultSet = statement.executeQuery()) {
+            int rowCount = 0;
             while (resultSet.next()) {
               for (int col = 1; col <= resultSet.getMetaData().getColumnCount(); col++) {
                 if (connection.isWrapperFor(CloudSpannerJdbcConnection.class)
@@ -103,7 +104,9 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
                       resultSet.getString(resultSet.getMetaData().getColumnLabel(col)));
                 }
               }
+              rowCount++;
             }
+            assertEquals(numRows, rowCount);
           }
         }
         if (!autoCommit) {

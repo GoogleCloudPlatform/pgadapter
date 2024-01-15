@@ -151,7 +151,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         iterations,
         "select * from benchmark_all_types where id in (select * from unnest("
             + getParameterName(1)
-            + "::varchar[]))",
+            + "::text[]))",
         autoCommit,
         numRows);
   }
