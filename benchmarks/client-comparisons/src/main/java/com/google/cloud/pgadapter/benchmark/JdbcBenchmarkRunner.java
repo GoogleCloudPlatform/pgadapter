@@ -57,7 +57,11 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
 
   @Override
   void runQuery(
-      String sql, boolean autoCommit, int iterations, ConcurrentLinkedQueue<Duration> durations) {
+      String sql,
+      boolean autoCommit,
+      int iterations,
+      int numRows,
+      ConcurrentLinkedQueue<Duration> durations) {
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
       connection.setAutoCommit(autoCommit);
       for (int n = 0; n < iterations; n++) {
@@ -67,10 +71,13 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
                   .nextLong(benchmarkConfiguration.getMaxRandomWait().toMillis());
           Thread.sleep(sleepDuration);
         }
-        String id = identifiers.get(ThreadLocalRandom.current().nextInt(identifiers.size()));
         Stopwatch watch = Stopwatch.createStarted();
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-          statement.setString(1, id);
+          if (numRows == 1) {
+            statement.setString(1, getRandomId());
+          } else {
+            statement.setArray(1, connection.createArrayOf("varchar", getRandomIds(numRows)));
+          }
           try (ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
               for (int col = 1; col <= resultSet.getMetaData().getColumnCount(); col++) {

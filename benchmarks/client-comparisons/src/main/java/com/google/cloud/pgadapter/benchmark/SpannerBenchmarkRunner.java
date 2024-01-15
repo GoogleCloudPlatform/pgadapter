@@ -83,7 +83,11 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
 
   @Override
   void runQuery(
-      String sql, boolean autoCommit, int iterations, ConcurrentLinkedQueue<Duration> durations) {
+      String sql,
+      boolean autoCommit,
+      int iterations,
+      int numRows,
+      ConcurrentLinkedQueue<Duration> durations) {
     try {
       for (int n = 0; n < iterations; n++) {
         if (!benchmarkConfiguration.getMaxRandomWait().isZero()) {
