@@ -265,7 +265,6 @@ public class ConnectionHandler implements Runnable {
     // emulator when 'autoConfigEmulator=true'.
     uri = uri + ";dialect=postgresql";
     uri = uri + ";useVirtualThreads=" + options.useVirtualThreads();
-    uri = uri + ";retryAbortsInternally=false";
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
           uri
