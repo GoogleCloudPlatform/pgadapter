@@ -21,9 +21,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,12 +98,22 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
                   .nextLong(benchmarkConfiguration.getMaxRandomWait().toMillis());
           Thread.sleep(sleepDuration);
         }
-        String id = identifiers.get(ThreadLocalRandom.current().nextInt(identifiers.size()));
         Stopwatch watch = Stopwatch.createStarted();
-        Statement statement = Statement.newBuilder(sql).bind("p1").to(id).build();
+        Statement.Builder builder = Statement.newBuilder(sql);
+        if (numRows == 1) {
+          builder.bind("p1").to(getRandomId()).build();
+        } else {
+          builder
+              .bind("p1")
+              .toStringArray(
+                  Arrays.stream(getRandomIds(numRows))
+                      .map(Object::toString)
+                      .collect(Collectors.toList()));
+        }
+        Statement statement = builder.build();
         if (autoCommit) {
           try (ResultSet resultSet = databaseClient.singleUse().executeQuery(statement)) {
-            consumeResultSet(resultSet);
+            consumeResultSet(resultSet, numRows);
           }
         } else {
           databaseClient
@@ -109,7 +121,7 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
               .run(
                   transaction -> {
                     try (ResultSet resultSet = transaction.executeQuery(statement)) {
-                      consumeResultSet(resultSet);
+                      consumeResultSet(resultSet, numRows);
                     }
                     return 0L;
                   });
@@ -122,14 +134,17 @@ class SpannerBenchmarkRunner extends AbstractBenchmarkRunner {
     }
   }
 
-  private void consumeResultSet(ResultSet resultSet) {
+  private void consumeResultSet(ResultSet resultSet, int expectedNumRows) {
+    int numRows = 0;
     while (resultSet.next()) {
       for (int col = 0; col < resultSet.getColumnCount(); col++) {
         assertEquals(
             resultSet.getValue(col),
             resultSet.getValue(resultSet.getMetadata().getRowType().getFields(col).getName()));
       }
+      numRows++;
     }
+    assertEquals(expectedNumRows, numRows);
   }
 
   private Spanner createSpanner() throws IOException {
