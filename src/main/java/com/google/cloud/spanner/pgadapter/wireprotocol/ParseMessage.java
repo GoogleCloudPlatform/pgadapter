@@ -248,6 +248,12 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   @Override
   public void flush() throws Exception {
     if (statement.hasException()) {
+      if (!Strings.isNullOrEmpty(this.name)) {
+        // Remove the statement again from the connection if it failed. Note that we cannot just
+        // wait with registering the statement on the connection until this flush call, as other
+        // incoming messages might depend on the statement before the response is flushed.
+        this.connection.closeStatement(this.name);
+      }
       handleError(statement.getException());
     } else if (isExtendedProtocol()) {
       // The simple query protocol does not need the ParseComplete response.
