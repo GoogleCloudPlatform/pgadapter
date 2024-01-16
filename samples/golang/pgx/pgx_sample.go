@@ -23,8 +23,15 @@ import (
 
 // This test application automatically starts PGAdapter in a Docker container and connects to
 // Cloud Spanner through PGAdapter using `pgx`.
-// Run with `go run pgx_sample.go -project my-project -instance my-instance -database my-database`
+//
+// Run with `go run pgx_sample.go` to run the sample on the Cloud Spanner emulator.
+//
+// Run with `go run pgx_sample.go -emulator=false -project my-project -instance my-instance -database my-database` to run the sample on
+// an existing Cloud Spanner database.
 func main() {
+	// TODO(developer): Change default to `false` if you do not want to default to using the Cloud Spanner emulator.
+	emulator := flag.Bool("emulator", true, "Use the Cloud Spanner Emulator instead of a real Cloud Spanner instance")
+
 	// TODO(developer): Uncomment if your environment does not already have default credentials set.
 	// os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/credentials.json")
 
@@ -34,13 +41,17 @@ func main() {
 	instance := flag.String("instance", "my-instance", "The Cloud Spanner instance to connect to")
 	database := flag.String("database", "my-database", "The Cloud Spanner database to connect to")
 	flag.Parse()
-	fmt.Printf("\nConnecting to projects/%s/instances/%s/databases/%s\n\n", *project, *instance, *database)
+	if *emulator {
+		fmt.Printf("\nConnecting to projects/%s/instances/%s/databases/%s on the emulator\n\n", *project, *instance, *database)
+	} else {
+		fmt.Printf("\nConnecting to projects/%s/instances/%s/databases/%s on Cloud Spanner\n\n", *project, *instance, *database)
+	}
 
 	// Start PGAdapter as a child process.
 	// PGAdapter will by default be started as a Java application if Java is available on this host.
 	// Otherwise, it will fall back to starting PGAdapter in a Docker test container.
 	ctx := context.Background()
-	pg, err := pgadapter.Start(ctx, pgadapter.Config{Project: *project, Instance: *instance})
+	pg, err := pgadapter.Start(ctx, pgadapter.Config{Project: *project, Instance: *instance, ConnectToEmulator: *emulator})
 	if err != nil {
 		fmt.Printf("failed to start PGAdapter: %v\n", err)
 		return
