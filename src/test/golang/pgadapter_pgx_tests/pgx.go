@@ -220,6 +220,96 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	if g, w := jsonbValue, "{\"key\": \"value\"}"; g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
+	wantInt8Array := pgtype.Int8Array{
+		Elements: []pgtype.Int8{{1, pgtype.Present}, {0, pgtype.Null}, {2, pgtype.Present}},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayBigint, wantInt8Array; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantBoolArray := pgtype.BoolArray{
+		Elements: []pgtype.Bool{{true, pgtype.Present}, {false, pgtype.Null}, {false, pgtype.Present}},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayBool, wantBoolArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantByteaArray := pgtype.ByteaArray{
+		Elements: []pgtype.Bytea{{[]byte("bytes1"), pgtype.Present}, {nil, pgtype.Null}, {[]byte("bytes2"), pgtype.Present}},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayBytea, wantByteaArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantFloat8Array := pgtype.Float8Array{
+		Elements: []pgtype.Float8{{3.14, pgtype.Present}, {0, pgtype.Null}, {-99.99, pgtype.Present}},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayFloat8, wantFloat8Array; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	// int (int4) values are automatically converted to bigint (int8) values in Cloud Spanner.
+	wantInt4Array := pgtype.Int8Array{
+		Elements: []pgtype.Int8{{-100, pgtype.Present}, {0, pgtype.Null}, {-200, pgtype.Present}},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayInt, wantInt4Array; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	var wantNumericValue1 pgtype.Numeric
+	_ = wantNumericValue1.Scan("6.626")
+	var wantNumericValue2 pgtype.Numeric
+	_ = wantNumericValue2.Scan("-3.14")
+	wantNumericArray := pgtype.NumericArray{
+		Elements: []pgtype.Numeric{wantNumericValue1, {Status: pgtype.Null}, wantNumericValue2},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayNumeric, wantNumericArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantDateValue1, _ := time.Parse("2006-01-02", "2023-02-20")
+	wantDateValue2, _ := time.Parse("2006-01-02", "2000-01-01")
+	wantDateArray := pgtype.DateArray{
+		Elements: []pgtype.Date{{wantDateValue1, pgtype.Present, 0}, {time.Time{}, pgtype.Null, 0}, {wantDateValue2, pgtype.Present, 0}},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayDate, wantDateArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantTimestamptzValue1, _ := time.Parse(time.RFC3339Nano, "2022-02-16T16:18:02.123456+00:00")
+	wantTimestamptzValue2, _ := time.Parse(time.RFC3339Nano, "2000-01-01T00:00:00+00:00")
+	wantTimestamptzArray := pgtype.TimestamptzArray{
+		Elements: []pgtype.Timestamptz{{wantTimestamptzValue1, pgtype.Present, 0}, {time.Time{}, pgtype.Null, 0}, {wantTimestamptzValue2, pgtype.Present, 0}},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	gotVal1 := arrayTimestamptz.(pgtype.TimestamptzArray).Elements[0].Time.UTC().String()
+	wantVal1 := wantTimestamptzArray.Elements[0].Time.UTC().String()
+	gotVal2 := arrayTimestamptz.(pgtype.TimestamptzArray).Elements[1].Time.UTC().String()
+	wantVal2 := wantTimestamptzArray.Elements[1].Time.UTC().String()
+	if g, w := gotVal1, wantVal1; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := gotVal2, wantVal2; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantVarcharArray := pgtype.VarcharArray{
+		Elements: []pgtype.Varchar{{"string1", pgtype.Present}, {"", pgtype.Null}, {"string2", pgtype.Present}},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayVarchar, wantVarcharArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantJsonb1 := pgtype.JSONB{}
+	wantJsonb1.Scan("{\"key\": \"value1\"}")
+	wantJsonb2 := pgtype.JSONB{}
+	wantJsonb2.Scan("{\"key\": \"value2\"}")
+	wantJsonbArray := pgtype.JSONBArray{
+		Elements: []pgtype.JSONB{wantJsonb1, {nil, pgtype.Null}, wantJsonb2},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present}
+	if g, w := arrayJsonb, wantJsonbArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
 
 	return nil
 }

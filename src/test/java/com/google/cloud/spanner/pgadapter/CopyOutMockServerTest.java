@@ -44,6 +44,7 @@ import com.google.spanner.v1.*;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PipedInputStream;
@@ -86,7 +87,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        createMockSpannerServiceWithQueryPartitions(), "d", builder -> {});
+        createMockSpannerServiceWithQueryPartitions(), "d", builder -> {}, OpenTelemetry.noop());
   }
 
   private static MockSpannerServiceImpl createMockSpannerServiceWithQueryPartitions() {

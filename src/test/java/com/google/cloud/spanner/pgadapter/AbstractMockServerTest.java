@@ -938,14 +938,20 @@ public abstract class AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        createMockSpannerThatReturnsOneQueryPartition(), "d", configurator -> {});
+        createMockSpannerThatReturnsOneQueryPartition(),
+        "d",
+        configurator -> {},
+        OpenTelemetry.noop());
   }
 
   protected static void doStartMockSpannerAndPgAdapterServers(
       String defaultDatabase, Consumer<TestOptionsMetadataBuilder> optionsConfigurator)
       throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        createMockSpannerThatReturnsOneQueryPartition(), defaultDatabase, optionsConfigurator);
+        createMockSpannerThatReturnsOneQueryPartition(),
+        defaultDatabase,
+        optionsConfigurator,
+        OpenTelemetry.noop());
   }
 
   public static PGobject createJdbcPgJsonbObject(String value) throws SQLException {
@@ -958,7 +964,8 @@ public abstract class AbstractMockServerTest {
   protected static void doStartMockSpannerAndPgAdapterServers(
       MockSpannerServiceImpl mockSpannerService,
       String defaultDatabase,
-      Consumer<TestOptionsMetadataBuilder> optionsConfigurator)
+      Consumer<TestOptionsMetadataBuilder> optionsConfigurator,
+      OpenTelemetry openTelemetry)
       throws Exception {
     mockSpanner = mockSpannerService;
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
@@ -1037,7 +1044,7 @@ public abstract class AbstractMockServerTest {
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
         .setCredentials(NoCredentials.getInstance());
     optionsConfigurator.accept(builder);
-    pgServer = new ProxyServer(builder.build(), OpenTelemetry.noop());
+    pgServer = new ProxyServer(builder.build(), openTelemetry);
     pgServer.startServer();
   }
 
