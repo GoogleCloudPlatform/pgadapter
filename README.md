@@ -177,6 +177,24 @@ See [samples/java/jdbc](samples/java/jdbc) for a small sample application that a
 PGAdapter as a compile-time dependency and runs it together with the main application.
 
 ## Emulator
+A pre-built Docker image that contains both PGAdapter and the Spanner Emulator can be started with
+these commands:
+
+```shell
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+docker run \
+  -d -p 5432:5432 \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+sleep 2
+psql -h localhost -p 5432 -d test-database
+```
+
+This Docker container configures PGAdapter to connect to a Cloud Spanner Emulator running inside
+the same container. You do not need to first create a Spanner instance or database on the Emulator
+before connecting to them. Instead, the instance and database are automatically created on the
+Emulator when you connect to PGAdapter.
+
+### Additional Information
 See [this document](docs/emulator.md) for more information on how to connect PGAdapter to the Cloud
 Spanner Emulator.
 
