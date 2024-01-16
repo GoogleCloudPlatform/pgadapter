@@ -45,6 +45,7 @@ public class QueryMessage extends ControlMessage {
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
+    connection.getExtendedQueryProtocolHandler().maybeStartSpan(true);
     this.originalStatement = Statement.of(this.readAll());
     connection.maybeDetermineWellKnownClient(this.originalStatement);
     this.simpleQueryStatement =
@@ -69,7 +70,7 @@ public class QueryMessage extends ControlMessage {
   }
 
   @Override
-  protected String getIdentifier() {
+  public String getIdentifier() {
     return String.valueOf(IDENTIFIER);
   }
 

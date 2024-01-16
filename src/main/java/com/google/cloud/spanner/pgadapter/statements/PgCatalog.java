@@ -48,6 +48,10 @@ public class PgCatalog {
               new TableOrIndexName(null, "pg_namespace"),
               new TableOrIndexName(null, "pg_namespace"))
           .put(
+              new TableOrIndexName("pg_catalog", "pg_database"),
+              new TableOrIndexName(null, "pg_database"))
+          .put(new TableOrIndexName(null, "pg_database"), new TableOrIndexName(null, "pg_database"))
+          .put(
               new TableOrIndexName("pg_collation", "pg_collation"),
               new TableOrIndexName(null, "pg_collation"))
           .put(
@@ -134,6 +138,7 @@ public class PgCatalog {
   private static final Map<TableOrIndexName, PgCatalogTable> DEFAULT_PG_CATALOG_TABLES =
       ImmutableMap.<TableOrIndexName, PgCatalogTable>builder()
           .put(new TableOrIndexName(null, "pg_namespace"), new PgNamespace())
+          .put(new TableOrIndexName(null, "pg_database"), new PgDatabase())
           .put(new TableOrIndexName(null, "pg_collation"), new PgCollation())
           .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
           .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
@@ -304,6 +309,38 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_NAMESPACE_CTE;
+    }
+  }
+
+  @InternalApi
+  public static class PgDatabase implements PgCatalogTable {
+    // https://www.postgresql.org/docs/current/catalog-pg-database.html
+    public static final String PG_DATABASE_CTE =
+        "pg_database as (\n"
+            + "  select 0::bigint as oid,\n"
+            + "         catalog_name as datname,\n"
+            + "         0::bigint as datdba,\n"
+            + "         6::bigint as encoding,\n"
+            + "         'c' as datlocprovider,\n"
+            + "         'C' as datcollate,\n"
+            + "         'C' as datctype,\n"
+            + "         false as datistemplate,\n"
+            + "         true as datallowconn,\n"
+            + "         -1::bigint as datconnlimit,\n"
+            + "         0::bigint as datlastsysoid,\n"
+            + "         0::bigint as datfrozenxid,\n"
+            + "         0::bigint as datminmxid,\n"
+            + "         0::bigint as dattablespace,\n"
+            + "         null as daticulocale,\n"
+            + "         null as daticurules,\n"
+            + "         null as datcollversion,\n"
+            + "         null as datacl"
+            + "  from information_schema.information_schema_catalog_name\n"
+            + ")";
+
+    @Override
+    public String getTableExpression() {
+      return PG_DATABASE_CTE;
     }
   }
 

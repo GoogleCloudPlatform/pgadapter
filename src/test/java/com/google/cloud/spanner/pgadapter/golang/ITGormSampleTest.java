@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.*;
 import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
@@ -40,6 +41,10 @@ public class ITGormSampleTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
+    assumeTrue(
+        "RETURNING generated value does not work with the emulator",
+        System.getenv("SPANNER_EMULATOR_HOST") == null);
+
     try {
       gormSampleTest =
           GolangTest.compile("../../../samples/golang/gorm/sample.go", GormSampleTest.class);

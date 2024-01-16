@@ -38,6 +38,10 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.semconv.SemanticAttributes;
 import java.util.List;
 
 /**
@@ -132,16 +136,28 @@ public class SimpleQueryStatement {
   @VisibleForTesting
   static ParsedStatement translatePotentialMetadataCommand(
       ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
-    for (Command currentCommand :
-        Command.getCommands(
-            parsedStatement.getSqlWithoutComments(),
-            connectionHandler.getSpannerConnection(),
-            connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
-      if (currentCommand.is()) {
-        return PARSER.parse(Statement.of(currentCommand.translate()));
+    Tracer tracer = connectionHandler.getExtendedQueryProtocolHandler().getTracer();
+    Span span =
+        tracer
+            .spanBuilder("translatePotentialMetadataCommand")
+            .setAttribute(
+                "pgadapter.connection_id", connectionHandler.getTraceConnectionId().toString())
+            .setAttribute(SemanticAttributes.DB_STATEMENT, parsedStatement.getSqlWithoutComments())
+            .startSpan();
+    try (Scope ignore = span.makeCurrent()) {
+      for (Command currentCommand :
+          Command.getCommands(
+              parsedStatement.getSqlWithoutComments(),
+              connectionHandler.getSpannerConnection(),
+              connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
+        if (currentCommand.is()) {
+          return PARSER.parse(Statement.of(currentCommand.translate()));
+        }
       }
+      return parsedStatement;
+    } finally {
+      span.end();
     }
-    return parsedStatement;
   }
 
   protected static ImmutableList<Statement> parseStatements(Statement statement) {

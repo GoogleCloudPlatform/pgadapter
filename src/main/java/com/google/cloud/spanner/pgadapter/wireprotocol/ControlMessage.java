@@ -56,6 +56,10 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.grpc.Context;
 import io.grpc.MethodDescriptor;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -313,34 +317,47 @@ public abstract class ControlMessage extends WireMessage {
    */
   SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
-    StatementResult statementResult = describedResult.getStatementResult();
-    Preconditions.checkArgument(
-        statementResult.getResultType() == ResultType.RESULT_SET,
-        "The statement result must be a result set");
-    long rows;
-    boolean hasData;
-    if (statementResult instanceof PartitionQueryResult) {
-      hasData = false;
-      PartitionQueryResult partitionQueryResult = (PartitionQueryResult) statementResult;
-      sendPrefix(describedResult, ((PartitionQueryResult) statementResult).getMetadataResultSet());
-      rows =
-          sendPartitionedQuery(
-              describedResult,
-              mode,
-              partitionQueryResult.getBatchTransactionId(),
-              partitionQueryResult.getPartitions());
-    } else {
-      hasData = describedResult.isHasMoreData();
-      ResultSet resultSet = describedResult.getStatementResult().getResultSet();
-      sendPrefix(describedResult, resultSet);
-      SendResultSetRunnable runnable =
-          SendResultSetRunnable.forResultSet(describedResult, resultSet, maxRows, mode, hasData);
-      rows = runnable.call();
-      hasData = runnable.hasData;
-    }
+    Tracer tracer = connection.getExtendedQueryProtocolHandler().getTracer();
+    Span span =
+        tracer
+            .spanBuilder("send_result_set")
+            .setAttribute("pgadapter.connection_id", connection.getTraceConnectionId().toString())
+            .setAttribute(SemanticAttributes.DB_STATEMENT, describedResult.getSql())
+            .startSpan();
+    try (Scope ignore = span.makeCurrent()) {
+      StatementResult statementResult = describedResult.getStatementResult();
+      Preconditions.checkArgument(
+          statementResult.getResultType() == ResultType.RESULT_SET,
+          "The statement result must be a result set");
+      long rows;
+      boolean hasData;
+      if (statementResult instanceof PartitionQueryResult) {
+        hasData = false;
+        PartitionQueryResult partitionQueryResult = (PartitionQueryResult) statementResult;
+        sendPrefix(
+            describedResult, ((PartitionQueryResult) statementResult).getMetadataResultSet());
+        rows =
+            sendPartitionedQuery(
+                describedResult,
+                mode,
+                partitionQueryResult.getBatchTransactionId(),
+                partitionQueryResult.getPartitions());
+      } else {
+        hasData = describedResult.isHasMoreData();
+        ResultSet resultSet = describedResult.getStatementResult().getResultSet();
+        sendPrefix(describedResult, resultSet);
+        SendResultSetRunnable runnable =
+            SendResultSetRunnable.forResultSet(describedResult, resultSet, maxRows, mode, hasData);
+        rows = runnable.call();
+        hasData = runnable.hasData;
+      }
 
-    sendSuffix(describedResult);
-    return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
+      sendSuffix(describedResult);
+      return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
+    } finally {
+      logger.log(Level.FINER, Logging.format("Send result", Action.Finished));
+      span.end();
+    }
   }
 
   private void sendPrefix(IntermediateStatement describedResult, ResultSet resultSet)

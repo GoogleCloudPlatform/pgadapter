@@ -14,5 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assume.assumeFalse;
+
 /** Integration Test interface. */
-public interface IntegrationTest {}
+public interface IntegrationTest {
+  static void skipOnEmulator(String reason) {
+    assumeFalse(reason, isRunningOnEmulator());
+  }
+
+  static boolean isRunningOnEmulator() {
+    return System.getenv("SPANNER_EMULATOR_HOST") != null;
+  }
+}

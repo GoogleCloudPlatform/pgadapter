@@ -108,7 +108,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   }
 
   @Override
-  protected String getIdentifier() {
+  public String getIdentifier() {
     return String.valueOf(IDENTIFIER);
   }
 

@@ -26,6 +26,8 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
+import io.opentelemetry.api.OpenTelemetry;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -54,6 +56,7 @@ public class ProxyServer extends AbstractApiService {
 
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
+  private final OpenTelemetry openTelemetry;
   private final Properties properties;
   private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
 
@@ -84,23 +87,32 @@ public class ProxyServer extends AbstractApiService {
    * @param optionsMetadata Resulting metadata from CLI.
    */
   public ProxyServer(OptionsMetadata optionsMetadata) {
-    this.options = optionsMetadata;
-    this.localPort = optionsMetadata.getProxyPort();
-    this.properties = new Properties();
-    this.debugMode = optionsMetadata.isDebugMode();
-    addConnectionProperties();
+    this(optionsMetadata, Server.setupOpenTelemetry(optionsMetadata));
+  }
+
+  /**
+   * Instantiates the ProxyServer from CLI-gathered metadata.
+   *
+   * @param optionsMetadata Resulting metadata from CLI.
+   * @param openTelemetry The {@link OpenTelemetry} to use to collect metrics
+   */
+  public ProxyServer(OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry) {
+    this(optionsMetadata, openTelemetry, new Properties());
   }
 
   /**
    * Instantiates the ProxyServer from metadata and properties. For use with in-process invocations.
    *
    * @param optionsMetadata Resulting metadata from CLI.
-   * @param properties Properties for specificying additional information to JDBC like an external
+   * @param openTelemetry The {@link OpenTelemetry} to use to collect metrics
+   * @param properties Properties for specifying additional information to JDBC like an external
    *     channel provider (see ConnectionOptions in Java Spanner client library for more details on
    *     supported properties).
    */
-  public ProxyServer(OptionsMetadata optionsMetadata, Properties properties) {
+  public ProxyServer(
+      OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties) {
     this.options = optionsMetadata;
+    this.openTelemetry = openTelemetry;
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
@@ -296,6 +308,9 @@ public class ProxyServer extends AbstractApiService {
                   serverSocket, e));
     } finally {
       logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocket));
+      if (openTelemetry instanceof Closeable) {
+        ((Closeable) openTelemetry).close();
+      }
       stoppedLatch.countDown();
     }
   }
@@ -342,6 +357,10 @@ public class ProxyServer extends AbstractApiService {
 
   public OptionsMetadata getOptions() {
     return this.options;
+  }
+
+  public OpenTelemetry getOpenTelemetry() {
+    return this.openTelemetry;
   }
 
   /** @return the JDBC connection properties that are used by this server */

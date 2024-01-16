@@ -14,10 +14,25 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.auth.Credentials;
+import com.google.cloud.opentelemetry.trace.TraceConfiguration;
+import com.google.cloud.opentelemetry.trace.TraceExporter;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableMap;
+import com.google.devtools.cloudtrace.v2.AttributeValue;
+import com.google.devtools.cloudtrace.v2.TruncatableString;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.time.Duration;
+import java.util.Locale;
+import java.util.Objects;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 
@@ -31,11 +46,90 @@ public class Server {
   public static void main(String[] args) {
     try {
       OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
-      ProxyServer server = new ProxyServer(optionsMetadata);
+      OpenTelemetry openTelemetry = setupOpenTelemetry(optionsMetadata);
+      ProxyServer server = new ProxyServer(optionsMetadata, openTelemetry);
       server.startServer();
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }
+  }
+
+  /** Creates an {@link OpenTelemetry} object from the given options. */
+  static OpenTelemetry setupOpenTelemetry(OptionsMetadata optionsMetadata) {
+    if (!optionsMetadata.isEnableOpenTelemetry()) {
+      return OpenTelemetry.noop();
+    }
+
+    if (getOpenTelemetrySetting("otel.traces.exporter") == null) {
+      System.setProperty("otel.traces.exporter", "none");
+    }
+    if (getOpenTelemetrySetting("otel.metrics.exporter") == null) {
+      System.setProperty("otel.metrics.exporter", "none");
+    }
+    if (getOpenTelemetrySetting("otel.logs.exporter") == null) {
+      System.setProperty("otel.logs.exporter", "none");
+    }
+    if (getOpenTelemetrySetting("otel.service.name") == null) {
+      System.setProperty("otel.service.name", "pgadapter");
+    }
+
+    TraceConfiguration.Builder builder =
+        TraceConfiguration.builder().setDeadline(Duration.ofSeconds(60L));
+    String projectId = optionsMetadata.getTelemetryProjectId();
+    if (projectId != null) {
+      builder.setProjectId(projectId);
+    }
+    try {
+      Credentials credentials = optionsMetadata.getTelemetryCredentials();
+      if (credentials != null) {
+        builder.setCredentials(credentials);
+      }
+      builder.setFixedAttributes(
+          ImmutableMap.of(
+              "service.name",
+              AttributeValue.newBuilder()
+                  .setStringValue(
+                      TruncatableString.newBuilder()
+                          .setValue(
+                              Objects.requireNonNull(getOpenTelemetrySetting("otel.service.name")))
+                          .build())
+                  .build()));
+      TraceConfiguration configuration = builder.build();
+      SpanExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
+      Sampler sampler;
+      if (optionsMetadata.getOpenTelemetryTraceRatio() == null) {
+        sampler = Sampler.parentBased(Sampler.traceIdRatioBased(0.05d));
+      } else {
+        sampler =
+            Sampler.parentBased(
+                Sampler.traceIdRatioBased(optionsMetadata.getOpenTelemetryTraceRatio()));
+      }
+      return AutoConfiguredOpenTelemetrySdk.builder()
+          .addTracerProviderCustomizer(
+              (sdkTracerProviderBuilder, configProperties) ->
+                  sdkTracerProviderBuilder
+                      .setSampler(sampler)
+                      .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()))
+          .build()
+          .getOpenTelemetrySdk();
+    } catch (IOException exception) {
+      throw new RuntimeException(exception);
+    }
+  }
+
+  static String getOpenTelemetrySetting(String systemProperty) {
+    if (System.getProperties().containsKey(systemProperty)) {
+      return System.getProperty(systemProperty);
+    }
+    String envVar = convertOpenTelemetrySystemPropertyToEnvVar(systemProperty);
+    if (System.getenv().containsKey(envVar)) {
+      return System.getenv(envVar);
+    }
+    return null;
+  }
+
+  static String convertOpenTelemetrySystemPropertyToEnvVar(String systemProperty) {
+    return systemProperty.replaceAll("\\.", "_").toUpperCase(Locale.ENGLISH);
   }
 
   static OptionsMetadata extractMetadata(String[] args, PrintStream out) {
@@ -60,7 +154,7 @@ public class Server {
     out.printf("Version: %s\n", getVersion());
   }
 
-  static String getVersion() {
+  public static String getVersion() {
     String version = Server.class.getPackage().getImplementationVersion();
     if (version != null) {
       return version;

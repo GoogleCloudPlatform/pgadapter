@@ -146,7 +146,7 @@ public class StartupMessage extends BootstrapMessage {
   }
 
   @Override
-  protected String getIdentifier() {
+  public String getIdentifier() {
     return Integer.toString(IDENTIFIER);
   }
 

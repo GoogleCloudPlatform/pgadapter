@@ -1920,7 +1920,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ")
+                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2  ORDER BY ordinal_position")
                 .bind("p1")
                 .to(usersSchema)
                 .bind("p2")
@@ -1930,7 +1930,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 and column_name in ($3, $4)")
+                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 and column_name in ($3, $4) ORDER BY ordinal_position")
                 .bind("p1")
                 .to(usersSchema)
                 .bind("p2")
@@ -1944,7 +1944,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 and column_name in ($3, $4)")
+                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 and column_name in ($3, $4) ORDER BY ordinal_position")
                 .bind("p1")
                 .to(usersSchema)
                 .bind("p2")
@@ -2013,7 +2013,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ")
+                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2  ORDER BY ordinal_position")
                 .bind("p1")
                 .to("public")
                 .bind("p2")
@@ -2026,7 +2026,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                     "SELECT column_name, spanner_type "
                         + "FROM information_schema.columns "
                         + "WHERE table_schema = $1 AND table_name = $2 "
-                        + "and column_name in ($3, $4, $5, $6, $7, $8, $9, $10, $11, $12)")
+                        + "and column_name in ($3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ORDER BY ordinal_position")
                 .bind("p1")
                 .to("public")
                 .bind("p2")
@@ -2219,7 +2219,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ")
+                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2  ORDER BY ordinal_position")
                 .bind("p1")
                 .to("public")
                 .bind("p2")
@@ -2232,7 +2232,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                     "SELECT column_name, spanner_type "
                         + "FROM information_schema.columns "
                         + "WHERE table_schema = $1 AND table_name = $2 "
-                        + "and column_name in ($3, $4, $5, $6, $7, $8, $9, $10, $11, $12)")
+                        + "and column_name in ($3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ORDER BY ordinal_position")
                 .bind("p1")
                 .to("public")
                 .bind("p2")

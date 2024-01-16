@@ -1,0 +1,74 @@
+on:
+  push:
+    branches:
+      - postgresql-dialect
+  pull_request:
+  workflow_dispatch:
+name: integration-emulator
+env:
+  GOOGLE_CLOUD_PROJECT: "test-project"
+  GOOGLE_CLOUD_INSTANCE: "test-instance"
+  GOOGLE_CLOUD_DATABASE: "test-db"
+jobs:
+  integration-test-emulator:
+    runs-on: ubuntu-latest
+    # Add a PostgreSQL Docker container and the emulator.
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        ports:
+          - 5432:5432
+        volumes:
+          - /pg:/var/run/postgresql
+          - /tmp:/tmp
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      emulator:
+        image: gcr.io/cloud-spanner-emulator/emulator:latest
+        ports:
+          - 9010:9010
+          - 9020:9020
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+      - run: java -version
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '^1.17.7'
+      - run: go version
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      - name: Setup psql
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client-14
+      - name: Create PostgreSQL test database
+        run: |
+          psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
+      - name: Run integration tests
+        run: mvn verify -B -Dclirr.skip=true -DskipUnits=true -DskipITs=false
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
+          SPANNER_EMULATOR_HOST: localhost:9010

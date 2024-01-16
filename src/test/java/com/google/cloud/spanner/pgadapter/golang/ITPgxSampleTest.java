@@ -43,6 +43,9 @@ public class ITPgxSampleTest implements IntegrationTest {
   @BeforeClass
   public static void setup() throws Exception {
     assumeTrue("This test only works on the default Spanner URL", testEnv.getSpannerUrl() == null);
+    assumeTrue(
+        "This test only works on the default Spanner URL",
+        System.getenv("SPANNER_EMULATOR_HOST") == null);
 
     String currentPath = new java.io.File(".").getCanonicalPath();
     String relativeSampleFilePath = "samples/golang/pgx/pgx_sample.go";

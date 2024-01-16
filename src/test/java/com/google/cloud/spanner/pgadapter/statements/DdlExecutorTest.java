@@ -20,10 +20,13 @@ import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.Table;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.utils.RegexQueryPartReplacer;
 import com.google.common.base.Suppliers;
@@ -235,19 +238,35 @@ public class DdlExecutorTest {
     assertSame(sql, ddlExecutorWithReplacements.applyReplacers(sql));
     assertEquals(
         "create table my_table (id bigint primary key, value timestamptz)",
-        ddlExecutorWithReplacements.applyReplacers(
+        applyReplacers(
+            ddlExecutorWithReplacements,
             "create table my_table (id bigint primary key, value timestamp)"));
     assertEquals(
         "create table databasechangelog_replaced (id bigint primary key)",
-        ddlExecutorWithReplacements.applyReplacers(
-            "create table databasechangelog (id bigint primary key)"));
+        applyReplacers(
+            ddlExecutorWithReplacements, "create table databasechangelog (id bigint primary key)"));
     assertEquals(
         "create table databasechangelog_replaced (id bigint primary key); create table databasechangelog_replaced (id bigint primary key)",
-        ddlExecutorWithReplacements.applyReplacers(
+        applyReplacers(
+            ddlExecutorWithReplacements,
             "create table databasechangelog (id bigint primary key); create table databasechangelog (id bigint primary key)"));
     assertEquals(
         "create table databasechangelog_reverted (id bigint primary key)",
-        ddlExecutorWithReplacements.applyReplacers(
+        applyReplacers(
+            ddlExecutorWithReplacements,
             "create table databasechangelog_replaced (id bigint primary key)"));
+  }
+
+  @Test
+  public void testTableComparison() {
+    assertEquals(1, new Table("public", "foo", "bar").compareTo(new Table("public", "baz", "foo")));
+    assertEquals(-1, new Table("public", "foo", "bar").compareTo(new Table("public", "bar", null)));
+  }
+
+  private String applyReplacers(DdlExecutor ddlExecutor, String sql) {
+    Statement statement = Statement.of(sql);
+    ParsedStatement parsedStatement = PARSER.parse(Statement.of(sql));
+    Tuple<ParsedStatement, Statement> result = ddlExecutor.replace(parsedStatement, statement);
+    return result.y().getSql();
   }
 }

@@ -44,7 +44,6 @@ import java.util.stream.IntStream;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -292,7 +291,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   }
 
   @Test
-  @Ignore("Parameterized limit and offset are not yet supported by Spangres")
   public void testParameterMetaDataInLimit() throws SQLException {
     String sql = "select * from all_types order by col_varchar limit ? offset ?";
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {

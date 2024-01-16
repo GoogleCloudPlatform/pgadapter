@@ -189,7 +189,9 @@ public class ITPsqlTest implements IntegrationTest {
                         + "as\n"
                         + "select id, full_name\n"
                         + "from singers\n"
-                        + "order by last_name, id")
+                        + (System.getenv("SPANNER_EMULATOR_HOST") == null
+                            ? "order by last_name, id"
+                            : ""))
                 .add("create index idx_singers_last_name on singers (last_name)")
                 .add(
                     "create unique index idx_tracks_title on tracks (id, title) interleave in albums")
@@ -201,8 +203,11 @@ public class ITPsqlTest implements IntegrationTest {
                     "create change stream cs_singers for singers (first_name, last_name, active)\n"
                         + "with (retention_period = '2d',\n"
                         + "value_capture_type = 'OLD_AND_NEW_VALUES')")
-                .add("create role hr_manager")
-                .add("grant select on table singers to hr_manager")
+                .addAll(
+                    System.getenv("SPANNER_EMULATOR_HOST") == null
+                        ? ImmutableList.of(
+                            "create role hr_manager", "grant select on table singers to hr_manager")
+                        : ImmutableList.of())
                 .build());
     testEnv.startPGAdapterServer(Collections.emptyList());
   }
@@ -307,7 +312,9 @@ public class ITPsqlTest implements IntegrationTest {
               + "drop table if exists numbers;\n"
               + "drop foreign table if exists f_all_types;\n"
               + "drop foreign table if exists f_numbers;\n"
-              + "drop role if exists hr_manager;\n"
+              + (System.getenv("SPANNER_EMULATOR_HOST") == null
+                  ? "drop role if exists hr_manager;\n"
+                  : "")
         };
     ProcessBuilder builder = new ProcessBuilder().command(dropTablesCommand);
     setPgPassword(builder);
@@ -536,13 +543,6 @@ public class ITPsqlTest implements IntegrationTest {
 
   @Test
   public void testSetOperationWithOrderBy() throws IOException, InterruptedException {
-    // TODO: Remove
-    assumeTrue(
-        testEnv.getSpannerUrl() != null
-            && testEnv
-                .getSpannerUrl()
-                .equals("https://staging-wrenchworks.sandbox.googleapis.com"));
-
     Tuple<String, String> result =
         runUsingPsql(
             "select * from (select 1) one union all select * from (select 2) two order by 1");

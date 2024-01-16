@@ -884,7 +884,11 @@ public class ITJdbcTest implements IntegrationTest {
 
       // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations'
       // when it tries to delete all data using a normal transaction.
-      connection.createStatement().execute("delete from all_types");
+      connection
+          .createStatement()
+          .execute(
+              "delete from all_types"
+                  + (IntegrationTest.isRunningOnEmulator() ? " where true" : ""));
     }
   }
 
@@ -1009,7 +1013,15 @@ public class ITJdbcTest implements IntegrationTest {
               if (resultSet.getLong(1) == 3L) {
                 assertNull(resultSet.getObject(col));
               } else {
-                assertNotNull(resultSet.getObject(col));
+                // JSONB (array) is currently not supported using the PG JDBC driver with the
+                // emulator, as the PG JDBC driver tries to dynamically load information about the
+                // type from teh pg_catalog tables.
+                if (!(resultSet.getMetaData().getColumnName(col).equals("col_jsonb")
+                    || resultSet.getMetaData().getColumnName(col).equals("col_array_jsonb"))) {
+                  assertNotNull(
+                      "Column " + resultSet.getMetaData().getColumnName(col),
+                      resultSet.getObject(col));
+                }
               }
             }
           }
@@ -1024,13 +1036,18 @@ public class ITJdbcTest implements IntegrationTest {
   public void testPGSettings() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       // First verify the default value.
-      // JDBC sets the DateStyle to 'ISO' for every connection in the connection request.
+      // JDBC sets the DateStyle to 'ISO' for every connection in the connection request, except in
+      // version 42.7.0, where the value is 'ISO, MDY'.
+      String originalDateStyle;
       try (ResultSet resultSet =
           connection
               .createStatement()
               .executeQuery("select setting from pg_settings where name='DateStyle'")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString("setting"));
+        originalDateStyle = resultSet.getString("setting");
+        assertTrue(
+            originalDateStyle,
+            "ISO".equals(originalDateStyle) || "ISO, MDY".equals(originalDateStyle));
         assertFalse(resultSet.next());
       }
       // Verify that we can also use a statement parameter to query the pg_settings table.
@@ -1039,7 +1056,8 @@ public class ITJdbcTest implements IntegrationTest {
         preparedStatement.setString(1, "DateStyle");
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
           assertTrue(resultSet.next());
-          assertEquals("ISO", resultSet.getString("setting"));
+          String dateStyle = resultSet.getString("setting");
+          assertTrue(dateStyle, "ISO".equals(dateStyle) || "ISO, MDY".equals(dateStyle));
           assertFalse(resultSet.next());
         }
       }
@@ -1084,7 +1102,7 @@ public class ITJdbcTest implements IntegrationTest {
               .createStatement()
               .executeQuery("select setting from pg_settings where name='DateStyle'")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString("setting"));
+        assertEquals(originalDateStyle, resultSet.getString("setting"));
         assertFalse(resultSet.next());
       }
     }

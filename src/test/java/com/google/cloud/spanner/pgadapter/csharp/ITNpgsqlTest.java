@@ -19,6 +19,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -67,6 +68,9 @@ public class ITNpgsqlTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
+    assumeTrue(
+        "This test requires pg_type support", System.getenv("SPANNER_EMULATOR_HOST") == null);
+
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());

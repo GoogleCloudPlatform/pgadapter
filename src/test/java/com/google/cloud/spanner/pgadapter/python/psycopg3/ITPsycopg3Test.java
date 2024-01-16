@@ -56,7 +56,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
-public class ITPsycopg3Test {
+public class ITPsycopg3Test implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
 
@@ -448,7 +448,14 @@ public class ITPsycopg3Test {
 
     String result = execute("batch_execution_error");
     assertTrue(result, result.contains("Executing batch failed with error"));
-    assertTrue(result, result.contains("Row [101] in table all_types already exists"));
+    if (IntegrationTest.isRunningOnEmulator()) {
+      assertTrue(
+          result,
+          result.contains(
+              "Failed to insert row with primary key ({pk#col_bigint:101}) due to previously existing row"));
+    } else {
+      assertTrue(result, result.contains("Row [101] in table all_types already exists"));
+    }
   }
 
   // TODO: Enable once the below PR has been merged
@@ -512,8 +519,7 @@ public class ITPsycopg3Test {
     // Add an extra NULL-row to the table.
     addNullRow();
 
-    String result = execute("binary_copy_out");
-    assertEquals(
+    String row1 =
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
@@ -533,8 +539,9 @@ public class ITPsycopg3Test {
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
-            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
-            + "col_bigint: 2\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n";
+    String row2 =
+        "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
             + "col_float8: None\n"
@@ -553,8 +560,14 @@ public class ITPsycopg3Test {
             + "col_array_timestamptz: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
-            + "col_array_jsonb: None\n",
-        result);
+            + "col_array_jsonb: None\n";
+
+    String result = execute("binary_copy_out");
+    if (IntegrationTest.isRunningOnEmulator()) {
+      assertEquals(row2 + row1, result);
+    } else {
+      assertEquals(row1 + row2, result);
+    }
   }
 
   @Test
@@ -562,8 +575,7 @@ public class ITPsycopg3Test {
     // Add an extra NULL-row to the table.
     addNullRow();
 
-    String result = execute("text_copy_out");
-    assertEquals(
+    String row1 =
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
@@ -583,8 +595,9 @@ public class ITPsycopg3Test {
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
-            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
-            + "col_bigint: 2\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n";
+    String row2 =
+        "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
             + "col_float8: None\n"
@@ -603,8 +616,14 @@ public class ITPsycopg3Test {
             + "col_array_timestamptz: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
-            + "col_array_jsonb: None\n",
-        result);
+            + "col_array_jsonb: None\n";
+
+    String result = execute("text_copy_out");
+    if (IntegrationTest.isRunningOnEmulator()) {
+      assertEquals(row2 + row1, result);
+    } else {
+      assertEquals(row1 + row2, result);
+    }
   }
 
   @Test

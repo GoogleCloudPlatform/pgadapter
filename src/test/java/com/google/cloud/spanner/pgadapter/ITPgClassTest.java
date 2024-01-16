@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.ITJdbcMetadataTest.getDdlStatem
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
@@ -280,7 +281,12 @@ public class ITPgClassTest implements IntegrationTest {
               resultSet.getBoolean("indnullsnotdistinct"));
           assertEquals(
               expected.indexrelid, expected.indisprimary, resultSet.getBoolean("indisprimary"));
-          assertEquals(expected.indexrelid, expected.indpred, resultSet.getString("indpred"));
+          // TODO: Remove when the emulator supports indpred.
+          if (IntegrationTest.isRunningOnEmulator()) {
+            assertNull(expected.indexrelid, resultSet.getString("indpred"));
+          } else {
+            assertEquals(expected.indexrelid, expected.indpred, resultSet.getString("indpred"));
+          }
           index++;
         }
         assertEquals(index, expectedRows.size());
@@ -609,7 +615,10 @@ public class ITPgClassTest implements IntegrationTest {
           assertEquals(expected.confupdtype, resultSet.getString("confupdtype"));
           assertEquals(expected.confdeltype, resultSet.getString("confdeltype"));
           assertEquals(expected.confmatchtype, resultSet.getString("confmatchtype"));
-          assertArrayEquals(expected.conkey, (Long[]) resultSet.getArray("conkey").getArray());
+          // TODO: Remove check when we array_agg with order by is supported.
+          if (!IntegrationTest.isRunningOnEmulator()) {
+            assertArrayEquals(expected.conkey, (Long[]) resultSet.getArray("conkey").getArray());
+          }
           assertArrayEquals(
               expected.confkey,
               resultSet.getArray("confkey") == null

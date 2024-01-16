@@ -47,6 +47,10 @@ See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked qu
 See [Latency Comparisons](benchmarks/latency-comparison/README.md) for benchmark comparisons between
 using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers and client libraries.
 
+## Insights
+See [OpenTelemetry in PGAdapter](docs/open_telemetry.md) for how to use `OpenTelemetry` to collect
+and export traces to Google Cloud Trace.
+
 ## Usage
 PGAdapter can be started both as a Docker container, a standalone process as well as an
 in-process server (the latter is only supported for Java and other JVM-based applications).
@@ -105,9 +109,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.26.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.28.0` with the version you want to download):
 ```shell
-VERSION=v0.26.0
+VERSION=v0.28.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -142,7 +146,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.26.0</version>
+  <version>0.28.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -153,19 +157,16 @@ This option is only available for Java/JVM-based applications.
 
 ```java
 class PGProxyRunner {
-    public static void main() {
-      String[] arguments =
-              new String[] {
-                      "-p",
-                      "my-project",
-                      "-i",
-                      "my-instance",
-                      "-d",
-                      "my-database",
-                      "-c",
-                      "/path/to/credentials.json"
-              };
-      ProxyServer server = new ProxyServer(new OptionsMetadata(arguments));
+  public static void main(String[] args) {
+      OptionsMetadata.Builder builder =
+          OptionsMetadata.newBuilder()
+              .setProject("my-project")
+              .setInstance("my-instance")
+              .setDatabase("my-database")
+              .setCredentialsFile("/path/to/credentials.json")
+              // Start PGAdapter on any available port.
+              .setPort(0);
+      ProxyServer server = new ProxyServer(builder.build());
       server.startServer();
       server.awaitRunning();
     }

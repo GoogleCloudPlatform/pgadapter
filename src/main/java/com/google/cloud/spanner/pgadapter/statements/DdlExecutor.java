@@ -113,8 +113,8 @@ class DdlExecutor {
     }
   }
 
-  private Tuple<ParsedStatement, Statement> replace(
-      ParsedStatement parsedStatement, Statement statement) {
+  @VisibleForTesting
+  Tuple<ParsedStatement, Statement> replace(ParsedStatement parsedStatement, Statement statement) {
     if (!ddlStatementReplacements.get().isEmpty()) {
       String replaced = applyReplacers(statement.getSql());
       if (!replaced.equals(statement.getSql())) {
@@ -383,7 +383,7 @@ class DdlExecutor {
     }
   }
 
-  private static final class Table implements Comparable<Table> {
+  static final class Table implements Comparable<Table> {
     private final String schema;
     private final String name;
     private final String parent;

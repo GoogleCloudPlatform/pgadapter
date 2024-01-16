@@ -33,10 +33,12 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
+import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Collections;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -48,7 +50,10 @@ public class OptionsMetadataTest {
   public void testDefaultDomainSocketFile() {
     for (String os : new String[] {"ubuntu", "windows"}) {
       OptionsMetadata options =
-          new OptionsMetadata(os, new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
+          new OptionsMetadata(
+              Collections.emptyMap(),
+              os,
+              new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
       if (options.isWindows()) {
         assertEquals("", options.getSocketFile(5432));
         assertFalse(options.isDomainSocketEnabled());
@@ -63,7 +68,10 @@ public class OptionsMetadataTest {
   public void testCustomDomainSocketFile() {
     for (String os : new String[] {"ubuntu", "windows"}) {
       OptionsMetadata options =
-          new OptionsMetadata(os, new String[] {"-p p", "-i i", "-c \"\"", "-dir /pgadapter"});
+          new OptionsMetadata(
+              Collections.emptyMap(),
+              os,
+              new String[] {"-p p", "-i i", "-c \"\"", "-dir /pgadapter"});
       assertEquals(
           "/pgadapter" + File.separatorChar + ".s.PGSQL.5432", options.getSocketFile(5432));
       assertTrue(options.isDomainSocketEnabled());
@@ -503,6 +511,7 @@ public class OptionsMetadataTest {
     assertEquals(
         "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database",
         new OptionsMetadata(
+                Collections.emptyMap(),
                 "linux",
                 "jdbc:cloudspanner:/projects/my-project/instances/my-instance/databases/my-database",
                 5432,
@@ -513,5 +522,22 @@ public class OptionsMetadataTest {
                 false,
                 null)
             .getDefaultConnectionUrl());
+  }
+
+  @Test
+  public void testBuildConnectionUrlWithEmulator() {
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter",
+        OptionsMetadata.newBuilder()
+            .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
+            .build()
+            .buildConnectionURL("projects/my-project/instances/my-instance/databases/my-database"));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter",
+        OptionsMetadata.newBuilder()
+            .setRequireAuthentication()
+            .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
+            .build()
+            .buildConnectionURL("projects/my-project/instances/my-instance/databases/my-database"));
   }
 }

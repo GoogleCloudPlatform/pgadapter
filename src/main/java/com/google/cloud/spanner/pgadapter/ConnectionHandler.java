@@ -81,6 +81,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -123,6 +124,10 @@ public class ConnectionHandler extends Thread {
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
   //  32 bytes, and shouldn't be incremented on failed startups.
   private static final AtomicInteger incrementingConnectionId = new AtomicInteger(0);
+
+  /** Randomly generated UUID that is included in tracing to identify a connection. */
+  private final UUID traceConnectionId = UUID.randomUUID();
+
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private int invalidMessagesCount;
@@ -706,6 +711,10 @@ public class ConnectionHandler extends Thread {
 
   public int getSecret() {
     return this.secret;
+  }
+
+  public UUID getTraceConnectionId() {
+    return traceConnectionId;
   }
 
   public void setMessageState(WireMessage message) {

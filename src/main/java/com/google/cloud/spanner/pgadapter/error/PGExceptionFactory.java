@@ -27,10 +27,26 @@ import java.util.regex.Pattern;
 public class PGExceptionFactory {
   private static final Pattern RELATION_NOT_FOUND_PATTERN =
       Pattern.compile("relation .+ does not exist");
+  private static final Pattern COLUMN_NOT_FOUND_PATTERN =
+      Pattern.compile("column .+ of relation .+ does not exist");
   private static final Pattern CANNOT_DROP_TABLE_WITH_INDICES_PATTERN =
-      Pattern.compile("Cannot drop table test with indices");
+      Pattern.compile("Cannot drop table .+ with indices");
   private static final Pattern ONLY_RESTRICT_BEHAVIOR =
       Pattern.compile("Only <RESTRICT> behavior is supported by <DROP> statement\\.");
+  private static final Pattern PK_VIOLATION_PATTERN =
+      Pattern.compile("Row .+ in table .+ already exists");
+  private static final Pattern PK_VIOLATION_PATTERN_EMULATOR =
+      Pattern.compile("Failed to insert row with primary key .+ due to previously existing row");
+  private static final Pattern UNIQUE_INDEX_VIOLATION_PATTERN =
+      Pattern.compile("Unique index violation on index .+ at index key .+");
+  private static final Pattern UNIQUE_INDEX_VIOLATION_PATTERN_EMULATOR =
+      Pattern.compile("UNIQUE violation on index .+ duplicate key: .+");
+  private static final Pattern FOREIGN_KEY_VIOLATION_PATTERN =
+      Pattern.compile(
+          "Foreign key constraint .+ is violated on table .+\\. Cannot find referenced values in .+");
+  private static final Pattern FOREIGN_KEY_VIOLATION_PATTERN_EMULATOR =
+      Pattern.compile(
+          "Foreign key .+ constraint violation on table .+\\. Cannot find referenced key .+ in table .+");
 
   private PGExceptionFactory() {}
 
@@ -85,19 +101,44 @@ public class PGExceptionFactory {
           .setSQLState(SQLState.SerializationFailure)
           .build();
     }
-    if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+    if ((spannerException.getErrorCode() == ErrorCode.NOT_FOUND
+            || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
+        && COLUMN_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
+      return PGException.newBuilder(extractMessage(spannerException))
+          .setSQLState(SQLState.UndefinedColumn)
+          .build();
+    } else if ((spannerException.getErrorCode() == ErrorCode.NOT_FOUND
+            || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
         && RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.UndefinedTable)
           .build();
+    } else if (spannerException.getErrorCode() == ErrorCode.ALREADY_EXISTS
+        && (PK_VIOLATION_PATTERN.matcher(spannerException.getMessage()).find()
+            || PK_VIOLATION_PATTERN_EMULATOR.matcher(spannerException.getMessage()).find()
+            || UNIQUE_INDEX_VIOLATION_PATTERN.matcher(spannerException.getMessage()).find()
+            || UNIQUE_INDEX_VIOLATION_PATTERN_EMULATOR
+                .matcher(spannerException.getMessage())
+                .find())) {
+      return PGException.newBuilder(extractMessage(spannerException))
+          .setSQLState(SQLState.UniqueViolation)
+          .build();
     } else if (spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+        && (FOREIGN_KEY_VIOLATION_PATTERN_EMULATOR.matcher(spannerException.getMessage()).find()
+            || FOREIGN_KEY_VIOLATION_PATTERN.matcher(spannerException.getMessage()).find())) {
+      return PGException.newBuilder(extractMessage(spannerException))
+          .setSQLState(SQLState.ForeignKeyViolation)
+          .build();
+    } else if ((spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+            || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
         && CANNOT_DROP_TABLE_WITH_INDICES_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.FeatureNotSupported)
           .setHints(
               "Execute 'set spanner.support_drop_cascade=true' to enable dropping tables with indices")
           .build();
-    } else if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+    } else if ((spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+            || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
         && ONLY_RESTRICT_BEHAVIOR.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.FeatureNotSupported)

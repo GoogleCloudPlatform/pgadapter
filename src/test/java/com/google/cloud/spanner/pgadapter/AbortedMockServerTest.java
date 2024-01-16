@@ -966,10 +966,11 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   @Test
   public void testShowSettingWithStartupValue() throws SQLException {
     try (Connection connection = createConnection()) {
-      // DATESTYLE is set to 'ISO' by the JDBC driver at startup.
+      // DATESTYLE is set to 'ISO' by the JDBC driver at startup ('ISO, MDY' in 42.7.0).
       try (ResultSet resultSet = connection.createStatement().executeQuery("show DATESTYLE")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        String dateStyle = resultSet.getString(1);
+        assertTrue(dateStyle, "ISO".equals(dateStyle) || "ISO, MDY".equals(dateStyle));
         assertFalse(resultSet.next());
       }
     }
@@ -1054,9 +1055,13 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   @Test
   public void testResetSettingWithStartupValue() throws SQLException {
     try (Connection connection = createConnection()) {
+      String originalDateStyle;
       try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        originalDateStyle = resultSet.getString(1);
+        assertTrue(
+            originalDateStyle,
+            "ISO".equals(originalDateStyle) || "ISO, MDY".equals(originalDateStyle));
         assertFalse(resultSet.next());
       }
 
@@ -1072,7 +1077,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
       try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        assertEquals(originalDateStyle, resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
