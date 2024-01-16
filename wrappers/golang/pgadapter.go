@@ -18,7 +18,6 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"io"
 	"net"
 	"net/http"
@@ -32,6 +31,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/oauth2/google"
 )
 
