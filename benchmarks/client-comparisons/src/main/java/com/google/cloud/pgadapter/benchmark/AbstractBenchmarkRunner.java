@@ -7,13 +7,16 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.pgadapter.benchmark.config.BenchmarkConfiguration;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,9 +49,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     this.benchmarkConfiguration = benchmarkConfiguration;
     this.benchmarks.put("SelectOneValueAutoCommit", this::benchmarkSelectOneValueAutoCommit);
     this.benchmarks.put("SelectOneRowAutoCommit", this::benchmarkSelectOneRowAutoCommit);
-    this.benchmarks.put("Select100RowsAutoCommit", this::benchmarkSelect100RowsRowAutoCommit);
+    this.benchmarks.put("Select100RowsAutoCommit", this::benchmarkSelect100RowsAutoCommit);
     this.benchmarks.put("SelectOneRowTransaction", this::benchmarkSelectOneRowTransaction);
-    this.benchmarks.put("Select100RowsTransaction", this::benchmarkSelect100RowsRowTransaction);
+    this.benchmarks.put("Select10RowsTransaction", this::benchmarkSelect10RowsTransaction);
     for (String benchmark : benchmarkConfiguration.getBenchmarks()) {
       if (!this.benchmarks.containsKey(benchmark)) {
         throw new IllegalArgumentException(
@@ -87,6 +90,18 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
   abstract List<String> loadIdentifiers();
 
+  String getRandomId() {
+    return identifiers.get(ThreadLocalRandom.current().nextInt(identifiers.size()));
+  }
+
+  Object[] getRandomIds(int numIds) {
+    Set<String> result = new HashSet<>(numIds);
+    while (result.size() < numIds) {
+      result.add(getRandomId());
+    }
+    return result.toArray();
+  }
+
   abstract String getParameterName(int index);
 
   void benchmarkSelectOneValueAutoCommit(String name, int parallelism) throws Exception {
@@ -95,7 +110,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         parallelism,
         benchmarkConfiguration.getIterations(),
         "select col_varchar from benchmark_all_types where id=" + getParameterName(1),
-        true);
+        true,
+        1);
   }
 
   void benchmarkSelectOneRowAutoCommit(String name, int parallelism) throws Exception {
@@ -104,16 +120,12 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         parallelism,
         benchmarkConfiguration.getIterations(),
         "select * from benchmark_all_types where id=" + getParameterName(1),
-        true);
+        true,
+        1);
   }
 
-  void benchmarkSelect100RowsRowAutoCommit(String name, int parallelism) throws Exception {
-    benchmarkSelect(
-        name,
-        parallelism,
-        benchmarkConfiguration.getIterations() / 10,
-        "select * from benchmark_all_types where id>=" + getParameterName(1) + " limit 100",
-        true);
+  void benchmarkSelect100RowsAutoCommit(String name, int parallelism) throws Exception {
+    benchmarkSelectNRows(name, parallelism, benchmarkConfiguration.getIterations(), 100, true);
   }
 
   void benchmarkSelectOneRowTransaction(String name, int parallelism) throws Exception {
@@ -122,20 +134,35 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         parallelism,
         benchmarkConfiguration.getIterations(),
         "select * from benchmark_all_types where id=" + getParameterName(1),
-        false);
+        false,
+        1);
   }
 
-  void benchmarkSelect100RowsRowTransaction(String name, int parallelism) throws Exception {
+  void benchmarkSelect10RowsTransaction(String name, int parallelism) throws Exception {
+    benchmarkSelectNRows(name, parallelism, benchmarkConfiguration.getIterations(), 10, false);
+  }
+
+  void benchmarkSelectNRows(
+      String name, int parallelism, int iterations, int numRows, boolean autoCommit)
+      throws Exception {
     benchmarkSelect(
         name,
         parallelism,
-        benchmarkConfiguration.getIterations() / 10,
-        "select * from benchmark_all_types where id>=" + getParameterName(1) + " limit 100",
-        false);
+        iterations,
+        "select * from benchmark_all_types where id in (select * from unnest("
+            + getParameterName(1)
+            + "::text[]))",
+        autoCommit,
+        numRows);
   }
 
   void benchmarkSelect(
-      String benchmarkName, int parallelism, int iterations, String sql, boolean autoCommit)
+      String benchmarkName,
+      int parallelism,
+      int iterations,
+      String sql,
+      boolean autoCommit,
+      int numRows)
       throws Exception {
     int totalOperations = parallelism * iterations;
     statistics.reset(this.name, benchmarkName, parallelism, totalOperations);
@@ -148,7 +175,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
     List<Future<?>> futures = new ArrayList<>(parallelism);
     for (int task = 0; task < parallelism; task++) {
-      futures.add(executor.submit(() -> runQuery(sql, autoCommit, iterations, durations)));
+      futures.add(executor.submit(() -> runQuery(sql, autoCommit, iterations, numRows, durations)));
     }
     executor.shutdown();
     assertTrue(executor.awaitTermination(1L, TimeUnit.HOURS));
@@ -161,5 +188,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
   }
 
   abstract void runQuery(
-      String sql, boolean autoCommit, int iterations, ConcurrentLinkedQueue<Duration> durations);
+      String sql,
+      boolean autoCommit,
+      int iterations,
+      int numRows,
+      ConcurrentLinkedQueue<Duration> durations);
 }

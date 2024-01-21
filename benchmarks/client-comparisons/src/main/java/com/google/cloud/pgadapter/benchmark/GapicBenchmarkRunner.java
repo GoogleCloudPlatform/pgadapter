@@ -31,11 +31,13 @@ import com.google.spanner.v1.TransactionSelector;
 import java.io.FileInputStream;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
 
@@ -118,7 +120,11 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
 
   @Override
   void runQuery(
-      String sql, boolean autoCommit, int iterations, ConcurrentLinkedQueue<Duration> durations) {
+      String sql,
+      boolean autoCommit,
+      int iterations,
+      int numRows,
+      ConcurrentLinkedQueue<Duration> durations) {
     try {
       Session session =
           client.createSession(
@@ -133,16 +139,32 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
           Thread.sleep(sleepDuration);
         }
         String id = identifiers.get(ThreadLocalRandom.current().nextInt(identifiers.size()));
+        Value paramValue;
+        if (numRows == 1) {
+          paramValue = Value.newBuilder().setStringValue(id).build();
+        } else {
+          paramValue =
+              Value.newBuilder()
+                  .setListValue(
+                      ListValue.newBuilder()
+                          .addAllValues(
+                              Arrays.stream(getRandomIds(numRows))
+                                  .map(
+                                      element ->
+                                          Value.newBuilder()
+                                              .setStringValue(element.toString())
+                                              .build())
+                                  .collect(Collectors.toList()))
+                          .build())
+                  .build();
+        }
         Stopwatch watch = Stopwatch.createStarted();
         ExecuteSqlRequest.Builder builder =
             ExecuteSqlRequest.newBuilder()
                 .setSession(session.getName())
                 .setSql(sql)
                 .setSeqno(1L)
-                .setParams(
-                    Struct.newBuilder()
-                        .putFields("p1", Value.newBuilder().setStringValue(id).build())
-                        .build());
+                .setParams(Struct.newBuilder().putFields("p1", paramValue).build());
         if (!autoCommit) {
           builder.setTransaction(
               TransactionSelector.newBuilder()
@@ -156,10 +178,10 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
         if (spannerConfiguration.isUseStreamingSql()) {
           ServerStream<PartialResultSet> stream =
               client.executeStreamingSqlCallable().call(builder.build());
-          metadata = consumeStream(stream);
+          metadata = consumeStream(stream, numRows);
         } else {
           ResultSet resultSet = client.executeSql(builder.build());
-          consumeResultSet(resultSet);
+          consumeResultSet(resultSet, numRows);
           metadata = resultSet.getMetadata();
         }
         if (!autoCommit) {
@@ -180,7 +202,8 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
     }
   }
 
-  private void consumeResultSet(ResultSet resultSet) {
+  private void consumeResultSet(ResultSet resultSet, int expectedNumRows) {
+    assertEquals(expectedNumRows, resultSet.getRowsList().size());
     for (ListValue row : resultSet.getRowsList()) {
       int col = 0;
       for (Value value : row.getValuesList()) {
@@ -190,18 +213,24 @@ class GapicBenchmarkRunner extends AbstractBenchmarkRunner {
     }
   }
 
-  private ResultSetMetadata consumeStream(ServerStream<PartialResultSet> stream) {
+  private ResultSetMetadata consumeStream(
+      ServerStream<PartialResultSet> stream, int expectedNumRows) {
     ResultSetMetadata metadata = ResultSetMetadata.getDefaultInstance();
+    int expectedNumCells = -1;
+    int numCells = 0;
     for (PartialResultSet partialResultSet : stream) {
       if (partialResultSet.hasMetadata()) {
         metadata = partialResultSet.getMetadata();
+        expectedNumCells = metadata.getRowType().getFieldsCount() * expectedNumRows;
       }
       int col = 0;
       for (Value value : partialResultSet.getValuesList()) {
         assertEquals(value, partialResultSet.getValues(col));
         col++;
+        numCells++;
       }
     }
+    assertEquals(expectedNumCells, numCells);
     return metadata;
   }
 
