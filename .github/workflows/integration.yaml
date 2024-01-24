@@ -34,7 +34,7 @@ jobs:
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         if: "${{ env.GCP_PROJECT_ID != '' }}"
-        run: echo "::set-output name=defined::true"
+        run: echo "defined=true" >> "$GITHUB_OUTPUT"
   integration-test:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
