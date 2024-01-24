@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,35 +11,19 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package com.google.cloud.postgres.models;
 
-import java.io.Serializable;
+package com.google.cloud.postgres;
 
-public class VenueDescription implements Serializable {
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
-  private String name;
-  private String val;
+@RunWith(JUnit4.class)
+public class SampleApplicationTest {
 
-  public VenueDescription() {}
-
-  public VenueDescription(String name, String val) {
-    this.name = name;
-    this.val = val;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public String getVal() {
-    return val;
-  }
-
-  public void setVal(String val) {
-    this.val = val;
+  @Test
+  public void testRunSampleApplication() throws Exception {
+    // Just verify that we can run the application without any errors.
+    SampleApplication.main(new String[] {});
   }
 }
