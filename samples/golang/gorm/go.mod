@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20231004063709-d26b77dee708
-	github.com/google/uuid v1.5.0
+	github.com/google/uuid v1.6.0
 	github.com/shopspring/decimal v1.3.1
 	github.com/testcontainers/testcontainers-go v0.27.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.27.0
