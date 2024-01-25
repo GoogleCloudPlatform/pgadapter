@@ -35,3 +35,14 @@ jobs:
       - name: Run pgx Sample tests
         working-directory: ./samples/golang/pgx
         run: go test
+  python-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - run: python --version
+      - name: Run psycopg3 Sample tests
+        working-directory: ./samples/python/psycopg3
+        run: python psycopg3_sample.py
