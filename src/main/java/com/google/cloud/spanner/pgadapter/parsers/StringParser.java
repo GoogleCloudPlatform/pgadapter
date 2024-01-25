@@ -16,13 +16,21 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.common.base.Utf8;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
 
 /** Translate from wire protocol to string. */
 @InternalApi
 public class StringParser extends Parser<String> {
+  private static final int MAX_WRITE_LENGTH = 1024;
+
+  private static final byte[] HEADER = new byte[0];
 
   StringParser(ResultSet item, int position) {
     this.item = item.getString(position);
@@ -53,8 +61,29 @@ public class StringParser extends Parser<String> {
     return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position) {
-    return resultSet.getString(position).getBytes(StandardCharsets.UTF_8);
+  public static byte[] convertToPG(
+      DataOutputStream dataOutputStream, ResultSet resultSet, int position) {
+    writeToPG(dataOutputStream, resultSet.getString(position));
+    return null;
+  }
+
+  static void writeToPG(DataOutputStream dataOutputStream, String value) {
+    writeToPG(dataOutputStream, value, HEADER);
+  }
+
+  static void writeToPG(DataOutputStream dataOutputStream, String value, byte[] header) {
+    int length = value.length();
+    try (OutputStreamWriter writer =
+        new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
+      dataOutputStream.writeInt(Utf8.encodedLength(value) + header.length);
+      dataOutputStream.write(header);
+      for (int offset = 0; offset < length; offset += MAX_WRITE_LENGTH) {
+        int writeLen = Math.min(MAX_WRITE_LENGTH, length - offset);
+        writer.write(value, offset, writeLen);
+      }
+    } catch (IOException ioException) {
+      throw SpannerExceptionFactory.asSpannerException(ioException);
+    }
   }
 
   public static byte[] binaryParse(ResultSet resultSet, int position) {

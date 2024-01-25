@@ -372,6 +372,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectHelloWorld() throws SQLException {
+    String randomString =
+        "╍➗⡢ⵄ⯣⺫␐Ⓔ⠊⓭∲Ⳋ⤄▹⡨⿄⦺⒢⠱\u2E5E⾀⭯⛧⫶⏵⽐⓮⻋⥍\u242A⫌⏎⎽⚚⒊ↄ⦛⹐⌣⸤ⳅ⼑╪␦⻛➯⃝⡥⨬⸺⇊⹐┪⍦╳◄⪷ⴺ⽾⣌⛛⬗⍘⧤⃰⩧⬔⇌⣸⮽❨⫘ⱶ⣗⤶⢽⚶⒪⁙♤✾✟⏩⟞\u20C5℈⺙ⵠ⋛✧⧬⯨➛⌁⻚ⰷ∑⼫⊅ⷛ";
+    String sql = String.format("SELECT '%s'", randomString);
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(randomString).build())
+                        .build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(randomString, resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testGetCatalogs() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(
