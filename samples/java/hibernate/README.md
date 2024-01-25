@@ -1,43 +1,37 @@
 # PGAdapter and Hibernate
 
-PGAdapter can be used in combination with Hibernate, but with a number of limitations. This sample
-shows the command line arguments and configuration that is needed in order to use Hibernate with
+PGAdapter can be used in combination with Hibernate, but with some limitations. This sample shows to use Hibernate with
 PGAdapter.
 
 > __Note__: This sample uses Hibernate directly. There is also a sample for using [Spring Data JPA
 with PGAdapter here](../spring-data-jpa).
 
-## Start PGAdapter
-You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
-pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
-to run PGAdapter.
+You can run the sample on the Cloud Spanner emulator with this command:
 
 ```shell
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
-docker run \
-  -d -p 5432:5432 \
-  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS \
-  -v /tmp:/tmp \
-  gcr.io/cloud-spanner-pg-adapter/pgadapter \
-  -p my-project -i my-instance \
-  -x
+mvn exec:java
 ```
 
-## Creating the Sample Data Model
-Run the following command in this directory. Replace the host, port and database name with the actual host, port and
-database name for your PGAdapter and database setup.
+You can also run the sample on a real Cloud Spanner database with this command:
 
 ```shell
-psql -h localhost -p 5432 -d my-database -f sample-schema.sql
+mvn exec:java \
+  -Dexec.args=" \
+    -p my-project \
+    -i my-instance \
+    -d my-database"
 ```
 
-You can also drop an existing data model using the `drop_data_model.sql` script:
+## PGAdapter
+PGAdapter is automatically started by the sample application as an in-process dependency. Depending on the command line
+arguments, one of the following will be started:
+1. No command line arguments: A Docker container with both PGAdapter and the Cloud Spanner emulator is started
+   automatically. The sample creates a database on the emulator and uses that for the sample application.
+2. With command line arguments: Use `-p <project> -i <instance> -d <database>` to point to an existing Cloud Spanner
+   PostgreSQL database that should be used for the sample. The database may be empty. The sample application will
+   automatically create the tables that are needed for the sample.
 
-```shell
-psql -h localhost -p 5432 -d my-database -f drop-data-model.sql
-```
+
 
 ## Data Types
 Cloud Spanner supports the following data types in combination with `Hibernate`.

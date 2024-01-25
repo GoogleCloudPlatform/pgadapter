@@ -13,13 +13,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.UUID;
 import org.hibernate.annotations.GenerationTime;
 import org.hibernate.annotations.GeneratorType;
 import org.hibernate.annotations.JdbcType;
-import org.hibernate.annotations.Type;
 import org.hibernate.type.descriptor.jdbc.BinaryJdbcType;
-import org.hibernate.type.descriptor.jdbc.VarbinaryJdbcType;
 
 @Entity
 public class Albums {

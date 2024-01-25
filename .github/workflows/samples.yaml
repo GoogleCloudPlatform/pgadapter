@@ -18,6 +18,9 @@ jobs:
       - name: Run JDBC Sample tests
         working-directory: ./samples/java/jdbc
         run: mvn test -B
+      - name: Run Hibernate Sample tests
+        working-directory: ./samples/java/hibernate
+        run: mvn test -B
   go-samples:
     runs-on: ubuntu-latest
     steps:
