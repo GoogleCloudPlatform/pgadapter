@@ -29,3 +29,6 @@ jobs:
       - name: Run gorm Sample tests
         working-directory: ./samples/golang/gorm
         run: go test
+      - name: Run pgx Sample tests
+        working-directory: ./samples/golang/pgx
+        run: go test
