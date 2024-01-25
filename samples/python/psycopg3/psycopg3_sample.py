@@ -76,7 +76,7 @@ try:
                            .format(port=port, database=args.database)) as conn:
     conn.autocommit = True
     with conn.cursor() as cur:
-      cur.execute("select 'Hello world!'1 as hello")
+      cur.execute("select 'Hello world!' as hello")
       print("Greeting from Cloud Spanner PostgreSQL:", cur.fetchone()[0], "\n")
 finally:
   if container is not None:
