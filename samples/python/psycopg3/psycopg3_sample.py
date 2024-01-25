@@ -16,11 +16,17 @@
 
 This sample application shows how to connect to PGAdapter and Cloud Spanner
 using the PostgreSQL psycopg3 driver. The sample starts PGAdapter in an embedded
-Docker container and then connects through this container to Cloud Spanner.
+Docker container and then connects through this container to the Cloud Spanner
+emulator or real Cloud Spanner.
+
+The sample uses the Cloud Spanner emulator by default.
 
 This sample requires Docker to be installed on the local environment.
 
-Usage:
+Usage (emulator):
+  python psycopg3_sample.py
+
+Usage (Cloud Spanner):
   python psycopg3_sample.py -p my-project -i my-instance -d my-database
 """
 
@@ -28,18 +34,37 @@ import argparse
 import psycopg
 from pgadapter import start_pgadapter
 
-
 parser = argparse.ArgumentParser(
   prog='PGAdapter psycopg3 sample',
   description='Sample application for using psycopg3 with PGAdapter')
-parser.add_argument('-p', '--project', default="my-project", help="The Google Cloud project containing the Cloud Spanner instance that PGAdapter should connect to.")
-parser.add_argument('-i', '--instance', default="my-instance", help="The Cloud Spanner instance that PGAdapter should connect to.")
-parser.add_argument('-d', '--database', default="my-database", help="The Cloud Spanner database that psycopg3 should connect to.")
-parser.add_argument('-c', '--credentials', required=False, help="The credentials file that PGAdapter should use to connect to Cloud Spanner. If None, then the sample application will try to use the default credentials in the environment.")
+parser.add_argument('-e', '--emulator', required=False, default=None,
+                    help="Set this option to 'True' to force PGAdapter to connect to the emulator.")
+parser.add_argument('-p', '--project', default="my-project",
+                    help="The Google Cloud project containing the Cloud Spanner instance that PGAdapter should connect to.")
+parser.add_argument('-i', '--instance', default="my-instance",
+                    help="The Cloud Spanner instance that PGAdapter should connect to.")
+parser.add_argument('-d', '--database', default="my-database",
+                    help="The Cloud Spanner database that psycopg3 should connect to.")
+parser.add_argument('-c', '--credentials', required=False,
+                    help="The credentials file that PGAdapter should use to connect to Cloud Spanner. If None, then the sample application will try to use the default credentials in the environment.")
 args = parser.parse_args()
 
+if (args.project == "my-project"
+    and args.instance == "my-instance"
+    and args.database == "my-database"
+    and args.emulator is None):
+  use_emulator = True
+else:
+  if args.emulator is None:
+    use_emulator = False
+  else:
+    use_emulator = args.emulator == "True"
+
 # Start PGAdapter in an embedded container.
-container, port = start_pgadapter(args.project, args.instance, args.credentials)
+container, port = start_pgadapter(args.project,
+                                  args.instance,
+                                  use_emulator,
+                                  args.credentials)
 try:
   print("PGAdapter running on port ", port, "\n")
 
@@ -48,7 +73,7 @@ try:
   with psycopg.connect("host=localhost port={port} "
                        "dbname={database} "
                        "sslmode=disable"
-                       .format(port=port, database=args.database)) as conn:
+                           .format(port=port, database=args.database)) as conn:
     conn.autocommit = True
     with conn.cursor() as cur:
       cur.execute("select 'Hello world!' as hello")
