@@ -21,3 +21,17 @@ jobs:
       - name: Run Hibernate Sample tests
         working-directory: ./samples/java/hibernate
         run: mvn test -B
+  go-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.7'
+      - run: go version
+      - name: Run gorm Sample tests
+        working-directory: ./samples/golang/gorm
+        run: go test
+      - name: Run pgx Sample tests
+        working-directory: ./samples/golang/pgx
+        run: go test

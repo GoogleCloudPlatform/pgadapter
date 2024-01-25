@@ -8,8 +8,8 @@ github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 h1:bvDV9
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20231004063709-d26b77dee708 h1:9ihP/Q9rwBGQ+QDpMWkcMG4GgEIJPbltK1q6nuLGs04=
-github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20231004063709-d26b77dee708/go.mod h1:Gd5VX+mfZV39bDbosomvY6oja55CNEm3oyEwe2Jo7Qg=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240124134511-6f84a1722435 h1:xp8Wj8gtM4+N1wmhYnY0HMQ/3iNCXjaDkXhrTjQnRSQ=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240124134511-6f84a1722435/go.mod h1:RDjSohojBNouglltL1D+Z1E5l35DiSA+bQrwqKt+nEU=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
 github.com/Microsoft/hcsshim v0.11.4 h1:68vKo2VN8DE9AdN4tnkWnmdhqdbpUFM8OF3Airm7fz8=
