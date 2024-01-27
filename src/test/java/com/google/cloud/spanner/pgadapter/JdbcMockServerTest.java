@@ -328,6 +328,52 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("3807").build())
                         .build())
                 .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT typinput='pg_catalog.array_in'::regproc as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .addValues(Value.newBuilder().setStringValue("3807").build())
+                        .build())
+                .build()));
   }
 
   /**
@@ -391,6 +437,33 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         assertEquals(randomString, resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testJsonbBinary() throws SQLException {
+    String randomString =
+        "{\"key\": \"╍➗⡢ⵄ⯣⺫␐Ⓔ⠊⓭∲Ⳋ⤄▹⡨⿄⦺⒢⠱\u2E5E⾀⭯⛧⫶⏵⽐⓮⻋⥍\u242A⫌⏎⎽⚚⒊ↄ⦛⹐⌣⸤ⳅ⼑╪␦⻛➯⃝⡥⨬⸺⇊⹐┪⍦╳◄⪷ⴺ⽾⣌⛛⬗⍘⧤⃰⩧⬔⇌⣸⮽❨⫘ⱶ⣗⤶⢽⚶⒪⁙♤✾✟⏩⟞\u20C5℈⺙ⵠ⋛✧⧬⯨➛⌁⻚ⰷ∑⼫⊅ⷛ\"}";
+    String sql = String.format("SELECT '%s'::jsonb", randomString);
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.JSON)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(randomString).build())
+                        .build())
+                .build()));
+
+    String binaryTransfer = "&binaryTransferEnable=" + Oid.JSONB;
+    try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransfer)) {
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertNotNull(resultSet.getObject(1));
         assertFalse(resultSet.next());
       }
     }
