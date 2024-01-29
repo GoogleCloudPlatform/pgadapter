@@ -22,6 +22,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.io.CharSource;
+import java.io.BufferedInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -112,11 +113,12 @@ public class BinaryParser extends Parser<ByteArray> {
           dataOutputStream.writeInt(length);
           if (length > 0) {
             try (InputStream inputStream =
-                Base64.getDecoder()
-                    .wrap(
-                        CharSource.wrap(base64)
-                            .asByteSource(StandardCharsets.UTF_8)
-                            .openStream())) {
+                new BufferedInputStream(
+                    Base64.getDecoder()
+                        .wrap(
+                            CharSource.wrap(base64)
+                                .asByteSource(StandardCharsets.UTF_8)
+                                .openStream()))) {
               copy(length, inputStream, dataOutputStream);
             }
           }
