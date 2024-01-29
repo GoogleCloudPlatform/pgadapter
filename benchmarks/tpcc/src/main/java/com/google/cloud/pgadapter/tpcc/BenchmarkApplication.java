@@ -5,6 +5,7 @@ import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoadStatus;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoader;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Stopwatch;
@@ -58,6 +59,11 @@ public class BenchmarkApplication implements CommandLineRunner {
                 server.getLocalPort());
     try {
       if (tpccConfiguration.isLoadData()) {
+        System.out.println("Checking schema");
+        SchemaService schemaService = new SchemaService(connectionUrl);
+        schemaService.createSchema();
+        System.out.println("Checked schema, starting benchmark");
+
         LOG.info("Starting data load");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         DataLoadStatus status = new DataLoadStatus(tpccConfiguration);
@@ -112,6 +118,28 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setProject(spannerConfiguration.getProject())
             .setInstance(spannerConfiguration.getInstance())
             .setDatabase(spannerConfiguration.getDatabase())
+            // .setNumChannels(pgAdapterConfiguration.getNumChannels())
+            .setSessionPoolOptions(
+                SessionPoolOptions.newBuilder()
+                    .setTrackStackTraceOfSessionCheckout(false)
+                    // .setMinSessions(
+                    //     benchmarkConfiguration.getParallelism().stream()
+                    //         .max(Integer::compare)
+                    //         .orElse(100))
+                    .setMinSessions(100)
+                    // .setMaxSessions(
+                    //     benchmarkConfiguration.getParallelism().stream()
+                    //         .max(Integer::compare)
+                    //         .orElse(400))
+                    .setMaxSessions(800)
+                    // .setOptimizeSessionPoolFuture(
+                    //     spannerConfiguration.isOptimizeSessionPoolFuture())
+                    // .setOptimizeUnbalancedCheck(spannerConfiguration.isOptimizeUnbalancedCheck())
+                    // .setRandomizePositionTransactionsPerSecondThreshold(
+                    //
+                    // spannerConfiguration.getRandomizePositionTransactionsPerSecondThreshold())
+                    .build())
+            // .setDisableVirtualThreads(!spannerConfiguration.isUseVirtualThreads())
             .disableUnixDomainSockets();
     if (pgAdapterConfiguration.isEnableOpenTelemetry()) {
       builder

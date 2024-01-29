@@ -321,7 +321,7 @@
                   <resources>
                     <resource>
                       <directory>resources</directory>
-                      <filtering>true</filtering>
+                      <filtering>false</filtering>
                     </resource>
                   </resources>
                 </configuration>
