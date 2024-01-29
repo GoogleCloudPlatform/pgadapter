@@ -109,7 +109,6 @@ public class BinaryParser extends Parser<ByteArray> {
         case SPANNER:
         case POSTGRESQL_BINARY:
           int length = base64ByteLength(base64);
-          resultSet.getBytes(1).toByteArray();
           dataOutputStream.writeInt(length);
           if (length > 0) {
             try (InputStream inputStream =
