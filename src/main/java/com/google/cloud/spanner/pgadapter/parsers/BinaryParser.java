@@ -21,11 +21,11 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.common.io.ByteStreams;
 import com.google.common.io.CharSource;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import javax.annotation.Nonnull;
@@ -37,6 +37,7 @@ import org.postgresql.util.PGbytea;
  */
 @InternalApi
 public class BinaryParser extends Parser<ByteArray> {
+  private static final int MAX_BUFFER_SIZE = 1 << 15;
 
   BinaryParser(ResultSet item, int position) {
     this.item = item.getBytes(position);
@@ -109,11 +110,15 @@ public class BinaryParser extends Parser<ByteArray> {
         case POSTGRESQL_BINARY:
           int length = base64ByteLength(base64);
           dataOutputStream.writeInt(length);
-          try (InputStream inputStream =
-              Base64.getDecoder()
-                  .wrap(
-                      CharSource.wrap(base64).asByteSource(StandardCharsets.UTF_8).openStream())) {
-            ByteStreams.copy(inputStream, dataOutputStream);
+          if (length > 0) {
+            try (InputStream inputStream =
+                Base64.getDecoder()
+                    .wrap(
+                        CharSource.wrap(base64)
+                            .asByteSource(StandardCharsets.UTF_8)
+                            .openStream())) {
+              copy(length, inputStream, dataOutputStream);
+            }
           }
           return null;
         case POSTGRESQL_TEXT:
@@ -124,6 +129,17 @@ public class BinaryParser extends Parser<ByteArray> {
     } catch (IOException ioException) {
       throw SpannerExceptionFactory.asSpannerException(ioException);
     }
+  }
+
+  static long copy(int length, InputStream from, OutputStream to) throws IOException {
+    byte[] buf = new byte[Math.min(length, MAX_BUFFER_SIZE)];
+    long total = 0;
+    int numRead;
+    while ((numRead = from.read(buf)) > -1) {
+      to.write(buf, 0, numRead);
+      total += numRead;
+    }
+    return total;
   }
 
   static int base64ByteLength(String base64) {
