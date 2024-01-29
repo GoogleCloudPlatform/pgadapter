@@ -39,7 +39,6 @@ class BenchmarkRunner implements Runnable {
   @Override
   public void run() {
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
-      prepareStatements(connection);
       runTransactions(connection);
       LOG.info("Stopping benchmark runner");
     } catch (InterruptedException interruptedException) {
@@ -143,7 +142,10 @@ class BenchmarkRunner implements Runnable {
     row =
         queryRow(
             statement,
-            "execute select_customer_info (%d, %d, %d)",
+            (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
+                + "SELECT c_discount, c_last, c_credit, w_tax "
+                + "FROM customer c, warehouse w "
+                + "WHERE w.w_id = %d AND c.w_id = w.w_id AND c.d_id = %d AND c.c_id = %d",
             warehouseId,
             districtId,
             customerId);
@@ -153,21 +155,29 @@ class BenchmarkRunner implements Runnable {
     BigDecimal warehouseTax = (BigDecimal) row[3];
 
     row =
-        queryRow(statement, "execute get_next_order_id_and_tax (%d, %d)", warehouseId, districtId);
+        queryRow(
+            statement,
+            (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
+                + "SELECT d_next_o_id, d_tax "
+                + "FROM district "
+                + "WHERE w_id = %d AND d_id = %d",
+            warehouseId,
+            districtId);
     long districtNextOrderId = (long) row[0];
     BigDecimal districtTax = (BigDecimal) row[1];
 
     statement.execute(
         String.format(
-            "execute update_next_order_id (%d, %d, %d)",
+            "UPDATE district " + "SET d_next_o_id = %d " + "WHERE d_id = %d AND w_id= %d",
             districtNextOrderId + 1L, districtId, warehouseId));
     statement.execute(
         String.format(
-            "execute insert_order (%d,%d,%d,%d,%d,%d)",
+            "INSERT INTO orders (o_id, d_id, w_id, c_id, o_entry_d, o_ol_cnt, o_all_local) "
+                + "VALUES (%d,%d,%d,%d,NOW(),%d,%d)",
             districtNextOrderId, districtId, warehouseId, customerId, orderLineCount, allLocal));
     statement.execute(
         String.format(
-            "execute insert_new_order (%d,%d,%d,%d)",
+            "INSERT INTO new_orders (o_id, c_id, d_id, w_id) " + "VALUES (%d,%d,%d,%d)",
             districtNextOrderId, customerId, districtId, warehouseId));
 
     for (int line = 0; line < orderLineCount; line++) {
@@ -176,7 +186,11 @@ class BenchmarkRunner implements Runnable {
       int orderLineQuantity = quantities[line];
 
       try {
-        row = queryRow(statement, "execute select_item (%d)", orderLineItemId);
+        row =
+            queryRow(
+                statement,
+                "SELECT i_price, i_name, i_data FROM item WHERE i_id = %d",
+                orderLineItemId);
       } catch (RowNotFoundException ignore) {
         // TODO: Record deliberate rollback
         LOG.info("Rolling back new_order transaction");
@@ -190,7 +204,12 @@ class BenchmarkRunner implements Runnable {
       row =
           queryRow(
               statement,
-              "execute select_stock (%d, %d)",
+              (tpccConfiguration.isLockScannedRanges()
+                      ? "/*@ lock_scanned_ranges=exclusive */"
+                      : "")
+                  + "SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10 "
+                  + "FROM stock "
+                  + "WHERE s_i_id = %d AND w_id= %d",
               orderLineItemId,
               orderLineSupplyWarehouseId);
       long stockQuantity = (long) row[0];
@@ -209,7 +228,7 @@ class BenchmarkRunner implements Runnable {
 
       statement.execute(
           String.format(
-              "execute update_stock (%d, %d, %d)",
+              "UPDATE stock " + "SET s_quantity = %d " + "WHERE s_i_id = %d AND w_id= %d",
               stockQuantity, orderLineItemId, orderLineSupplyWarehouseId));
 
       BigDecimal totalTax = BigDecimal.ONE.add(warehouseTax).add(districtTax);
@@ -221,7 +240,8 @@ class BenchmarkRunner implements Runnable {
               .multiply(discountFactor);
       statement.execute(
           String.format(
-              "execute insert_order_line (%d,%d,%d,%d,%d,%d,%d,%d,%s,'%s')",
+              "INSERT INTO order_line (o_id, c_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) "
+                  + "VALUES (%d,%d,%d,%d,%d,%d,%d,%d,%s,'%s')",
               districtNextOrderId,
               customerId,
               districtId,
@@ -267,9 +287,18 @@ class BenchmarkRunner implements Runnable {
     }
 
     statement.execute("begin transaction");
-    statement.execute(String.format("execute update_warehouse (%s, %d)", amount, warehouseId));
+    statement.execute(
+        String.format(
+            "UPDATE warehouse " + "SET w_ytd = w_ytd + %s " + "WHERE w_id = %d",
+            amount, warehouseId));
 
-    row = queryRow(statement, "execute select_warehouse (%d)", warehouseId);
+    row =
+        queryRow(
+            statement,
+            "SELECT w_street_1, w_street_2, w_city, w_state, w_zip, w_name "
+                + "FROM warehouse "
+                + "WHERE w_id = %d",
+            warehouseId);
     String warehouseStreet1 = (String) row[0];
     String warehouseStreet2 = (String) row[1];
     String warehouseCity = (String) row[2];
@@ -278,9 +307,18 @@ class BenchmarkRunner implements Runnable {
     String warehouseName = (String) row[5];
 
     statement.execute(
-        String.format("execute update_district (%s, %d, %d)", amount, warehouseId, districtId));
+        String.format(
+            "UPDATE district " + "SET d_ytd = d_ytd + %s " + "WHERE w_id = %d AND d_id= %d",
+            amount, warehouseId, districtId));
 
-    row = queryRow(statement, "execute select_district (%d, %d)", warehouseId, districtId);
+    row =
+        queryRow(
+            statement,
+            "SELECT d_street_1, d_street_2, d_city, d_state, d_zip, d_name "
+                + "FROM district "
+                + "WHERE w_id = %d AND d_id = %d",
+            warehouseId,
+            districtId);
     String districtStreet1 = (String) row[0];
     String districtStreet2 = (String) row[1];
     String districtCity = (String) row[2];
@@ -292,7 +330,9 @@ class BenchmarkRunner implements Runnable {
       row =
           queryRow(
               statement,
-              "execute count_customer (%d, %d, '%s')",
+              "SELECT count(c_id) namecnt "
+                  + "FROM customer "
+                  + "WHERE w_id = %d AND d_id= %d AND c_last='%s'",
               customerWarehouseId,
               customerDistrictId,
               lastName);
@@ -303,7 +343,10 @@ class BenchmarkRunner implements Runnable {
       try (ResultSet resultSet =
           statement.executeQuery(
               String.format(
-                  "execute select_customer (%d, %d, '%s')",
+                  "SELECT c_id "
+                      + "FROM customer "
+                      + "WHERE w_id = %d AND d_id= %d AND c_last='%s' "
+                      + "ORDER BY c_first",
                   customerWarehouseId, customerDistrictId, lastName))) {
         for (int counter = 0; counter < nameCount; counter++) {
           if (resultSet.next()) {
@@ -315,7 +358,10 @@ class BenchmarkRunner implements Runnable {
     row =
         queryRow(
             statement,
-            "execute select_customer_details (%d, %d, %d)",
+            (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
+                + "SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_since "
+                + "FROM customer "
+                + "WHERE w_id = %d AND d_id= %d AND c_id=%d",
             customerWarehouseId,
             customerDistrictId,
             customerId);
@@ -341,7 +387,7 @@ class BenchmarkRunner implements Runnable {
       row =
           queryRow(
               statement,
-              "execute select_customer_c_data (%d, %d, %d)",
+              "SELECT c_data " + "FROM customer " + "WHERE w_id = %d AND d_id=%d AND c_id= %d",
               customerWarehouseId,
               customerDistrictId,
               customerId);
@@ -363,7 +409,9 @@ class BenchmarkRunner implements Runnable {
 
       statement.execute(
           String.format(
-              "execute update_customer_1_ (%s, %s, '%s', %d, %d, %d)",
+              "UPDATE customer "
+                  + "SET c_balance=%s, c_ytd_payment=%s, c_data='%s' "
+                  + "WHERE w_id = %d AND d_id=%d AND c_id=%d",
               balance,
               ytdPayment,
               newCustomerData,
@@ -373,12 +421,15 @@ class BenchmarkRunner implements Runnable {
     } else {
       statement.execute(
           String.format(
-              "execute update_customer_2_ (%s, %s, %d, %d, %d)",
+              "UPDATE customer "
+                  + "SET c_balance=%s, c_ytd_payment=%s "
+                  + "WHERE w_id = %d AND d_id=%d AND c_id=%d",
               balance, ytdPayment, customerWarehouseId, customerDistrictId, customerId));
     }
     statement.execute(
         String.format(
-            "execute insert_history (%d,%d,%d,%d,%d,%s,'%s')",
+            "INSERT INTO history (d_id, w_id, c_id, h_d_id,  h_w_id, h_date, h_amount, h_data) "
+                + "VALUES (%d,%d,%d,%d,%d,NOW(),%s,'%s')",
             customerDistrictId,
             customerWarehouseId,
             customerId,
@@ -418,7 +469,9 @@ class BenchmarkRunner implements Runnable {
       row =
           queryRow(
               statement,
-              "execute count_customer (%d, %d, '%s')",
+              "SELECT count(c_id) namecnt "
+                  + "FROM customer "
+                  + "WHERE w_id = %d AND d_id= %d AND c_last='%s'",
               warehouseId,
               districtId,
               lastName);
@@ -429,7 +482,9 @@ class BenchmarkRunner implements Runnable {
       try (ResultSet resultSet =
           statement.executeQuery(
               String.format(
-                  "execute select_customer_balance_1_ (%d, %d, '%s')",
+                  "SELECT c_balance, c_first, c_middle, c_id "
+                      + "FROM customer WHERE w_id = %d AND d_id= %d AND c_last='%s' "
+                      + "ORDER BY c_first",
                   warehouseId, districtId, lastName))) {
         for (int counter = 0; counter < nameCount; counter++) {
           if (resultSet.next()) {
@@ -444,7 +499,9 @@ class BenchmarkRunner implements Runnable {
       row =
           queryRow(
               statement,
-              "execute select_customer_balance_2_ (%d, %d, %d)",
+              "SELECT c_balance, c_first, c_middle, c_last "
+                  + "FROM customer "
+                  + "WHERE w_id = %d AND d_id=%d AND c_id=%d",
               warehouseId,
               districtId,
               customerId);
@@ -458,7 +515,10 @@ class BenchmarkRunner implements Runnable {
         queryRow(
             QueryRowMode.ALLOW_MORE_THAN_ONE,
             statement,
-            "execute select_order (%d, %d, %d)",
+            "SELECT o_id, o_carrier_id, o_entry_d "
+                + "FROM orders "
+                + "WHERE w_id = %d AND d_id = %d AND c_id = %d "
+                + "ORDER BY o_id DESC",
             warehouseId,
             districtId,
             customerId);
@@ -466,7 +526,10 @@ class BenchmarkRunner implements Runnable {
     try (ResultSet resultSet =
         statement.executeQuery(
             String.format(
-                "execute select_order_line (%d, %d, %d)", warehouseId, districtId, orderId))) {
+                "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d "
+                    + "FROM order_line "
+                    + "WHERE w_id = %d AND d_id = %d  AND o_id = %d",
+                warehouseId, districtId, orderId))) {
       while (resultSet.next()) {
         resultSet.getLong(1); // item_id
         resultSet.getLong(2); // supply_warehouse_id
@@ -494,7 +557,14 @@ class BenchmarkRunner implements Runnable {
           queryRow(
               QueryRowMode.ALLOW_LESS_THAN_ONE,
               statement,
-              "execute select_new_order (%d, %d)",
+              (tpccConfiguration.isLockScannedRanges()
+                      ? "/*@ lock_scanned_ranges=exclusive */"
+                      : "")
+                  + "SELECT o_id, c_id "
+                  + "FROM new_orders "
+                  + "WHERE d_id = %d AND w_id = %d "
+                  + "ORDER BY o_id ASC "
+                  + "LIMIT 1",
               districtId,
               warehouseId);
       if (row != null) {
@@ -502,28 +572,36 @@ class BenchmarkRunner implements Runnable {
         long customerId = (long) row[1];
         statement.execute(
             String.format(
-                "execute delete_new_order (%d, %d, %d, %d)",
+                "DELETE "
+                    + "FROM new_orders "
+                    + "WHERE o_id = %d AND c_id = %d AND d_id = %d AND w_id = %d",
                 newOrderId, customerId, districtId, warehouseId));
         row =
             queryRow(
                 statement,
-                "execute select_order_customer (%d, %d, %d)",
+                "SELECT c_id " + "FROM orders " + "WHERE o_id = %d AND d_id = %d AND w_id = %d",
                 newOrderId,
                 districtId,
                 warehouseId);
         // long customerId = (long) row[0];
         statement.execute(
             String.format(
-                "execute update_order (%d, %d, %d, %d, %d)",
+                "UPDATE orders "
+                    + "SET o_carrier_id = %d "
+                    + "WHERE o_id = %d AND c_id = %d AND d_id = %d AND w_id = %d",
                 carrierId, newOrderId, customerId, districtId, warehouseId));
         statement.execute(
             String.format(
-                "execute update_order_line (%d, %d, %d, %d)",
+                "UPDATE order_line "
+                    + "SET ol_delivery_d = NOW() "
+                    + "WHERE o_id = %d AND c_id = %d AND d_id = %d AND w_id = %d",
                 newOrderId, customerId, districtId, warehouseId));
         row =
             queryRow(
                 statement,
-                "execute sum_order_line (%d, %d, %d, %d)",
+                "SELECT SUM(ol_amount) sm "
+                    + "FROM order_line "
+                    + "WHERE o_id = %d AND c_id = %d AND d_id = %d AND w_id = %d",
                 newOrderId,
                 customerId,
                 districtId,
@@ -531,7 +609,9 @@ class BenchmarkRunner implements Runnable {
         BigDecimal sumOrderLineAmount = (BigDecimal) row[0];
         statement.execute(
             String.format(
-                "execute update_customer_bal (%s, %d, %d, %d)",
+                "UPDATE customer "
+                    + "SET c_balance = c_balance + %s, c_delivery_cnt = c_delivery_cnt + 1 "
+                    + "WHERE c_id = %d AND d_id = %d AND w_id = %d",
                 sumOrderLineAmount, customerId, districtId, warehouseId));
       }
     }
@@ -554,13 +634,26 @@ class BenchmarkRunner implements Runnable {
     String stockLevelQueries = "case1";
     Object[] row;
 
-    row = queryRow(statement, "execute get_next_order_id (%d, %d)", districtId, warehouseId);
+    row =
+        queryRow(
+            statement,
+            "SELECT d_next_o_id " + "FROM district " + "WHERE d_id = %d AND w_id= %d",
+            districtId,
+            warehouseId);
     long nextOrderId = (long) row[0];
     // Only 'case1' is implemented.
     try (ResultSet resultSet =
         statement.executeQuery(
             String.format(
-                "execute count_order_line (%d,%d,%d,%d,%d,%d)",
+                "SELECT COUNT(DISTINCT (s_i_id)) "
+                    + "FROM order_line ol, stock s "
+                    + "WHERE ol.w_id = %d "
+                    + "AND ol.d_id = %d "
+                    + "AND ol.o_id < %d "
+                    + "AND ol.o_id >= %d "
+                    + "AND s.w_id= %d "
+                    + "AND s_i_id=ol_i_id "
+                    + "AND s_quantity < %d",
                 warehouseId, districtId, nextOrderId, nextOrderId - 20, warehouseId, level))) {
       while (resultSet.next()) {
         long orderLineItemId = resultSet.getLong(1);
@@ -569,7 +662,9 @@ class BenchmarkRunner implements Runnable {
         row =
             queryRow(
                 statement.getConnection().createStatement(),
-                "execute select_stock_count (%d, %d, %d)",
+                "SELECT count(*) FROM stock "
+                    + "WHERE w_id = %d AND s_i_id = %d "
+                    + "AND s_quantity < %d",
                 warehouseId,
                 orderLineItemId,
                 level);
@@ -622,199 +717,6 @@ class BenchmarkRunner implements Runnable {
         throw new SQLException(String.format("More than one result found for: %s", sql));
       }
       return result;
-    }
-  }
-
-  private void prepareStatements(Connection connection) throws SQLException {
-    try (Statement statement = connection.createStatement()) {
-      statement.execute(
-          "PREPARE select_customer_info as "
-              + (tpccConfiguration.isLockScannedRanges()
-                  ? "/*@ lock_scanned_ranges=exclusive */"
-                  : "")
-              + "SELECT c_discount, c_last, c_credit, w_tax "
-              + "FROM customer c, warehouse w "
-              + "WHERE w.w_id = $1 AND c.w_id = w.w_id AND c.d_id = $2 AND c.c_id = $3");
-      statement.execute(
-          "PREPARE get_next_order_id_and_tax as "
-              + (tpccConfiguration.isLockScannedRanges()
-                  ? "/*@ lock_scanned_ranges=exclusive */"
-                  : "")
-              + "SELECT d_next_o_id, d_tax "
-              + "FROM district "
-              + "WHERE w_id = $1 AND d_id = $2");
-      statement.execute(
-          "PREPARE get_next_order_id as "
-              + "SELECT d_next_o_id "
-              + "FROM district "
-              + "WHERE d_id = $1 AND w_id= $2");
-      statement.execute(
-          "PREPARE update_next_order_id as "
-              + "UPDATE district "
-              + "SET d_next_o_id = $1 "
-              + "WHERE d_id = $2 AND w_id= $3");
-      statement.execute(
-          "PREPARE insert_order (bigint,bigint,bigint,bigint,bigint,bigint) as "
-              + "INSERT INTO orders (o_id, d_id, w_id, c_id, o_entry_d, o_ol_cnt, o_all_local) "
-              + "VALUES ($1,$2,$3,$4,NOW(),$5,$6)");
-      statement.execute(
-          "PREPARE insert_new_order as "
-              + "INSERT INTO new_orders (o_id, c_id, d_id, w_id) "
-              + "VALUES ($1,$2,$3,$4)");
-      statement.execute(
-          "PREPARE select_item as SELECT i_price, i_name, i_data FROM item WHERE i_id = $1");
-      statement.execute(
-          "PREPARE select_stock as "
-              + (tpccConfiguration.isLockScannedRanges()
-                  ? "/*@ lock_scanned_ranges=exclusive */"
-                  : "")
-              + "SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10 "
-              + "FROM stock "
-              + "WHERE s_i_id = $1 AND w_id= $2");
-      statement.execute(
-          "PREPARE update_stock as "
-              + "UPDATE stock "
-              + "SET s_quantity = $1 "
-              + "WHERE s_i_id = $2 AND w_id= $3");
-      statement.execute(
-          "PREPARE insert_order_line as "
-              + "INSERT INTO order_line (o_id, c_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) "
-              + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)");
-      statement.execute(
-          "PREPARE update_warehouse as "
-              + "UPDATE warehouse "
-              + "SET w_ytd = w_ytd + $1 "
-              + "WHERE w_id = $2");
-      statement.execute(
-          "PREPARE select_warehouse as "
-              + "SELECT w_street_1, w_street_2, w_city, w_state, w_zip, w_name "
-              + "FROM warehouse "
-              + "WHERE w_id = $1");
-      statement.execute(
-          "PREPARE update_district as "
-              + "UPDATE district "
-              + "SET d_ytd = d_ytd + $1 "
-              + "WHERE w_id = $2 AND d_id= $3");
-      statement.execute(
-          "PREPARE select_district as "
-              + "SELECT d_street_1, d_street_2, d_city, d_state, d_zip, d_name "
-              + "FROM district "
-              + "WHERE w_id = $1 AND d_id = $2");
-      statement.execute(
-          "PREPARE count_customer as "
-              + "SELECT count(c_id) namecnt "
-              + "FROM customer "
-              + "WHERE w_id = $1 AND d_id= $2 AND c_last=$3");
-      statement.execute(
-          "PREPARE select_customer as "
-              + "SELECT c_id "
-              + "FROM customer "
-              + "WHERE w_id = $1 AND d_id= $2 AND c_last=$3 "
-              + "ORDER BY c_first");
-      statement.execute(
-          "PREPARE select_customer_details as "
-              + (tpccConfiguration.isLockScannedRanges()
-                  ? "/*@ lock_scanned_ranges=exclusive */"
-                  : "")
-              + "SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_since "
-              + "FROM customer "
-              + "WHERE w_id = $1 AND d_id= $2 AND c_id=$3");
-      statement.execute(
-          "PREPARE select_customer_c_data as "
-              + "SELECT c_data "
-              + "FROM customer "
-              + "WHERE w_id = $1 AND d_id=$2 AND c_id= $3");
-      statement.execute(
-          "PREPARE update_customer_1_ as "
-              + "UPDATE customer "
-              + "SET c_balance=$1, c_ytd_payment=$2, c_data=$3 "
-              + "WHERE w_id = $4 AND d_id=$5 AND c_id=$6");
-      statement.execute(
-          "PREPARE update_customer_2_ as "
-              + "UPDATE customer "
-              + "SET c_balance=$1, c_ytd_payment=$2 "
-              + "WHERE w_id = $3 AND d_id=$4 AND c_id=$5");
-      statement.execute(
-          "PREPARE insert_history (bigint,bigint,bigint,bigint,bigint,bigint,varchar) as "
-              + "INSERT INTO history (d_id, w_id, c_id, h_d_id,  h_w_id, h_date, h_amount, h_data) "
-              + "VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7)");
-      statement.execute(
-          "PREPARE select_customer_balance_1_ as "
-              + "SELECT c_balance, c_first, c_middle, c_id "
-              + "FROM customer WHERE w_id = $1 AND d_id= $2 AND c_last=$3 "
-              + "ORDER BY c_first");
-      statement.execute(
-          "PREPARE select_customer_balance_2_ as "
-              + "SELECT c_balance, c_first, c_middle, c_last "
-              + "FROM customer "
-              + "WHERE w_id = $1 AND d_id=$2 AND c_id=$3");
-      statement.execute(
-          "PREPARE select_order as "
-              + "SELECT o_id, o_carrier_id, o_entry_d "
-              + "FROM orders "
-              + "WHERE w_id = $1 AND d_id = $2 AND c_id = $3 "
-              + "ORDER BY o_id DESC");
-      statement.execute(
-          "PREPARE select_order_line as "
-              + "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d "
-              + "FROM order_line "
-              + "WHERE w_id = $1 AND d_id = $2  AND o_id = $3");
-      statement.execute(
-          "PREPARE select_new_order as "
-              + (tpccConfiguration.isLockScannedRanges()
-                  ? "/*@ lock_scanned_ranges=exclusive */"
-                  : "")
-              + "SELECT o_id, c_id "
-              + "FROM new_orders "
-              + "WHERE d_id = $1 AND w_id = $2 "
-              + "ORDER BY o_id ASC "
-              + "LIMIT 1");
-      statement.execute(
-          "PREPARE delete_new_order as "
-              + "DELETE "
-              + "FROM new_orders "
-              + "WHERE o_id = $1 AND c_id = $2 AND d_id = $3 AND w_id = $4");
-      statement.execute(
-          "PREPARE select_order_customer as "
-              + "SELECT c_id "
-              + "FROM orders "
-              + "WHERE o_id = $1 AND d_id = $2 AND w_id = $3");
-      statement.execute(
-          "PREPARE update_order as "
-              + "UPDATE orders "
-              + "SET o_carrier_id = $1 "
-              + "WHERE o_id = $2 AND c_id = $3 AND d_id = $4 AND w_id = $5");
-      statement.execute(
-          "PREPARE update_order_line as "
-              + "UPDATE order_line "
-              + "SET ol_delivery_d = NOW() "
-              + "WHERE o_id = $1 AND c_id = $2 AND d_id = $3 AND w_id = $4");
-      statement.execute(
-          "PREPARE sum_order_line as "
-              + "SELECT SUM(ol_amount) sm "
-              + "FROM order_line "
-              + "WHERE o_id = $1 AND c_id = $2 AND d_id = $3 AND w_id = $4");
-      statement.execute(
-          "PREPARE update_customer_bal as "
-              + "UPDATE customer "
-              + "SET c_balance = c_balance + $1, c_delivery_cnt = c_delivery_cnt + 1 "
-              + "WHERE c_id = $2 AND d_id = $3 AND w_id = $4");
-      statement.execute(
-          "PREPARE count_order_line as "
-              + "SELECT COUNT(DISTINCT (s_i_id)) "
-              + "FROM order_line ol, stock s "
-              + "WHERE ol.w_id = $1 "
-              + "AND ol.d_id = $2 "
-              + "AND ol.o_id < $3 "
-              + "AND ol.o_id >= $4 "
-              + "AND s.w_id= $5 "
-              + "AND s_i_id=ol_i_id "
-              + "AND s_quantity < $6");
-      statement.execute(
-          "PREPARE select_stock_count as "
-              + "SELECT count(*) FROM stock "
-              + "WHERE w_id = $1 AND s_i_id = $2 "
-              + "AND s_quantity < $3");
     }
   }
 }
