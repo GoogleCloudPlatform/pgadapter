@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Stopwatch;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.nio.file.Files;
 import java.sql.Connection;
@@ -125,6 +126,8 @@ public class Benchmark {
                 t.printStackTrace();
               }
             } else {
+              Uninterruptibles.sleepUninterruptibly(
+                  ThreadLocalRandom.current().nextInt(2000), TimeUnit.MILLISECONDS);
               try (Connection connection =
                   DriverManager.getConnection(
                       String.format(
