@@ -37,7 +37,7 @@ import org.postgresql.util.PGbytea;
  */
 @InternalApi
 public class BinaryParser extends Parser<ByteArray> {
-  private static final int MAX_BUFFER_SIZE = 1 << 15;
+  private static final int MAX_BUFFER_SIZE = 8192;
 
   BinaryParser(ResultSet item, int position) {
     this.item = item.getBytes(position);
@@ -109,6 +109,7 @@ public class BinaryParser extends Parser<ByteArray> {
         case SPANNER:
         case POSTGRESQL_BINARY:
           int length = base64ByteLength(base64);
+          resultSet.getBytes(1).toByteArray();
           dataOutputStream.writeInt(length);
           if (length > 0) {
             try (InputStream inputStream =
