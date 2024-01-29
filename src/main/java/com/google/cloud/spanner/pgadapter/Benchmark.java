@@ -128,7 +128,8 @@ public class Benchmark {
               try (Connection connection =
                   DriverManager.getConnection(
                       String.format(
-                          "jdbc:postgresql://localhost:%d/knut-test-db", server.getLocalPort()))) {
+                          "jdbc:postgresql://localhost:%d/knut-test-db?sslResponseTimeout=20000&connectTimeout=20&sslMode=disabled",
+                          server.getLocalPort()))) {
                 try (PreparedStatement statement =
                     connection.prepareStatement("select * from benchmark_all_types where id=?")) {
                   for (int n = 0; n < iterations; n++) {
