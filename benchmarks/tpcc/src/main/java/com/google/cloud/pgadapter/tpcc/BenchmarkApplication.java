@@ -51,23 +51,36 @@ public class BenchmarkApplication implements CommandLineRunner {
   @Override
   public void run(String... args) throws Exception {
     ProxyServer server = pgAdapterConfiguration.isInProcess() ? startPGAdapter() : null;
-    String connectionUrl =
+    String pgadapterConnectionUrl =
         server == null
             ? pgAdapterConfiguration.getConnectionUrl()
             : String.format(
                 "jdbc:postgresql://localhost:%d/tpcc?preferQueryMode=simple",
                 server.getLocalPort());
+    String spannerConnectionUrl =
+        String.format(
+            "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d;minSessions=%d;maxSessions=%d"
+                + (pgAdapterConfiguration.getCredentials() == null
+                    ? ""
+                    : ";credentials=" + pgAdapterConfiguration.getCredentials()),
+            spannerConfiguration.getProject(),
+            spannerConfiguration.getInstance(),
+            spannerConfiguration.getDatabase(),
+            pgAdapterConfiguration.getNumChannels(),
+            Math.max(100, tpccConfiguration.getBenchmarkThreads()),
+            Math.max(400, tpccConfiguration.getBenchmarkThreads()));
     try {
       if (tpccConfiguration.isLoadData()) {
         System.out.println("Checking schema");
-        SchemaService schemaService = new SchemaService(connectionUrl);
+        SchemaService schemaService = new SchemaService(pgadapterConnectionUrl);
         schemaService.createSchema();
         System.out.println("Checked schema, starting benchmark");
 
         LOG.info("Starting data load");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         DataLoadStatus status = new DataLoadStatus(tpccConfiguration);
-        Future<Long> loadDataFuture = executor.submit(() -> loadData(status, connectionUrl));
+        Future<Long> loadDataFuture =
+            executor.submit(() -> loadData(status, pgadapterConnectionUrl));
         executor.shutdown();
         Stopwatch watch = Stopwatch.createStarted();
         while (!loadDataFuture.isDone()) {
@@ -78,13 +91,24 @@ public class BenchmarkApplication implements CommandLineRunner {
         System.out.printf("Finished loading %d rows\n", loadDataFuture.get());
       }
 
-      if (tpccConfiguration.isRunBenchmark()) {
+      if (tpccConfiguration.isRunPgadapterBenchmark()
+          || tpccConfiguration.isRunSpannerJdbcBenchmark()) {
         LOG.info("Starting benchmark");
         Statistics statistics = new Statistics(tpccConfiguration);
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
-          executor.submit(new BenchmarkRunner(statistics, connectionUrl, tpccConfiguration));
+          if (tpccConfiguration.isRunPgadapterBenchmark()) {
+            // Run PGAdapter benchmark
+            statistics.setRunnerName("PGAdapter benchmark");
+            executor.submit(
+                new JdbcBenchmarkRunner(statistics, pgadapterConnectionUrl, tpccConfiguration));
+          } else if (tpccConfiguration.isRunSpannerJdbcBenchmark()) {
+            // Run Spanner JDBC benchmark
+            statistics.setRunnerName("Spanner JDBC benchmark");
+            executor.submit(
+                new JdbcBenchmarkRunner(statistics, spannerConnectionUrl, tpccConfiguration));
+          }
         }
 
         Stopwatch watch = Stopwatch.createStarted();

@@ -3,9 +3,12 @@ package com.google.cloud.pgadapter.tpcc;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 class Statistics {
   private final TpccConfiguration tpccConfiguration;
+
+  private final AtomicReference<String> runnerName = new AtomicReference<>("(unknown)");
 
   private final AtomicLong newOrder = new AtomicLong();
 
@@ -29,6 +32,7 @@ class Statistics {
     System.out.print("\033[2J\033[1;1H");
     System.out.printf(
         """
+                \rRunner:         %s\t
                 \rNum threads:    %d\t
                 \rDuration:       %s\t
                 \rRead-only tx:   %s\t
@@ -46,6 +50,7 @@ class Statistics {
                 \r
                 \rTotal:          %d (%.2f/s)\t
                 """,
+        getRunnerName(),
         tpccConfiguration.getBenchmarkThreads(),
         runtime,
         tpccConfiguration.isUseReadOnlyTransactions(),
@@ -71,6 +76,14 @@ class Statistics {
         getSuccessfulPerSecond(runtime),
         getTotal(),
         getTotalPerSecond(runtime));
+  }
+
+  String getRunnerName() {
+    return runnerName.get();
+  }
+
+  void setRunnerName(String name) {
+    this.runnerName.set(name);
   }
 
   long getNewOrder() {

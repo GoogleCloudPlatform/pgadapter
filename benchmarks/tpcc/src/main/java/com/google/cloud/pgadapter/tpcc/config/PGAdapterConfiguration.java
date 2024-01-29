@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Configuration;
 public class PGAdapterConfiguration {
   private boolean inProcess;
 
+  private int numChannels;
+
   private String credentials;
 
   private boolean enableOpenTelemetry;
@@ -28,6 +30,14 @@ public class PGAdapterConfiguration {
 
   public void setInProcess(boolean inProcess) {
     this.inProcess = inProcess;
+  }
+
+  public int getNumChannels() {
+    return numChannels;
+  }
+
+  public void setNumChannels(int numChannels) {
+    this.numChannels = numChannels;
   }
 
   public boolean isEnableOpenTelemetry() {

@@ -16,8 +16,8 @@ import org.postgresql.util.PSQLState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class BenchmarkRunner implements Runnable {
-  private static final Logger LOG = LoggerFactory.getLogger(BenchmarkRunner.class);
+abstract class AbstractBenchmarkRunner implements Runnable {
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractBenchmarkRunner.class);
 
   private final Random random = new Random();
 
@@ -29,7 +29,7 @@ class BenchmarkRunner implements Runnable {
 
   private boolean failed;
 
-  BenchmarkRunner(
+  AbstractBenchmarkRunner(
       Statistics statistics, String connectionUrl, TpccConfiguration tpccConfiguration) {
     this.statistics = statistics;
     this.connectionUrl = connectionUrl;
@@ -38,14 +38,15 @@ class BenchmarkRunner implements Runnable {
 
   @Override
   public void run() {
+    LOG.info("Starting benchmark runner: " + statistics.getRunnerName());
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
       runTransactions(connection);
-      LOG.info("Stopping benchmark runner");
+      LOG.info("Stopping benchmark runner: " + statistics.getRunnerName());
     } catch (InterruptedException interruptedException) {
-      LOG.info("Stopping benchmark runner due to interruption");
+      LOG.info("Stopping benchmark runner due to interruption: " + statistics.getRunnerName());
     } catch (Throwable throwable) {
       throwable.printStackTrace();
-      LOG.error("Benchmark runner failed", throwable);
+      LOG.error("Benchmark runner failed:" + statistics.getRunnerName(), throwable);
       failed = true;
     }
   }
@@ -686,7 +687,7 @@ class BenchmarkRunner implements Runnable {
     }
   }
 
-  enum QueryRowMode {
+  public enum QueryRowMode {
     REQUIRE_ONE,
     ALLOW_MORE_THAN_ONE,
     ALLOW_LESS_THAN_ONE,
@@ -697,26 +698,30 @@ class BenchmarkRunner implements Runnable {
     return queryRow(QueryRowMode.REQUIRE_ONE, statement, query, parameters);
   }
 
-  private Object[] queryRow(
+  abstract Object[] queryRow(
       QueryRowMode queryRowMode, Statement statement, String query, Object... parameters)
-      throws SQLException {
-    String sql = String.format(query, parameters);
-    try (ResultSet resultSet = statement.executeQuery(sql)) {
-      if (!resultSet.next()) {
-        if (queryRowMode == QueryRowMode.ALLOW_LESS_THAN_ONE) {
-          return null;
-        } else {
-          throw new RowNotFoundException(String.format("No results found for: %s", sql));
-        }
-      }
-      Object[] result = new Object[resultSet.getMetaData().getColumnCount()];
-      for (int i = 0; i < result.length; i++) {
-        result[i] = resultSet.getObject(i + 1);
-      }
-      if (queryRowMode != QueryRowMode.ALLOW_MORE_THAN_ONE && resultSet.next()) {
-        throw new SQLException(String.format("More than one result found for: %s", sql));
-      }
-      return result;
-    }
-  }
+      throws SQLException;
+
+  // private Object[] queryRow(
+  //     QueryRowMode queryRowMode, Statement statement, String query, Object... parameters)
+  //     throws SQLException {
+  //   String sql = String.format(query, parameters);
+  //   try (ResultSet resultSet = statement.executeQuery(sql)) {
+  //     if (!resultSet.next()) {
+  //       if (queryRowMode == QueryRowMode.ALLOW_LESS_THAN_ONE) {
+  //         return null;
+  //       } else {
+  //         throw new RowNotFoundException(String.format("No results found for: %s", sql));
+  //       }
+  //     }
+  //     Object[] result = new Object[resultSet.getMetaData().getColumnCount()];
+  //     for (int i = 0; i < result.length; i++) {
+  //       result[i] = resultSet.getObject(i + 1);
+  //     }
+  //     if (queryRowMode != QueryRowMode.ALLOW_MORE_THAN_ONE && resultSet.next()) {
+  //       throw new SQLException(String.format("More than one result found for: %s", sql));
+  //     }
+  //     return result;
+  //   }
+  // }
 }

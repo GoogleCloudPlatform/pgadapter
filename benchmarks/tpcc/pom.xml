@@ -27,6 +27,12 @@
       <artifactId>postgresql</artifactId>
       <version>42.6.0</version>
     </dependency>
+    <!-- Add the Cloud Spanner JDBC driver -->
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-jdbc</artifactId>
+      <version>2.15.0</version>
+    </dependency>
     <!-- Add PGAdapter as a dependency, so we can start it in-process -->
     <dependency>
       <groupId>com.google.cloud</groupId>

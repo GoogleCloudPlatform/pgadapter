@@ -13,6 +13,10 @@ public class TpccConfiguration {
 
   private boolean truncateBeforeLoad;
 
+  private boolean runPgadapterBenchmark;
+
+  private boolean runSpannerJdbcBenchmark;
+
   private boolean runBenchmark;
 
   private int benchmarkThreads;
@@ -54,6 +58,22 @@ public class TpccConfiguration {
 
   public void setTruncateBeforeLoad(boolean truncateBeforeLoad) {
     this.truncateBeforeLoad = truncateBeforeLoad;
+  }
+
+  public boolean isRunPgadapterBenchmark() {
+    return runPgadapterBenchmark;
+  }
+
+  public void setRunPgadapterBenchmark(boolean runPgadapterBenchmark) {
+    this.runPgadapterBenchmark = runPgadapterBenchmark;
+  }
+
+  public boolean isRunSpannerJdbcBenchmark() {
+    return runSpannerJdbcBenchmark;
+  }
+
+  public void setRunSpannerJdbcBenchmark(boolean runSpannerJdbcBenchmark) {
+    this.runSpannerJdbcBenchmark = runSpannerJdbcBenchmark;
   }
 
   public boolean isRunBenchmark() {
