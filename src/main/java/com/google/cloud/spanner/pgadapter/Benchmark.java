@@ -126,8 +126,6 @@ public class Benchmark {
                 t.printStackTrace();
               }
             } else {
-              Uninterruptibles.sleepUninterruptibly(
-                  ThreadLocalRandom.current().nextInt(5000), TimeUnit.MILLISECONDS);
               try (Connection connection =
                   DriverManager.getConnection(
                       String.format(
