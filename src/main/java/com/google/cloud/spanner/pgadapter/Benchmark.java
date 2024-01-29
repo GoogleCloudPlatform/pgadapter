@@ -127,7 +127,7 @@ public class Benchmark {
               }
             } else {
               Uninterruptibles.sleepUninterruptibly(
-                  ThreadLocalRandom.current().nextInt(2000), TimeUnit.MILLISECONDS);
+                  ThreadLocalRandom.current().nextInt(5000), TimeUnit.MILLISECONDS);
               try (Connection connection =
                   DriverManager.getConnection(
                       String.format(
