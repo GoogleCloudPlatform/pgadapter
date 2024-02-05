@@ -70,8 +70,7 @@ public class ConnectionHandlerTest {
   public void testRegisterStatement() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     IntermediatePreparedStatement statement = mock(IntermediatePreparedStatement.class);
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
@@ -88,8 +87,7 @@ public class ConnectionHandlerTest {
   public void testCloseUnknownStatement() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
 
@@ -100,8 +98,7 @@ public class ConnectionHandlerTest {
   public void testCloseAll() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     IntermediatePreparedStatement statement1 = mock(IntermediatePreparedStatement.class);
     IntermediatePreparedStatement statement2 = mock(IntermediatePreparedStatement.class);
 
@@ -119,8 +116,7 @@ public class ConnectionHandlerTest {
   public void testTerminateClosesSocket() throws IOException {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
 
@@ -133,8 +129,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
     when(socket.isClosed()).thenReturn(false, true);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
 
@@ -150,8 +145,7 @@ public class ConnectionHandlerTest {
   public void testTerminateHandlesCloseError() throws IOException {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     // IOException should be handled internally in terminate().
     doThrow(new IOException("test exception")).when(socket).close();
 
@@ -165,8 +159,7 @@ public class ConnectionHandlerTest {
   public void testTerminateClosesAllPortals() throws Exception {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     IntermediatePortalStatement portal1 = mock(IntermediatePortalStatement.class);
     IntermediatePortalStatement portal2 = mock(IntermediatePortalStatement.class);
 
@@ -184,8 +177,7 @@ public class ConnectionHandlerTest {
   public void testTerminateIgnoresPortalCloseError() throws Exception {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     IntermediatePortalStatement portal1 = mock(IntermediatePortalStatement.class);
     IntermediatePortalStatement portal2 = mock(IntermediatePortalStatement.class);
     doThrow(new Exception("test")).when(portal2).close();
@@ -204,8 +196,7 @@ public class ConnectionHandlerTest {
   public void testGetPortal() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     IntermediatePortalStatement portal1 = mock(IntermediatePortalStatement.class);
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
@@ -218,8 +209,7 @@ public class ConnectionHandlerTest {
   public void testGetUnknownPortal() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
     PGException exception =
@@ -231,8 +221,7 @@ public class ConnectionHandlerTest {
   public void testClosePortal() throws Exception {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     IntermediatePortalStatement portal1 = mock(IntermediatePortalStatement.class);
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
@@ -246,8 +235,7 @@ public class ConnectionHandlerTest {
   public void testCloseUnknownPortal() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
 
     ConnectionHandler connection = new ConnectionHandler(server, socket);
     PGException exception =
@@ -259,8 +247,7 @@ public class ConnectionHandlerTest {
   public void testHandleMessages_NonFatalException() throws Exception {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
     when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
@@ -289,8 +276,7 @@ public class ConnectionHandlerTest {
   public void testHandleMessages_FatalException() throws Exception {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
     when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
@@ -315,15 +301,14 @@ public class ConnectionHandlerTest {
   public void testCancelActiveStatement() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
-    when(address.getHostAddress()).thenReturn("address1");
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     Connection spannerConnection = mock(Connection.class);
 
     ConnectionHandler connectionHandler =
         new ConnectionHandler(server, socket, mock(Connection.class));
     ConnectionHandler connectionHandlerToCancel =
         new ConnectionHandler(server, socket, spannerConnection);
+    connectionHandlerToCancel.setThread(mock(Thread.class));
 
     // Cancelling yourself is not allowed.
     assertFalse(
@@ -354,8 +339,7 @@ public class ConnectionHandlerTest {
   public void testRestartConnectionWithSsl_CreatesSslSocket() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     AtomicBoolean calledCreateSSLSocket = new AtomicBoolean();
     ConnectionHandler connection =
         new ConnectionHandler(server, socket) {
@@ -373,8 +357,7 @@ public class ConnectionHandlerTest {
   public void testRestartConnectionWithSsl_SslSocketCreationFailureIsConvertedToPGException() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connection =
         new ConnectionHandler(server, socket) {
           @Override
@@ -391,8 +374,7 @@ public class ConnectionHandlerTest {
       testRestartConnectionWithSsl_SslSocketCreationFailureIsConvertedToPGExceptionWithMessage() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connection =
         new ConnectionHandler(server, socket) {
           @Override
@@ -408,8 +390,7 @@ public class ConnectionHandlerTest {
   public void testRestartConnectionWithSsl_SendsPGException() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
 
     ConnectionHandler connection =
         new ConnectionHandler(server, socket) {
@@ -432,8 +413,7 @@ public class ConnectionHandlerTest {
   public void testRestartConnectionWithSsl_IgnoresExceptionErrorHandling() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
 
     ConnectionHandler connection =
         new ConnectionHandler(server, socket) {
@@ -463,8 +443,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler =
         new ConnectionHandler(server, socket) {
           @Override
@@ -472,12 +451,7 @@ public class ConnectionHandlerTest {
             return new ConnectionMetadata(mock(InputStream.class), mock(OutputStream.class));
           }
         };
-
-    when(address.isLoopbackAddress()).thenReturn(true);
     assertTrue(connectionHandler.checkValidConnection(false));
-
-    when(address.isLoopbackAddress()).thenReturn(false);
-    assertFalse(connectionHandler.checkValidConnection(false));
   }
 
   @Test
@@ -486,8 +460,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler =
         new ConnectionHandler(server, socket) {
           @Override
@@ -495,12 +468,7 @@ public class ConnectionHandlerTest {
             return new ConnectionMetadata(mock(InputStream.class), mock(OutputStream.class));
           }
         };
-
-    when(address.isAnyLocalAddress()).thenReturn(true);
     assertTrue(connectionHandler.checkValidConnection(false));
-
-    when(address.isAnyLocalAddress()).thenReturn(false);
-    assertFalse(connectionHandler.checkValidConnection(false));
   }
 
   @Test
@@ -509,8 +477,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler =
         new ConnectionHandler(server, socket) {
           @Override
@@ -520,11 +487,9 @@ public class ConnectionHandlerTest {
         };
 
     when(options.getSslMode()).thenReturn(SslMode.Enable);
-    when(address.isLoopbackAddress()).thenReturn(true);
     assertTrue(connectionHandler.checkValidConnection(false));
 
     assertTrue(connectionHandler.checkValidConnection(true));
-    when(address.isLoopbackAddress()).thenReturn(false);
     assertTrue(connectionHandler.checkValidConnection(true));
 
     when(options.getSslMode()).thenReturn(SslMode.Require);
@@ -539,8 +504,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
 
     assertTrue(connectionHandler.checkValidConnection(false));
@@ -552,8 +516,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
 
     when(options.shouldAutoDetectClient()).thenReturn(true);
@@ -570,8 +533,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
 
     when(options.shouldAutoDetectClient()).thenReturn(true);
@@ -592,8 +554,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
 
     when(options.shouldAutoDetectClient()).thenReturn(false);
@@ -614,8 +575,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
 
     when(options.shouldAutoDetectClient()).thenReturn(true);
@@ -640,8 +600,7 @@ public class ConnectionHandlerTest {
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
     Socket socket = mock(Socket.class);
-    InetAddress address = mock(InetAddress.class);
-    when(socket.getInetAddress()).thenReturn(address);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
     ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
 
     when(options.shouldAutoDetectClient()).thenReturn(true);

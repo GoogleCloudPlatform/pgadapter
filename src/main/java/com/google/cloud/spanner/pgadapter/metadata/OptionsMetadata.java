@@ -83,6 +83,7 @@ public class OptionsMetadata {
     private SslMode sslMode;
     private int port;
     private String unixDomainSocketDirectory;
+    private boolean disableVirtualThreads;
     private boolean autoConfigEmulator;
     private boolean debugMode;
     private String endpoint;
@@ -296,6 +297,17 @@ public class OptionsMetadata {
     }
 
     /**
+     * Disables the use of virtual threads for connection handlers. Virtual threads are only
+     * supported on Java 21 and higher (and in the standard Docker image), and is automatically
+     * disabled for Java versions prior to 21. Use this method to explicitly disable it for Java 21
+     * and higher.
+     */
+    public Builder setDisableVirtualThreads(boolean disableVirtualThreads) {
+      this.disableVirtualThreads = disableVirtualThreads;
+      return this;
+    }
+
+    /**
      * Instructs PGAdapter to connect to the Cloud Spanner emulator and to automatically create the
      * instance and the database in the connection request if the instance or database does not yet
      * exist on the emulator. Setting this flag takes care of everything you need to connect to the
@@ -310,6 +322,11 @@ public class OptionsMetadata {
 
     Builder enableDebugMode() {
       this.debugMode = true;
+      return this;
+    }
+
+    Builder disableDebugMode() {
+      this.debugMode = false;
       return this;
     }
 
@@ -370,6 +387,9 @@ public class OptionsMetadata {
       }
       if (skipLocalhostCheck) {
         addOption(args, OPTION_DISABLE_LOCALHOST_CHECK);
+      }
+      if (disableVirtualThreads) {
+        addOption(args, OPTION_DISABLE_VIRTUAL_THREADS);
       }
       if (sslMode != null) {
         addLongOption(args, OPTION_SSL, sslMode.name());
@@ -489,6 +509,7 @@ public class OptionsMetadata {
   private static final String OPTION_OPEN_TELEMETRY_TRACE_RATIO = "otel_trace_ratio";
   private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
+  private static final String OPTION_DISABLE_VIRTUAL_THREADS = "disable_virtual_threads";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
       "disable_default_local_statements";
   private static final String OPTION_DISABLE_PG_CATALOG_REPLACEMENTS =
@@ -534,6 +555,7 @@ public class OptionsMetadata {
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
   private final boolean disablePgCatalogReplacements;
+  private final boolean disableVirtualThreads;
   private final boolean requiresMatcher;
   private final DdlTransactionMode ddlTransactionMode;
   private final boolean replaceJdbcMetadataQueries;
@@ -619,6 +641,7 @@ public class OptionsMetadata {
         commandLine.hasOption(OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS);
     this.disablePgCatalogReplacements =
         commandLine.hasOption(OPTION_DISABLE_PG_CATALOG_REPLACEMENTS);
+    this.disableVirtualThreads = commandLine.hasOption(OPTION_DISABLE_VIRTUAL_THREADS);
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
@@ -693,6 +716,7 @@ public class OptionsMetadata {
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
     this.disablePgCatalogReplacements = false;
+    this.disableVirtualThreads = false;
     this.requiresMatcher = requiresMatcher;
     this.ddlTransactionMode = DdlTransactionMode.AutocommitImplicitTransaction;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
@@ -1159,6 +1183,13 @@ public class OptionsMetadata {
             + "the value of this option could cause a client or driver to alter its behavior and cause unexpected "
             + "errors when used with PGAdapter.");
     options.addOption(
+        null,
+        OPTION_DISABLE_VIRTUAL_THREADS,
+        false,
+        "PGAdapter by default uses virtual threads for connection handlers. Virtual threads use "
+            + "less memory and other system resources, and allows PGAdapter to handle more connections "
+            + "simultaneously than when using platform threads.");
+    options.addOption(
         OPTION_INTERNAL_DEBUG_MODE,
         "internal-debug-mode",
         false,
@@ -1375,6 +1406,10 @@ public class OptionsMetadata {
 
   public boolean replacePgCatalogTables() {
     return !this.disablePgCatalogReplacements;
+  }
+
+  public boolean useVirtualThreads() {
+    return !this.disableVirtualThreads;
   }
 
   public boolean requiresMatcher() {

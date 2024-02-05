@@ -1,5 +1,5 @@
 # BUILD
-FROM maven:3.8.4-eclipse-temurin-17-alpine AS build
+FROM maven:3-eclipse-temurin-21 AS build
 # Copy over build files to docker image.
 COPY LICENSE ./
 COPY CONTRIBUTING.md ./
@@ -23,9 +23,11 @@ RUN mvn package -Passembly -DskipTests
 FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:455.0.0-slim
 
 RUN apt update && apt -y install postgresql-client
-RUN apt -y install default-jre
 RUN apt -y install wget
 RUN apt -y install python
+
+ADD https://download.java.net/java/GA/jdk21.0.1/415e3f918a1f4062a0074a2794853d0d/12/GPL/openjdk-21.0.1_linux-x64_bin.tar.gz /openjdk.tar.gz
+RUN tar xvfz /openjdk.tar.gz
 
 COPY --from=build target/pgadapter /
 

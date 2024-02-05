@@ -76,12 +76,6 @@ jobs:
         run: |
           echo "EXCLUDED_INTEGRATION_TESTS=SlowTest" >> $GITHUB_ENV
       - uses: actions/checkout@v4
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: 17
-      - run: java -version
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -104,6 +98,20 @@ jobs:
       - name: Create PostgreSQL test database
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
+      - name: Setup Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 11
+      - run: java -version
+      - name: Run unit tests without virtual threads
+        run: mvn test -B
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 21
+      - run: java -version
       - name: Run unit tests
         run: mvn test -B -Ptest-all
       - name: Auth

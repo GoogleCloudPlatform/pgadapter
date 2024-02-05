@@ -101,7 +101,7 @@ import javax.net.ssl.SSLSocketFactory;
  * necessarily need to have its own thread, this makes the implementation more straightforward.
  */
 @InternalApi
-public class ConnectionHandler extends Thread {
+public class ConnectionHandler implements Runnable {
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
   private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
@@ -119,6 +119,7 @@ public class ConnectionHandler extends Thread {
   private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
       new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
+  private Thread thread;
   private final int connectionId;
   private final int secret;
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
@@ -152,20 +153,34 @@ public class ConnectionHandler extends Thread {
   /** Constructor only for testing. */
   @VisibleForTesting
   ConnectionHandler(ProxyServer server, Socket socket, Connection spannerConnection) {
-    super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
     this.connectionId = incrementingConnectionId.incrementAndGet();
     CONNECTION_HANDLERS.put(this.connectionId, this);
-    setDaemon(true);
+    this.spannerConnection = spannerConnection;
+  }
+
+  void start() {
+    thread.start();
+  }
+
+  String getName() {
+    return thread.getName();
+  }
+
+  Thread getThread() {
+    return thread;
+  }
+
+  void setThread(Thread thread) {
+    this.thread = thread;
     logger.log(
         Level.INFO,
         () ->
             String.format(
                 "Connection handler with ID %s created for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
-    this.spannerConnection = spannerConnection;
   }
 
   void createSSLSocket() throws IOException {
@@ -249,6 +264,7 @@ public class ConnectionHandler extends Thread {
     // only used to determine what dialect the database should have that is being created on the
     // emulator when 'autoConfigEmulator=true'.
     uri = uri + ";dialect=postgresql";
+    uri = uri + ";useVirtualThreads=" + options.useVirtualThreads();
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
           uri
@@ -630,7 +646,7 @@ public class ConnectionHandler extends Thread {
     // otherwise)
     try {
       connectionToCancel.getSpannerConnection().cancel();
-      connectionToCancel.interrupt();
+      connectionToCancel.getThread().interrupt();
       return true;
     } catch (Throwable ignore) {
     }
