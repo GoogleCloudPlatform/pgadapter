@@ -76,6 +76,7 @@ public class OptionsMetadata {
     private DdlTransactionMode ddlTransactionMode;
     private String credentialsFile;
     private Credentials credentials;
+    private boolean disableInternalRetries;
     private boolean requireAuthentication;
     private boolean enableOpenTelemetry;
     private Double openTelemetryTraceRatio;
@@ -211,6 +212,12 @@ public class OptionsMetadata {
       Preconditions.checkState(
           this.credentialsFile == null, "Cannot set both credentials and credentialsFile");
       this.credentials = Preconditions.checkNotNull(credentials);
+      return this;
+    }
+
+    /** Disables internal retries of aborted read/write transactions. */
+    public Builder setDisableInternalRetries() {
+      this.disableInternalRetries = true;
       return this;
     }
 
@@ -383,7 +390,11 @@ public class OptionsMetadata {
       if (endpoint != null) {
         addOption(args, OPTION_SPANNER_ENDPOINT, endpoint);
       }
-      if (usePlainText || numChannels != null || databaseRole != null || autoConfigEmulator) {
+      if (usePlainText
+          || numChannels != null
+          || databaseRole != null
+          || autoConfigEmulator
+          || disableInternalRetries) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -396,6 +407,9 @@ public class OptionsMetadata {
         }
         if (autoConfigEmulator) {
           jdbcOptionBuilder.append("autoConfigEmulator=true;");
+        }
+        if (disableInternalRetries) {
+          jdbcOptionBuilder.append("retryAbortsInternally=false;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
