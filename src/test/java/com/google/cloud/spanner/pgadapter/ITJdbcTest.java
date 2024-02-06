@@ -290,8 +290,6 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testSelectWithParameters() throws SQLException {
-    skipOnEmulator("Casting jsonb to text is not supported on the emulator");
-
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
@@ -396,8 +394,6 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testInsertWithParameters() throws SQLException {
-    skipOnEmulator("jsonb[] is not fully supported on the emulator");
-
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement =
@@ -890,7 +886,9 @@ public class ITJdbcTest implements IntegrationTest {
       // when it tries to delete all data using a normal transaction.
       connection
           .createStatement()
-          .execute("delete from all_types" + (isRunningOnEmulator() ? " where true" : ""));
+          .execute(
+              "delete from all_types"
+                  + (IntegrationTest.isRunningOnEmulator() ? " where true" : ""));
     }
   }
 
@@ -1038,13 +1036,18 @@ public class ITJdbcTest implements IntegrationTest {
   public void testPGSettings() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       // First verify the default value.
-      // JDBC sets the DateStyle to 'ISO' for every connection in the connection request.
+      // JDBC sets the DateStyle to 'ISO' for every connection in the connection request, except in
+      // version 42.7.0, where the value is 'ISO, MDY'.
+      String originalDateStyle;
       try (ResultSet resultSet =
           connection
               .createStatement()
               .executeQuery("select setting from pg_settings where name='DateStyle'")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString("setting"));
+        originalDateStyle = resultSet.getString("setting");
+        assertTrue(
+            originalDateStyle,
+            "ISO".equals(originalDateStyle) || "ISO, MDY".equals(originalDateStyle));
         assertFalse(resultSet.next());
       }
       // Verify that we can also use a statement parameter to query the pg_settings table.
@@ -1053,7 +1056,8 @@ public class ITJdbcTest implements IntegrationTest {
         preparedStatement.setString(1, "DateStyle");
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
           assertTrue(resultSet.next());
-          assertEquals("ISO", resultSet.getString("setting"));
+          String dateStyle = resultSet.getString("setting");
+          assertTrue(dateStyle, "ISO".equals(dateStyle) || "ISO, MDY".equals(dateStyle));
           assertFalse(resultSet.next());
         }
       }
@@ -1098,7 +1102,7 @@ public class ITJdbcTest implements IntegrationTest {
               .createStatement()
               .executeQuery("select setting from pg_settings where name='DateStyle'")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString("setting"));
+        assertEquals(originalDateStyle, resultSet.getString("setting"));
         assertFalse(resultSet.next());
       }
     }
@@ -1114,10 +1118,8 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(namespaces.next());
         assertEquals("public", namespaces.getString(1));
         assertTrue(namespaces.next());
-        if (!isRunningOnEmulator()) {
-          assertEquals("pg_catalog", namespaces.getString(1));
-          assertTrue(namespaces.next());
-        }
+        assertEquals("pg_catalog", namespaces.getString(1));
+        assertTrue(namespaces.next());
         assertEquals("information_schema", namespaces.getString(1));
         assertTrue(namespaces.next());
         assertEquals("spanner_sys", namespaces.getString(1));

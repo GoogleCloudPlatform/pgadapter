@@ -16,16 +16,12 @@ package com.google.cloud.postgres.models;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 
 public class HibernateConfiguration {
+  private final SessionFactory sessionFactory;
 
-  private Configuration configuration;
-  private SessionFactory sessionFactory;
-
-  private HibernateConfiguration(Configuration configuration, SessionFactory sessionFactory) {
-    this.configuration = configuration;
+  private HibernateConfiguration(SessionFactory sessionFactory) {
     this.sessionFactory = sessionFactory;
   }
 
@@ -37,8 +33,17 @@ public class HibernateConfiguration {
     sessionFactory.close();
   }
 
-  public static HibernateConfiguration createHibernateConfiguration() {
+  public static HibernateConfiguration createHibernateConfiguration(String connectionUrl) {
     final Configuration configuration = new Configuration();
+
+    configuration.setProperty("hibernate.connection.url", connectionUrl);
+    configuration.setProperty("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+    configuration.setProperty("hibernate.connection.driver_class", "org.postgresql.Driver");
+    configuration.setProperty("hibernate.show_sql", "true");
+    configuration.setProperty("hibernate.format_sql", "true");
+    configuration.setProperty("hibernate.connection.pool_size", "5");
+    configuration.setProperty("hibernate.hbm2ddl.auto", "none");
+
     configuration.addAnnotatedClass(Albums.class);
     configuration.addAnnotatedClass(Concerts.class);
     configuration.addAnnotatedClass(Singers.class);
@@ -46,9 +51,8 @@ public class HibernateConfiguration {
     configuration.addAnnotatedClass(Tracks.class);
     configuration.addAnnotatedClass(TracksId.class);
 
-    final SessionFactory sessionFactory =
-        configuration.buildSessionFactory(new StandardServiceRegistryBuilder().build());
+    final SessionFactory sessionFactory = configuration.buildSessionFactory();
 
-    return new HibernateConfiguration(configuration, sessionFactory);
+    return new HibernateConfiguration(sessionFactory);
   }
 }

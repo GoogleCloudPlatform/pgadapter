@@ -372,6 +372,59 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testGetCatalogs() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with pg_database as (\n"
+                    + "  select 0::bigint as oid,\n"
+                    + "         catalog_name as datname,\n"
+                    + "         0::bigint as datdba,\n"
+                    + "         6::bigint as encoding,\n"
+                    + "         'c' as datlocprovider,\n"
+                    + "         'C' as datcollate,\n"
+                    + "         'C' as datctype,\n"
+                    + "         false as datistemplate,\n"
+                    + "         true as datallowconn,\n"
+                    + "         -1::bigint as datconnlimit,\n"
+                    + "         0::bigint as datlastsysoid,\n"
+                    + "         0::bigint as datfrozenxid,\n"
+                    + "         0::bigint as datminmxid,\n"
+                    + "         0::bigint as dattablespace,\n"
+                    + "         null as daticulocale,\n"
+                    + "         null as daticurules,\n"
+                    + "         null as datcollversion,\n"
+                    + "         null as datacl  from information_schema.information_schema_catalog_name\n"
+                    + ")\n"
+                    + "SELECT datname AS TABLE_CAT FROM pg_database WHERE datallowconn = true ORDER BY datname"),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("TABLE_CAT")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("test-database").build())
+                        .build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet catalogs = connection.getMetaData().getCatalogs()) {
+        assertTrue(catalogs.next());
+        assertEquals("test-database", catalogs.getString("TABLE_CAT"));
+        assertFalse(catalogs.next());
+      }
+    }
+  }
+
+  @Test
   public void testStatementReturnGeneratedKeys() throws SQLException {
     String sql = "insert into test (id, value) values (1, 'One')";
     mockSpanner.putStatementResult(
@@ -3546,10 +3599,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testShowSettingWithStartupValue() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      // DATESTYLE is set to 'ISO' by the JDBC driver at startup.
+      // DATESTYLE is set to 'ISO' by the JDBC driver at startup, except in version 42.7.0, which
+      // sets 'ISO, MDY'.
       try (ResultSet resultSet = connection.createStatement().executeQuery("show DATESTYLE")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        String dateStyle = resultSet.getString(1);
+        assertTrue(dateStyle, "ISO".equals(dateStyle) || "ISO, MDY".equals(dateStyle));
         assertFalse(resultSet.next());
       }
     }
@@ -3634,9 +3689,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testResetSettingWithStartupValue() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      String originalDateStyle;
       try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        originalDateStyle = resultSet.getString(1);
+        assertTrue(
+            originalDateStyle,
+            "ISO".equals(originalDateStyle) || "ISO, MDY".equals(originalDateStyle));
         assertFalse(resultSet.next());
       }
 
@@ -3652,7 +3711,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        assertEquals(originalDateStyle, resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }

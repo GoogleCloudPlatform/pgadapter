@@ -109,9 +109,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.26.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.28.0` with the version you want to download):
 ```shell
-VERSION=v0.26.0
+VERSION=v0.28.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -146,7 +146,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.26.0</version>
+  <version>0.28.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -157,19 +157,16 @@ This option is only available for Java/JVM-based applications.
 
 ```java
 class PGProxyRunner {
-    public static void main() {
-      String[] arguments =
-              new String[] {
-                      "-p",
-                      "my-project",
-                      "-i",
-                      "my-instance",
-                      "-d",
-                      "my-database",
-                      "-c",
-                      "/path/to/credentials.json"
-              };
-      ProxyServer server = new ProxyServer(new OptionsMetadata(arguments));
+  public static void main(String[] args) {
+      OptionsMetadata.Builder builder =
+          OptionsMetadata.newBuilder()
+              .setProject("my-project")
+              .setInstance("my-instance")
+              .setDatabase("my-database")
+              .setCredentialsFile("/path/to/credentials.json")
+              // Start PGAdapter on any available port.
+              .setPort(0);
+      ProxyServer server = new ProxyServer(builder.build());
       server.startServer();
       server.awaitRunning();
     }
@@ -180,6 +177,24 @@ See [samples/java/jdbc](samples/java/jdbc) for a small sample application that a
 PGAdapter as a compile-time dependency and runs it together with the main application.
 
 ## Emulator
+A pre-built Docker image that contains both PGAdapter and the Spanner Emulator can be started with
+these commands:
+
+```shell
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+docker run \
+  -d -p 5432:5432 \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+sleep 2
+psql -h localhost -p 5432 -d test-database
+```
+
+This Docker container configures PGAdapter to connect to a Cloud Spanner Emulator running inside
+the same container. You do not need to first create a Spanner instance or database on the Emulator
+before connecting to them. Instead, the instance and database are automatically created on the
+Emulator when you connect to PGAdapter.
+
+### Additional Information
 See [this document](docs/emulator.md) for more information on how to connect PGAdapter to the Cloud
 Spanner Emulator.
 

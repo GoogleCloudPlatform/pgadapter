@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - id: 'auth'
-        uses: 'google-github-actions/auth@v1'
+        uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
 
@@ -43,13 +43,13 @@ jobs:
 
       # Upload the assembly to Google Cloud Storage
       - id: 'upload-versioned-file'
-        uses: 'google-github-actions/upload-cloud-storage@v1'
+        uses: 'google-github-actions/upload-cloud-storage@v2'
         with:
           path: ${{ env.assembly }}
           destination: 'pgadapter-jar-releases'
           parent: false
       - id: 'overwrite-current-file'
-        uses: 'google-github-actions/upload-cloud-storage@v1'
+        uses: 'google-github-actions/upload-cloud-storage@v2'
         with:
           path: ${{ env.assembly_current }}
           destination: 'pgadapter-jar-releases'

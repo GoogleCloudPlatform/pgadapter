@@ -15,29 +15,76 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
   </properties>
+  
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>1.19.4</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+  
   <dependencies>
-    <!-- [START spanner_hibernate_dependencies] -->
+    <!-- Add PGAdapter as a dependency, so we can start it in-process with the Java application. -->
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-pgadapter</artifactId>
+      <version>0.28.0</version>
+    </dependency>
     <!-- Hibernate core dependency -->
     <dependency>
       <groupId>org.hibernate.orm</groupId>
       <artifactId>hibernate-core</artifactId>
-      <version>6.3.1.Final</version>
+      <version>6.4.3.Final</version>
     </dependency>
-
     <!-- Postgresql JDBC driver dependency -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.6.0</version>
+      <version>42.7.1</version>
     </dependency>
-    <!-- [END spanner_hibernate_dependencies] -->
+    <!-- Add testcontainers, so we can run a Docker container with PGAdapter+Spanner Emulator -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+    </dependency>
 
     <!-- Jackson is required if you want to use JSONB with Hibernate. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>2.15.3</version>
+      <version>2.16.1</version>
     </dependency>
-
+    
+    <!-- NOTE: This dependency is deliberately not defined with scope <test>, as that breaks the use of testcontainers in the sample application. -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+    </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.1.1</version>
+        <configuration>
+          <mainClass>com.google.cloud.postgres.SampleApplication</mainClass>
+          <cleanupDaemonThreads>false</cleanupDaemonThreads>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>com.coveo</groupId>
+        <artifactId>fmt-maven-plugin</artifactId>
+        <version>2.13</version>
+      </plugin>
+    </plugins>
+  </build>
+  
 </project>

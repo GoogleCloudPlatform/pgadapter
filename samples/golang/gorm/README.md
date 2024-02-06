@@ -7,7 +7,14 @@ The [sample.go](sample.go) file contains a sample application using `gorm` with 
 features of `gorm` that are supported with PGAdapter. This sample assumes that the reader is familiar with `gorm`, and
 it is not intended as a tutorial for how to use `gorm` in general.
 
-You can run the sample application with this command:
+The sample is by default executed using the Cloud Spanner emulator. You can run the sample on the emulator with this
+command:
+
+```shell
+go run sample.go
+```
+
+You can also run the sample application on a real Cloud Spanner PostgreSQL database with this command:
 
 ```shell
 go run sample.go -project my-project -instance my-instance -database my-database

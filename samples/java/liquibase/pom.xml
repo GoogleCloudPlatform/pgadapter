@@ -37,7 +37,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.5.7</version>
+    <version>1.7.1</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -62,7 +62,7 @@
         <plugin>
           <groupId>org.liquibase</groupId>
           <artifactId>liquibase-maven-plugin</artifactId>
-          <version>4.24.0</version>
+          <version>4.25.1</version>
           <configuration>
             <propertyFile>liquibase.properties</propertyFile>
             <outputChangeLogFile>changelog-master.xml</outputChangeLogFile>
@@ -71,7 +71,7 @@
             <dependency>
               <groupId>org.postgresql</groupId>
               <artifactId>postgresql</artifactId>
-              <version>42.6.0</version>
+              <version>42.7.1</version>
             </dependency>
           </dependencies>
         </plugin>
