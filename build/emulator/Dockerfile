@@ -13,6 +13,10 @@ ADD build/emulator/startup.sh /home/pgadapter/startup.sh
 RUN chmod +x /home/pgadapter/startup.sh
 
 # Add the emulator binaries.
+COPY --from=emulator /lib/* /lib/
+COPY --from=emulator /lib64/* /lib64/
+COPY --from=emulator /usr/lib/* /usr/lib/
+COPY --from=emulator /var/* /var/
 COPY --from=emulator /gateway_main /emulator/gateway_main
 COPY --from=emulator /emulator_main /emulator/emulator_main
 COPY --from=emulator /licenses.txt.gz /emulator/licenses.txt.gz
