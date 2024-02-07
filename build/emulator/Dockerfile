@@ -12,17 +12,17 @@ FROM gcr.io/cloud-spanner-pg-adapter/pgadapter AS pgadapter
 ADD build/emulator/startup.sh /home/pgadapter/startup.sh
 RUN chmod +x /home/pgadapter/startup.sh
 
+# Add the emulator binaries.
 COPY --from=emulator /gateway_main /emulator/gateway_main
 COPY --from=emulator /emulator_main /emulator/emulator_main
 COPY --from=emulator /licenses.txt.gz /emulator/licenses.txt.gz
 RUN chmod u+x /emulator/gateway_main
 RUN chmod u+x /emulator/emulator_main
 
-# Add the emulator binaries.
+# Add the emulator libraries.
 COPY --from=emulator /lib/* /lib/
 COPY --from=emulator /lib64/* /lib64/
 COPY --from=emulator /usr/lib/* /usr/lib/
-COPY --from=emulator /var/* /var/
 
 # Expose 5432 (PGAdapter PostgreSQL port), 9010 (Emulator gRPC port), and 9020 (Emulator REST port)
 EXPOSE 5432 9010 9020
