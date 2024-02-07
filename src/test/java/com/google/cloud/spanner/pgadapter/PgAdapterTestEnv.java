@@ -172,6 +172,10 @@ public class PgAdapterTestEnv {
 
   private ProxyServer server;
 
+  public static boolean isRunningOnEmulator() {
+    return System.getenv("SPANNER_EMULATOR_HOST") != null;
+  }
+
   public void setUp() {
     spannerHost = getSpannerUrl();
     logger.info("Using Spanner host: " + spannerHost);
