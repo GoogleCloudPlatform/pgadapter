@@ -73,13 +73,22 @@ public class StringParser extends Parser<String> {
 
   static void writeToPG(DataOutputStream dataOutputStream, String value, byte[] header) {
     int length = value.length();
-    try (OutputStreamWriter writer =
-        new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
-      dataOutputStream.writeInt(Utf8.encodedLength(value) + header.length);
-      dataOutputStream.write(header);
-      for (int offset = 0; offset < length; offset += MAX_WRITE_LENGTH) {
-        int writeLen = Math.min(MAX_WRITE_LENGTH, length - offset);
-        writer.write(value, offset, writeLen);
+    try {
+      if (length < MAX_WRITE_LENGTH) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        dataOutputStream.writeInt(bytes.length + header.length);
+        dataOutputStream.write(header);
+        dataOutputStream.write(bytes);
+      } else {
+        try (OutputStreamWriter writer =
+            new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
+          dataOutputStream.writeInt(Utf8.encodedLength(value) + header.length);
+          dataOutputStream.write(header);
+          for (int offset = 0; offset < length; offset += MAX_WRITE_LENGTH) {
+            int writeLen = Math.min(MAX_WRITE_LENGTH, length - offset);
+            writer.write(value, offset, writeLen);
+          }
+        }
       }
     } catch (IOException ioException) {
       throw SpannerExceptionFactory.asSpannerException(ioException);
