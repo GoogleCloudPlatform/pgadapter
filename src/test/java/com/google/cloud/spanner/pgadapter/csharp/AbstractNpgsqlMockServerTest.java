@@ -101,7 +101,7 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + "WHERE\n"
               + "    typtype IN ('b', 'r', 'm', 'e', 'd') OR -- Base, range, multirange, enum, domain\n"
               + "    (typtype = 'c' AND relkind='c') OR -- User-defined free-standing composites (not table composites) by default\n"
-              + "    (typtype = 'p' AND typname IN ('record', 'void')) OR -- Some special supported pseudo-types\n"
+              + "    (typtype = 'p' AND typname IN ('record', 'void', 'unknown')) OR -- Some special supported pseudo-types\n"
               + "    (typtype = 'a' AND (  -- Array of...\n"
               + "        elemtyptype IN ('b', 'r', 'm', 'e', 'd') OR -- Array of base, range, multirange, enum, domain\n"
               + "        (elemtyptype = 'p' AND elemtypname IN ('record', 'void')) OR -- Arrays of special supported pseudo-types\n"
@@ -423,6 +423,15 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setStringValue("a").build())
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BYTEA)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue("705").build())
+                  .addValues(Value.newBuilder().setStringValue("unknown").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue("705").build())
                   .build())
           .setMetadata(SELECT_TYPES_METADATA)
           .build();
