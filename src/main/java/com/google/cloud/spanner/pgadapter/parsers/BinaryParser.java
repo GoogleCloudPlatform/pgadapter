@@ -25,7 +25,6 @@ import com.google.common.io.CharSource;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import javax.annotation.Nonnull;
@@ -110,7 +109,7 @@ public class BinaryParser extends Parser<ByteArray> {
         case POSTGRESQL_BINARY:
           int length = base64ByteLength(base64);
           dataOutputStream.writeInt(length);
-          if (length > 0) {
+          if (length > MAX_BUFFER_SIZE) {
             try (InputStream inputStream =
                 Base64.getDecoder()
                     .wrap(
@@ -119,8 +118,10 @@ public class BinaryParser extends Parser<ByteArray> {
                             .openStream())) {
               copy(length, inputStream, dataOutputStream);
             }
+          } else {
+            dataOutputStream.write(Base64.getDecoder().decode(base64));
           }
-          return null;
+            return null;
         case POSTGRESQL_TEXT:
           return bytesToHex(resultSet.getBytes(position).toByteArray());
         default:
@@ -131,7 +132,7 @@ public class BinaryParser extends Parser<ByteArray> {
     }
   }
 
-  static long copy(int length, InputStream from, OutputStream to) throws IOException {
+  static long copy(int length, InputStream from, DataOutputStream to) throws IOException {
     byte[] buf = new byte[Math.min(length, MAX_BUFFER_SIZE)];
     long total = 0;
     int numRead;
