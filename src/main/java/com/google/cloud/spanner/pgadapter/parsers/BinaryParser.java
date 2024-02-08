@@ -114,14 +114,14 @@ public class BinaryParser extends Parser<ByteArray> {
                 Base64.getDecoder()
                     .wrap(
                         CharSource.wrap(base64)
-                            .asByteSource(StandardCharsets.UTF_8)
+                            .asByteSource(StandardCharsets.ISO_8859_1)
                             .openStream())) {
               copy(length, inputStream, dataOutputStream);
             }
           } else {
             dataOutputStream.write(Base64.getDecoder().decode(base64));
           }
-            return null;
+          return null;
         case POSTGRESQL_TEXT:
           return bytesToHex(resultSet.getBytes(position).toByteArray());
         default:
