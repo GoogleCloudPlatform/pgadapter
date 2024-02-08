@@ -117,6 +117,7 @@ public class ProxyServer extends AbstractApiService {
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
     addConnectionProperties();
+    System.setProperty("spanner.statement_cache_size_mb", "0");
   }
 
   private void addConnectionProperties() {
