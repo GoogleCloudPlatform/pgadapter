@@ -1161,6 +1161,9 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(Oid.FLOAT8, types.getInt(1));
         assertEquals("float8", types.getString(2));
         assertTrue(types.next());
+        assertEquals(705, types.getInt(1));
+        assertEquals("unknown", types.getString(2));
+        assertTrue(types.next());
         assertEquals(Oid.BOOL_ARRAY, types.getInt(1));
         assertEquals("_bool", types.getString(2));
         assertTrue(types.next());

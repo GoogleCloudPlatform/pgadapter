@@ -466,6 +466,7 @@ public class ITPsqlTest implements IntegrationTest {
             + " text\n"
             + " float4\n"
             + " float8\n"
+            + " unknown\n"
             + " _bool\n"
             + " _bytea\n"
             + " _int2\n"
@@ -486,7 +487,7 @@ public class ITPsqlTest implements IntegrationTest {
             + " numeric\n"
             + " jsonb\n"
             + " _jsonb\n"
-            + "(28 rows)\n",
+            + "(29 rows)\n",
         output);
   }
 
