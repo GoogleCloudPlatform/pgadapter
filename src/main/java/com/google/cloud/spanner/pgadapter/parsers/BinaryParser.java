@@ -38,7 +38,7 @@ import org.postgresql.util.PGbytea;
  */
 @InternalApi
 public class BinaryParser extends Parser<ByteArray> {
-  private static final int MAX_BUFFER_SIZE = 8192;
+  private static final int MAX_BUFFER_SIZE = 1 << 20;
 
   BinaryParser(ResultSet item, int position) {
     this.item = item.getBytes(position);
