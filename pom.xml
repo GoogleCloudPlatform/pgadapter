@@ -75,6 +75,12 @@
     <dependencies>
       <dependency>
         <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-spanner-bom</artifactId>
+        <version>6.57.1-SNAPSHOT</version>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
         <version>26.31.0</version>
         <type>pom</type>
@@ -103,7 +109,6 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>6.56.0</version>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
