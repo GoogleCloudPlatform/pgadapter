@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.29.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.28.0...v0.29.0) (2024-02-06)
+
+
+### Features
+
+* support Emulator in the Go wrapper ([#1331](https://github.com/GoogleCloudPlatform/pgadapter/issues/1331)) ([9e106d5](https://github.com/GoogleCloudPlatform/pgadapter/commit/9e106d587e1f65495083b8fb096bd5c5a238272c))
+
+
+### Bug Fixes
+
+* do not allocate statement name if it fails ([#1252](https://github.com/GoogleCloudPlatform/pgadapter/issues/1252)) ([d438ce5](https://github.com/GoogleCloudPlatform/pgadapter/commit/d438ce52a2359c8bd312f3e0d71e6762db11d824))
+
+
+### Documentation
+
+* update JDBC sample to use emulator ([#1330](https://github.com/GoogleCloudPlatform/pgadapter/issues/1330)) ([0af129d](https://github.com/GoogleCloudPlatform/pgadapter/commit/0af129d7e94251559358ec69b8e9e48bef53316b))
+* use emulator for the pgx sample ([#1332](https://github.com/GoogleCloudPlatform/pgadapter/issues/1332)) ([5f20e56](https://github.com/GoogleCloudPlatform/pgadapter/commit/5f20e5657ff6b1bf07be8213233eccb7a8980916))
+
 ## [0.28.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.27.1...v0.28.0) (2023-12-29)
 
 

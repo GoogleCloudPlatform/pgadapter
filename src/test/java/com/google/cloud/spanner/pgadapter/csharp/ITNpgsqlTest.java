@@ -19,7 +19,6 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -34,6 +33,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -68,9 +68,6 @@ public class ITNpgsqlTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
-    assumeTrue(
-        "This test requires pg_type support", System.getenv("SPANNER_EMULATOR_HOST") == null);
-
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
@@ -311,7 +308,7 @@ public class ITNpgsqlTest implements IntegrationTest {
 
     String result = execute("TestBatchExecutionError", createConnectionString());
     assertTrue(result, result.contains("Executing batch failed with error"));
-    assertTrue(result, result.contains("Row [101] in table all_types already exists"));
+    assertTrue(result, result.contains(SQLState.UniqueViolation.toString()));
   }
 
   @Test
