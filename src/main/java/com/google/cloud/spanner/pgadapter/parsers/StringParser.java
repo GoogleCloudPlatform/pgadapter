@@ -28,7 +28,7 @@ import javax.annotation.Nonnull;
 /** Translate from wire protocol to string. */
 @InternalApi
 public class StringParser extends Parser<String> {
-  private static final int MAX_WRITE_LENGTH = 1 << 13;
+  private static final int MAX_WRITE_LENGTH = 1 << 16;
 
   private static final byte[] HEADER = new byte[0];
 
