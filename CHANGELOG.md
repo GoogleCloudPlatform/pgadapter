@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.29.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.29.0...v0.29.1) (2024-02-09)
+
+
+### Bug Fixes
+
+* add libs to Docker build with emulator ([#1375](https://github.com/GoogleCloudPlatform/pgadapter/issues/1375)) ([e74edfd](https://github.com/GoogleCloudPlatform/pgadapter/commit/e74edfd3ab138b029d66b517619a7d2cce9c7022))
+
+
+### Performance Improvements
+
+* reduce memory consumption during conversion of JSONB in binary format ([#1346](https://github.com/GoogleCloudPlatform/pgadapter/issues/1346)) ([adbbd2b](https://github.com/GoogleCloudPlatform/pgadapter/commit/adbbd2b2e0999fb1fb500ecf1f4560e8e678f6f4))
+
 ## [0.29.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.28.0...v0.29.0) (2024-02-06)
 
 
