@@ -17,10 +17,17 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.common.io.CharSource;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import javax.annotation.Nonnull;
 import org.postgresql.util.PGbytea;
 
@@ -93,16 +100,68 @@ public class BinaryParser extends Parser<ByteArray> {
     return this.item == null ? null : this.item.toByteArray();
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
-    switch (format) {
-      case SPANNER:
-      case POSTGRESQL_BINARY:
-        return resultSet.getBytes(position).toByteArray();
-      case POSTGRESQL_TEXT:
-        return bytesToHex(resultSet.getBytes(position).toByteArray());
-      default:
-        throw new IllegalArgumentException("unknown data format: " + format);
+  public static byte[] convertToPG(
+      SessionState sessionState,
+      DataOutputStream dataOutputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format) {
+    int bufferSize = sessionState.getBinaryConversionBufferSize();
+    try {
+      String base64 = resultSet.getValue(position).getAsString();
+      switch (format) {
+        case SPANNER:
+        case POSTGRESQL_BINARY:
+          int length = base64ByteLength(base64);
+          dataOutputStream.writeInt(length);
+          if (bufferSize > 0 && length > bufferSize) {
+            try (InputStream inputStream =
+                Base64.getDecoder()
+                    .wrap(
+                        CharSource.wrap(base64)
+                            .asByteSource(StandardCharsets.ISO_8859_1)
+                            .openStream())) {
+              copy(length, inputStream, dataOutputStream, bufferSize);
+            }
+          } else {
+            dataOutputStream.write(Base64.getDecoder().decode(base64));
+          }
+          return null;
+        case POSTGRESQL_TEXT:
+          return bytesToHex(resultSet.getBytes(position).toByteArray());
+        default:
+          throw new IllegalArgumentException("unknown data format: " + format);
+      }
+    } catch (IOException ioException) {
+      throw SpannerExceptionFactory.asSpannerException(ioException);
     }
+  }
+
+  static long copy(int length, InputStream from, DataOutputStream to, int bufferSize)
+      throws IOException {
+    byte[] buf = new byte[Math.min(length, bufferSize)];
+    long total = 0;
+    int numRead;
+    while ((numRead = from.read(buf)) > -1) {
+      to.write(buf, 0, numRead);
+      total += numRead;
+    }
+    return total;
+  }
+
+  static int base64ByteLength(String base64) {
+    int padding = 0;
+    int index = base64.length();
+    while (--index >= 0 && base64.charAt(index) == '=') {
+      padding++;
+    }
+    int length = 3 * ((base64.length() - padding) / 4);
+    if (padding == 2) {
+      length += 1;
+    } else if (padding == 1) {
+      length += 2;
+    }
+    return length;
   }
 
   @Override

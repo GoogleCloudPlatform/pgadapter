@@ -543,7 +543,8 @@ public abstract class ControlMessage extends WireMessage {
           rows++;
           hasData = resultSet.next();
           if (rows % 1000 == 0) {
-            logger.log(Level.INFO, String.format("Sent %d rows", rows));
+            long sentRows = rows;
+            logger.log(Level.FINER, () -> String.format("Sent %d rows", sentRows));
           }
           if (rows == maxRows) {
             break;
