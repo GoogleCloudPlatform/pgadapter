@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -94,14 +95,19 @@ public class JsonbParser extends Parser<String> {
   }
 
   public static byte[] convertToPG(
-      DataOutputStream dataOutputStream, ResultSet resultSet, int position, DataFormat format) {
+      SessionState sessionState,
+      DataOutputStream dataOutputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format) {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        StringParser.writeToPG(dataOutputStream, resultSet.getPgJsonb(position));
+        StringParser.writeToPG(sessionState, dataOutputStream, resultSet.getPgJsonb(position));
         return null;
       case POSTGRESQL_BINARY:
-        StringParser.writeToPG(dataOutputStream, resultSet.getPgJsonb(position), BINARY_HEADER);
+        StringParser.writeToPG(
+            sessionState, dataOutputStream, resultSet.getPgJsonb(position), BINARY_HEADER);
         return null;
       default:
         throw new IllegalArgumentException("unknown data format: " + format);

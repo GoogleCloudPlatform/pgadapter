@@ -21,6 +21,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.io.CharSource;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -36,7 +37,6 @@ import org.postgresql.util.PGbytea;
  */
 @InternalApi
 public class BinaryParser extends Parser<ByteArray> {
-  private static final int MAX_BUFFER_SIZE = 1 << 13;
 
   BinaryParser(ResultSet item, int position) {
     this.item = item.getBytes(position);
@@ -101,7 +101,12 @@ public class BinaryParser extends Parser<ByteArray> {
   }
 
   public static byte[] convertToPG(
-      DataOutputStream dataOutputStream, ResultSet resultSet, int position, DataFormat format) {
+      SessionState sessionState,
+      DataOutputStream dataOutputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format) {
+    int bufferSize = sessionState.getBinaryConversionBufferSize();
     try {
       String base64 = resultSet.getValue(position).getAsString();
       switch (format) {
@@ -109,14 +114,14 @@ public class BinaryParser extends Parser<ByteArray> {
         case POSTGRESQL_BINARY:
           int length = base64ByteLength(base64);
           dataOutputStream.writeInt(length);
-          if (length > MAX_BUFFER_SIZE) {
+          if (bufferSize > 0 && length > bufferSize) {
             try (InputStream inputStream =
                 Base64.getDecoder()
                     .wrap(
                         CharSource.wrap(base64)
                             .asByteSource(StandardCharsets.ISO_8859_1)
                             .openStream())) {
-              copy(length, inputStream, dataOutputStream);
+              copy(length, inputStream, dataOutputStream, bufferSize);
             }
           } else {
             dataOutputStream.write(Base64.getDecoder().decode(base64));
@@ -132,8 +137,9 @@ public class BinaryParser extends Parser<ByteArray> {
     }
   }
 
-  static long copy(int length, InputStream from, DataOutputStream to) throws IOException {
-    byte[] buf = new byte[Math.min(length, MAX_BUFFER_SIZE)];
+  static long copy(int length, InputStream from, DataOutputStream to, int bufferSize)
+      throws IOException {
+    byte[] buf = new byte[Math.min(length, bufferSize)];
     long total = 0;
     int numRead;
     while ((numRead = from.read(buf)) > -1) {

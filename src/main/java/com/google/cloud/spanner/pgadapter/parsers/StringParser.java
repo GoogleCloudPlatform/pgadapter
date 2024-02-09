@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.base.Utf8;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -28,8 +29,6 @@ import javax.annotation.Nonnull;
 /** Translate from wire protocol to string. */
 @InternalApi
 public class StringParser extends Parser<String> {
-  private static final int MAX_WRITE_LENGTH = 1 << 18;
-
   private static final byte[] HEADER = new byte[0];
 
   StringParser(ResultSet item, int position) {
@@ -62,19 +61,25 @@ public class StringParser extends Parser<String> {
   }
 
   public static byte[] convertToPG(
-      DataOutputStream dataOutputStream, ResultSet resultSet, int position) {
-    writeToPG(dataOutputStream, resultSet.getString(position));
+      SessionState sessionState,
+      DataOutputStream dataOutputStream,
+      ResultSet resultSet,
+      int position) {
+    writeToPG(sessionState, dataOutputStream, resultSet.getString(position));
     return null;
   }
 
-  static void writeToPG(DataOutputStream dataOutputStream, String value) {
-    writeToPG(dataOutputStream, value, HEADER);
+  static void writeToPG(
+      SessionState sessionState, DataOutputStream dataOutputStream, String value) {
+    writeToPG(sessionState, dataOutputStream, value, HEADER);
   }
 
-  static void writeToPG(DataOutputStream dataOutputStream, String value, byte[] header) {
+  static void writeToPG(
+      SessionState sessionState, DataOutputStream dataOutputStream, String value, byte[] header) {
+    int bufferSize = sessionState.getStringConversionBufferSize();
     int length = value.length();
     try {
-      if (length < MAX_WRITE_LENGTH) {
+      if (bufferSize <= 0 || length < bufferSize) {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         dataOutputStream.writeInt(bytes.length + header.length);
         dataOutputStream.write(header);
@@ -84,8 +89,8 @@ public class StringParser extends Parser<String> {
             new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
           dataOutputStream.writeInt(Utf8.encodedLength(value) + header.length);
           dataOutputStream.write(header);
-          for (int offset = 0; offset < length; offset += MAX_WRITE_LENGTH) {
-            int writeLen = Math.min(MAX_WRITE_LENGTH, length - offset);
+          for (int offset = 0; offset < length; offset += bufferSize) {
+            int writeLen = Math.min(bufferSize, length - offset);
             writer.write(value, offset, writeLen);
           }
         }

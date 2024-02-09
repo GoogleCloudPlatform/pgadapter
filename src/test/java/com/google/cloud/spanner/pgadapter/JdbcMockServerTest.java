@@ -434,10 +434,15 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .build()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        assertTrue(resultSet.next());
-        assertEquals(randomString, resultSet.getString(1));
-        assertFalse(resultSet.next());
+      for (int bufferSize : new int[] {0, 32}) {
+        connection
+            .createStatement()
+            .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals(randomString, resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
       }
     }
   }
@@ -461,10 +466,15 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String binaryTransfer = "&binaryTransferEnable=" + Oid.JSONB;
     try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransfer)) {
       connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
-      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        assertTrue(resultSet.next());
-        assertNotNull(resultSet.getObject(1));
-        assertFalse(resultSet.next());
+      for (int bufferSize : new int[] {0, 32}) {
+        connection
+            .createStatement()
+            .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertNotNull(resultSet.getObject(1));
+          assertFalse(resultSet.next());
+        }
       }
     }
   }
@@ -3178,119 +3188,134 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testRandomResults() throws SQLException {
-    for (boolean binary : new boolean[] {false, true}) {
-      // Also get the random results using the normal Spanner client to compare the results with
-      // what is returned by PGAdapter.
-      Spanner spanner =
-          SpannerOptions.newBuilder()
-              .setProjectId("p")
-              .setHost(String.format("http://localhost:%d", spannerServer.getPort()))
-              .setCredentials(NoCredentials.getInstance())
-              .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
-              .setClientLibToken("pg-adapter")
-              .build()
-              .getService();
-      DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));
-      com.google.cloud.spanner.ResultSet spannerResult =
-          client.singleUse().executeQuery(SELECT_RANDOM);
+    for (int bufferSize : new int[] {0, 32}) {
+      for (boolean binary : new boolean[] {false, true}) {
+        // Also get the random results using the normal Spanner client to compare the results with
+        // what is returned by PGAdapter.
+        Spanner spanner =
+            SpannerOptions.newBuilder()
+                .setProjectId("p")
+                .setHost(String.format("http://localhost:%d", spannerServer.getPort()))
+                .setCredentials(NoCredentials.getInstance())
+                .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+                .setClientLibToken("pg-adapter")
+                .build()
+                .getService();
+        DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));
+        com.google.cloud.spanner.ResultSet spannerResult =
+            client.singleUse().executeQuery(SELECT_RANDOM);
 
-      String binaryTransferEnable =
-          "&binaryTransferEnable="
-              + ImmutableList.of(
-                      Oid.BOOL,
-                      Oid.BYTEA,
-                      Oid.VARCHAR,
-                      Oid.NUMERIC,
-                      Oid.FLOAT8,
-                      Oid.INT8,
-                      Oid.DATE,
-                      Oid.TIMESTAMPTZ)
-                  .stream()
-                  .map(String::valueOf)
-                  .collect(Collectors.joining(","));
+        String binaryTransferEnable =
+            "&binaryTransferEnable="
+                + ImmutableList.of(
+                        Oid.BOOL,
+                        Oid.BYTEA,
+                        Oid.VARCHAR,
+                        Oid.NUMERIC,
+                        Oid.FLOAT8,
+                        Oid.INT8,
+                        Oid.DATE,
+                        Oid.TIMESTAMPTZ)
+                    .stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
 
-      final int fetchSize = 3;
-      try (Connection connection =
-          DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
-        connection.setAutoCommit(false);
-        connection.unwrap(PGConnection.class).setPrepareThreshold(binary ? -1 : 5);
-        try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
-          statement.setFetchSize(fetchSize);
-          try (ResultSet resultSet = statement.executeQuery()) {
-            int rowCount = 0;
-            while (resultSet.next()) {
-              assertTrue(spannerResult.next());
-              for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
-                // TODO: Remove once we have a replacement for pg_type, as the JDBC driver will try
-                // to read type information from the backend when it hits an 'unknown' type (jsonb
-                // is not one of the types that the JDBC driver will load automatically).
-                if (col == 5 || col == 14) {
-                  resultSet.getString(col + 1);
-                } else {
-                  resultSet.getObject(col + 1);
+        final int fetchSize = 3;
+        try (Connection connection =
+            DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
+          connection.setAutoCommit(false);
+          connection.unwrap(PGConnection.class).setPrepareThreshold(binary ? -1 : 5);
+          connection
+              .createStatement()
+              .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+          connection
+              .createStatement()
+              .execute(String.format("set spanner.binary_conversion_buffer_size=%d", bufferSize));
+
+          try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
+            statement.setFetchSize(fetchSize);
+            try (ResultSet resultSet = statement.executeQuery()) {
+              int rowCount = 0;
+              while (resultSet.next()) {
+                assertTrue(spannerResult.next());
+                for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
+                  // TODO: Remove once we have a replacement for pg_type, as the JDBC driver will
+                  // try
+                  // to read type information from the backend when it hits an 'unknown' type (jsonb
+                  // is not one of the types that the JDBC driver will load automatically).
+                  if (col == 5 || col == 14) {
+                    resultSet.getString(col + 1);
+                  } else {
+                    resultSet.getObject(col + 1);
+                  }
                 }
+                assertEqual(spannerResult, resultSet);
+                rowCount++;
               }
-              assertEqual(spannerResult, resultSet);
-              rowCount++;
+              assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
             }
-            assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
           }
+          connection.commit();
         }
-        connection.commit();
-      }
 
-      // Close the resources used by the normal Spanner client.
-      spannerResult.close();
-      spanner.close();
+        // Close the resources used by the normal Spanner client.
+        spannerResult.close();
+        spanner.close();
 
-      // The ExecuteSql request should only be sent once to Cloud Spanner by PGAdapter.
-      // The normal Spanner client will also send it once to Spanner.
-      assertEquals(binary ? 3 : 2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-      ExecuteSqlRequest executeRequest =
-          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(binary ? 2 : 1);
-      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-      assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
+        // The ExecuteSql request should only be sent once to Cloud Spanner by PGAdapter.
+        // The normal Spanner client will also send it once to Spanner.
+        assertEquals(binary ? 3 : 2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        ExecuteSqlRequest executeRequest =
+            mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(binary ? 2 : 1);
+        assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+        assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
 
-      // PGAdapter should receive 5 Execute messages:
-      // 1. BEGIN
-      // 2. Execute - fetch rows 1, 2
-      // 3. Execute - fetch rows 3, 4
-      // 4. Execute - fetch rows 5
-      // 5. COMMIT
-      if (pgServer != null) {
-        List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
-        assertEquals(1, describeMessages.size());
-        DescribeMessage describeMessage = describeMessages.get(0);
-        assertEquals(
-            binary ? PreparedType.Statement : PreparedType.Portal, describeMessage.getType());
+        // PGAdapter should receive 5 Execute messages:
+        // 1. BEGIN
+        // 2. Execute - fetch rows 1, 2
+        // 3. Execute - fetch rows 3, 4
+        // 4. Execute - fetch rows 5
+        // 5. COMMIT
+        if (pgServer != null) {
+          List<DescribeMessage> describeMessages =
+              getWireMessagesOfType(DescribeMessage.class).stream()
+                  .filter(message -> message.getSql().equals(SELECT_RANDOM.getSql()))
+                  .collect(Collectors.toList());
+          assertEquals(1, describeMessages.size());
+          DescribeMessage describeMessage = describeMessages.get(0);
+          assertEquals(
+              binary ? PreparedType.Statement : PreparedType.Portal, describeMessage.getType());
 
-        List<ExecuteMessage> executeMessages =
-            getWireMessagesOfType(ExecuteMessage.class).stream()
-                .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-                .collect(Collectors.toList());
-        int expectedExecuteMessageCount =
-            RANDOM_RESULTS_ROW_COUNT / fetchSize
-                + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
-                + 2;
-        assertEquals(expectedExecuteMessageCount, executeMessages.size());
-        assertEquals("", executeMessages.get(0).getName());
-        for (ExecuteMessage executeMessage :
-            executeMessages.subList(1, executeMessages.size() - 1)) {
-          assertEquals(fetchSize, executeMessage.getMaxRows());
+          List<ExecuteMessage> executeMessages =
+              getWireMessagesOfType(ExecuteMessage.class).stream()
+                  .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+                  .filter(message -> !message.getSql().startsWith("set spanner."))
+                  .collect(Collectors.toList());
+          int expectedExecuteMessageCount =
+              RANDOM_RESULTS_ROW_COUNT / fetchSize
+                  + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
+                  + 2;
+          assertEquals(expectedExecuteMessageCount, executeMessages.size());
+          assertEquals("", executeMessages.get(0).getName());
+          for (ExecuteMessage executeMessage :
+              executeMessages.subList(1, executeMessages.size() - 1)) {
+            assertEquals(fetchSize, executeMessage.getMaxRows());
+          }
+          assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
+
+          List<ParseMessage> parseMessages =
+              getWireMessagesOfType(ParseMessage.class).stream()
+                  .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+                  .filter(message -> !message.getSql().startsWith("set spanner."))
+                  .collect(Collectors.toList());
+          assertEquals(3, parseMessages.size());
+          assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
+          assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
+          assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
         }
-        assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
-
-        List<ParseMessage> parseMessages =
-            getWireMessagesOfType(ParseMessage.class).stream()
-                .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-                .collect(Collectors.toList());
-        assertEquals(3, parseMessages.size());
-        assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-        assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
-        assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+        mockSpanner.clearRequests();
+        pgServer.clearDebugMessages();
       }
-      mockSpanner.clearRequests();
-      pgServer.clearDebugMessages();
     }
   }
 

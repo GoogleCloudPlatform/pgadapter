@@ -158,7 +158,7 @@ public class Converter implements AutoCloseable {
       case BOOL:
         return BooleanParser.convertToPG(result, position, format);
       case BYTES:
-        return BinaryParser.convertToPG(outputStream, result, position, format);
+        return BinaryParser.convertToPG(sessionState, outputStream, result, position, format);
       case DATE:
         return DateParser.convertToPG(result, position, format);
       case FLOAT64:
@@ -168,11 +168,11 @@ public class Converter implements AutoCloseable {
       case PG_NUMERIC:
         return NumericParser.convertToPG(result, position, format);
       case STRING:
-        return StringParser.convertToPG(outputStream, result, position);
+        return StringParser.convertToPG(sessionState, outputStream, result, position);
       case TIMESTAMP:
         return TimestampParser.convertToPG(result, position, format, sessionState.getTimezone());
       case PG_JSONB:
-        return JsonbParser.convertToPG(outputStream, result, position, format);
+        return JsonbParser.convertToPG(sessionState, outputStream, result, position, format);
       case ARRAY:
         ArrayParser arrayParser = new ArrayParser(result, position, sessionState);
         return arrayParser.parse(format);
