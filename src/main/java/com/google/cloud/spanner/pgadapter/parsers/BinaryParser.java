@@ -137,14 +137,20 @@ public class BinaryParser extends Parser<ByteArray> {
     }
   }
 
-  static long copy(int length, InputStream from, DataOutputStream to, int bufferSize)
+  static int copy(int length, InputStream from, DataOutputStream to, int bufferSize)
       throws IOException {
     byte[] buf = new byte[Math.min(length, bufferSize)];
-    long total = 0;
+    int total = 0;
     int numRead;
     while ((numRead = from.read(buf)) > -1) {
-      to.write(buf, 0, numRead);
       total += numRead;
+      // Some Java 8 implementations read 2 bytes more from the byte source than there actually are.
+      // So we limit that here by ensuring that we never write more than 'length' bytes.
+      if (total > length) {
+        numRead -= (total - length);
+        total = length;
+      }
+      to.write(buf, 0, numRead);
     }
     return total;
   }

@@ -87,7 +87,8 @@ public class StringParser extends Parser<String> {
       } else {
         try (OutputStreamWriter writer =
             new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
-          dataOutputStream.writeInt(Utf8.encodedLength(value) + header.length);
+          int utf8Length = Utf8.encodedLength(value) + header.length;
+          dataOutputStream.writeInt(utf8Length);
           dataOutputStream.write(header);
           for (int offset = 0; offset < length; offset += bufferSize) {
             int writeLen = Math.min(bufferSize, length - offset);
