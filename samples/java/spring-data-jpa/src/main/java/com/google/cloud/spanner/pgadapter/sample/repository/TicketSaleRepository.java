@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.sample.repository;
 
-import com.google.cloud.spanner.pgadapter.sample.model.Singer;
-import java.util.List;
+import com.google.cloud.spanner.pgadapter.sample.model.TicketSale;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
-public interface SingerRepository extends JpaRepository<Singer, String> {
-
-  /** Get all singers that have a last name that starts with the given prefix. */
-  @Query("SELECT s FROM Singer s WHERE cast(starts_with(s.lastName, :lastName) as boolean)")
-  List<Singer> searchByLastNameStartsWith(@Param("lastName") String lastName);
-}
+public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {}

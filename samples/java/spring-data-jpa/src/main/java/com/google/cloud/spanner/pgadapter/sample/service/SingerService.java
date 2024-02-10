@@ -61,7 +61,11 @@ public class SingerService {
       }
       log.info("# concerts: {}", singer.getConcerts().size());
       for (Concert concert : singer.getConcerts()) {
-        log.info("  Concert: {} starts at {}", concert.getName(), concert.getStartTime());
+        log.info(
+            "  Concert: {} starts at {} and has sold {} tickets",
+            concert.getName(),
+            concert.getStartTime(),
+            concert.getTicketSales().size());
       }
     }
   }

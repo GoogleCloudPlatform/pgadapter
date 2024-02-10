@@ -38,6 +38,7 @@ with Cloud Spanner PostgreSQL databases:
 | Liquibase                    | The sample application uses Liquibase to create the database schema. It is recommended to use a higher-level schema management tool like Liquibase to manage your database schema. This also allows you to use Cloud Spanner-specific features like interleaved tables. The schema definition can be found in [db.changelog-v1.0.sql](src/main/resources/db/changelog/db.changelog-v1.0.sql).      |
 | UUID Primary Keys            | All entities in this sample that extend from the [AbstractUuidEntity](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/AbstractUuidEntity.java) class use an automatically generated UUID as the primary key value. This is the recommended type of primary key.                                                                                                                      |
 | Sequential Primary Key       | Sequential primary key values can cause hotspots in Cloud Spanner. The [Venue](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Venue.java) and [Concert](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Concert.java) entities in this sample application show how you can safely use a sequential auto-generated primary key with Cloud Spanner and Spring Data JPA. |
+| Bit-reversed Sequence        | Sequential primary key values can cause hotspots in Cloud Spanner. The [TicketSale](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/TicketSale.java) entity in this sample application shows how you can use a bit-reversed sequence to generate values for the primary key with Cloud Spanner and Spring Data JPA. The generator that is used for the entity supports batching.     |
 | Interleaved Tables           | The [Track](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Track.java) entity is an interleaved table. The table definition is is in [db.changelog-v1.0.sql](src/main/resources/db/changelog/db.changelog-v1.0.sql). The relationship between Track (the child) and Album (the parent) is mapped in JPA as if it was a regular `@ManyToOne` relationship.                           |
 | JSONB Fields                 | The [Venue](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/Venue.java) entity contains a JSONB property.                                                                                                                                                                                                                                                                            |
 | Read/write Transactions      | Execute read/write transactions on Cloud Spanner. See [SingerService.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/service/SingerService.java) for an example.                                                                                                                                                                                                                     |
@@ -59,6 +60,68 @@ is a mapped super class that is used by most of the concrete entities in this sa
 defines a primary key of type UUID that is stored as a string. This is the recommended primary key
 type when using JPA with Cloud Spanner, as the primary key generation is fully handled in the client.
 This reduces the number of round-trips to the database. See also https://cloud.google.com/spanner/docs/schema-and-data-model#choosing_a_primary_key.
+
+### Bit-reversed Sequence
+
+Using a traditional auto-increment primary key with Cloud Spanner is not recommended, because a
+monotonically increasing or decreasing primary key value can create a write-hotspot. This will cause
+all writes to be sent to one server. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
+for more background information.
+
+Cloud Spanner therefore supports bit-reversed sequences. These internally work as traditional
+sequences, but the value that is returned is bit-reversed before being returned to the user. These
+sequences can be used to generate primary keys with JPA / Hibernate.
+
+Note that Hibernate requires sequences to support pooling in order to support efficient batching of
+multiple inserts. Pooling normally requires the sequence to support an increment size larger than 1.
+Bit-reversed sequences can also support pooling, but require a custom ID generator to be used.
+Follow these steps to define an entity that uses a bit-reversed sequence for generating a primary
+key that also supports batching:
+
+1. Add the following dependency to your project:
+
+```xml
+<!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
+<dependency>
+   <groupId>com.google.cloud</groupId>
+   <artifactId>google-cloud-spanner-hibernate-tools</artifactId>
+   <version>3.1.0</version>
+</dependency>
+```
+
+2. Add the following annotations to your entity:
+
+```java
+  @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ticketSaleId")
+  @GenericGenerator(
+      // This is the name of the generator, not the name of the sequence. This name must correspond
+      // with the name given in the @GeneratedValue above.
+      name = "ticketSaleId",
+      // Use this custom strategy to ensure the use of a bit-reversed sequence that is compatible
+      // with
+      // batching multiple inserts. See also
+      // https://docs.jboss.org/hibernate/orm/5.4/userguide/html_single/Hibernate_User_Guide.html#batch.
+      type = PooledBitReversedSequenceStyleGenerator.class,
+      parameters = {
+        // Use a separate sequence name for each entity.
+        // See resources/db.changelog-v1.1.sql file for the sequence definition in the database.
+        @Parameter(name = SequenceStyleGenerator.SEQUENCE_PARAM, value = "ticket_sale_seq"),
+        // The increment_size is not actually set on the sequence that is created, but is used to
+        // generate a SELECT query that fetches this number of identifiers at once.
+        @Parameter(name = SequenceStyleGenerator.INCREMENT_PARAM, value = "200"),
+        @Parameter(name = SequenceStyleGenerator.INITIAL_PARAM, value = "50000"),
+        // Add any range that should be excluded by the generator if your table already
+        // contains existing values that have been generated by other generators.
+        @Parameter(
+            name = PooledBitReversedSequenceStyleGenerator.EXCLUDE_RANGE_PARAM,
+            value = "[1,1000]"),
+      })
+  public Long id;
+```
+
+See [TicketSale.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/model/TicketSale.java)
+for a working example.
 
 ### Sequential Primary Keys
 
