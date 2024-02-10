@@ -71,7 +71,8 @@ public class ITSpringDataJpaSampleTest implements IntegrationTest {
     assertTrue(output, output.contains(expectedOutput));
   }
 
-  String runApplication(String expectedOutput, DatabaseId databaseId) throws IOException, InterruptedException {
+  String runApplication(String expectedOutput, DatabaseId databaseId)
+      throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
     ImmutableList<String> runCommand =
         ImmutableList.<String>builder().add("mvn", "spring-boot:run").build();
