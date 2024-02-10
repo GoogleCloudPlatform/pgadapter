@@ -44,7 +44,6 @@ import java.util.stream.IntStream;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -110,8 +109,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testQuery() throws SQLException {
-    skipOnEmulator("Equality operator for numeric is not supported on the emulator");
-
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
@@ -148,8 +145,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testParameterMetaData() throws SQLException {
-    skipOnEmulator("Equality operator for numeric is not supported on the emulator");
-
     for (String sql :
         new String[] {
           "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
@@ -296,7 +291,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   }
 
   @Test
-  @Ignore("Parameterized limit and offset are not yet supported by Spangres")
   public void testParameterMetaDataInLimit() throws SQLException {
     String sql = "select * from all_types order by col_varchar limit ? offset ?";
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -379,8 +373,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testResultSetMetaData() throws SQLException {
-    skipOnEmulator("Equality operator for numeric is not supported on the emulator");
-
     ImmutableList<String> columnNames =
         ImmutableList.of(
             "col_bigint",
@@ -433,8 +425,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testSelectWithParameters() throws SQLException {
-    skipOnEmulator("Equality operator for numeric is not supported on the emulator");
-
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "

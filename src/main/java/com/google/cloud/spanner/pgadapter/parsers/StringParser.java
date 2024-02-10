@@ -16,13 +16,20 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.common.base.Utf8;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
 
 /** Translate from wire protocol to string. */
 @InternalApi
 public class StringParser extends Parser<String> {
+  private static final byte[] HEADER = new byte[0];
 
   StringParser(ResultSet item, int position) {
     this.item = item.getString(position);
@@ -53,8 +60,45 @@ public class StringParser extends Parser<String> {
     return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position) {
-    return resultSet.getString(position).getBytes(StandardCharsets.UTF_8);
+  public static byte[] convertToPG(
+      SessionState sessionState,
+      DataOutputStream dataOutputStream,
+      ResultSet resultSet,
+      int position) {
+    writeToPG(sessionState, dataOutputStream, resultSet.getString(position));
+    return null;
+  }
+
+  static void writeToPG(
+      SessionState sessionState, DataOutputStream dataOutputStream, String value) {
+    writeToPG(sessionState, dataOutputStream, value, HEADER);
+  }
+
+  static void writeToPG(
+      SessionState sessionState, DataOutputStream dataOutputStream, String value, byte[] header) {
+    int bufferSize = sessionState.getStringConversionBufferSize();
+    int length = value.length();
+    try {
+      if (bufferSize <= 0 || length < bufferSize) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        dataOutputStream.writeInt(bytes.length + header.length);
+        dataOutputStream.write(header);
+        dataOutputStream.write(bytes);
+      } else {
+        try (OutputStreamWriter writer =
+            new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
+          int utf8Length = Utf8.encodedLength(value) + header.length;
+          dataOutputStream.writeInt(utf8Length);
+          dataOutputStream.write(header);
+          for (int offset = 0; offset < length; offset += bufferSize) {
+            int writeLen = Math.min(bufferSize, length - offset);
+            writer.write(value, offset, writeLen);
+          }
+        }
+      }
+    } catch (IOException ioException) {
+      throw SpannerExceptionFactory.asSpannerException(ioException);
+    }
   }
 
   public static byte[] binaryParse(ResultSet resultSet, int position) {

@@ -48,6 +48,10 @@ public class PgCatalog {
               new TableOrIndexName(null, "pg_namespace"),
               new TableOrIndexName(null, "pg_namespace"))
           .put(
+              new TableOrIndexName("pg_catalog", "pg_database"),
+              new TableOrIndexName(null, "pg_database"))
+          .put(new TableOrIndexName(null, "pg_database"), new TableOrIndexName(null, "pg_database"))
+          .put(
               new TableOrIndexName("pg_collation", "pg_collation"),
               new TableOrIndexName(null, "pg_collation"))
           .put(
@@ -134,6 +138,7 @@ public class PgCatalog {
   private static final Map<TableOrIndexName, PgCatalogTable> DEFAULT_PG_CATALOG_TABLES =
       ImmutableMap.<TableOrIndexName, PgCatalogTable>builder()
           .put(new TableOrIndexName(null, "pg_namespace"), new PgNamespace())
+          .put(new TableOrIndexName(null, "pg_database"), new PgDatabase())
           .put(new TableOrIndexName(null, "pg_collation"), new PgCollation())
           .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
           .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
@@ -308,6 +313,38 @@ public class PgCatalog {
   }
 
   @InternalApi
+  public static class PgDatabase implements PgCatalogTable {
+    // https://www.postgresql.org/docs/current/catalog-pg-database.html
+    public static final String PG_DATABASE_CTE =
+        "pg_database as (\n"
+            + "  select 0::bigint as oid,\n"
+            + "         catalog_name as datname,\n"
+            + "         0::bigint as datdba,\n"
+            + "         6::bigint as encoding,\n"
+            + "         'c' as datlocprovider,\n"
+            + "         'C' as datcollate,\n"
+            + "         'C' as datctype,\n"
+            + "         false as datistemplate,\n"
+            + "         true as datallowconn,\n"
+            + "         -1::bigint as datconnlimit,\n"
+            + "         0::bigint as datlastsysoid,\n"
+            + "         0::bigint as datfrozenxid,\n"
+            + "         0::bigint as datminmxid,\n"
+            + "         0::bigint as dattablespace,\n"
+            + "         null as daticulocale,\n"
+            + "         null as daticurules,\n"
+            + "         null as datcollversion,\n"
+            + "         null as datacl"
+            + "  from information_schema.information_schema_catalog_name\n"
+            + ")";
+
+    @Override
+    public String getTableExpression() {
+      return PG_DATABASE_CTE;
+    }
+  }
+
+  @InternalApi
   public static class PgCollation implements PgCatalogTable {
     public static final String PG_COLLATION_CTE =
         "pg_collation as (\n"
@@ -406,7 +443,8 @@ public class PgCatalog {
             + "  select 1115 as oid, '_timestamp' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 1114 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
             + "  select 1185 as oid, '_timestamptz' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 1184 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'timestamp with time zone[]' as spanner_type union all\n"
             + "  select 1231 as oid, '_numeric' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 1700 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'numeric[]' as spanner_type union all\n"
-            + "  select 3807 as oid, '_jsonb' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 3802 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'jsonb[]' as spanner_type\n"
+            + "  select 3807 as oid, '_jsonb' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 3802 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'jsonb[]' as spanner_type union all\n"
+            + "  select 705 as oid, 'unknown' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'p' as typtype, 'X' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 0 as typarray, 'unknownin' as typinput, 'unknownout' as typoutput, 'unknownrecv' as typreceive, 'unknownsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type\n"
             + ")";
 
     @Override

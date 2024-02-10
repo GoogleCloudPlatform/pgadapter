@@ -27,11 +27,20 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
 
 /**
  * Sample application for connecting to Cloud Spanner using the PostgreSQL JDBC driver. This sample
  * application starts an embedded in-process PGAdapter instance together with the sample application
  * and connects to it using a Unix domain socket.
+ *
+ * <p>Run the sample application using the Cloud Spanner Emulator as follows:
+ *
+ * <pre>{@code
+ * mvn exec:java
+ * }</pre>
  *
  * <p>Run the sample application using default credentials as follows:
  *
@@ -70,24 +79,24 @@ public class SampleApplication {
   public static void main(String[] args) throws SQLException {
     // Read command line arguments.
     CommandLine commandLine = parseCommandLine(args);
+    // Use the Cloud Spanner Emulator if no project/instance/database has been specified.
+    boolean useEmulator = commandLine.getOptions().length == 0;
+
     String project = commandLine.getOptionValue('p', "my-project");
     String instance = commandLine.getOptionValue('i', "my-instance");
     String database = commandLine.getOptionValue('d', "my-database");
     String credentials = commandLine.getOptionValue('c');
 
-    // Start PGAdapter in-process. The server will be started on a random available port.
-    ProxyServer server = startPGAdapter(project, instance, credentials);
+    // Start PGAdapter in-process or as a Docker container with the Cloud Spanner Emulator.
+    // The server will be started on a random available port.
+    Server server =
+        useEmulator ? startPGAdapterWithEmulator() : startPGAdapter(project, instance, credentials);
     try {
-      // Create a connection URL that will use Unix domain sockets to connect to PGAdapter.
       String connectionUrl =
-          String.format(
-              "jdbc:postgresql://localhost/%s?"
-                  + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
-                  + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
-              database, server.getLocalPort());
+          String.format("jdbc:postgresql://localhost:%d/%s?", server.getPort(), database);
       runSample(connectionUrl);
     } finally {
-      server.stopServer();
+      server.shutdown();
       SpannerPool.closeSpannerPool();
     }
   }
@@ -113,7 +122,7 @@ public class SampleApplication {
    * @param credentialsFile the full path of a credentials file that PGAdapter should use, or <code>
    *     null</code> if PGAdapter should use the application default credentials
    */
-  static ProxyServer startPGAdapter(String project, String instance, String credentialsFile) {
+  static Server startPGAdapter(String project, String instance, String credentialsFile) {
     OptionsMetadata.Builder builder =
         OptionsMetadata.newBuilder()
             .setProject(project)
@@ -127,12 +136,24 @@ public class SampleApplication {
     server.startServer();
     server.awaitRunning();
 
-    return server;
+    return new PGAdapter(server);
+  }
+
+  /** Starts a Docker container that contains both PGAdapter and the Cloud Spanner Emulator. */
+  static Server startPGAdapterWithEmulator() {
+    GenericContainer<?> container =
+        new GenericContainer<>(
+            DockerImageName.parse("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator"));
+    container.addExposedPort(5432);
+    container.setWaitStrategy(Wait.forListeningPorts(5432));
+    container.start();
+
+    return new PGAdapterWithEmulator(container);
   }
 
   static CommandLine parseCommandLine(String[] args) {
     String commandLineArguments =
-        "pgadapter -p <project> -i <instance> -d <database> [-c <credentials_file>]";
+        "pgadapter [-p <project> -i <instance> -d <database> -c <credentials_file>]";
 
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
@@ -154,7 +175,7 @@ public class SampleApplication {
   static Options createOptions() {
     Options options = new Options();
     options.addOption(
-        "p", "project", true, "The Google Cloud project ID that " + "PGAdapter should connect to.");
+        "p", "project", true, "The Google Cloud project ID that PGAdapter should connect to.");
     options.addOption(
         "i",
         "instance",
@@ -173,5 +194,48 @@ public class SampleApplication {
             + "If not specified, the sample application will try to read the application default "
             + "credentials.");
     return options;
+  }
+
+  interface Server {
+    int getPort();
+
+    void shutdown();
+  }
+
+  static class PGAdapterWithEmulator implements Server {
+    private final GenericContainer<?> container;
+
+    PGAdapterWithEmulator(GenericContainer<?> container) {
+      this.container = container;
+    }
+
+    @Override
+    public int getPort() {
+      return container.getMappedPort(5432);
+    }
+
+    @Override
+    public void shutdown() {
+      container.stop();
+    }
+  }
+
+  static class PGAdapter implements Server {
+    private final ProxyServer server;
+
+    PGAdapter(ProxyServer server) {
+      this.server = server;
+    }
+
+    @Override
+    public int getPort() {
+      return server.getLocalPort();
+    }
+
+    @Override
+    public void shutdown() {
+      server.stopServer();
+      server.awaitTerminated();
+    }
   }
 }

@@ -1,5 +1,79 @@
 # Changelog
 
+## [0.29.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.29.0...v0.29.1) (2024-02-09)
+
+
+### Bug Fixes
+
+* add libs to Docker build with emulator ([#1375](https://github.com/GoogleCloudPlatform/pgadapter/issues/1375)) ([e74edfd](https://github.com/GoogleCloudPlatform/pgadapter/commit/e74edfd3ab138b029d66b517619a7d2cce9c7022))
+
+
+### Performance Improvements
+
+* reduce memory consumption during conversion of JSONB in binary format ([#1346](https://github.com/GoogleCloudPlatform/pgadapter/issues/1346)) ([adbbd2b](https://github.com/GoogleCloudPlatform/pgadapter/commit/adbbd2b2e0999fb1fb500ecf1f4560e8e678f6f4))
+
+## [0.29.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.28.0...v0.29.0) (2024-02-06)
+
+
+### Features
+
+* support Emulator in the Go wrapper ([#1331](https://github.com/GoogleCloudPlatform/pgadapter/issues/1331)) ([9e106d5](https://github.com/GoogleCloudPlatform/pgadapter/commit/9e106d587e1f65495083b8fb096bd5c5a238272c))
+
+
+### Bug Fixes
+
+* do not allocate statement name if it fails ([#1252](https://github.com/GoogleCloudPlatform/pgadapter/issues/1252)) ([d438ce5](https://github.com/GoogleCloudPlatform/pgadapter/commit/d438ce52a2359c8bd312f3e0d71e6762db11d824))
+
+
+### Documentation
+
+* update JDBC sample to use emulator ([#1330](https://github.com/GoogleCloudPlatform/pgadapter/issues/1330)) ([0af129d](https://github.com/GoogleCloudPlatform/pgadapter/commit/0af129d7e94251559358ec69b8e9e48bef53316b))
+* use emulator for the pgx sample ([#1332](https://github.com/GoogleCloudPlatform/pgadapter/issues/1332)) ([5f20e56](https://github.com/GoogleCloudPlatform/pgadapter/commit/5f20e5657ff6b1bf07be8213233eccb7a8980916))
+
+## [0.28.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.27.1...v0.28.0) (2023-12-29)
+
+
+### Features
+
+* translate integrity constraint error codes ([#1266](https://github.com/GoogleCloudPlatform/pgadapter/issues/1266)) ([9d1ed5a](https://github.com/GoogleCloudPlatform/pgadapter/commit/9d1ed5a59b4198d31c39eefd30f7db15c15f4747))
+
+
+### Bug Fixes
+
+* support pg_database ([#1308](https://github.com/GoogleCloudPlatform/pgadapter/issues/1308)) ([55d1aac](https://github.com/GoogleCloudPlatform/pgadapter/commit/55d1aacc8fd2ae80051e17c1fee0881f06285576))
+* update ycsb service account ([#1309](https://github.com/GoogleCloudPlatform/pgadapter/issues/1309)) ([771028b](https://github.com/GoogleCloudPlatform/pgadapter/commit/771028bc5498e88fcc4c4582d8647d1dac6fc2f5))
+* use array lower bound 1 by default ([#1302](https://github.com/GoogleCloudPlatform/pgadapter/issues/1302)) ([78e01fa](https://github.com/GoogleCloudPlatform/pgadapter/commit/78e01fa93980923801b9688df93fda0ea8f495b0))
+
+
+### Dependencies
+
+* use libraries bom for google cloud deps ([#1301](https://github.com/GoogleCloudPlatform/pgadapter/issues/1301)) ([4575b29](https://github.com/GoogleCloudPlatform/pgadapter/commit/4575b29943de6ba3f9765a817dc5dcf33a438075))
+
+
+### Documentation
+
+* simplify the in-process sample ([#1273](https://github.com/GoogleCloudPlatform/pgadapter/issues/1273)) ([f8b3c9f](https://github.com/GoogleCloudPlatform/pgadapter/commit/f8b3c9f15339c9172caf614763f55944e095d201))
+
+## [0.27.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.27.0...v0.27.1) (2023-11-23)
+
+
+### Bug Fixes
+
+* re-instante public constructor for ProxyServer ([#1216](https://github.com/GoogleCloudPlatform/pgadapter/issues/1216)) ([a8ce633](https://github.com/GoogleCloudPlatform/pgadapter/commit/a8ce6332aeefa4612956bab629721eeb87315d87))
+
+## [0.27.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.26.0...v0.27.0) (2023-11-23)
+
+
+### Features
+
+* add OpenTelemetry tracing ([#1182](https://github.com/GoogleCloudPlatform/pgadapter/issues/1182)) ([26217a3](https://github.com/GoogleCloudPlatform/pgadapter/commit/26217a3a937d3004813ceeedcca8fe452d1a70d9))
+* support PostgreSQL JDBC 42.7.0 ([#1208](https://github.com/GoogleCloudPlatform/pgadapter/issues/1208)) ([425d530](https://github.com/GoogleCloudPlatform/pgadapter/commit/425d530d6a54ee18bdef672ae067d5a9772da972))
+
+
+### Documentation
+
+* document emulator usage ([#1178](https://github.com/GoogleCloudPlatform/pgadapter/issues/1178)) ([539ea4d](https://github.com/GoogleCloudPlatform/pgadapter/commit/539ea4d44d0de70078ee0f8eab93ac5642362a41))
+
 ## [0.26.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.25.0...v0.26.0) (2023-11-07)
 
 

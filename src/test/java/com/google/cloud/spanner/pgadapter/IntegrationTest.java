@@ -18,11 +18,11 @@ import static org.junit.Assume.assumeFalse;
 
 /** Integration Test interface. */
 public interface IntegrationTest {
-  default void skipOnEmulator(String reason) {
+  static void skipOnEmulator(String reason) {
     assumeFalse(reason, isRunningOnEmulator());
   }
 
-  default boolean isRunningOnEmulator() {
+  static boolean isRunningOnEmulator() {
     return System.getenv("SPANNER_EMULATOR_HOST") != null;
   }
 }

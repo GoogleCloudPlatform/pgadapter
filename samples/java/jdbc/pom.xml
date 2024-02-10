@@ -33,18 +33,30 @@
   <description>
     Sample for using the PostgreSQL JDBC driver with PGAdapter
   </description>
+  
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>1.19.5</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <!-- [START pgadapter_and_jdbc_dependency] -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.6.0</version>
+      <version>42.7.1</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.26.0</version>
+      <version>0.29.0</version>
     </dependency>
     <!-- [END pgadapter_and_jdbc_dependency] -->
     <dependency>
@@ -58,6 +70,10 @@
       <artifactId>junixsocket-common</artifactId>
       <version>${junixsocket.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -67,19 +83,13 @@
         <version>3.1.1</version>
         <configuration>
           <mainClass>com.google.cloud.spanner.pgadapter.sample.SampleApplication</mainClass>
+          <cleanupDaemonThreads>false</cleanupDaemonThreads>
         </configuration>
       </plugin>
       <plugin>
         <groupId>com.coveo</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
         <version>2.13</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>format</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
