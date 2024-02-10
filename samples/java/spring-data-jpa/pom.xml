@@ -44,6 +44,12 @@
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
       <version>0.29.0</version>
     </dependency>
+    <!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-hibernate-tools</artifactId>
+      <version>3.1.0</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure</artifactId>
