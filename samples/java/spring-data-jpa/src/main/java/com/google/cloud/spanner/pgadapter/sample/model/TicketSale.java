@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter.sample.model;
 
 import com.google.cloud.spanner.hibernate.PooledBitReversedSequenceStyleGenerator;
+import io.hypersistence.utils.hibernate.type.array.ListArrayType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -23,8 +25,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.List;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Parameter;
+import org.hibernate.annotations.Type;
 import org.hibernate.id.enhanced.SequenceStyleGenerator;
 
 /**
@@ -80,6 +84,22 @@ public class TicketSale extends AbstractBaseEntity {
 
   private BigDecimal price;
 
+  /**
+   * This column is mapped to a text[] column in the database. The {@link ListArrayType} is defined
+   * in the hypersistence-utils-hibernate-63 library. Add the following to your pom.xml to use it:
+   *
+   * <pre>{@code
+   * <dependency>
+   *   <groupId>io.hypersistence</groupId>
+   *   <artifactId>hypersistence-utils-hibernate-63</artifactId>
+   *   <version>3.7.2</version>
+   * </dependency>
+   * }</pre>
+   */
+  @Type(ListArrayType.class)
+  @Column(columnDefinition = "_varchar")
+  private List<String> seats;
+
   public TicketSale() {}
 
   public Long getId() {
@@ -112,5 +132,13 @@ public class TicketSale extends AbstractBaseEntity {
 
   public void setPrice(BigDecimal price) {
     this.price = price;
+  }
+
+  public List<String> getSeats() {
+    return seats;
+  }
+
+  public void setSeats(List<String> seats) {
+    this.seats = seats;
   }
 }

@@ -8,6 +8,7 @@ create table ticket_sales (
     concert_id       bigint not null,
     customer_name    varchar not null,
     price            decimal not null,
+    seats            text[],
     created_at       timestamptz,
     updated_at       timestamptz,
     constraint fk_ticket_sales_concerts foreign key (concert_shard_id, concert_id) references concerts (shard_id, id)

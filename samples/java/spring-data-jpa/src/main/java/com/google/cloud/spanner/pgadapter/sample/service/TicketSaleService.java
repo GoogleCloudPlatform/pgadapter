@@ -24,6 +24,8 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
@@ -64,8 +66,16 @@ public class TicketSaleService {
           new BigDecimal(random.nextInt(30000))
               .setScale(2, RoundingMode.HALF_UP)
               .divide(new BigDecimal(100), RoundingMode.HALF_UP));
+      ticketSale.setSeats(
+          IntStream.range(0, random.nextInt(10) + 1)
+              .mapToObj(Integer::toString)
+              .collect(Collectors.toList()));
       ticketSales.add(ticketSale);
     }
     return repository.saveAll(ticketSales);
+  }
+
+  public List<TicketSale> all() {
+    return repository.findAll();
   }
 }
