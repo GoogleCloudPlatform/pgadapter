@@ -488,6 +488,22 @@ public class SessionState {
         () -> Duration.parse(setting.getBootVal()));
   }
 
+  /**
+   * Returns the buffer size to use for converting bytea values from the Spanner Base64 format to
+   * the PostgreSQL wire-format. Zero means no buffer and instead convert it directly in all cases.
+   */
+  public int getBinaryConversionBufferSize() {
+    return getIntegerSetting("spanner", "binary_conversion_buffer_size", 0);
+  }
+
+  /**
+   * Returns the buffer size to use for converting string values to the PostgreSQL wire-format. Zero
+   * means no buffer and instead convert it directly in all cases.
+   */
+  public int getStringConversionBufferSize() {
+    return getIntegerSetting("spanner", "string_conversion_buffer_size", 0);
+  }
+
   private ZoneId cachedZoneId;
 
   /** Returns the {@link ZoneId} of the current timezone for this session. */

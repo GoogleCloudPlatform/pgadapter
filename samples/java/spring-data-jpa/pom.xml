@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.1.5</version>
+    <version>3.2.2</version>
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
   <groupId>com.google.cloud.spanner</groupId>
@@ -31,7 +31,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.6.0</version>
+      <version>42.7.1</version>
     </dependency>
     <!-- Add Jackson for json parsing. This is required for using JSONB columns with Spring Data JPA. -->
     <dependency>
@@ -42,7 +42,19 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.26.0</version>
+      <version>0.29.0</version>
+    </dependency>
+    <!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-hibernate-tools</artifactId>
+      <version>3.1.0</version>
+    </dependency>
+    <!-- Add Hypersistence Utils for access to additional data type mappings, for example for arrays. -->
+    <dependency>
+      <groupId>io.hypersistence</groupId>
+      <artifactId>hypersistence-utils-hibernate-63</artifactId>
+      <version>3.7.2</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -70,7 +82,7 @@
       <plugin>
         <groupId>com.spotify.fmt</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.21.1</version>
+        <version>2.22.1</version>
         <executions>
           <execution>
             <goals>

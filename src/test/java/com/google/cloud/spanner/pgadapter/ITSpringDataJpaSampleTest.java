@@ -19,16 +19,14 @@ import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
-import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -41,10 +39,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ITSpringDataJpaSampleTest implements IntegrationTest {
   private static final String SPRING_DATA_JPA_SAMPLE_DIRECTORY = "samples/java/spring-data-jpa";
-  private static final String APPLICATION_PROPERTIES_FILE =
-      SPRING_DATA_JPA_SAMPLE_DIRECTORY + "/src/main/resources/application.properties";
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static String originalApplicationProperties;
+  private static DatabaseId databaseId;
 
   @BeforeClass
   public static void setup() throws ClassNotFoundException, IOException, SQLException {
@@ -60,54 +56,30 @@ public class ITSpringDataJpaSampleTest implements IntegrationTest {
 
     testEnv.setUp();
     Database database = testEnv.createDatabase(ImmutableList.of());
-
-    // Write application.properties
-    StringBuilder original = new StringBuilder();
-    try (Scanner scanner = new Scanner(new FileReader(APPLICATION_PROPERTIES_FILE))) {
-      while (scanner.hasNextLine()) {
-        original.append(scanner.nextLine()).append("\n");
-      }
-    }
-    originalApplicationProperties = original.toString();
-    try (FileWriter writer = new FileWriter(APPLICATION_PROPERTIES_FILE)) {
-      String properties =
-          originalApplicationProperties
-              .replace(
-                  "spanner.project=my-project",
-                  "spanner.project=" + database.getId().getInstanceId().getProject())
-              .replace(
-                  "spanner.instance=my-instance",
-                  "spanner.instance=" + database.getId().getInstanceId().getInstance())
-              .replace(
-                  "spanner.database=my-database",
-                  "spanner.database=" + database.getId().getDatabase());
-      writer.write(properties);
-      writer.flush();
-    }
+    databaseId = database.getId();
   }
 
   @AfterClass
   public static void teardown() throws IOException {
-    if (originalApplicationProperties != null) {
-      try (FileWriter writer = new FileWriter(APPLICATION_PROPERTIES_FILE)) {
-        writer.write(originalApplicationProperties);
-      }
-    }
     testEnv.cleanUp();
   }
 
   @Test
   public void testRunApplication() throws IOException, InterruptedException {
     String expectedOutput = "concerts using a stale read.";
-    String output = runApplication(expectedOutput);
+    String output = runApplication(expectedOutput, databaseId);
     assertTrue(output, output.contains(expectedOutput));
   }
 
-  String runApplication(String expectedOutput) throws IOException, InterruptedException {
+  String runApplication(String expectedOutput, DatabaseId databaseId)
+      throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
     ImmutableList<String> runCommand =
         ImmutableList.<String>builder().add("mvn", "spring-boot:run").build();
     builder.command(runCommand);
+    builder.environment().put("SPANNER_PROJECT", databaseId.getInstanceId().getProject());
+    builder.environment().put("SPANNER_INSTANCE", databaseId.getInstanceId().getInstance());
+    builder.environment().put("SPANNER_DATABASE", databaseId.getDatabase());
     builder.directory(new File(SPRING_DATA_JPA_SAMPLE_DIRECTORY));
     Process process = builder.start();
 

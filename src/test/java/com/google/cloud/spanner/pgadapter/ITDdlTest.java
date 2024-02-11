@@ -191,10 +191,10 @@ public class ITDdlTest implements IntegrationTest {
         statement.addBatch("create unique index idx_tracks_title on tracks (id, title)");
         statement.addBatch(
             "create view v_singers sql security invoker as select first_name, last_name from singers"
-                + (isRunningOnEmulator() ? "" : " order by last_name"));
+                + (IntegrationTest.isRunningOnEmulator() ? "" : " order by last_name"));
         statement.addBatch(
             "create view v_venues sql security invoker as select name, description from venues"
-                + (isRunningOnEmulator() ? "" : " order by name"));
+                + (IntegrationTest.isRunningOnEmulator() ? "" : " order by name"));
 
         assertArrayEquals(new int[] {0, 0, 0, 0, 0, 0, 0, 0, 0}, statement.executeBatch());
       }

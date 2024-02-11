@@ -83,67 +83,77 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testFirst() {
-    String sql = "SELECT * FROM \"users\" ORDER BY \"users\".\"id\" LIMIT 1";
+    String sql = "SELECT * FROM \"users\" ORDER BY \"users\".\"id\" LIMIT $1";
 
+    StructType rowType =
+        StructType.newBuilder()
+            .addFields(
+                Field.newBuilder()
+                    .setName("ID")
+                    .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                    .build())
+            .addFields(
+                Field.newBuilder()
+                    .setName("Name")
+                    .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                    .build())
+            .addFields(
+                Field.newBuilder()
+                    .setName("Email")
+                    .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                    .build())
+            .addFields(
+                Field.newBuilder()
+                    .setName("Age")
+                    .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                    .build())
+            .addFields(
+                Field.newBuilder()
+                    .setName("Birthday")
+                    .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                    .build())
+            .addFields(
+                Field.newBuilder()
+                    .setName("MemberNumber")
+                    .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                    .build())
+            .addFields(
+                Field.newBuilder()
+                    .setName("ActivatedAt")
+                    .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                    .build())
+            .addFields(
+                Field.newBuilder()
+                    .setName("CreatedAt")
+                    .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                    .build())
+            .addFields(
+                Field.newBuilder()
+                    .setName("UpdatedAt")
+                    .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                    .build())
+            .build();
+    StructType parameters =
+        StructType.newBuilder()
+            .addFields(
+                Field.newBuilder()
+                    .setName("p1")
+                    .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                    .build())
+            .build();
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(rowType)
+            .setUndeclaredParameters(parameters)
+            .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(sql),
+            Statement.of(sql), ResultSet.newBuilder().setMetadata(metadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(),
             ResultSet.newBuilder()
-                .setMetadata(
-                    ResultSetMetadata.newBuilder()
-                        .setRowType(
-                            StructType.newBuilder()
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("ID")
-                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("Name")
-                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("Email")
-                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("Age")
-                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("Birthday")
-                                        .setType(
-                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("MemberNumber")
-                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("ActivatedAt")
-                                        .setType(
-                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("CreatedAt")
-                                        .setType(
-                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("UpdatedAt")
-                                        .setType(
-                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
-                                        .build())
-                                .build())
-                        .build())
+                .setMetadata(metadata)
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("1").build())
@@ -309,8 +319,27 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testQueryAllDataTypes() {
-    String sql = "SELECT * FROM \"all_types\" ORDER BY \"all_types\".\"col_varchar\" LIMIT 1";
-    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
+    String sql = "SELECT * FROM \"all_types\" ORDER BY \"all_types\".\"col_varchar\" LIMIT $1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ALL_TYPES_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
 
     String res = gormTest.TestQueryAllDataTypes(createConnString());
 
@@ -331,9 +360,27 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testQueryNullsAllDataTypes() {
-    String sql = "SELECT * FROM \"all_types\" ORDER BY \"all_types\".\"col_varchar\" LIMIT 1";
+    String sql = "SELECT * FROM \"all_types\" ORDER BY \"all_types\".\"col_varchar\" LIMIT $1";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql), ALL_TYPES_NULLS_RESULTSET));
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ALL_TYPES_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_NULLS_RESULTSET));
 
     String res = gormTest.TestQueryNullsAllDataTypes(createConnString());
 

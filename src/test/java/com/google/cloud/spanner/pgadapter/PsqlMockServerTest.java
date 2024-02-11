@@ -34,6 +34,7 @@ import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.TypeCode;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -64,7 +65,8 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
     doStartMockSpannerAndPgAdapterServers(
         createMockSpannerThatReturnsOneQueryPartition(),
         "d",
-        builder -> builder.setDdlTransactionMode(DdlTransactionMode.AutocommitExplicitTransaction));
+        builder -> builder.setDdlTransactionMode(DdlTransactionMode.AutocommitExplicitTransaction),
+        OpenTelemetry.noop());
   }
 
   private static boolean isPsqlAvailable() {

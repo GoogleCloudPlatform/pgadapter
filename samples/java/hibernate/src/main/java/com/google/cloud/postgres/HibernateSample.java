@@ -32,21 +32,22 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import org.hibernate.query.MutationQuery;
 import org.hibernate.query.Query;
 
-public class HibernateSampleTest {
+public class HibernateSample {
 
-  private static final Logger logger = Logger.getLogger(HibernateSampleTest.class.getName());
+  private static final Logger logger = Logger.getLogger(HibernateSample.class.getName());
 
-  private HibernateConfiguration hibernateConfiguration;
+  private final HibernateConfiguration hibernateConfiguration;
 
-  private List<String> singersId = new ArrayList<>();
-  private List<String> albumsId = new ArrayList<>();
-  private List<Long> tracksId = new ArrayList<>();
-  private List<String> venuesId = new ArrayList<>();
-  private List<String> concertsId = new ArrayList<>();
+  private final List<String> singersId = new ArrayList<>();
+  private final List<String> albumsId = new ArrayList<>();
+  private final List<Long> tracksId = new ArrayList<>();
+  private final List<String> venuesId = new ArrayList<>();
+  private final List<String> concertsId = new ArrayList<>();
 
-  public HibernateSampleTest(HibernateConfiguration hibernateConfiguration) {
+  public HibernateSample(HibernateConfiguration hibernateConfiguration) {
     this.hibernateConfiguration = hibernateConfiguration;
   }
 
@@ -55,12 +56,12 @@ public class HibernateSampleTest {
       final Singers singers = Utils.createSingers();
       final Albums albums = Utils.createAlbums(singers);
       s.getTransaction().begin();
-      s.saveOrUpdate(singers);
-      s.saveOrUpdate(albums);
+      s.persist(singers);
+      s.persist(albums);
       final Tracks tracks1 = Utils.createTracks(albums.getId());
-      s.saveOrUpdate(tracks1);
+      s.persist(tracks1);
       final Tracks tracks2 = Utils.createTracks(albums.getId());
-      s.saveOrUpdate(tracks2);
+      s.persist(tracks2);
       s.getTransaction().commit();
       s.clear();
 
@@ -69,7 +70,7 @@ public class HibernateSampleTest {
       Root<Albums> albumsRoot = albumsCriteriaDelete.from(Albums.class);
       albumsCriteriaDelete.where(cb.equal(albumsRoot.get("id"), albums.getId()));
       Transaction transaction = s.beginTransaction();
-      s.createQuery(albumsCriteriaDelete).executeUpdate();
+      s.createMutationQuery(albumsCriteriaDelete).executeUpdate();
       transaction.commit();
     }
   }
@@ -96,7 +97,7 @@ public class HibernateSampleTest {
       albumsCriteriaUpdate.set("marketingBudget", new BigDecimal("5.0"));
       albumsCriteriaUpdate.where(cb.equal(albumsRoot.get("id"), albumsId.get(0)));
       Transaction transaction = s.beginTransaction();
-      s.createQuery(albumsCriteriaUpdate).executeUpdate();
+      s.createMutationQuery(albumsCriteriaUpdate).executeUpdate();
       transaction.commit();
     }
   }
@@ -106,12 +107,12 @@ public class HibernateSampleTest {
       Singers singers = Utils.createSingers();
       singers.setLastName("Cord");
       s.getTransaction().begin();
-      s.saveOrUpdate(singers);
+      s.persist(singers);
       s.getTransaction().commit();
 
       s.getTransaction().begin();
-      Query query =
-          s.createQuery(
+      MutationQuery query =
+          s.createMutationQuery(
               "update Singers set active=:active "
                   + "where lastName=:lastName and firstName=:firstName");
       query.setParameter("active", false);
@@ -126,25 +127,24 @@ public class HibernateSampleTest {
 
   public void testHqlList() {
     try (Session s = hibernateConfiguration.openSession()) {
-      Query query = s.createQuery("from Singers");
+      Query<Singers> query = s.createQuery("from Singers", Singers.class);
       List<Singers> list = query.list();
       System.out.println("Singers list size: " + list.size());
 
-      query = s.createQuery("from Singers order by fullName");
+      query = s.createQuery("from Singers order by fullName", Singers.class);
       query.setFirstResult(2);
       // We must use a limit when we use an offset.
       query.setMaxResults(Integer.MAX_VALUE);
       list = query.list();
       System.out.println("Singers list size with first result: " + list.size());
 
-      query = s.createQuery("from Singers");
+      query = s.createQuery("from Singers", Singers.class);
       query.setMaxResults(2);
       list = query.list();
       System.out.println("Singers list size with first result: " + list.size());
 
-      query = s.createQuery("select  sum(sampleRate) from Tracks");
-      list = query.list();
-      System.out.println("Sample rate sum: " + list);
+      Query<Double> sumQuery = s.createQuery("select sum(sampleRate) from Tracks", Double.class);
+      System.out.println("Sample rate sum: " + sumQuery.list());
     }
   }
 
@@ -153,8 +153,7 @@ public class HibernateSampleTest {
       Venues venues = s.get(Venues.class, venuesId.get(0));
       if (venues == null) {
         logger.log(Level.SEVERE, "Previously Added Venues Not Found.");
-      }
-      if (venues.getConcerts().size() <= 1) {
+      } else if (venues.getConcerts().size() <= 1) {
         logger.log(Level.SEVERE, "Previously Added Concerts Not Found.");
       }
 
@@ -166,16 +165,17 @@ public class HibernateSampleTest {
     try (Session s = hibernateConfiguration.openSession()) {
       Singers singers = Utils.createSingers();
       s.getTransaction().begin();
-      s.saveOrUpdate(singers);
+      s.persist(singers);
       s.getTransaction().commit();
 
       singers = s.get(Singers.class, singers.getId());
       if (singers == null) {
         logger.log(Level.SEVERE, "Added singers not found.");
+        return;
       }
 
       s.getTransaction().begin();
-      s.delete(singers);
+      s.remove(singers);
       s.getTransaction().commit();
 
       singers = s.get(Singers.class, singers.getId());
@@ -194,24 +194,24 @@ public class HibernateSampleTest {
       final Concerts concerts2 = Utils.createConcerts(singers, venues);
       final Concerts concerts3 = Utils.createConcerts(singers, venues);
       s.getTransaction().begin();
-      s.saveOrUpdate(singers);
-      s.saveOrUpdate(albums);
-      s.saveOrUpdate(venues);
+      s.persist(singers);
+      s.persist(albums);
+      s.persist(venues);
       s.persist(concerts1);
       s.persist(concerts2);
       final Tracks tracks1 = Utils.createTracks(albums.getId());
-      s.saveOrUpdate(tracks1);
+      s.persist(tracks1);
       final Tracks tracks2 = Utils.createTracks(albums.getId());
-      s.saveOrUpdate(tracks2);
+      s.persist(tracks2);
       s.persist(concerts3);
       s.getTransaction().commit();
 
-      singersId.add(singers.getId().toString());
-      albumsId.add(albums.getId().toString());
-      venuesId.add(venues.getId().toString());
-      concertsId.add(concerts1.getId().toString());
-      concertsId.add(concerts2.getId().toString());
-      concertsId.add(concerts3.getId().toString());
+      singersId.add(singers.getId());
+      albumsId.add(albums.getId());
+      venuesId.add(venues.getId());
+      concertsId.add(concerts1.getId());
+      concertsId.add(concerts2.getId());
+      concertsId.add(concerts3.getId());
       tracksId.add(tracks1.getId().getTrackNumber());
       tracksId.add(tracks2.getId().getTrackNumber());
 
@@ -230,7 +230,7 @@ public class HibernateSampleTest {
     try (Session s = hibernateConfiguration.openSession()) {
       final Singers singers = Utils.createSingers();
       s.getTransaction().begin();
-      s.saveOrUpdate(singers);
+      s.persist(singers);
       s.getTransaction().rollback();
 
       System.out.println("Singers that was saved: " + singers.getId());
@@ -249,18 +249,18 @@ public class HibernateSampleTest {
       final Albums albums = Utils.createAlbums(singers);
 
       s.getTransaction().begin();
-      s.saveOrUpdate(singers);
+      s.persist(singers);
       s.persist(albums);
       s.getTransaction().commit();
 
-      singersId.add(singers.getId().toString());
-      albumsId.add(albums.getId().toString());
+      singersId.add(singers.getId());
+      albumsId.add(albums.getId());
       System.out.println("Created Singer: " + singers.getId());
       System.out.println("Created Albums: " + albums.getId());
     }
   }
 
-  public void executeTest() {
+  public void runHibernateSample() {
     try {
       System.out.println("Testing Foreign Key");
       testForeignKey();
@@ -302,13 +302,5 @@ public class HibernateSampleTest {
       // application might keep non-daemon threads alive and not stop.
       hibernateConfiguration.closeSessionFactory();
     }
-  }
-
-  public static void main(String[] args) {
-    System.out.println("Starting Hibernate Test");
-    HibernateSampleTest hibernateSampleTest =
-        new HibernateSampleTest(HibernateConfiguration.createHibernateConfiguration());
-    hibernateSampleTest.executeTest();
-    System.out.println("Hibernate Test Ended Successfully");
   }
 }

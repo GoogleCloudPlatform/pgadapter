@@ -115,7 +115,7 @@ public class ITAuthTest implements IntegrationTest {
 
   @Test
   public void testConnectWithOAuth2Token() throws Exception {
-    skipOnEmulator("Credentials are never used with the emulator");
+    IntegrationTest.skipOnEmulator("Credentials are never used with the emulator");
     String credentialsFile = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
     assumeTrue("Auth tests require default (service account) credentials", credentialsFile != null);
     assumeTrue("OAuth2 test requires gcloud", isGcloudAvailable());
@@ -154,7 +154,7 @@ public class ITAuthTest implements IntegrationTest {
 
   @Test
   public void testConnectWithCredentials() throws Exception {
-    skipOnEmulator("Credentials are never used with the emulator");
+    IntegrationTest.skipOnEmulator("Credentials are never used with the emulator");
     String credentialsFile = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
     assumeTrue("Auth tests require default (service account) credentials", credentialsFile != null);
 
@@ -177,7 +177,7 @@ public class ITAuthTest implements IntegrationTest {
 
   @Test
   public void testConnectWithPrivateKey() throws Exception {
-    skipOnEmulator("Credentials are never used with the emulator");
+    IntegrationTest.skipOnEmulator("Credentials are never used with the emulator");
     String credentialsFile = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
     assumeTrue("Auth tests require default (service account) credentials", credentialsFile != null);
 

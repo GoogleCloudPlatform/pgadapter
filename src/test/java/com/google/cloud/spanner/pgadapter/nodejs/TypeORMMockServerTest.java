@@ -86,7 +86,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String sql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
-            + "FROM \"user\" \"User\" WHERE (\"User\".\"id\" = $1) LIMIT 1";
+            + "FROM \"user\" \"User\" WHERE ((\"User\".\"id\" = $1)) LIMIT 1";
     // The parameter is sent as an untyped parameter, and therefore not included in the statement
     // lookup on the mock server, hence the Statement.of(sql) instead of building a statement that
     // does include the parameter value.
@@ -192,7 +192,8 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String sql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
-            + "FROM \"user\" \"User\" WHERE (\"User\".\"firstName\" = $1 AND \"User\".\"lastName\" = $2) "
+            + "FROM \"user\" \"User\" "
+            + "WHERE ((\"User\".\"firstName\" = $1) AND (\"User\".\"lastName\" = $2)) "
             + "LIMIT 1";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -277,7 +278,9 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String loadSql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
-            + "FROM \"user\" \"User\" WHERE (\"User\".\"id\" = $1) LIMIT 1";
+            + "FROM \"user\" \"User\" "
+            + "WHERE ((\"User\".\"id\" = $1)) "
+            + "LIMIT 1";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(loadSql),
@@ -416,7 +419,9 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String loadSql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
-            + "FROM \"user\" \"User\" WHERE (\"User\".\"id\" = $1) LIMIT 1";
+            + "FROM \"user\" \"User\" "
+            + "WHERE ((\"User\".\"id\" = $1)) "
+            + "LIMIT 1";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(loadSql),
@@ -543,7 +548,8 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "\"AllTypes\".\"col_timestamptz\" AS \"AllTypes_col_timestamptz\", \"AllTypes\".\"col_date\" AS \"AllTypes_col_date\", "
             + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\", \"AllTypes\".\"col_jsonb\" AS \"AllTypes_col_jsonb\" "
             + "FROM \"all_types\" \"AllTypes\" "
-            + "WHERE (\"AllTypes\".\"col_bigint\" = $1) LIMIT 1";
+            + "WHERE ((\"AllTypes\".\"col_bigint\" = $1)) "
+            + "LIMIT 1";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -734,7 +740,8 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "\"AllTypes\".\"col_timestamptz\" AS \"AllTypes_col_timestamptz\", \"AllTypes\".\"col_date\" AS \"AllTypes_col_date\", "
             + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\", \"AllTypes\".\"col_jsonb\" AS \"AllTypes_col_jsonb\" "
             + "FROM \"all_types\" \"AllTypes\" "
-            + "WHERE (\"AllTypes\".\"col_bigint\" = $1) LIMIT 1";
+            + "WHERE ((\"AllTypes\".\"col_bigint\" = $1)) "
+            + "LIMIT 1";
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("AllTypes_")));
     String updateSql =

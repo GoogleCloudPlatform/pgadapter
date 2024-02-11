@@ -1,0 +1,52 @@
+on:
+  push:
+    branches:
+      - postgresql-dialect
+  pull_request:
+  workflow_dispatch:
+name: samples
+jobs:
+  java-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+      - name: Run JDBC Sample tests
+        working-directory: ./samples/java/jdbc
+        run: mvn test -B
+      - name: Run Hibernate Sample tests
+        working-directory: ./samples/java/hibernate
+        run: mvn test -B
+  go-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.7'
+      - run: go version
+      - name: Run gorm Sample tests
+        working-directory: ./samples/golang/gorm
+        run: go test
+      - name: Run pgx Sample tests
+        working-directory: ./samples/golang/pgx
+        run: go test
+  python-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - run: python --version
+      - name: Install pip
+        run: python -m pip install --upgrade pip
+      - name: Run psycopg3 Sample tests
+        working-directory: ./samples/python/psycopg3
+        run: |
+          pip install -r requirements.txt
+          python psycopg3_sample.py

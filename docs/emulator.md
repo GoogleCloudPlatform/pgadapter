@@ -6,8 +6,29 @@ Connecting to the Cloud Spanner Emulator is supported with:
 2. Cloud Spanner Emulator 1.5.12 and higher.
 
 ## Usage
+The easiest way to use PGAdapter with the Cloud Spanner Emulator is to use the pre-built Docker
+image that contains both PGAdapter and the Emulator.
 
-PGAdapter can connect to the Cloud Spanner Emulator. The best way to do this is by following these
+The pre-built Docker image contains both PGAdapter and the Spanner Emulator and can be started with
+these commands:
+
+```shell
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+docker run \
+  -d -p 5432:5432 \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+sleep 2
+psql -h localhost -p 5432 -d test-database
+```
+
+This Docker container configures PGAdapter to connect to a Cloud Spanner Emulator running inside
+the same container. You do not need to first create a Spanner instance or database on the Emulator
+before connecting to them. Instead, the instance and database are automatically created on the
+Emulator when you connect to PGAdapter.
+
+### Running PGAdapter and Emulator Separately 
+You can also start PGAdapter and the Cloud Spanner Emulator separately, and then connect PGAdapter
+to the Cloud Spanner Emulator. The best way to do this is by following these
 steps:
 1. Start PGAdapter with the additional command line argument `-r autoConfigEmulator=true`. Adding
    this command line argument will instruct PGAdapter to automatically create the Cloud Spanner
@@ -20,7 +41,7 @@ steps:
    on `localhost:9010`. This will typically be the case if both PGAdapter and the emulator are both
    running in separate Docker containers.
 
-### Example: Running PGAdapter in a Docker Container
+### Example: Running PGAdapter + Emulator using Docker Compose
 
 When running PGAdapter in a Docker container, PGAdapter must have network access to the Cloud
 Spanner Emulator. The easiest way to achieve this is by running both in Docker and connect them both

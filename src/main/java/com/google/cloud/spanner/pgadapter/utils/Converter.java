@@ -117,9 +117,12 @@ public class Converter implements AutoCloseable {
             fixedFormat == null
                 ? DataFormat.getDataFormat(column_index, statement, mode, options)
                 : fixedFormat;
-        byte[] column = Converter.convertToPG(this.resultSet, column_index, format, sessionState);
-        outputStream.writeInt(column.length);
-        outputStream.write(column);
+        byte[] column =
+            Converter.convertToPG(outputStream, this.resultSet, column_index, format, sessionState);
+        if (column != null) {
+          outputStream.writeInt(column.length);
+          outputStream.write(column);
+        }
       }
     }
     return buffer.size();
@@ -140,13 +143,22 @@ public class Converter implements AutoCloseable {
    */
   public static byte[] convertToPG(
       ResultSet result, int position, DataFormat format, SessionState sessionState) {
+    return convertToPG(null, result, position, format, sessionState);
+  }
+
+  public static byte[] convertToPG(
+      DataOutputStream outputStream,
+      ResultSet result,
+      int position,
+      DataFormat format,
+      SessionState sessionState) {
     Preconditions.checkArgument(!result.isNull(position), "Column may not contain a null value");
     Type type = result.getColumnType(position);
     switch (type.getCode()) {
       case BOOL:
         return BooleanParser.convertToPG(result, position, format);
       case BYTES:
-        return BinaryParser.convertToPG(result, position, format);
+        return BinaryParser.convertToPG(sessionState, outputStream, result, position, format);
       case DATE:
         return DateParser.convertToPG(result, position, format);
       case FLOAT64:
@@ -156,11 +168,11 @@ public class Converter implements AutoCloseable {
       case PG_NUMERIC:
         return NumericParser.convertToPG(result, position, format);
       case STRING:
-        return StringParser.convertToPG(result, position);
+        return StringParser.convertToPG(sessionState, outputStream, result, position);
       case TIMESTAMP:
         return TimestampParser.convertToPG(result, position, format, sessionState.getTimezone());
       case PG_JSONB:
-        return JsonbParser.convertToPG(result, position, format);
+        return JsonbParser.convertToPG(sessionState, outputStream, result, position, format);
       case ARRAY:
         ArrayParser arrayParser = new ArrayParser(result, position, sessionState);
         return arrayParser.parse(format);

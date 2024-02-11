@@ -43,6 +43,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Bytes;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
@@ -171,6 +172,10 @@ public class PgAdapterTestEnv {
 
   private ProxyServer server;
 
+  public static boolean isRunningOnEmulator() {
+    return System.getenv("SPANNER_EMULATOR_HOST") != null;
+  }
+
   public void setUp() {
     spannerHost = getSpannerUrl();
     logger.info("Using Spanner host: " + spannerHost);
@@ -178,16 +183,24 @@ public class PgAdapterTestEnv {
   }
 
   public void startPGAdapterServer(Iterable<String> additionalPGAdapterOptions) {
-    startPGAdapterServer(null, additionalPGAdapterOptions);
+    startPGAdapterServer(null, additionalPGAdapterOptions, OpenTelemetry.noop());
   }
 
   public void startPGAdapterServerWithDefaultDatabase(
       DatabaseId databaseId, Iterable<String> additionalPGAdapterOptions) {
-    startPGAdapterServer(databaseId.getDatabase(), additionalPGAdapterOptions);
+    startPGAdapterServer(
+        databaseId.getDatabase(), additionalPGAdapterOptions, OpenTelemetry.noop());
+  }
+
+  public void startPGAdapterServerWithDefaultDatabase(
+      DatabaseId databaseId,
+      Iterable<String> additionalPGAdapterOptions,
+      OpenTelemetry openTelemetry) {
+    startPGAdapterServer(databaseId.getDatabase(), additionalPGAdapterOptions, openTelemetry);
   }
 
   private void startPGAdapterServer(
-      String databaseId, Iterable<String> additionalPGAdapterOptions) {
+      String databaseId, Iterable<String> additionalPGAdapterOptions, OpenTelemetry openTelemetry) {
     if (PG_ADAPTER_ADDRESS == null) {
       additionalPGAdapterOptions = maybeAddAutoConfigEmulator(additionalPGAdapterOptions);
       String credentials = getCredentials();
@@ -209,7 +222,7 @@ public class PgAdapterTestEnv {
       }
       argsListBuilder.addAll(additionalPGAdapterOptions);
       String[] args = argsListBuilder.build().toArray(new String[0]);
-      server = new ProxyServer(new OptionsMetadata(args));
+      server = new ProxyServer(new OptionsMetadata(args), openTelemetry);
       server.startServer();
     }
   }

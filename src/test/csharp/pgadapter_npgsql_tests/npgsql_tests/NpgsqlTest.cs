@@ -829,7 +829,7 @@ public class NpgsqlTest
         connection.Open();
         
         using (var reader =
-               connection.BeginBinaryExport("COPY all_types " +
+               connection.BeginBinaryExport("COPY (select * from all_types order by col_bigint) " +
                                             "TO STDOUT (FORMAT BINARY)"))
         {
             while (reader.StartRow() > -1)
@@ -1051,7 +1051,7 @@ public class NpgsqlTest
         connection.Open();
         
         using (var reader =
-               connection.BeginTextExport("COPY all_types " +
+               connection.BeginTextExport("COPY (select * from all_types order by col_bigint) " +
                                             "TO STDOUT"))
         {
             while (true)
