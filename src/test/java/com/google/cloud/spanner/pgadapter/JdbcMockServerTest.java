@@ -875,6 +875,20 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowWellKnownClient() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort()))) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.well_known_client")) {
+        assertTrue(resultSet.next());
+        assertEquals("JDBC", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testSetWellKnownClient() throws SQLException {
     for (String client : new String[] {"pgx", "npgsql", "sqlalchemy2"}) {
       try (Connection connection =
