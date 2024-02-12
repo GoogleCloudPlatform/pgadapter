@@ -3,6 +3,7 @@
 
 /* skip_on_open_source_pg */ start batch ddl;
 
+drop table if exists ticket_sales;
 drop table if exists concerts;
 drop table if exists venues;
 drop table if exists tracks;
