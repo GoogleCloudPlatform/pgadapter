@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import java.time.Duration;
+
 public class TestOptionsMetadataBuilder extends OptionsMetadata.Builder {
 
   @Override
@@ -28,8 +30,15 @@ public class TestOptionsMetadataBuilder extends OptionsMetadata.Builder {
     return this;
   }
 
+  @Override
   public TestOptionsMetadataBuilder setUsePlainText() {
     super.setUsePlainText();
+    return this;
+  }
+
+  @Override
+  public TestOptionsMetadataBuilder setStartupTimeout(Duration timeout) {
+    super.setStartupTimeout(timeout);
     return this;
   }
 }

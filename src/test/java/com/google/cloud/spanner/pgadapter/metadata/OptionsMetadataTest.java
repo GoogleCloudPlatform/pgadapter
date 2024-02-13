@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DEFAULT_STARTUP_TIMEOUT;
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.parseSslMode;
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.toServerVersionNum;
 import static org.junit.Assert.assertEquals;
@@ -53,6 +54,7 @@ public class OptionsMetadataTest {
           new OptionsMetadata(
               Collections.emptyMap(),
               os,
+              DEFAULT_STARTUP_TIMEOUT,
               new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
       if (options.isWindows()) {
         assertEquals("", options.getSocketFile(5432));
@@ -71,6 +73,7 @@ public class OptionsMetadataTest {
           new OptionsMetadata(
               Collections.emptyMap(),
               os,
+              DEFAULT_STARTUP_TIMEOUT,
               new String[] {"-p p", "-i i", "-c \"\"", "-dir /pgadapter"});
       assertEquals(
           "/pgadapter" + File.separatorChar + ".s.PGSQL.5432", options.getSocketFile(5432));
