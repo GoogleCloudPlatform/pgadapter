@@ -68,7 +68,6 @@ The following limitations are currently known:
 |------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Migrations             | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated migrations using `gorm` are therefore not supported.                                                                                                                                     |
 | OnConflict             | OnConflict clauses are not supported                                                                                                                                                                                                                               |
-| Nested transactions    | Nested transactions and savepoints are not supported. It is therefore recommended to set the configuration option `DisableNestedTransaction: true,`                                                                                                                |
 | Locking                | Lock clauses (e.g. `clause.Locking{Strength: "UPDATE"}`) are not supported. These are generally speaking also not required, as the default isolation level that is used by Cloud Spanner is serializable.                                                          |
 | Auto-save associations | Auto saved associations are not supported, as these will automatically use an OnConflict clause                                                                                                                                                                    |
 
@@ -177,17 +176,6 @@ blog := Blog{
 }
 db.Create(&user)
 db.Create(&blog)
-```
-
-### Nested Transactions
-`gorm` uses savepoints for nested transactions. Savepoints are currently not supported by Cloud Spanner. Nested
-transactions can therefore not be used with PGAdapter. It is recommended to set the configuration option
-`DisableNestedTransactions: true` to be sure that `gorm` does not try to use a nested transaction.
-
-```go
-db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{
-    DisableNestedTransaction: true,
-})
 ```
 
 ### Locking

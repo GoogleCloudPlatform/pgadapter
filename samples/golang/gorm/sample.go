@@ -326,14 +326,22 @@ func CreateRandomSingersAndAlbums(db *gorm.DB) error {
 				return err
 			}
 			fmt.Print(".")
-			// Create between 2 and 12 random albums
-			for j := 0; j < randInt(2, 12); j++ {
-				_, err = CreateAlbumWithRandomTracks(db, singerId, randAlbumTitle(), randInt(1, 22))
-				if err != nil {
-					fmt.Printf("Failed to create album: %v\n", err)
-					return err
+
+			// Use a nested transaction to create albums.
+			if err := tx.Transaction(func(tx *gorm.DB) error {
+				// Create between 2 and 12 random albums
+				for j := 0; j < randInt(2, 12); j++ {
+					_, err = CreateAlbumWithRandomTracks(db, singerId, randAlbumTitle(), randInt(1, 22))
+					if err != nil {
+						fmt.Printf("Failed to create album: %v\n", err)
+						return err
+					}
+					fmt.Print(".")
 				}
-				fmt.Print(".")
+				return nil
+			}); err != nil {
+				fmt.Printf("Nested transaction failed: %v\n", err)
+				return err
 			}
 		}
 		return nil
