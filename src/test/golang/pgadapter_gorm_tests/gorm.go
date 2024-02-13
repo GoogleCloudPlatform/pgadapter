@@ -798,15 +798,16 @@ func TestCreateInBatches(connString string) *C.char {
 	}
 	defer conn.Close()
 
-	res := db.CreateInBatches([]*AllTypes{
-		{ColVarchar: stringRef("1")},
-		{ColVarchar: stringRef("2")},
-		{ColVarchar: stringRef("3")},
-	}, 10)
+	numRows := 100
+	rows := make([]*AllTypes, numRows)
+	for i := 0; i < numRows; i++ {
+		rows[i] = &AllTypes{ColVarchar: stringRef(fmt.Sprintf("%d", i))}
+	}
+	res := db.CreateInBatches(rows, 10)
 	if res.Error != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert batch: %v", res.Error))
 	}
-	if g, w := res.RowsAffected, int64(3); g != w {
+	if g, w := res.RowsAffected, int64(numRows); g != w {
 		return C.CString(fmt.Sprintf("rows affected mismatch\nGot:  %v\nWant: %v", g, w))
 	}
 

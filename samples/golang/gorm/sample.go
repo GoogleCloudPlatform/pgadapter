@@ -25,14 +25,13 @@ import (
 	"strings"
 	"time"
 
+	wrapper "github.com/GoogleCloudPlatform/pgadapter/wrappers/golang"
+	"github.com/google/uuid"
 	"github.com/jackc/pgtype"
+	"github.com/shopspring/decimal"
 	"github.com/testcontainers/testcontainers-go"
 	pgWrapper "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
-
-	wrapper "github.com/GoogleCloudPlatform/pgadapter/wrappers/golang"
-	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -701,10 +700,8 @@ func CreateAlbumWithRandomTracks(db *gorm.DB, singerId, albumTitle string, numTr
 		tracks[n] = &Track{BaseModel: BaseModel{ID: albumId}, TrackNumber: int64(n + 1), Title: randTrackTitle(), SampleRate: randFloat64(30.0, 60.0)}
 	}
 
-	// Note: The batch size is deliberately kept small here in order to prevent the statement from getting too big and
-	// exceeding the maximum number of parameters in a prepared statement. PGAdapter can currently handle at most 50
-	// parameters in a prepared statement.
-	res = db.CreateInBatches(tracks, 8)
+	// Using a relatively large batch size reduces the number of round-trips to the database.
+	res = db.CreateInBatches(tracks, 100)
 	return albumId, res.Error
 }
 
