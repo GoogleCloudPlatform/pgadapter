@@ -639,121 +639,75 @@ public class GormMockServerTest extends AbstractMockServerTest {
   public void testCreateInBatches() {
     String sql =
         "INSERT INTO \"all_types\" (\"col_bigint\",\"col_bool\",\"col_bytea\",\"col_float8\",\"col_int\",\"col_numeric\",\"col_timestamptz\",\"col_date\",\"col_varchar\") "
-            + "VALUES "
-            + "($1,$2,$3,$4,$5,$6,$7,$8,$9),"
-            + "($10,$11,$12,$13,$14,$15,$16,$17,$18),"
-            + "($19,$20,$21,$22,$23,$24,$25,$26,$27)";
+            + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9),($10,$11,$12,$13,$14,$15,$16,$17,$18),"
+            + "($19,$20,$21,$22,$23,$24,$25,$26,$27),($28,$29,$30,$31,$32,$33,$34,$35,$36),"
+            + "($37,$38,$39,$40,$41,$42,$43,$44,$45),($46,$47,$48,$49,$50,$51,$52,$53,$54),"
+            + "($55,$56,$57,$58,$59,$60,$61,$62,$63),($64,$65,$66,$67,$68,$69,$70,$71,$72),"
+            + "($73,$74,$75,$76,$77,$78,$79,$80,$81),($82,$83,$84,$85,$86,$87,$88,$89,$90)";
+    ImmutableList.Builder<TypeCode> typeCodes = ImmutableList.builder();
+    for (int i = 0; i < 10; i++) {
+      typeCodes.add(
+          TypeCode.INT64,
+          TypeCode.BOOL,
+          TypeCode.BYTES,
+          TypeCode.FLOAT64,
+          TypeCode.INT64,
+          TypeCode.NUMERIC,
+          TypeCode.TIMESTAMP,
+          TypeCode.DATE,
+          TypeCode.STRING);
+    }
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
             ResultSet.newBuilder()
-                .setMetadata(
-                    createParameterTypesMetadata(
-                        ImmutableList.of(
-                            TypeCode.INT64,
-                            TypeCode.BOOL,
-                            TypeCode.BYTES,
-                            TypeCode.FLOAT64,
-                            TypeCode.INT64,
-                            TypeCode.NUMERIC,
-                            TypeCode.TIMESTAMP,
-                            TypeCode.DATE,
-                            TypeCode.STRING,
-                            TypeCode.INT64,
-                            TypeCode.BOOL,
-                            TypeCode.BYTES,
-                            TypeCode.FLOAT64,
-                            TypeCode.INT64,
-                            TypeCode.NUMERIC,
-                            TypeCode.TIMESTAMP,
-                            TypeCode.DATE,
-                            TypeCode.STRING,
-                            TypeCode.INT64,
-                            TypeCode.BOOL,
-                            TypeCode.BYTES,
-                            TypeCode.FLOAT64,
-                            TypeCode.INT64,
-                            TypeCode.NUMERIC,
-                            TypeCode.TIMESTAMP,
-                            TypeCode.DATE,
-                            TypeCode.STRING)))
+                .setMetadata(createParameterTypesMetadata(typeCodes.build()))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(
-        StatementResult.update(
-            Statement.newBuilder(sql)
-                .bind("p1")
-                .to((Long) null)
-                .bind("p2")
-                .to((Boolean) null)
-                .bind("p3")
-                .to((ByteArray) null)
-                .bind("p4")
-                .to((Double) null)
-                .bind("p5")
-                .to((Long) null)
-                .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric(null))
-                .bind("p7")
-                .to((Timestamp) null)
-                .bind("p8")
-                .to((Date) null)
-                .bind("p9")
-                .to("1")
-                .bind("p10")
-                .to((Long) null)
-                .bind("p11")
-                .to((Boolean) null)
-                .bind("p12")
-                .to((ByteArray) null)
-                .bind("p13")
-                .to((Double) null)
-                .bind("p14")
-                .to((Long) null)
-                .bind("p15")
-                .to(com.google.cloud.spanner.Value.pgNumeric(null))
-                .bind("p16")
-                .to((Timestamp) null)
-                .bind("p17")
-                .to((Date) null)
-                .bind("p18")
-                .to("2")
-                .bind("p19")
-                .to((Long) null)
-                .bind("p20")
-                .to((Boolean) null)
-                .bind("p21")
-                .to((ByteArray) null)
-                .bind("p22")
-                .to((Double) null)
-                .bind("p23")
-                .to((Long) null)
-                .bind("p24")
-                .to(com.google.cloud.spanner.Value.pgNumeric(null))
-                .bind("p25")
-                .to((Timestamp) null)
-                .bind("p26")
-                .to((Date) null)
-                .bind("p27")
-                .to("3")
-                .build(),
-            3L));
+    for (int batch = 0; batch < 10; batch++) {
+      Statement.Builder statementBuilder = Statement.newBuilder(sql);
+      int parameterIndex = 0;
+      for (int i = 0; i < 10; i++) {
+        statementBuilder
+            .bind(String.format("p%d", ++parameterIndex))
+            .to((Long) null)
+            .bind(String.format("p%d", ++parameterIndex))
+            .to((Boolean) null)
+            .bind(String.format("p%d", ++parameterIndex))
+            .to((ByteArray) null)
+            .bind(String.format("p%d", ++parameterIndex))
+            .to((Double) null)
+            .bind(String.format("p%d", ++parameterIndex))
+            .to((Long) null)
+            .bind(String.format("p%d", ++parameterIndex))
+            .to(com.google.cloud.spanner.Value.pgNumeric(null))
+            .bind(String.format("p%d", ++parameterIndex))
+            .to((Timestamp) null)
+            .bind(String.format("p%d", ++parameterIndex))
+            .to((Date) null)
+            .bind(String.format("p%d", ++parameterIndex))
+            .to(String.format("%d", i + batch * 10));
+      }
+      mockSpanner.putStatementResult(StatementResult.update(statementBuilder.build(), 10L));
+    }
 
     String res = gormTest.TestCreateInBatches(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent two
-    // times to the backend the first time it is executed:
+    // pgx by default always uses prepared statements. That means that the insert statement is
+    // described first, and then executed 10 times:
     // 1. DescribeStatement
-    // 2. Execute
-    assertEquals(2, requests.size());
+    // 2. Execute * 10
+    assertEquals(11, requests.size());
     ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(1);
-    assertEquals(sql, executeRequest.getSql());
-    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    for (int i = 1; i < 11; i++) {
+      ExecuteSqlRequest executeRequest = requests.get(i);
+      assertEquals(sql, executeRequest.getSql());
+      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    }
   }
 
   @Test
