@@ -27,7 +27,7 @@ import (
 
 	wrapper "github.com/GoogleCloudPlatform/pgadapter/wrappers/golang"
 	"github.com/google/uuid"
-	"github.com/lib/pq"
+	"github.com/jackc/pgtype"
 	"github.com/shopspring/decimal"
 	"github.com/testcontainers/testcontainers-go"
 	pgWrapper "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -111,7 +111,7 @@ type TicketSale struct {
 	ConcertId    string
 	CustomerName string
 	Price        decimal.Decimal
-	Seats        pq.StringArray `gorm:"type:text[]"`
+	Seats        pgtype.TextArray `gorm:"type:text[]"`
 }
 
 var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -418,7 +418,11 @@ func CreateVenueAndConcertInTransaction(db *gorm.DB) error {
 			ConcertId:    concert.ID,
 			CustomerName: randFirstName() + " " + randLastName(),
 			Price:        price,
-			Seats:        pq.StringArray{"A19", "A20", "A21"},
+			Seats: pgtype.TextArray{
+				Dimensions: []pgtype.ArrayDimension{{3, 1}},
+				Status:     pgtype.Present,
+				Elements:   []pgtype.Text{{String: "A19", Status: pgtype.Present}, {String: "A20", Status: pgtype.Present}, {String: "A21", Status: pgtype.Present}},
+			},
 		}
 		tx.Create(&ticketSale)
 		// Return nil to instruct `gorm` to commit the transaction.
@@ -443,7 +447,7 @@ func PrintConcerts(db *gorm.DB) error {
 		fmt.Printf("Concert %q starting at %v will be performed by %s at %s\n",
 			concert.Name, concert.StartTime, concert.Singer.FullName, concert.Venue.Name)
 		for _, ticketSale := range concert.TicketSales {
-			fmt.Printf("Ticket sold to %s for seats %s\n", ticketSale.CustomerName, ticketSale.Seats)
+			fmt.Printf("Ticket sold to %s for seats %v\n", ticketSale.CustomerName, ticketSale.Seats)
 		}
 	}
 	fmt.Println()

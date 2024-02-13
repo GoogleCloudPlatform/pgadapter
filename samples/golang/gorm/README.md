@@ -47,18 +47,27 @@ go run sample.go -postgres=true
 ## Data Types
 Cloud Spanner supports the following data types in combination with `gorm`.
 
-| PostgreSQL Type                        | gorm / go type           |
-|----------------------------------------|--------------------------|
-| boolean                                | bool, sql.NullBool       |
-| bigint / int8                          | int64, sql.NullInt64     |
-| varchar                                | string, sql.NullString   |
-| text                                   | string, sql.NullString   |
-| float8 / double precision              | float64, sql.NullFloat64 |
-| numeric                                | decimal.NullDecimal      |
-| timestamptz / timestamp with time zone | time.Time, sql.NullTime  |
-| date                                   | datatypes.Date           |
-| bytea                                  | []byte                   |
-| text[]                                 | pq.StringArray           |
+| PostgreSQL Type                            | gorm / go type                      |
+|--------------------------------------------|-------------------------------------|
+| boolean                                    | bool, sql.NullBool                  |
+| bigint / int8                              | int64, sql.NullInt64                |
+| varchar                                    | string, sql.NullString              |
+| text                                       | string, sql.NullString              |
+| float8 / double precision                  | float64, sql.NullFloat64            |
+| numeric                                    | decimal.NullDecimal                 |
+| timestamptz / timestamp with time zone     | time.Time, sql.NullTime             |
+| date                                       | datatypes.Date                      |
+| bytea                                      | []byte                              |
+| jsonb                                      | string                              |
+| bool[]                                     | pq.BoolArray, pgtype.BoolArray      |
+| bigint[]                                   | pq.Int64Array, pgtype.Int8Array     |
+| varchar[] / text[]                         | pq.StringArray, pgtype.TextArray    |
+| float8[] / double precision[]              | pq.Float64Array, pgtype.Float8Array |
+| numeric[]                                  | pgtype.NumericArray                 |
+| timestamptz[] / timestamp with time zone[] | pgtype.TimestamptzArray             |
+| date[]                                     | pgtype.DateArray                    |
+| bytea[]                                    | pgtype.ByteaArray                   |
+| jsonb[]                                    | pgtype.JSONBArray                   |
 
 
 ## Limitations

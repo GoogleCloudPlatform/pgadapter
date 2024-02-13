@@ -39,9 +39,11 @@ import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
+import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -603,6 +605,286 @@ public class GormMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+  }
+
+  @Test
+  public void testQueryAllArrayDataTypes() {
+    String sql = "SELECT * FROM \"all_array_types\" ORDER BY \"all_array_types\".\"id\" LIMIT $1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createAllArrayTypesResultSetMetadata("")
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_ARRAY_TYPES_RESULTSET));
+
+    String res = gormTest.TestQueryAllArrayDataTypes(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // pgx by default always uses prepared statements.
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
+    assertEquals(sql, describeRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
+  public void testQueryNullsAllArrayDataTypes() {
+    String sql = "SELECT * FROM \"all_array_types\" ORDER BY \"all_array_types\".\"id\" LIMIT $1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createAllArrayTypesResultSetMetadata("")
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_ARRAY_TYPES_NULLS_RESULTSET));
+
+    String res = gormTest.TestQueryNullsAllArrayDataTypes(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // pgx by default always uses prepared statements.
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
+    assertEquals(sql, describeRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
+  public void testInsertAllArrayDataTypes() {
+    String sql =
+        "INSERT INTO \"all_array_types\" (\"id\",\"col_array_bigint\",\"col_array_bool\",\"col_array_bytea\",\"col_array_float8\",\"col_array_int\",\"col_array_numeric\",\"col_array_timestamptz\",\"col_array_date\",\"col_array_varchar\",\"col_array_jsonb\") "
+            + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(
+                                            Type.newBuilder().setCode(TypeCode.STRING).build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p2")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.INT64)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p3")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.BOOL)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p4")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.BYTES)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p5")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.FLOAT64)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p6")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.INT64)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p7")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.NUMERIC)
+                                                        .setTypeAnnotation(
+                                                            TypeAnnotationCode.PG_NUMERIC)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p8")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.TIMESTAMP)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p9")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.DATE)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p10")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.STRING)
+                                                        .build())
+                                                .build()))
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p11")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.JSON)
+                                                        .setTypeAnnotation(
+                                                            TypeAnnotationCode.PG_JSONB)
+                                                        .build())
+                                                .build())
+                                        .build())
+                                .build())
+                        .build())
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .toInt64Array(Arrays.asList(1L, null, 2L))
+                .bind("p3")
+                .toBoolArray(Arrays.asList(true, null, false))
+                .bind("p4")
+                .toBytesArray(
+                    Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .bind("p5")
+                .toFloat64Array(Arrays.asList(3.14d, null, -99.99d))
+                .bind("p6")
+                .toInt64Array(Arrays.asList(-100L, null, -200L))
+                .bind("p7")
+                .toPgNumericArray(Arrays.asList("6626e-3", null, "-314e-2"))
+                .bind("p8")
+                .toTimestampArray(
+                    Arrays.asList(
+                        Timestamp.parseTimestamp("2022-02-16T16:18:02.123456000Z"),
+                        null,
+                        Timestamp.parseTimestamp("2000-01-01T00:00:00Z")))
+                .bind("p9")
+                .toDateArray(
+                    Arrays.asList(Date.parseDate("2023-02-20"), null, Date.parseDate("2000-01-01")))
+                .bind("p10")
+                .toStringArray(Arrays.asList("string1", null, "string2"))
+                .bind("p11")
+                .toPgJsonbArray(Arrays.asList("{\"key\":\"value1\"}", null, "{\"key\":\"value2\"}"))
+                .build(),
+            1L));
+
+    String res = gormTest.TestInsertAllArrayDataTypes(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // pgx by default always uses prepared statements. That means that each request is sent two
+    // times to the backend the first time it is executed:
+    // 1. DescribeStatement
+    // 2. Execute
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
+    assertEquals(sql, describeRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasId());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(executeRequest.getTransaction().getId(), commitRequest.getTransactionId());
   }
 
   @Test
