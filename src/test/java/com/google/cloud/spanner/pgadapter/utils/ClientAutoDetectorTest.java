@@ -93,6 +93,28 @@ public class ClientAutoDetectorTest {
                 "client_encoding", "UTF8",
                 "DateStyle", "ISO",
                 "TimeZone", "some-time-zone")));
+    // Version 42.7.0 of the JDBC driver by accident used 'MDY' as the DateStyle.
+    assertEquals(
+        WellKnownClient.JDBC,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("user", "database", "client_encoding", "DateStyle", "TimeZone"),
+            ImmutableMap.of(
+                "user", "some-user",
+                "database", "some-database",
+                "client_encoding", "UTF8",
+                "DateStyle", "ISO, MDY",
+                "TimeZone", "some-time-zone")));
+    // Other values for DateStyle have never been used.
+    assertNotEquals(
+        WellKnownClient.JDBC,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("user", "database", "client_encoding", "DateStyle", "TimeZone"),
+            ImmutableMap.of(
+                "user", "some-user",
+                "database", "some-database",
+                "client_encoding", "UTF8",
+                "DateStyle", "ISO, DMY",
+                "TimeZone", "some-time-zone")));
     // Additional parameters are allowed.
     assertEquals(
         WellKnownClient.JDBC,
