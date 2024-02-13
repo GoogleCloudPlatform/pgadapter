@@ -16,6 +16,7 @@ package main
 
 import "C"
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/jackc/pgtype"
@@ -418,6 +419,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 		return C.CString(err.Error())
 	}
 	defer conn.Close()
+	_, _  = conn.ExecContext(context.Background(), "set time zone UTC")
 	row := AllArrayTypes{}
 	if err := db.First(&row).Error; err != nil {
 		return C.CString(fmt.Sprintf("failed to get AllArrayTypes: %v", err))
@@ -539,9 +541,9 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 
 	wantTimestamptzArray := pgtype.TimestamptzArray{
 		Elements: []pgtype.Timestamptz{
-			{Time: parseTimestamp("2022-02-16T16:18:02.123456Z").Local(), Status: pgtype.Present},
+			{Time: parseTimestamp("2022-02-16T16:18:02.123456+00:00"), Status: pgtype.Present},
 			{Status: pgtype.Null},
-			{Time: parseTimestamp("2000-01-01T00:00:00Z").Local(), Status: pgtype.Present},
+			{Time: parseTimestamp("2000-01-01T00:00:00+00:00"), Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
 		Status: pgtype.Present,
@@ -995,7 +997,7 @@ func stringRef(val string) *string {
 
 func parseTimestamp(ts string) time.Time {
 	t, _ := time.Parse(time.RFC3339Nano, ts)
-	return t.UTC()
+	return t
 }
 
 // parseDate returns the given date string as a Date. The Date contains a Time instance at the given
