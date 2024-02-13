@@ -33,6 +33,12 @@ public interface GormTest extends Library {
 
   String TestUpdateAllDataTypes(GoString connString);
 
+  String TestQueryAllArrayDataTypes(GoString connString);
+
+  String TestQueryNullsAllArrayDataTypes(GoString connString);
+
+  String TestInsertAllArrayDataTypes(GoString connString);
+
   String TestDelete(GoString connString);
 
   String TestCreateInBatches(GoString connString);

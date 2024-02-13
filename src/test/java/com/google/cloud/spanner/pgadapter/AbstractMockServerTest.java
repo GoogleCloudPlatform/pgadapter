@@ -345,6 +345,10 @@ public abstract class AbstractMockServerTest {
       createAllTypesResultSet("");
   protected static final com.google.spanner.v1.ResultSet ALL_TYPES_NULLS_RESULTSET =
       createAllTypesNullResultSet("");
+  protected static final com.google.spanner.v1.ResultSet ALL_ARRAY_TYPES_RESULTSET =
+      createAllArrayTypesResultSet("1", "", true);
+  protected static final com.google.spanner.v1.ResultSet ALL_ARRAY_TYPES_NULLS_RESULTSET =
+      createAllArrayTypesNullResultSet("");
 
   protected static final StatusRuntimeException EXCEPTION =
       Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException();
@@ -508,30 +512,127 @@ public abstract class AbstractMockServerTest {
   protected static ResultSet createAllArrayTypesResultSet(
       String id, String columnPrefix, boolean microsTimestamp) {
     return com.google.spanner.v1.ResultSet.newBuilder()
-        .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
+        .setMetadata(createAllArrayTypesResultSetMetadata(columnPrefix))
         .addRows(
             ListValue.newBuilder()
                 .addValues(Value.newBuilder().setStringValue(id).build())
-                .addValues(Value.newBuilder().setBoolValue(true).build())
                 .addValues(
                     Value.newBuilder()
-                        .setStringValue(
-                            Base64.getEncoder()
-                                .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
-                        .build())
-                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
-                .addValues(Value.newBuilder().setStringValue("100").build())
-                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("1").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("2").build())
+                                .build()))
                 .addValues(
                     Value.newBuilder()
-                        .setStringValue(
-                            microsTimestamp
-                                ? "2022-02-16T13:18:02.123456Z"
-                                : "2022-02-16T13:18:02.123456789Z")
-                        .build())
-                .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
-                .addValues(Value.newBuilder().setStringValue("test").build())
-                .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setBoolValue(true).build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setBoolValue(false).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            Base64.getEncoder()
+                                                .encodeToString(
+                                                    "bytes1".getBytes(StandardCharsets.UTF_8)))
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            Base64.getEncoder()
+                                                .encodeToString(
+                                                    "bytes2".getBytes(StandardCharsets.UTF_8)))
+                                        .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setNumberValue(-99.99).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("-100").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("-200").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("-3.14").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            microsTimestamp
+                                                ? "2022-02-16T16:18:02.123456Z"
+                                                : "2022-02-16T16:18:02.123456789Z")
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("2000-01-01T00:00:00Z")
+                                        .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("2023-02-20").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("2000-01-01").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("string1").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("string2").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("{\"key\": \"value1\"}")
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("{\"key\": \"value2\"}")
+                                        .build())
+                                .build()))
                 .build())
         .build();
   }
@@ -567,6 +668,33 @@ public abstract class AbstractMockServerTest {
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 // Arrays
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .build())
+        .build();
+  }
+
+  protected static ResultSet createAllArrayTypesNullResultSet(String columnPrefix) {
+    return createAllArrayTypesNullResultSet(columnPrefix, null);
+  }
+
+  protected static ResultSet createAllArrayTypesNullResultSet(String columnPrefix, String id) {
+    return com.google.spanner.v1.ResultSet.newBuilder()
+        .setMetadata(createAllArrayTypesResultSetMetadata(columnPrefix))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(
+                    id == null
+                        ? Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
+                        : Value.newBuilder().setStringValue(id).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -727,6 +855,10 @@ public abstract class AbstractMockServerTest {
     return ResultSetMetadata.newBuilder()
         .setRowType(
             StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "id")
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_array_bigint")
