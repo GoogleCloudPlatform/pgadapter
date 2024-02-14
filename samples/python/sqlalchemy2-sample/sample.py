@@ -351,7 +351,7 @@ def delete_all_data():
 # The deletion of the tracks is done by the database, and not by SQLAlchemy, as
 # passive_deletes=True has been set on the relationship.
 def delete_album(album_id):
-  with Session(read_only_engine) as session:
+  with Session(engine) as session:
     album = session.get(Album, album_id)
     session.delete(album)
     session.commit()
