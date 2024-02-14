@@ -52,10 +52,6 @@ async function main() {
   // sequence. The value can be returned to the application using a 'returning' clause.
   await createVenuesAndConcerts(knex);
 
-  // Introduce a deliberate test failure.
-  const foo = await knex.select('*').from('foo');
-  console.log(foo);
-
   // Close the knex connection pool and shut down PGAdapter.
   await knex.destroy();
   await pgAdapter.stop();
