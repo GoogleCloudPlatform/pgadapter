@@ -430,8 +430,9 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
     assertEquals("\nCreated Venue and Concert\n", output);
   }
 
-  @Ignore("Skipped as SQLAlchemy requires the server to return the exact ID that was inserted, "
-      + "which we do not know beforehand")
+  @Ignore(
+      "Skipped as SQLAlchemy requires the server to return the exact ID that was inserted, "
+          + "which we do not know beforehand")
   @Test
   public void testCreateRandomSingersAndAlbums() throws Exception {
     String insertSingersSql =
@@ -486,7 +487,9 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                                 TypeCode.TIMESTAMP,
                                 TypeCode.TIMESTAMP))
                         .toBuilder()
-                        .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING)).getRowType()))
+                        .setRowType(
+                            createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING))
+                                .getRowType()))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putPartialStatementResult(
