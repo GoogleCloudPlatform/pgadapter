@@ -183,7 +183,7 @@ public class ProxyServer extends AbstractApiService {
         listenerThread.start();
       }
       try {
-        if (startupLatch.await(30L, TimeUnit.SECONDS)) {
+        if (startupLatch.await(options.getStartupTimeout().toMillis(), TimeUnit.MILLISECONDS)) {
           notifyStarted();
         } else {
           throw SpannerExceptionFactory.newSpannerException(

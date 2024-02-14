@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -49,6 +50,7 @@ import org.json.simple.JSONObject;
 
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
+  static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
 
   /**
    * Builder class for creating an instance of {@link OptionsMetadata}.
@@ -87,6 +89,7 @@ public class OptionsMetadata {
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
+    private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
 
     Builder() {}
 
@@ -323,6 +326,11 @@ public class OptionsMetadata {
       return this;
     }
 
+    Builder setStartupTimeout(Duration timeout) {
+      this.startupTimeout = timeout;
+      return this;
+    }
+
     public OptionsMetadata build() {
       if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
         throw SpannerExceptionFactory.newSpannerException(
@@ -542,6 +550,7 @@ public class OptionsMetadata {
   private final Map<String, String> propertyMap;
   private final String serverVersion;
   private final boolean debugMode;
+  private final Duration startupTimeout;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -550,7 +559,7 @@ public class OptionsMetadata {
    * of calling this method directly.
    */
   public OptionsMetadata(String[] args) {
-    this(System.getenv(), System.getProperty("os.name", ""), args);
+    this(System.getenv(), System.getProperty("os.name", ""), DEFAULT_STARTUP_TIMEOUT, args);
   }
 
   private OptionsMetadata(Builder builder) {
@@ -559,11 +568,13 @@ public class OptionsMetadata {
         System.getProperty("os.name", ""),
         builder.toCommandLineArguments(),
         builder.credentials,
-        builder.sessionPoolOptions);
+        builder.sessionPoolOptions,
+        builder.startupTimeout);
   }
 
-  OptionsMetadata(Map<String, String> environment, String osName, String[] args) {
-    this(environment, osName, args, null, null);
+  OptionsMetadata(
+      Map<String, String> environment, String osName, Duration startupTimeout, String[] args) {
+    this(environment, osName, args, null, null, startupTimeout);
   }
 
   OptionsMetadata(
@@ -571,7 +582,8 @@ public class OptionsMetadata {
       String osName,
       String[] args,
       @Nullable Credentials credentials,
-      @Nullable SessionPoolOptions sessionPoolOptions) {
+      @Nullable SessionPoolOptions sessionPoolOptions,
+      Duration startupTimeout) {
     this.environment = Preconditions.checkNotNull(environment);
     this.osName = osName;
     this.commandLine = buildOptions(args);
@@ -630,6 +642,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
+    this.startupTimeout = startupTimeout;
   }
 
   /**
@@ -701,6 +714,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
+    this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
   private Map<String, String> parseProperties(String propertyOptions) {
@@ -1250,6 +1264,10 @@ public class OptionsMetadata {
 
   public boolean isDebugMode() {
     return this.debugMode;
+  }
+
+  public Duration getStartupTimeout() {
+    return this.startupTimeout;
   }
 
   public JSONObject getCommandMetadataJSON() {
