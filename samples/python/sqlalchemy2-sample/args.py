@@ -29,7 +29,7 @@ def parse_arguments():
                       help="The Cloud Spanner instance that PGAdapter should "
                            "connect to.")
   parser.add_argument('-d', '--database', default="my-database",
-                      help="The Cloud Spanner database that psycopg3 should "
+                      help="The Cloud Spanner database that SQLAlchemy should "
                            "connect to.")
   parser.add_argument('-c', '--credentials', required=False,
                       help="The credentials file that PGAdapter should use to "

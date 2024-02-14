@@ -19,9 +19,13 @@ from sqlalchemy import create_engine
 
 def create_test_engine(autocommit=False, options=""):
   parser = argparse.ArgumentParser(description='Run SQLAlchemy tests.')
-  parser.add_argument('host', type=str, help='host to connect to')
-  parser.add_argument('port', type=int, help='port number to connect to')
-  parser.add_argument('database', type=str, help='database to connect to')
+  parser.add_argument('--host', type=str, help='host to connect to',
+                      required=False, default='localhost')
+  parser.add_argument('--port', type=int, help='port number to connect to',
+                      required=False, default=5432)
+  parser.add_argument('-d', '--database', default="my-database",
+                      help="The Cloud Spanner database that SQLAlchemy should "
+                           "connect to.")
   args = parser.parse_args()
 
   conn_string = "postgresql+psycopg://user:password@{host}:{port}/d{options}".format(
