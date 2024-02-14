@@ -430,17 +430,19 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
     assertEquals("\nCreated Venue and Concert\n", output);
   }
 
+  @Ignore(
+      "Skipped as SQLAlchemy requires the server to return the exact ID that was inserted, "
+          + "which we do not know beforehand")
   @Test
   public void testCreateRandomSingersAndAlbums() throws Exception {
     String insertSingersSql =
-        "INSERT INTO singers (first_name, last_name, active, id, version_id, created_at, updated_at) "
-            + "VALUES ($1::VARCHAR(100), $2::VARCHAR(200), $3, $4::VARCHAR, $5::INTEGER, $6::TIMESTAMP WITH TIME ZONE, "
-            + "$7::TIMESTAMP WITH TIME ZONE), ($8::VARCHAR(100), $9::VARCHAR(200), $10, $11::VARCHAR, $12::INTEGER, "
-            + "$13::TIMESTAMP WITH TIME ZONE, $14::TIMESTAMP WITH TIME ZONE), ($15::VARCHAR(100), $16::VARCHAR(200), "
-            + "$17, $18::VARCHAR, $19::INTEGER, $20::TIMESTAMP WITH TIME ZONE, $21::TIMESTAMP WITH TIME ZONE), "
-            + "($22::VARCHAR(100), $23::VARCHAR(200), $24, $25::VARCHAR, $26::INTEGER, $27::TIMESTAMP WITH TIME ZONE, "
-            + "$28::TIMESTAMP WITH TIME ZONE), ($29::VARCHAR(100), $30::VARCHAR(200), $31, $32::VARCHAR, $33::INTEGER, "
-            + "$34::TIMESTAMP WITH TIME ZONE, $35::TIMESTAMP WITH TIME ZONE) RETURNING singers.full_name";
+        "INSERT INTO singers (first_name, last_name, active, id, version_id, created_at, updated_at) VALUES "
+            + "($1::VARCHAR, $2::VARCHAR, $3, $4::VARCHAR, $5::INTEGER, $6::TIMESTAMP WITH TIME ZONE, $7::TIMESTAMP WITH TIME ZONE), "
+            + "($8::VARCHAR, $9::VARCHAR, $10, $11::VARCHAR, $12::INTEGER, $13::TIMESTAMP WITH TIME ZONE, $14::TIMESTAMP WITH TIME ZONE), "
+            + "($15::VARCHAR, $16::VARCHAR, $17, $18::VARCHAR, $19::INTEGER, $20::TIMESTAMP WITH TIME ZONE, $21::TIMESTAMP WITH TIME ZONE), "
+            + "($22::VARCHAR, $23::VARCHAR, $24, $25::VARCHAR, $26::INTEGER, $27::TIMESTAMP WITH TIME ZONE, $28::TIMESTAMP WITH TIME ZONE), "
+            + "($29::VARCHAR, $30::VARCHAR, $31, $32::VARCHAR, $33::INTEGER, $34::TIMESTAMP WITH TIME ZONE, $35::TIMESTAMP WITH TIME ZONE) "
+            + "RETURNING singers.full_name, singers.id";
 
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -485,7 +487,9 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                                 TypeCode.TIMESTAMP,
                                 TypeCode.TIMESTAMP))
                         .toBuilder()
-                        .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType()))
+                        .setRowType(
+                            createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING))
+                                .getRowType()))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putPartialStatementResult(
@@ -502,32 +506,42 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                                         .setName("full_name")
                                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                                         .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("id")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
                                 .build()))
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .addValues(Value.newBuilder().setStringValue("1").build())
                         .build())
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .addValues(Value.newBuilder().setStringValue("2").build())
                         .build())
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .addValues(Value.newBuilder().setStringValue("3").build())
                         .build())
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .addValues(Value.newBuilder().setStringValue("4").build())
                         .build())
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .addValues(Value.newBuilder().setStringValue("5").build())
                         .build())
                 .setStats(ResultSetStats.newBuilder().setRowCountExact(5L).build())
                 .build()));
     String insertAlbumSql =
         "INSERT INTO albums (title, marketing_budget, release_date, cover_picture, singer_id, id, version_id, created_at, updated_at) "
-            + "VALUES ($1::VARCHAR(200), $2, $3::DATE, $4, $5::VARCHAR, $6::VARCHAR, $7::INTEGER, $8::TIMESTAMP WITH TIME ZONE, $9::TIMESTAMP WITH TIME ZONE)";
+            + "VALUES ($1::VARCHAR, $2, $3::DATE, $4, $5::VARCHAR, $6::VARCHAR, $7::INTEGER, $8::TIMESTAMP WITH TIME ZONE, $9::TIMESTAMP WITH TIME ZONE)";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(insertAlbumSql),
@@ -754,7 +768,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
   public void testAddSinger() throws Exception {
     String insertSingerSql =
         "INSERT INTO singers (first_name, last_name, active, id, version_id, created_at, updated_at) "
-            + "VALUES ($1::VARCHAR(100), $2::VARCHAR(200), $3, $4::VARCHAR, $5::INTEGER, $6::TIMESTAMP WITH TIME ZONE, $7::TIMESTAMP WITH TIME ZONE) RETURNING singers.full_name";
+            + "VALUES ($1::VARCHAR, $2::VARCHAR, $3, $4::VARCHAR, $5::INTEGER, $6::TIMESTAMP WITH TIME ZONE, $7::TIMESTAMP WITH TIME ZONE) RETURNING singers.full_name";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(insertSingerSql),
@@ -846,10 +860,11 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                         Timestamp.parseTimestamp("2022-12-01T10:00:00Z")))
                 .build()));
     String updateSql =
-        "UPDATE singers "
-            + "SET first_name=$1::VARCHAR(100), last_name=$2::VARCHAR(200), version_id=$3::INTEGER, "
+        "UPDATE singers SET "
+            + "first_name=$1::VARCHAR, last_name=$2::VARCHAR, version_id=$3::INTEGER, "
             + "updated_at=$4::TIMESTAMP WITH TIME ZONE "
-            + "WHERE singers.id = $5::VARCHAR AND singers.version_id = $6::INTEGER RETURNING singers.full_name";
+            + "WHERE singers.id = $5::VARCHAR "
+            + "AND singers.version_id = $6::INTEGER RETURNING singers.full_name";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(updateSql),
@@ -1085,7 +1100,9 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             + ")\n"
             + "SELECT pg_class.relname \n"
             + "FROM pg_class JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace \n"
-            + "WHERE pg_class.relname = $1::VARCHAR(64)  AND pg_class.relkind = ANY (ARRAY[$2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR]) AND true ";
+            + "WHERE pg_class.relname = $1::VARCHAR "
+            + "AND pg_class.relkind = ANY (ARRAY[$2::VARCHAR, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::VARCHAR]) "
+            + "AND true AND pg_namespace.nspname != $7::VARCHAR";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(checkTableExistsSql),
@@ -1096,6 +1113,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
+                                        TypeCode.STRING,
                                         TypeCode.STRING,
                                         TypeCode.STRING,
                                         TypeCode.STRING,
@@ -1120,6 +1138,8 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                 .to("v")
                 .bind("p6")
                 .to("m")
+                .bind("p7")
+                .to("pg_catalog")
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
@@ -1139,6 +1159,8 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                 .to("v")
                 .bind("p6")
                 .to("m")
+                .bind("p7")
+                .to("pg_catalog")
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
@@ -1158,6 +1180,8 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                 .to("v")
                 .bind("p6")
                 .to("m")
+                .bind("p7")
+                .to("pg_catalog")
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
@@ -1177,6 +1201,8 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                 .to("v")
                 .bind("p6")
                 .to("m")
+                .bind("p7")
+                .to("pg_catalog")
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
@@ -1196,6 +1222,8 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                 .to("v")
                 .bind("p6")
                 .to("m")
+                .bind("p7")
+                .to("pg_catalog")
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))

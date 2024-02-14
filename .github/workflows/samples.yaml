@@ -50,6 +50,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           python psycopg3_sample.py
+      - name: Run SQLAlchemy2 Sample tests
+        working-directory: ./samples/python/sqlalchemy2-sample
+        run: |
+          pip install -r requirements.txt
+          python run_sample.py
   nodejs-samples:
     runs-on: ubuntu-latest
     steps:

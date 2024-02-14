@@ -75,8 +75,11 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
         new String[] {
           directory.getAbsolutePath() + "/venv/bin/python",
           script,
+          "--host",
           host,
+          "--port",
           Integer.toString(port),
+          "--database",
           database == null ? "d" : database
         },
         directoryName);
