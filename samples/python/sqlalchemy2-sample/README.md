@@ -11,10 +11,34 @@ to use `SQLAlchemy` in general.
 
 See [Limitations](#limitations) for a full list of known limitations when working with `SQLAlchemy 2.x`.
 
-## Start PGAdapter
-You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
-pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
-to run PGAdapter.
+## Running the Sample
+
+You can run the sample directly on the Spanner emulator with the following command. It will
+automatically start both PGAdapter and the Spanner emulator. This requires Docker on the local
+machine to work:
+
+```shell
+python run_sample.py
+```
+
+You can also connect to a real Spanner instance instead of the emulator by running the sample like
+this. The database must exist. The sample will automatically create the tables that are needed for
+the sample:
+
+```shell
+python run_sample.py \
+  --project my-project \
+  --instance my-instance \
+  --database my-database \
+  --credentials /path/to/credentials.json
+```
+
+
+### Start PGAdapter Manually
+You can also start PGAdapter before you run the sample and connect to that PGAdapter instance. The
+following command shows how to start PGAdapter using the pre-built Docker image and then run the
+sample against that instance.
+See [Running PGAdapter](../../../README.md#usage) for more information on other options for how to run PGAdapter.
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
@@ -27,9 +51,15 @@ docker run \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance \
   -x
+python run_sample.py \
+  --host localhost \
+  --port 5432 \
+  --database my-database
 ```
 
 ## Creating the Sample Data Model
+The sample data model is created automatically by the sample script.
+
 The sample data model contains example tables that cover all supported data types the Cloud Spanner
 PostgreSQL dialect. It also includes an example for how [interleaved tables](https://cloud.google.com/spanner/docs/reference/postgresql/data-definition-language#extensions_to)
 can be used with SQLAlchemy. Interleaved tables is a Cloud Spanner extension of the standard
@@ -37,8 +67,9 @@ PostgreSQL dialect.
 
 The corresponding SQLAlchemy model is defined in [model.py](model.py).
 
-Run the following command in this directory. Replace the host, port and database name with the actual
-host, port and database name for your PGAdapter and database setup.
+You can also create the sample data model manually using for example `psql`.
+Run the following command in this directory. Replace the host, port and database name with the
+actual host, port and database name for your PGAdapter and database setup.
 
 ```shell
 psql -h localhost -p 5432 -d my-database -f create_data_model.sql
