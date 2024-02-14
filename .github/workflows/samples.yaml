@@ -65,4 +65,6 @@ jobs:
       - run: node --version
       - name: Run Knex Sample tests
         working-directory: ./samples/nodejs/knex
-        run: npm start
+        run: |
+          npm install
+          npm start
