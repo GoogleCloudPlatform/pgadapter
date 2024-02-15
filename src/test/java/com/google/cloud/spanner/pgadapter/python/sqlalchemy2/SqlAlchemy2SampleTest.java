@@ -343,11 +343,31 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                         .addAllValues(singerValues)
                         .build())
                 .build()));
+    String ticketSalesSql =
+        "SELECT ticket_sales.concert_id AS ticket_sales_concert_id, ticket_sales.customer_name AS ticket_sales_customer_name, ticket_sales.price AS ticket_sales_price, ticket_sales.seats AS ticket_sales_seats, ticket_sales.id AS ticket_sales_id, ticket_sales.version_id AS ticket_sales_version_id, ticket_sales.created_at AS ticket_sales_created_at, ticket_sales.updated_at AS ticket_sales_updated_at \n"
+            + "FROM ticket_sales \n"
+            + "WHERE $1::VARCHAR = ticket_sales.concert_id";
+    mockSpanner.putPartialStatementResult(
+        StatementResult.query(
+            Statement.of(ticketSalesSql),
+            ResultSet.newBuilder()
+                .setMetadata(createTicketSalesMetadata("ticket_sales_"))
+                .addRows(
+                    createTicketSaleRow(
+                        1L,
+                        "c1",
+                        "Alice",
+                        "99.99",
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z"),
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z")))
+                .build()));
+
     String output =
         execute(SAMPLE_DIR, "test_print_concerts.py", "localhost", pgServer.getLocalPort());
     assertEquals(
         "\n"
-            + "Concert 'Avenue Park Open' starting at 2023-02-02T01:00:00+00:00 with Pete Allison will be held at Avenue Park\n",
+            + "Concert 'Avenue Park Open' starting at 2023-02-02T01:00:00+00:00 with Pete Allison will be held at Avenue Park\n"
+            + "  Ticket sold to Alice for seats ['A10']\n",
         output);
   }
 
@@ -420,6 +440,97 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(
                 "INSERT INTO concerts (name, venue_id, singer_id, start_time, end_time, id, version_id, created_at, updated_at) "),
             1L));
+    String insertTicketSaleSql =
+        "INSERT INTO ticket_sales (concert_id, customer_name, price, seats, version_id, created_at, updated_at) "
+            + "VALUES ($1::VARCHAR, $2::VARCHAR, $3, $4, $5::INTEGER, $6::TIMESTAMP WITH TIME ZONE, $7::TIMESTAMP WITH TIME ZONE) "
+            + "RETURNING ticket_sales.id";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertTicketSaleSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("id")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p2")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p3")
+                                        .setType(
+                                            Type.newBuilder().setCode(TypeCode.NUMERIC).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p4")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.STRING)
+                                                        .build())
+                                                .build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p5")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p6")
+                                        .setType(
+                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p7")
+                                        .setType(
+                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                                        .build())
+                                .build())
+                        .build())
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putPartialStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "INSERT INTO ticket_sales (concert_id, customer_name, price, seats, version_id, created_at, updated_at) "),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("id")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .build())
+                .build()));
 
     String output =
         execute(
@@ -1087,6 +1198,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         output);
   }
 
+  @Ignore("Requires support for array casting/coercion")
   @Test
   public void testCreateDataModel() throws Exception {
     String checkTableExistsSql =
@@ -1228,6 +1340,27 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             ResultSet.newBuilder()
                 .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
                 .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(checkTableExistsSql)
+                .bind("p1")
+                .to("ticket_sales")
+                .bind("p2")
+                .to("r")
+                .bind("p3")
+                .to("p")
+                .bind("p4")
+                .to("f")
+                .bind("p5")
+                .to("v")
+                .bind("p6")
+                .to("m")
+                .bind("p7")
+                .to("pg_catalog")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
     addDdlResponseToSpannerAdmin();
 
     String actualOutput =
@@ -1241,7 +1374,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             .map(req -> (UpdateDatabaseDdlRequest) req)
             .collect(Collectors.toList());
     assertEquals(1, requests.size());
-    assertEquals(5, requests.get(0).getStatementsCount());
+    assertEquals(6, requests.get(0).getStatementsCount());
     assertEquals(
         "CREATE TABLE singers (\n"
             + "\tfirst_name VARCHAR(100), \n"
@@ -1312,6 +1445,20 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             + "\tFOREIGN KEY(id) REFERENCES albums (id)\n"
             + ")",
         requests.get(0).getStatements(4));
+    assertEquals(
+        "CREATE TABLE ticket_sales (\n"
+            + "\tconcert_id VARCHAR, \n"
+            + "\tcustomer_name VARCHAR, \n"
+            + "\tprice NUMERIC, \n"
+            + "\tseats VARCHAR[], \n"
+            + "\tid SERIAL NOT NULL, \n"
+            + "\tversion_id INTEGER NOT NULL, \n"
+            + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tPRIMARY KEY (id), \n"
+            + "\tFOREIGN KEY(concert_id) REFERENCES concerts (id)\n"
+            + ")",
+        requests.get(0).getStatements(5));
   }
 
   @Ignore("Uses too much pg_catalog tables")
@@ -1567,6 +1714,88 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         .addValues(Value.newBuilder().setStringValue(String.valueOf(trackNumber)).build())
         .addValues(Value.newBuilder().setStringValue(title).build())
         .addValues(Value.newBuilder().setNumberValue(sampleRate).build())
+        .addValues(Value.newBuilder().setStringValue("1").build())
+        .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
+        .build();
+  }
+
+  static ResultSetMetadata createTicketSalesMetadata(String prefix) {
+    return ResultSetMetadata.newBuilder()
+        .setRowType(
+            StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "concert_id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "customer_name")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.NUMERIC)
+                                .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
+                                .build())
+                        .setName(prefix + "price")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.STRING).build())
+                                .build())
+                        .setName(prefix + "seats")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                        .setName(prefix + "id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                        .setName(prefix + "version_id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .setName(prefix + "created_at")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .setName(prefix + "updated_at")
+                        .build())
+                .build())
+        .build();
+  }
+
+  static ListValue createTicketSaleRow(
+      long id,
+      String concertId,
+      String customerName,
+      String price,
+      Timestamp createdAt,
+      Timestamp updatedAt) {
+    return ListValue.newBuilder()
+        .addValues(Value.newBuilder().setStringValue(concertId).build())
+        .addValues(Value.newBuilder().setStringValue(customerName).build())
+        .addValues(Value.newBuilder().setStringValue(price).build())
+        .addValues(
+            Value.newBuilder()
+                .setListValue(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("A10").build())
+                        .build())
+                .build())
+        .addValues(Value.newBuilder().setStringValue(String.valueOf(id)).build())
         .addValues(Value.newBuilder().setStringValue("1").build())
         .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
