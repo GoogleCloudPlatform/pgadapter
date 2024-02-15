@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.api.core.SettableApiFuture;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
@@ -59,6 +60,7 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -759,6 +761,39 @@ public class ConnectionHandlerTest {
                   optionsWithSystemProperty,
                   buildProperties(optionsWithSystemProperty.getPropertyMap())));
         });
+  }
+
+  @Test
+  public void testGetName() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    Connection connection = mock(Connection.class);
+    ConnectionHandler connectionHandler = new ConnectionHandler(server, socket, connection);
+
+    assertThrows(IllegalStateException.class, connectionHandler::getName);
+
+    Thread thread = new Thread(() -> {}, "test-thread");
+    connectionHandler.setThread(thread);
+    assertEquals("test-thread", connectionHandler.getName());
+  }
+
+  @Test
+  public void testStart() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    Connection connection = mock(Connection.class);
+    ConnectionHandler connectionHandler = new ConnectionHandler(server, socket, connection);
+
+    assertThrows(IllegalStateException.class, connectionHandler::start);
+
+    SettableApiFuture<Boolean> started = SettableApiFuture.create();
+    Thread thread = new Thread(() -> started.set(true), "test-thread");
+    connectionHandler.setThread(thread);
+
+    connectionHandler.start();
+    assertTrue(started.get(10L, TimeUnit.SECONDS));
   }
 
   static Properties buildProperties(Map<String, String> map) {
