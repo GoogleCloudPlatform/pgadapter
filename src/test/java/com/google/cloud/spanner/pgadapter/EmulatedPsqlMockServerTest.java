@@ -99,11 +99,16 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
    * recognize the connection as a psql connection.
    */
   private String createUrl(String database) {
+    return createUrl(database, "psql");
+  }
+
+  private String createUrl(String database, String applicationName) {
     return String.format(
-        "jdbc:postgresql://localhost:%d/%s?preferQueryMode=simple&%s=psql&%s=090000",
+        "jdbc:postgresql://localhost:%d/%s?preferQueryMode=simple&%s=%s&%s=090000",
         pgServer.getLocalPort(),
         database,
         PGProperty.APPLICATION_NAME.getName(),
+        applicationName,
         PGProperty.ASSUME_MIN_SERVER_VERSION.getName());
   }
 
@@ -210,37 +215,61 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testConnectToNonExistingInstance() {
+    for (String appName : new String[] {"psql", "other-app"}) {
+      try {
+        mockSpanner.setExecuteStreamingSqlExecutionTime(
+            SimulatedExecutionTime.ofStickyException(
+                newStatusResourceNotFoundException(
+                    "i",
+                    "type.googleapis.com/google.spanner.admin.instance.v1.Instance",
+                    "projects/p/instances/i")));
+        // The Connection API calls listInstanceConfigs(..) once first when the connection is a
+        // localhost connection. It does so to verify that the connection is valid and to quickly
+        // return an error if someone is for example trying to connect to the emulator while the
+        // emulator is not running. This does not happen when you connect to a remote host. We
+        // therefore need to add a response for the listInstanceConfigs as well.
+        mockInstanceAdmin.addResponse(ListInstanceConfigsResponse.getDefaultInstance());
+        mockInstanceAdmin.addResponse(
+            ListInstancesResponse.newBuilder()
+                .addInstances(
+                    Instance.newBuilder()
+                        .setConfig("projects/p/instanceConfigs/ic")
+                        .setName("projects/p/instances/i")
+                        .build())
+                .build());
+
+        SQLException exception =
+            assertThrows(
+                SQLException.class,
+                () -> DriverManager.getConnection(createUrl("non-existing-db", appName)));
+        assertTrue(exception.getMessage(), exception.getMessage().contains("NOT_FOUND"));
+
+        boolean isPsql = "psql".equals(appName);
+        assertEquals(
+            exception.getMessage(),
+            isPsql,
+            exception.getMessage().contains("These instances are available in project p:"));
+        assertEquals(
+            exception.getMessage(),
+            isPsql,
+            exception.getMessage().contains("\tprojects/p/instances/i\n"));
+      } finally {
+        closeSpannerPool(true);
+      }
+    }
+  }
+
+  @Test
+  public void testConnectFailed() {
     try {
       mockSpanner.setExecuteStreamingSqlExecutionTime(
           SimulatedExecutionTime.ofStickyException(
-              newStatusResourceNotFoundException(
-                  "i",
-                  "type.googleapis.com/google.spanner.admin.instance.v1.Instance",
-                  "projects/p/instances/i")));
-      // The Connection API calls listInstanceConfigs(..) once first when the connection is a
-      // localhost connection. It does so to verify that the connection is valid and to quickly
-      // return an error if someone is for example trying to connect to the emulator while the
-      // emulator is not running. This does not happen when you connect to a remote host. We
-      // therefore need to add a response for the listInstanceConfigs as well.
-      mockInstanceAdmin.addResponse(ListInstanceConfigsResponse.getDefaultInstance());
-      mockInstanceAdmin.addResponse(
-          ListInstancesResponse.newBuilder()
-              .addInstances(
-                  Instance.newBuilder()
-                      .setConfig("projects/p/instanceConfigs/ic")
-                      .setName("projects/p/instances/i")
-                      .build())
-              .build());
-
+              Status.INVALID_ARGUMENT.withDescription("test error").asRuntimeException()));
       SQLException exception =
           assertThrows(
               SQLException.class, () -> DriverManager.getConnection(createUrl("non-existing-db")));
-      assertTrue(exception.getMessage(), exception.getMessage().contains("NOT_FOUND"));
-      assertTrue(
-          exception.getMessage(),
-          exception.getMessage().contains("These instances are available in project p:"));
-      assertTrue(
-          exception.getMessage(), exception.getMessage().contains("\tprojects/p/instances/i\n"));
+      assertTrue(exception.getMessage(), exception.getMessage().contains("test error"));
+
     } finally {
       closeSpannerPool(true);
     }

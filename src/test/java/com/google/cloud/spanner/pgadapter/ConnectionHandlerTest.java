@@ -14,7 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.appendPropertiesToUrl;
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.buildConnectionURL;
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.listDatabasesOrInstances;
+import static com.google.cloud.spanner.pgadapter.EmulatedPsqlMockServerTest.newStatusResourceNotFoundException;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -22,15 +26,21 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.api.core.SettableApiFuture;
+import com.google.api.gax.paging.Pages;
 import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -50,6 +60,9 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.spanner.v1.DatabaseName;
+import io.grpc.StatusRuntimeException;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -58,6 +71,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -794,6 +808,81 @@ public class ConnectionHandlerTest {
 
     connectionHandler.start();
     assertTrue(started.get(10L, TimeUnit.SECONDS));
+  }
+
+  @Test
+  public void testAppendPropertiesToUrl() {
+    assertEquals(
+        "cloudspanner:/project/p/instances/i/databases/d",
+        appendPropertiesToUrl("cloudspanner:/project/p/instances/i/databases/d", new Properties()));
+    assertEquals(
+        "cloudspanner:/project/p/instances/i/databases/d",
+        appendPropertiesToUrl("cloudspanner:/project/p/instances/i/databases/d", null));
+    assertEquals(
+        "cloudspanner:/project/p/instances/i/databases/d",
+        appendPropertiesToUrl(
+            "cloudspanner:/project/p/instances/i/databases/d",
+            buildProperties(ImmutableMap.of("key", ""))));
+    assertEquals(
+        "cloudspanner:/project/p/instances/i/databases/d;key=value",
+        appendPropertiesToUrl(
+            "cloudspanner:/project/p/instances/i/databases/d",
+            buildProperties(ImmutableMap.of("key", "value"))));
+  }
+
+  @Test
+  public void testCheckValidConnection_External() throws Exception {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getByName("google.com"));
+    Connection connection = mock(Connection.class);
+
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    ConnectionMetadata connectionMetadata =
+        new ConnectionMetadata(new ByteArrayInputStream(new byte[0]), bos);
+
+    ConnectionHandler connectionHandler =
+        new ConnectionHandler(server, socket, connection) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connectionHandler.setThread(new Thread(() -> {}, "test-thread"));
+
+    assertFalse(connectionHandler.checkValidConnection(false));
+    byte[] bytes = bos.toByteArray();
+    assertEquals(74, bytes.length);
+    assertEquals('E', bytes[0]); // Error
+    // The total length of the Error message is 68.
+    assertArrayEquals(new byte[] {0, 0, 0, 68}, Arrays.copyOfRange(bytes, 1, 5));
+    // The next message is a Terminate ('X') message.
+    assertEquals('X', bytes[69]);
+  }
+
+  @Test
+  public void testListDatabasesOrInstances() {
+    Spanner spanner = mock(Spanner.class);
+    DatabaseAdminClient adminClient = mock(DatabaseAdminClient.class);
+    when(spanner.getDatabaseAdminClient()).thenReturn(adminClient);
+    when(adminClient.listDatabases(eq("my-instance"), any())).thenReturn(Pages.empty());
+    StatusRuntimeException exception =
+        newStatusResourceNotFoundException(
+            "test-database",
+            "type.googleapis.com/google.spanner.admin.database.v1.Database",
+            "projects/my-project/instances/my-instance/databases/test-database");
+    ResourceNotFoundException resourceNotFoundException =
+        (ResourceNotFoundException) SpannerExceptionFactory.asSpannerException(exception);
+    assertEquals(
+        "Database projects/my-project/instances/my-instance/databases/test-database not found.\n"
+            + "\n"
+            + "These PostgreSQL databases are available on instance projects/my-project/instances/my-instance:\n",
+        listDatabasesOrInstances(
+            resourceNotFoundException,
+            DatabaseName.of("my-project", "my-instance", "test-database"),
+            spanner));
   }
 
   static Properties buildProperties(Map<String, String> map) {

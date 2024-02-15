@@ -291,13 +291,14 @@ public class ConnectionHandler implements Runnable {
     return uri;
   }
 
-  private static String appendPropertiesToUrl(String url, Properties info) {
+  @VisibleForTesting
+  static String appendPropertiesToUrl(String url, Properties info) {
     if (info == null || info.isEmpty()) {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
     for (Entry<Object, Object> entry : info.entrySet()) {
-      if (entry.getValue() != null && !"".equals(entry.getValue())) {
+      if (!Strings.isNullOrEmpty((String) entry.getValue())) {
         result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
       }
     }
