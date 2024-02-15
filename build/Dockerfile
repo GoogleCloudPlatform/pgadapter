@@ -2,7 +2,7 @@
 #                                     BUILD                                    #
 ################################################################################
 
-FROM maven:3.8.6-eclipse-temurin-17 AS build
+FROM maven:3-eclipse-temurin-21 AS build
 
 # Copy over build files to docker image.
 COPY LICENSE ./
@@ -24,7 +24,7 @@ RUN mvn package -Passembly -DskipTests
 #                                   RELEASE                                    #
 ################################################################################
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 
 COPY --from=build target/pgadapter /home/pgadapter
 COPY --from=build LICENSE /home/pgadapter/
