@@ -24,6 +24,10 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
@@ -44,8 +48,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -772,6 +779,28 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
           assertEquals("10s", resultSet.getString(1));
           assertFalse(resultSet.next());
         }
+      }
+    }
+  }
+
+  @Test
+  public void testConnectStorm() throws Exception {
+    int numThreads = 1000;
+    ListeningExecutorService service =
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numThreads));
+    List<ListenableFuture<Void>> futures = new ArrayList<>(numThreads);
+    for (int n = 0; n < numThreads; n++) {
+      futures.add(service.submit(new ConnectCallable()));
+    }
+    assertEquals(numThreads, Futures.allAsList(futures).get().size());
+  }
+
+  class ConnectCallable implements Callable<Void> {
+    @Override
+    public Void call() throws Exception {
+      try (Connection ignore = DriverManager.getConnection(createUrl())) {
+        // Just connect and disconnect.
+        return null;
       }
     }
   }

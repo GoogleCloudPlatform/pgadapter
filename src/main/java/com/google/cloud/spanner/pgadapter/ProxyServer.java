@@ -41,6 +41,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -80,6 +83,9 @@ public class ProxyServer extends AbstractApiService {
   private final boolean debugMode;
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
+
+  private final ExecutorService createConnectionHandlerExecutor =
+      new ThreadPoolExecutor(1, Integer.MAX_VALUE, 20L, TimeUnit.SECONDS, new SynchronousQueue<>());
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -220,6 +226,7 @@ public class ProxyServer extends AbstractApiService {
       SpannerPool.closeSpannerPool();
     } catch (Throwable ignore) {
     }
+    createConnectionHandlerExecutor.shutdown();
     notifyStopped();
   }
 
@@ -296,7 +303,24 @@ public class ProxyServer extends AbstractApiService {
     awaitRunning();
     try {
       while (isRunning()) {
-        createConnectionHandler(serverSocket.accept());
+        Socket socket = serverSocket.accept();
+        // Hand off the creation of the connection handler to a worker thread to ensure that we
+        // continue to listen for new incoming connection requests as quickly as possible.
+        // This prevents connection timeouts if there is a large 'connect storm' (i.e. a client
+        // sends a large number of connection requests at the same time).
+        createConnectionHandlerExecutor.submit(
+            () -> {
+              try {
+                createConnectionHandler(socket);
+              } catch (SocketException socketException) {
+                logger.log(
+                    Level.WARNING,
+                    () ->
+                        String.format(
+                            "Failed to create connection on socket %s: %s.",
+                            socket, socketException));
+              }
+            });
       }
     } catch (SocketException e) {
       // This is a normal exception, as this will occur when Server#stopServer() is called.
