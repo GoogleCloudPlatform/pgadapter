@@ -23,6 +23,7 @@ import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
+import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.Server;
 import com.google.common.annotations.VisibleForTesting;
@@ -50,6 +51,12 @@ import org.json.simple.JSONObject;
 
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
+  /** These system properties can be used to turn on the use of virtual threads. */
+  public static String USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME = "pgadapter.use_virtual_threads";
+
+  public static String USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME =
+      "pgadapter.use_virtual_grpc_transport_threads";
+
   static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
 
   /**
@@ -82,6 +89,8 @@ public class OptionsMetadata {
     private boolean enableOpenTelemetry;
     private Double openTelemetryTraceRatio;
     private boolean skipLocalhostCheck;
+    private boolean useVirtualThreads;
+    private boolean useVirtualGrpcTransportThreads;
     private SslMode sslMode;
     private int port;
     private String unixDomainSocketDirectory;
@@ -256,6 +265,35 @@ public class OptionsMetadata {
     }
 
     /**
+     * Creates a virtual thread for each connection instead of a platform thread. Enabling this
+     * option only has effect if PGAdapter is running on Java 21 or higher. Enabling virtual threads
+     * can reduce memory consumption for PGAdapter instances that have a large number of incoming
+     * connections, and reduces the total number of platform threads that are created.
+     *
+     * <p>See <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual
+     * threads</a> for more information on virtual threads.
+     */
+    public Builder useVirtualThreads() {
+      this.useVirtualThreads = true;
+      return this;
+    }
+
+    /**
+     * Uses virtual threads instead of platform threads for the gRPC executor pool. Enabling this
+     * option only has effect if PGAdapter is running on Java 21 or higher. Enabling virtual threads
+     * for gRPC can reduce memory consumption for PGAdapter instances that execute a large number of
+     * parallel queries or transactions, and reduces the total number of platform threads that are
+     * created.
+     *
+     * <p>See <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual
+     * threads</a> for more information on virtual threads.
+     */
+    public Builder useVirtualGrpcTransportThreads() {
+      this.useVirtualGrpcTransportThreads = true;
+      return this;
+    }
+
+    /**
      * PGAdapter by default does not support SSL connections. Call this method to allow or require
      * SSL connections.
      *
@@ -391,7 +429,12 @@ public class OptionsMetadata {
       if (endpoint != null) {
         addOption(args, OPTION_SPANNER_ENDPOINT, endpoint);
       }
-      if (usePlainText || numChannels != null || databaseRole != null || autoConfigEmulator) {
+      if (usePlainText
+          || numChannels != null
+          || databaseRole != null
+          || autoConfigEmulator
+          || useVirtualThreads
+          || useVirtualGrpcTransportThreads) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -404,6 +447,16 @@ public class OptionsMetadata {
         }
         if (autoConfigEmulator) {
           jdbcOptionBuilder.append("autoConfigEmulator=true;");
+        }
+        if (useVirtualThreads) {
+          jdbcOptionBuilder
+              .append(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME)
+              .append("=true;");
+        }
+        if (useVirtualGrpcTransportThreads) {
+          jdbcOptionBuilder
+              .append(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME)
+              .append("=true;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
@@ -729,6 +782,18 @@ public class OptionsMetadata {
           throw new IllegalArgumentException("Invalid JDBC property specified: " + propertyOptions);
         }
       }
+    }
+    // Set virtual thread properties from system properties if:
+    // 1. The virtual thread property has not been set in the command line arguments.
+    // 2. The corresponding system property has been set.
+    if (properties.get(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME) == null
+        && Boolean.parseBoolean(System.getProperty(USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME))) {
+      properties.put(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME, "true");
+    }
+    if (properties.get(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME) == null
+        && Boolean.parseBoolean(
+            System.getProperty(USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME))) {
+      properties.put(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME, "true");
     }
     return properties;
   }
@@ -1264,6 +1329,16 @@ public class OptionsMetadata {
 
   public boolean isDebugMode() {
     return this.debugMode;
+  }
+
+  public boolean isUseVirtualThreads() {
+    return Boolean.parseBoolean(
+        getPropertyMap().get(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME));
+  }
+
+  public boolean isUseGrpcTransportVirtualThreads() {
+    return Boolean.parseBoolean(
+        getPropertyMap().get(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME));
   }
 
   public Duration getStartupTimeout() {

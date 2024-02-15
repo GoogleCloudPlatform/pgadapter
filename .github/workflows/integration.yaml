@@ -80,7 +80,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: 17
+          java-version: 21
       - run: java -version
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -106,6 +106,8 @@ jobs:
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
         run: mvn test -B -Ptest-all
+      - name: Run unit tests with virtual threads
+        run: mvn test -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true -B -Ptest-all
       - name: Auth
         uses: google-github-actions/auth@v2
         with:
