@@ -1,8 +1,4 @@
----
-layout: readme
-title: PGAdapter Spanner and Knex.js
-keywords: Cloud Spanner Knex Knex.js PGAdapter
----
+<meta name='keywords' content='pgadapter, knex, knex.js, spanner, cloud spanner, node, node.js'>
 
 # PGAdapter Spanner and Knex.js
 
