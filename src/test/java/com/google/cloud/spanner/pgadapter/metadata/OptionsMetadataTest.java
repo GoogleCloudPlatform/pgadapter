@@ -451,6 +451,13 @@ public class OptionsMetadataTest {
             .build()
             .getPropertyMap()
             .get("useVirtualGrpcTransportThreads"));
+    assertFalse(OptionsMetadata.newBuilder().build().isUseGrpcTransportVirtualThreads());
+    assertTrue(
+        OptionsMetadata.newBuilder()
+            .useVirtualGrpcTransportThreads()
+            .build()
+            .isUseGrpcTransportVirtualThreads());
+
     assertEquals(
         DdlTransactionMode.Batch,
         OptionsMetadata.newBuilder()

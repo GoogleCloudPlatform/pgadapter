@@ -319,7 +319,6 @@ public class ConnectionHandler implements Runnable {
                 String.format(
                     "Connection handler with ID %s starting for client %s with thread %s",
                     getName(), socket.getInetAddress().getHostAddress(), thread.toString())));
-    System.out.println("Started " + thread.toString());
     if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
       logger.log(
           Level.INFO,
