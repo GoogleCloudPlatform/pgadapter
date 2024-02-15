@@ -204,6 +204,8 @@ class TicketSale(BaseInt64Mixin, Base):
   # database. If we were to configure the type to be ARRAY(String) here, then
   # we would get an error 'Array casting / coercion is not supported', as
   # SQLAlchemy would try to cast the value to a VARCHAR[].
+  # TODO: Use this mapping when array casting/coercion is supported.
+  #       seats = Column(ARRAY(String))
   seats = Column()
 
   def __repr__(self):

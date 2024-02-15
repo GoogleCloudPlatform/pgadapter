@@ -156,9 +156,6 @@ def create_venue_and_concert_in_transaction():
     session.commit()
     print()
     print("Created Venue and Concert")
-    # The auto-generated ID for the TicketSale is returned from the database to
-    # SQLAlchemy.
-    print("The TicketSale was assigned id", ticket_sale.id, "by the database")
 
 
 # Prints the concerts currently in the database.
