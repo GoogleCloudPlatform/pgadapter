@@ -1,6 +1,12 @@
-# PGAdapter and Knex
+---
+layout: readme
+title: PGAdapter Spanner and Knex.js
+keywords: Cloud Spanner Knex Knex.js PGAdapter
+---
 
-PGAdapter has experimental support for [Knex](https://knexjs.org/) with the standard Node.js `pg`
+# PGAdapter Spanner and Knex.js
+
+PGAdapter has experimental support for [Knex.js](https://knexjs.org/) with the standard Node.js `pg`
 driver. This sample application shows how to connect to PGAdapter with Knex, and how to execute
 queries and transactions on Cloud Spanner.
 

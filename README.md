@@ -39,6 +39,8 @@ PGAdapter can be used with the following frameworks and tools:
 1. `Ruby ActiveRecord`: Version 7.x has _experimental support_ and with limitations. Please read the
    instructions in [PGAdapter - Ruby ActiveRecord Connection Options](docs/ruby-activerecord.md)
    carefully for how to set up ActiveRecord to work with PGAdapter.
+1. `Knex.js` query builder can be used with PGAdapter. See [Knex.js sample application](samples/nodejs/knex)
+   for a sample application.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
