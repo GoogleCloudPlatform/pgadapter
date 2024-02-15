@@ -42,7 +42,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -85,7 +85,12 @@ public class ProxyServer extends AbstractApiService {
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
   private final ExecutorService createConnectionHandlerExecutor =
-      new ThreadPoolExecutor(1, Integer.MAX_VALUE, 20L, TimeUnit.SECONDS, new SynchronousQueue<>());
+      new ThreadPoolExecutor(
+          1,
+          Runtime.getRuntime().availableProcessors(),
+          20L,
+          TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>());
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.

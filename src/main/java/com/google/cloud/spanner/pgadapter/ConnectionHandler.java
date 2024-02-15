@@ -399,7 +399,9 @@ public class ConnectionHandler extends Thread {
               String.format(
                   "Exception on connection handler with ID %s for client %s: %s",
                   getName(),
-                  socket == null ? "(none)" : socket.getInetAddress().getHostAddress(),
+                  socket == null || socket.getInetAddress() == null
+                      ? "(none)"
+                      : socket.getInetAddress().getHostAddress(),
                   e));
     } finally {
       if (result != RunConnectionState.RESTART_WITH_SSL) {

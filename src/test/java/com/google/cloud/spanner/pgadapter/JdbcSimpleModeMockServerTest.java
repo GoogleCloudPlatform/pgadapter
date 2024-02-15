@@ -785,7 +785,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testConnectStorm() throws Exception {
-    int numThreads = 1000;
+    int numThreads = Runtime.getRuntime().availableProcessors() * 10;
     ListeningExecutorService service =
         MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numThreads));
     List<ListenableFuture<Void>> futures = new ArrayList<>(numThreads);
