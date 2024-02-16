@@ -59,6 +59,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -85,7 +86,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -97,13 +97,13 @@ import javax.net.ssl.SSLSocketFactory;
  * representation {@link IntermediateStatement} that servers as a middle layer between Postgres and
  * Spanner.
  *
- * <p>Each {@link ConnectionHandler} is also a {@link Thread}. Although a TCP connection does not
- * necessarily need to have its own thread, this makes the implementation more straightforward.
+ * <p>Each {@link ConnectionHandler} is also a {@link Runnable} so it can be handed to a single
+ * handler thread. Although a TCP connection does not necessarily need to have its own thread, this
+ * makes the implementation more straightforward. The handler thread may be a virtual thread.
  */
 @InternalApi
-public class ConnectionHandler extends Thread {
+public class ConnectionHandler implements Runnable {
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
-  private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
   private final ProxyServer server;
@@ -119,6 +119,7 @@ public class ConnectionHandler extends Thread {
   private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
       new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
+  private Thread thread;
   private final int connectionId;
   private final int secret;
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
@@ -152,20 +153,37 @@ public class ConnectionHandler extends Thread {
   /** Constructor only for testing. */
   @VisibleForTesting
   ConnectionHandler(ProxyServer server, Socket socket, Connection spannerConnection) {
-    super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
     this.connectionId = incrementingConnectionId.incrementAndGet();
     CONNECTION_HANDLERS.put(this.connectionId, this);
-    setDaemon(true);
+    this.spannerConnection = spannerConnection;
+  }
+
+  void start() {
+    Preconditions.checkState(thread != null, "Cannot start a ConnectionHandler without a thread");
+    thread.start();
+  }
+
+  String getName() {
+    Preconditions.checkState(
+        thread != null, "Cannot get the name of a ConnectionHandler without a thread");
+    return thread.getName();
+  }
+
+  Thread getThread() {
+    return this.thread;
+  }
+
+  void setThread(Thread thread) {
+    this.thread = thread;
     logger.log(
         Level.INFO,
         () ->
             String.format(
                 "Connection handler with ID %s created for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
-    this.spannerConnection = spannerConnection;
   }
 
   void createSSLSocket() throws IOException {
@@ -273,13 +291,14 @@ public class ConnectionHandler extends Thread {
     return uri;
   }
 
-  private static String appendPropertiesToUrl(String url, Properties info) {
+  @VisibleForTesting
+  static String appendPropertiesToUrl(String url, Properties info) {
     if (info == null || info.isEmpty()) {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
     for (Entry<Object, Object> entry : info.entrySet()) {
-      if (entry.getValue() != null && !"".equals(entry.getValue())) {
+      if (!Strings.isNullOrEmpty((String) entry.getValue())) {
         result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
       }
     }
@@ -299,8 +318,8 @@ public class ConnectionHandler extends Thread {
             "Run",
             () ->
                 String.format(
-                    "Connection handler with ID %s starting for client %s",
-                    getName(), socket.getInetAddress().getHostAddress())));
+                    "Connection handler with ID %s starting for client %s with thread %s",
+                    getName(), socket.getInetAddress().getHostAddress(), thread.toString())));
     if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
       logger.log(
           Level.INFO,
@@ -630,7 +649,7 @@ public class ConnectionHandler extends Thread {
     // otherwise)
     try {
       connectionToCancel.getSpannerConnection().cancel();
-      connectionToCancel.interrupt();
+      connectionToCancel.getThread().interrupt();
       return true;
     } catch (Throwable ignore) {
     }
