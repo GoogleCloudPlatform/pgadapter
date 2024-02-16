@@ -27,7 +27,7 @@ RUN apt -y install wget
 RUN apt -y install python
 
 # Install Java 21 in the Docker image.
-ADD https://download.java.net/java/GA/jdk21.0.2/f2283984656d49d69e91c558476027ac/13/GPL/openjdk-21.0.2_linux-aarch64_bin.tar.gz /openjdk.tar.gz
+ADD https://download.java.net/java/GA/jdk21.0.2/f2283984656d49d69e91c558476027ac/13/GPL/openjdk-21.0.2_linux-x64_bin.tar.gz /openjdk.tar.gz
 RUN tar xvfz /openjdk.tar.gz
 
 COPY --from=build target/pgadapter /
