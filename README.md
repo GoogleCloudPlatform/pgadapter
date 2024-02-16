@@ -39,6 +39,8 @@ PGAdapter can be used with the following frameworks and tools:
 1. `Ruby ActiveRecord`: Version 7.x has _experimental support_ and with limitations. Please read the
    instructions in [PGAdapter - Ruby ActiveRecord Connection Options](docs/ruby-activerecord.md)
    carefully for how to set up ActiveRecord to work with PGAdapter.
+1. `Knex.js` query builder can be used with PGAdapter. See [Knex.js sample application](samples/nodejs/knex)
+   for a sample application.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
@@ -109,9 +111,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.29.1` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.30.0` with the version you want to download):
 ```shell
-VERSION=v0.29.1
+VERSION=v0.30.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -146,7 +148,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.29.1</version>
+  <version>0.30.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```

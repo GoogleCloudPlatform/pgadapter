@@ -47,17 +47,27 @@ go run sample.go -postgres=true
 ## Data Types
 Cloud Spanner supports the following data types in combination with `gorm`.
 
-| PostgreSQL Type                         | gorm / go type               |
-|-----------------------------------------|------------------------------|
-| boolean                                 | bool, sql.NullBool           |
-| bigint / int8                           | int64, sql.NullInt64         |
-| varchar                                 | string, sql.NullString       |
-| text                                    | string, sql.NullString       |
-| float8 / double precision               | float64, sql.NullFloat64     |
-| numeric                                 | decimal.NullDecimal          |
-| timestamptz / timestamp with time zone  | time.Time, sql.NullTime      |
-| date                                    | datatypes.Date               |
-| bytea                                   | []byte                       |
+| PostgreSQL Type                            | gorm / go type                      |
+|--------------------------------------------|-------------------------------------|
+| boolean                                    | bool, sql.NullBool                  |
+| bigint / int8                              | int64, sql.NullInt64                |
+| varchar                                    | string, sql.NullString              |
+| text                                       | string, sql.NullString              |
+| float8 / double precision                  | float64, sql.NullFloat64            |
+| numeric                                    | decimal.NullDecimal                 |
+| timestamptz / timestamp with time zone     | time.Time, sql.NullTime             |
+| date                                       | datatypes.Date                      |
+| bytea                                      | []byte                              |
+| jsonb                                      | string                              |
+| bool[]                                     | pq.BoolArray, pgtype.BoolArray      |
+| bigint[]                                   | pq.Int64Array, pgtype.Int8Array     |
+| varchar[] / text[]                         | pq.StringArray, pgtype.TextArray    |
+| float8[] / double precision[]              | pq.Float64Array, pgtype.Float8Array |
+| numeric[]                                  | pgtype.NumericArray                 |
+| timestamptz[] / timestamp with time zone[] | pgtype.TimestamptzArray             |
+| date[]                                     | pgtype.DateArray                    |
+| bytea[]                                    | pgtype.ByteaArray                   |
+| jsonb[]                                    | pgtype.JSONBArray                   |
 
 
 ## Limitations
@@ -66,12 +76,9 @@ The following limitations are currently known:
 | Limitation             | Workaround                                                                                                                                                                                                                                                         |
 |------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Migrations             | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated migrations using `gorm` are therefore not supported.                                                                                                                                     |
-| Generated primary keys | Disable auto increment for primary key columns by adding the annotation `gorm:"primaryKey;autoIncrement:false"` to the primary key property.                                                                                                                       |
 | OnConflict             | OnConflict clauses are not supported                                                                                                                                                                                                                               |
-| Nested transactions    | Nested transactions and savepoints are not supported. It is therefore recommended to set the configuration option `DisableNestedTransaction: true,`                                                                                                                |
 | Locking                | Lock clauses (e.g. `clause.Locking{Strength: "UPDATE"}`) are not supported. These are generally speaking also not required, as the default isolation level that is used by Cloud Spanner is serializable.                                                          |
 | Auto-save associations | Auto saved associations are not supported, as these will automatically use an OnConflict clause                                                                                                                                                                    |
-| Large CreateInBatches  | PGAdapter can handle at most 50 parameters in a prepared statement. A large number of rows in a `CreateInBatches` call can exceed this limit. Limit the batch size to a smaller number to prevent `gorm` from generating a statement with more than 50 parameters. |
 
 ### Migrations
 Migrations are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect.
@@ -79,18 +86,46 @@ It is recommended to create the schema manually.
 See [create_data_model.sql](create_data_model.sql) for the data model for this example.
 
 ### Generated Primary Keys
-Generated primary keys are not supported and should be replaced with primary key definitions that
-are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
-for more information on choosing a good primary key. This sample uses UUIDs that are generated by the client for primary
-keys.
+Cloud Spanner supports bit-reversed sequences. These work as regular sequences, except that the value is bit-reversed
+before being returned to the user. That makes these values safe for use as a primary key in Cloud Spanner, and these
+will not cause hot-spotting. You can use the standard `gorm.Model` in combination with bit-reversed sequences.
+
+Example model definition:
 
 ```go
-type User struct {
-	// Prevent gorm from using an auto-generated key.
-	ID           int64 `gorm:"primaryKey;autoIncrement:false"`
-	Name         string
+type TicketSale struct {
+	gorm.Model
+	Concert      Concert
+	ConcertId    string
+	CustomerName string
+	Price        decimal.Decimal
+	Seats        pq.StringArray `gorm:"type:text[]"`
 }
 ```
+
+Corresponding table and sequence definition:
+
+```sql
+create sequence if not exists ticket_sale_seq
+    bit_reversed_positive
+    skip range 1 1000
+    start counter with 50000
+;
+
+create table if not exists ticket_sales (
+    id bigint not null primary key default nextval('ticket_sale_seq'),
+    concert_id       varchar not null,
+    customer_name    varchar not null,
+    price            decimal not null,
+    seats            text[],
+    created_at       timestamptz,
+    updated_at       timestamptz,
+    deleted_at       timestamptz,
+    constraint fk_ticket_sales_concerts foreign key (concert_id) references concerts (id)
+);
+```
+
+See also https://cloud.google.com/spanner/docs/reference/postgresql/data-definition-language#create_sequence
 
 ### Generated Columns
 Generated columns can be used, but Cloud Spanner does not support the `RETURNING` keyword. This means that `gorm` is not
@@ -150,17 +185,6 @@ blog := Blog{
 }
 db.Create(&user)
 db.Create(&blog)
-```
-
-### Nested Transactions
-`gorm` uses savepoints for nested transactions. Savepoints are currently not supported by Cloud Spanner. Nested
-transactions can therefore not be used with PGAdapter. It is recommended to set the configuration option
-`DisableNestedTransactions: true` to be sure that `gorm` does not try to use a nested transaction.
-
-```go
-db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{
-    DisableNestedTransaction: true,
-})
 ```
 
 ### Locking

@@ -927,6 +927,8 @@ public class ITPsqlTest implements IntegrationTest {
           ZoneId.of("Asia/Amman"),
           // Iran observed DST in 1978. Not all databases agree on this.
           ZoneId.of("Asia/Tehran"),
+          // Changed the use of DST multiple times. Changed offset on 2024-02-29.
+          ZoneId.of("Asia/Almaty"),
           // Rankin_Inlet and Resolute did not observe DST in 1970-1979, but not all databases
           // agree.
           ZoneId.of("America/Rankin_Inlet"),
@@ -942,6 +944,9 @@ public class ITPsqlTest implements IntegrationTest {
           // Nuuk stopped using DST in 2023. This is unknown to older JDKs.
           ZoneId.of("America/Nuuk"),
           ZoneId.of("America/Godthab"),
+          // Antarctica has multiple differences between databases.
+          ZoneId.of("Antarctica/Vostok"),
+          ZoneId.of("Antarctica/Casey"),
           // Egypt has started using DST again from 2023.
           ZoneId.of("Egypt"));
 

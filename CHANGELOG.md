@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.30.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.29.1...v0.30.0) (2024-02-16)
+
+
+### Features
+
+* add sample for bit-reversed sequence with Hibernate / JPA ([#1387](https://github.com/GoogleCloudPlatform/pgadapter/issues/1387)) ([216efa6](https://github.com/GoogleCloudPlatform/pgadapter/commit/216efa6f4dd20ed322d0c7e4798752089a2dfa4b))
+* bit-reversed sequences in SQLAlchemy ([#1405](https://github.com/GoogleCloudPlatform/pgadapter/issues/1405)) ([6a7d393](https://github.com/GoogleCloudPlatform/pgadapter/commit/6a7d393d5896d0c119c6ae9a4cc8b62dc67ea239))
+* document and test ARRAY mapping for gorm ([#1400](https://github.com/GoogleCloudPlatform/pgadapter/issues/1400)) ([968ac2d](https://github.com/GoogleCloudPlatform/pgadapter/commit/968ac2daca2b07a7056df688a7986e565535f16d))
+* gorm nested transactions ([#1401](https://github.com/GoogleCloudPlatform/pgadapter/issues/1401)) ([2636a49](https://github.com/GoogleCloudPlatform/pgadapter/commit/2636a49415061bb3b0e392d143e78a20dcd5e400))
+* run SQLAlchemy2 sample on emulator ([#1403](https://github.com/GoogleCloudPlatform/pgadapter/issues/1403)) ([542f2dc](https://github.com/GoogleCloudPlatform/pgadapter/commit/542f2dc99ba72242c217078263a1e1dccc4068ad))
+* support bit-reversed sequences in gorm ([#1397](https://github.com/GoogleCloudPlatform/pgadapter/issues/1397)) ([77d2307](https://github.com/GoogleCloudPlatform/pgadapter/commit/77d2307c322bef537a984628e1abbc83ca154f7d))
+* support knex ([#1169](https://github.com/GoogleCloudPlatform/pgadapter/issues/1169)) ([0a78cf6](https://github.com/GoogleCloudPlatform/pgadapter/commit/0a78cf628bd18c60a6678404f4bc6f0c796cf898))
+* support large batches in gorm ([#1399](https://github.com/GoogleCloudPlatform/pgadapter/issues/1399)) ([24e49de](https://github.com/GoogleCloudPlatform/pgadapter/commit/24e49de987abd154ea017f24a794066c9b204410))
+
+
+### Bug Fixes
+
+* allow space between timestamp and timezone ([#1390](https://github.com/GoogleCloudPlatform/pgadapter/issues/1390)) ([9e91973](https://github.com/GoogleCloudPlatform/pgadapter/commit/9e91973a3641e3209ed5479f6c77bf67ec77a954))
+* limit the num bytes to write to length ([#1388](https://github.com/GoogleCloudPlatform/pgadapter/issues/1388)) ([028fdd4](https://github.com/GoogleCloudPlatform/pgadapter/commit/028fdd46d2069bec24b899d9167ed9c02c86d0d1))
+
+
+### Performance Improvements
+
+* support virtual threads on Java 21 and higher ([#1406](https://github.com/GoogleCloudPlatform/pgadapter/issues/1406)) ([ebdf1dd](https://github.com/GoogleCloudPlatform/pgadapter/commit/ebdf1dd624265d237ecf5f1d738dd9862f5ae49d))
+
+
+### Dependencies
+
+* bouncycastle was moved to new Maven coordinates ([#1420](https://github.com/GoogleCloudPlatform/pgadapter/issues/1420)) ([53b95ce](https://github.com/GoogleCloudPlatform/pgadapter/commit/53b95ce27ba88641ea271a857f803bb330526d83))
+* bump Docker images to Java 21 ([#1410](https://github.com/GoogleCloudPlatform/pgadapter/issues/1410)) ([b696e7f](https://github.com/GoogleCloudPlatform/pgadapter/commit/b696e7f8a24386fd38fe2e407b0c6818f8021541))
+
+
+### Documentation
+
+* add sample for using bit-reversed sequence with plain Hibernate ([#1416](https://github.com/GoogleCloudPlatform/pgadapter/issues/1416)) ([ca23785](https://github.com/GoogleCloudPlatform/pgadapter/commit/ca237859625be7a8626cd79416af59baef16a0b7))
+* remove samples for Cloud Run that embed PGAdapter in Docker image ([#1415](https://github.com/GoogleCloudPlatform/pgadapter/issues/1415)) ([d60dc31](https://github.com/GoogleCloudPlatform/pgadapter/commit/d60dc317fbce6cecace1342d9e0bbaa268f131f9))
+
 ## [0.29.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.29.0...v0.29.1) (2024-02-09)
 
 

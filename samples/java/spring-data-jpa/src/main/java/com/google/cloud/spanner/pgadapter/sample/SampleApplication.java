@@ -20,6 +20,7 @@ import com.google.cloud.spanner.pgadapter.sample.service.AlbumService;
 import com.google.cloud.spanner.pgadapter.sample.service.ConcertService;
 import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
 import com.google.cloud.spanner.pgadapter.sample.service.StaleReadService;
+import com.google.cloud.spanner.pgadapter.sample.service.TicketSaleService;
 import com.google.cloud.spanner.pgadapter.sample.service.TrackService;
 import com.google.cloud.spanner.pgadapter.sample.service.VenueService;
 import java.time.OffsetDateTime;
@@ -44,6 +45,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *   <li>Configure and use Liquibase with PGAdapter to create the schema of the database
  *   <li>Use UUID primary key values
  *   <li>Use auto-generated sequential primary key values without the risk of creating hotspots
+ *   <li>Use a bit-reversed sequence to generate primary key values
  *   <li>Use interleaved tables with Spring Boot Data JPA
  *   <li>How to map all supported data types to the corresponding Java types
  *   <li>How to execute read/write and read-only transactions
@@ -65,6 +67,7 @@ public class SampleApplication implements CommandLineRunner {
   private final TrackService trackService;
   private final VenueService venueService;
   private final ConcertService concertService;
+
   /**
    * The {@link StaleReadService} is a generic service that can be used to execute workloads using
    * stale reads. Stale reads can perform better than strong reads. See <a
@@ -75,6 +78,8 @@ public class SampleApplication implements CommandLineRunner {
 
   private final ConcertRepository concertRepository;
 
+  private final TicketSaleService ticketSaleService;
+
   public SampleApplication(
       SingerService singerService,
       AlbumService albumService,
@@ -82,7 +87,8 @@ public class SampleApplication implements CommandLineRunner {
       VenueService venueService,
       ConcertService concertService,
       StaleReadService staleReadService,
-      ConcertRepository concertRepository) {
+      ConcertRepository concertRepository,
+      TicketSaleService ticketSaleService) {
     this.singerService = singerService;
     this.albumService = albumService;
     this.trackService = trackService;
@@ -90,6 +96,7 @@ public class SampleApplication implements CommandLineRunner {
     this.concertService = concertService;
     this.staleReadService = staleReadService;
     this.concertRepository = concertRepository;
+    this.ticketSaleService = ticketSaleService;
   }
 
   public static void main(String[] args) {
@@ -100,6 +107,7 @@ public class SampleApplication implements CommandLineRunner {
   public void run(String... args) {
     // First clear the current tables.
     log.info("Deleting all existing data");
+    ticketSaleService.deleteAllTicketSales();
     concertService.deleteAllConcerts();
     albumService.deleteAllAlbums();
     singerService.deleteAllSingers();
@@ -115,6 +123,8 @@ public class SampleApplication implements CommandLineRunner {
     log.info("Created 20 venues");
     concertService.generateRandomConcerts(50);
     log.info("Created 50 concerts");
+    ticketSaleService.generateRandomTicketSales(200);
+    log.info("Created 200 ticket sales");
 
     // Print some of the randomly inserted data.
     printData();

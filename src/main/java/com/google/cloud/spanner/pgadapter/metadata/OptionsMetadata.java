@@ -23,6 +23,7 @@ import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
+import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.Server;
 import com.google.common.annotations.VisibleForTesting;
@@ -34,6 +35,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -49,6 +51,13 @@ import org.json.simple.JSONObject;
 
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
+  /** These system properties can be used to turn on the use of virtual threads. */
+  public static String USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME = "pgadapter.use_virtual_threads";
+
+  public static String USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME =
+      "pgadapter.use_virtual_grpc_transport_threads";
+
+  static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
 
   /**
    * Builder class for creating an instance of {@link OptionsMetadata}.
@@ -80,6 +89,8 @@ public class OptionsMetadata {
     private boolean enableOpenTelemetry;
     private Double openTelemetryTraceRatio;
     private boolean skipLocalhostCheck;
+    private boolean useVirtualThreads;
+    private boolean useVirtualGrpcTransportThreads;
     private SslMode sslMode;
     private int port;
     private String unixDomainSocketDirectory;
@@ -87,6 +98,7 @@ public class OptionsMetadata {
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
+    private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
 
     Builder() {}
 
@@ -253,6 +265,35 @@ public class OptionsMetadata {
     }
 
     /**
+     * Creates a virtual thread for each connection instead of a platform thread. Enabling this
+     * option only has effect if PGAdapter is running on Java 21 or higher. Enabling virtual threads
+     * can reduce memory consumption for PGAdapter instances that have a large number of incoming
+     * connections, and reduces the total number of platform threads that are created.
+     *
+     * <p>See <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual
+     * threads</a> for more information on virtual threads.
+     */
+    public Builder useVirtualThreads() {
+      this.useVirtualThreads = true;
+      return this;
+    }
+
+    /**
+     * Uses virtual threads instead of platform threads for the gRPC executor pool. Enabling this
+     * option only has effect if PGAdapter is running on Java 21 or higher. Enabling virtual threads
+     * for gRPC can reduce memory consumption for PGAdapter instances that execute a large number of
+     * parallel queries or transactions, and reduces the total number of platform threads that are
+     * created.
+     *
+     * <p>See <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual
+     * threads</a> for more information on virtual threads.
+     */
+    public Builder useVirtualGrpcTransportThreads() {
+      this.useVirtualGrpcTransportThreads = true;
+      return this;
+    }
+
+    /**
      * PGAdapter by default does not support SSL connections. Call this method to allow or require
      * SSL connections.
      *
@@ -323,6 +364,11 @@ public class OptionsMetadata {
       return this;
     }
 
+    Builder setStartupTimeout(Duration timeout) {
+      this.startupTimeout = timeout;
+      return this;
+    }
+
     public OptionsMetadata build() {
       if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
         throw SpannerExceptionFactory.newSpannerException(
@@ -383,7 +429,12 @@ public class OptionsMetadata {
       if (endpoint != null) {
         addOption(args, OPTION_SPANNER_ENDPOINT, endpoint);
       }
-      if (usePlainText || numChannels != null || databaseRole != null || autoConfigEmulator) {
+      if (usePlainText
+          || numChannels != null
+          || databaseRole != null
+          || autoConfigEmulator
+          || useVirtualThreads
+          || useVirtualGrpcTransportThreads) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -396,6 +447,16 @@ public class OptionsMetadata {
         }
         if (autoConfigEmulator) {
           jdbcOptionBuilder.append("autoConfigEmulator=true;");
+        }
+        if (useVirtualThreads) {
+          jdbcOptionBuilder
+              .append(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME)
+              .append("=true;");
+        }
+        if (useVirtualGrpcTransportThreads) {
+          jdbcOptionBuilder
+              .append(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME)
+              .append("=true;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
@@ -542,6 +603,7 @@ public class OptionsMetadata {
   private final Map<String, String> propertyMap;
   private final String serverVersion;
   private final boolean debugMode;
+  private final Duration startupTimeout;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -550,7 +612,7 @@ public class OptionsMetadata {
    * of calling this method directly.
    */
   public OptionsMetadata(String[] args) {
-    this(System.getenv(), System.getProperty("os.name", ""), args);
+    this(System.getenv(), System.getProperty("os.name", ""), DEFAULT_STARTUP_TIMEOUT, args);
   }
 
   private OptionsMetadata(Builder builder) {
@@ -559,11 +621,13 @@ public class OptionsMetadata {
         System.getProperty("os.name", ""),
         builder.toCommandLineArguments(),
         builder.credentials,
-        builder.sessionPoolOptions);
+        builder.sessionPoolOptions,
+        builder.startupTimeout);
   }
 
-  OptionsMetadata(Map<String, String> environment, String osName, String[] args) {
-    this(environment, osName, args, null, null);
+  OptionsMetadata(
+      Map<String, String> environment, String osName, Duration startupTimeout, String[] args) {
+    this(environment, osName, args, null, null, startupTimeout);
   }
 
   OptionsMetadata(
@@ -571,7 +635,8 @@ public class OptionsMetadata {
       String osName,
       String[] args,
       @Nullable Credentials credentials,
-      @Nullable SessionPoolOptions sessionPoolOptions) {
+      @Nullable SessionPoolOptions sessionPoolOptions,
+      Duration startupTimeout) {
     this.environment = Preconditions.checkNotNull(environment);
     this.osName = osName;
     this.commandLine = buildOptions(args);
@@ -630,6 +695,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
+    this.startupTimeout = startupTimeout;
   }
 
   /**
@@ -701,6 +767,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
+    this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
   private Map<String, String> parseProperties(String propertyOptions) {
@@ -715,6 +782,18 @@ public class OptionsMetadata {
           throw new IllegalArgumentException("Invalid JDBC property specified: " + propertyOptions);
         }
       }
+    }
+    // Set virtual thread properties from system properties if:
+    // 1. The virtual thread property has not been set in the command line arguments.
+    // 2. The corresponding system property has been set.
+    if (properties.get(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME) == null
+        && Boolean.parseBoolean(System.getProperty(USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME))) {
+      properties.put(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME, "true");
+    }
+    if (properties.get(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME) == null
+        && Boolean.parseBoolean(
+            System.getProperty(USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME))) {
+      properties.put(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME, "true");
     }
     return properties;
   }
@@ -1250,6 +1329,20 @@ public class OptionsMetadata {
 
   public boolean isDebugMode() {
     return this.debugMode;
+  }
+
+  public boolean isUseVirtualThreads() {
+    return Boolean.parseBoolean(
+        getPropertyMap().get(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME));
+  }
+
+  public boolean isUseGrpcTransportVirtualThreads() {
+    return Boolean.parseBoolean(
+        getPropertyMap().get(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME));
+  }
+
+  public Duration getStartupTimeout() {
+    return this.startupTimeout;
   }
 
   public JSONObject getCommandMetadataJSON() {

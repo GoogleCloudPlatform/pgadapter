@@ -19,6 +19,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.ThreadFactoryUtil;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -81,6 +83,8 @@ public class ProxyServer extends AbstractApiService {
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
+  private final ThreadFactory threadFactory;
+
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
    *
@@ -116,6 +120,9 @@ public class ProxyServer extends AbstractApiService {
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
+    this.threadFactory =
+        ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory(
+            "ConnectionHandler", optionsMetadata.isUseVirtualThreads());
     addConnectionProperties();
   }
 
@@ -183,7 +190,7 @@ public class ProxyServer extends AbstractApiService {
         listenerThread.start();
       }
       try {
-        if (startupLatch.await(30L, TimeUnit.SECONDS)) {
+        if (startupLatch.await(options.getStartupTimeout().toMillis(), TimeUnit.MILLISECONDS)) {
           notifyStarted();
         } else {
           throw SpannerExceptionFactory.newSpannerException(
@@ -329,6 +336,8 @@ public class ProxyServer extends AbstractApiService {
     socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
+    Thread thread = threadFactory.newThread(handler);
+    handler.setThread(thread);
     handler.start();
   }
 

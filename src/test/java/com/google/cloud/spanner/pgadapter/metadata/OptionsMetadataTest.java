@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DEFAULT_STARTUP_TIMEOUT;
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.parseSslMode;
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.toServerVersionNum;
 import static org.junit.Assert.assertEquals;
@@ -21,6 +22,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.OAuth2Credentials;
@@ -53,6 +55,7 @@ public class OptionsMetadataTest {
           new OptionsMetadata(
               Collections.emptyMap(),
               os,
+              DEFAULT_STARTUP_TIMEOUT,
               new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
       if (options.isWindows()) {
         assertEquals("", options.getSocketFile(5432));
@@ -71,6 +74,7 @@ public class OptionsMetadataTest {
           new OptionsMetadata(
               Collections.emptyMap(),
               os,
+              DEFAULT_STARTUP_TIMEOUT,
               new String[] {"-p p", "-i i", "-c \"\"", "-dir /pgadapter"});
       assertEquals(
           "/pgadapter" + File.separatorChar + ".s.PGSQL.5432", options.getSocketFile(5432));
@@ -120,6 +124,12 @@ public class OptionsMetadataTest {
 
   @Test
   public void testBuildConnectionUrlWithFullPath() {
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME)
+            == null);
+
     assertEquals(
         "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;credentials=credentials.json",
         new OptionsMetadata(new String[] {"-c", "credentials.json"})
@@ -154,6 +164,12 @@ public class OptionsMetadataTest {
 
   @Test
   public void testBuildConnectionUrlWithDefaultProjectId() {
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME)
+            == null);
+
     OptionsMetadata useDefaultProjectIdOptions =
         new OptionsMetadata(new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
           @Override
@@ -179,6 +195,12 @@ public class OptionsMetadataTest {
 
   @Test
   public void testBuildConnectionUrlWithDefaultCredentials() {
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME)
+            == null);
+
     OptionsMetadata useDefaultCredentials =
         new OptionsMetadata(new String[] {"-p", "test-project", "-i", "test-instance"}) {
           @Override
@@ -296,6 +318,12 @@ public class OptionsMetadataTest {
 
   @Test
   public void testBuilder() {
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME)
+            == null);
+
     assertFalse(
         OptionsMetadata.newBuilder()
             .setProject("my-project")
@@ -395,6 +423,41 @@ public class OptionsMetadataTest {
             .build()
             .getPropertyMap()
             .get("usePlainText"));
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("useVirtualThreads"));
+    assertEquals(
+        "true",
+        OptionsMetadata.newBuilder()
+            .useVirtualThreads()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("useVirtualThreads"));
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("useVirtualGrpcTransportThreads"));
+    assertEquals(
+        "true",
+        OptionsMetadata.newBuilder()
+            .useVirtualGrpcTransportThreads()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("useVirtualGrpcTransportThreads"));
+    assertFalse(OptionsMetadata.newBuilder().build().isUseGrpcTransportVirtualThreads());
+    assertTrue(
+        OptionsMetadata.newBuilder()
+            .useVirtualGrpcTransportThreads()
+            .build()
+            .isUseGrpcTransportVirtualThreads());
+
     assertEquals(
         DdlTransactionMode.Batch,
         OptionsMetadata.newBuilder()

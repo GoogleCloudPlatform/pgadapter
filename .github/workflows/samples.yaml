@@ -50,3 +50,21 @@ jobs:
         run: |
           pip install -r requirements.txt
           python psycopg3_sample.py
+      - name: Run SQLAlchemy2 Sample tests
+        working-directory: ./samples/python/sqlalchemy2-sample
+        run: |
+          pip install -r requirements.txt
+          python run_sample.py
+  nodejs-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --version
+      - name: Run Knex Sample tests
+        working-directory: ./samples/nodejs/knex
+        run: |
+          npm install
+          npm start
