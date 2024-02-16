@@ -13,8 +13,8 @@ if [[ "$DATABASES" != *"$SPANNER_DATABASE"* ]]; then
 fi
 SPANNER_PROJECT=$(gcloud --quiet config get project)
 
-java -jar pgadapter.jar -p $SPANNER_PROJECT -i $SPANNER_INSTANCE -enable_otel -r="minSessions=1000;maxSessions=1000;numChannels=20;useVirtualThreads=true;useVirtualGrpcTransportThreads=true" -x &
-sleep 6
+java -jar pgadapter.jar -p $SPANNER_PROJECT -i $SPANNER_INSTANCE -enable_otel -r="minSessions=1000;maxSessions=1000;numChannels=20;useVirtualThreads=true;useVirtualGrpcTransportThreads=true" &
+sleep 12
 export PGDATABASE=$SPANNER_DATABASE
 psql -h localhost -c "CREATE TABLE IF NOT EXISTS usertable (
                    YCSB_KEY VARCHAR(255) PRIMARY KEY,
