@@ -19,11 +19,6 @@ COPY --from=emulator /licenses.txt.gz /emulator/licenses.txt.gz
 RUN chmod u+x /emulator/gateway_main
 RUN chmod u+x /emulator/emulator_main
 
-# Add the emulator libraries.
-COPY --from=emulator /lib /lib
-COPY --from=emulator /lib64 /lib64
-COPY --from=emulator /usr/lib /usr/lib
-
 # Expose 5432 (PGAdapter PostgreSQL port), 9010 (Emulator gRPC port), and 9020 (Emulator REST port)
 EXPOSE 5432 9010 9020
 
