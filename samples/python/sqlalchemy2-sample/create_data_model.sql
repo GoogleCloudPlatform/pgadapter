@@ -61,4 +61,25 @@ create table if not exists concerts (
     constraint chk_end_time_after_start_time check (end_time > start_time)
 );
 
+-- Create a bit-reversed sequence that will be used to generate identifiers for the ticket_sales table.
+-- See also https://cloud.google.com/spanner/docs/reference/postgresql/data-definition-language#create_sequence
+-- Note that the 'bit_reversed_positive' keyword is required for Spanner.
+create sequence if not exists ticket_sale_seq
+    bit_reversed_positive
+    skip range 1 1000
+    start counter with 50000
+;
+
+create table if not exists ticket_sales (
+    id bigint not null primary key default nextval('ticket_sale_seq'),
+    version_id       int not null,
+    concert_id       varchar not null,
+    customer_name    varchar not null,
+    price            decimal not null,
+    seats            text[],
+    created_at       timestamptz,
+    updated_at       timestamptz,
+    constraint fk_ticket_sales_concerts foreign key (concert_id) references concerts (id)
+);
+
 run batch;
