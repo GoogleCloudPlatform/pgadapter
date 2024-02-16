@@ -50,6 +50,7 @@ public class HibernateConfiguration {
     configuration.addAnnotatedClass(Venues.class);
     configuration.addAnnotatedClass(Tracks.class);
     configuration.addAnnotatedClass(TracksId.class);
+    configuration.addAnnotatedClass(TicketSale.class);
 
     final SessionFactory sessionFactory = configuration.buildSessionFactory();
 
