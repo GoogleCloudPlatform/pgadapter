@@ -57,7 +57,7 @@
     <dependency>
       <groupId>io.hypersistence</groupId>
       <artifactId>hypersistence-utils-hibernate-63</artifactId>
-      <version>3.7.2</version>
+      <version>3.7.3</version>
     </dependency>
     <!-- Add testcontainers, so we can run a Docker container with PGAdapter+Spanner Emulator -->
     <dependency>
