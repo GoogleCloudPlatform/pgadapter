@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 name: benchmark-tests
 jobs:
-  java-samples:
+  java-benchmarks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,5 +16,5 @@ jobs:
           distribution: zulu
           java-version: 17
       - name: Run Java Latency Benchmark tests
-        working-directory: ./benchmarks/latency-comparisons/java
+        working-directory: ./benchmarks/latency-comparison/java
         run: mvn test -B
