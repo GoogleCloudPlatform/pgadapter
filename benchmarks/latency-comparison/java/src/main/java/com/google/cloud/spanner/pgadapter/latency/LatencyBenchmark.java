@@ -38,6 +38,29 @@ import org.apache.commons.cli.ParseException;
 
 public class LatencyBenchmark {
   public static void main(String[] args) throws ParseException {
+    CommandLine cmd = parseCommandLine(args);
+    String project = System.getenv("GOOGLE_CLOUD_PROJECT");
+    String instance = System.getenv("SPANNER_INSTANCE");
+    String database = System.getenv("SPANNER_DATABASE");
+    String fullyQualifiedDatabase;
+    if (cmd.hasOption('d')) {
+      fullyQualifiedDatabase = cmd.getOptionValue('d');
+    } else if (project != null && instance != null && database != null) {
+      fullyQualifiedDatabase =
+          String.format("projects/%s/instances/%s/databases/%s", project, instance, database);
+    } else {
+      throw new IllegalArgumentException(
+          "You must either set all the environment variables GOOGLE_CLOUD_PROJECT, SPANNER_INSTANCE and SPANNER_DATABASE, or specify a value for the command line argument --database");
+    }
+
+    LatencyBenchmark benchmark = new LatencyBenchmark(DatabaseId.of(fullyQualifiedDatabase));
+    if (cmd.hasOption("create_results_table")) {
+      benchmark.createResultsTableIfNotExists();
+    }
+    benchmark.run(cmd);
+  }
+
+  private static CommandLine parseCommandLine(String[] args) throws ParseException {
     Options options = new Options();
     options.addOption("d", "database", true, "The database to use for benchmarking.");
     options.addOption(
@@ -63,27 +86,7 @@ public class LatencyBenchmark {
     options.addOption("s", "store_results", false, "Store results in the test database.");
     options.addOption("name", true, "Name of this test run");
     CommandLineParser parser = new DefaultParser();
-    CommandLine cmd = parser.parse(options, args);
-
-    String project = System.getenv("GOOGLE_CLOUD_PROJECT");
-    String instance = System.getenv("SPANNER_INSTANCE");
-    String database = System.getenv("SPANNER_DATABASE");
-    String fullyQualifiedDatabase;
-    if (cmd.hasOption('d')) {
-      fullyQualifiedDatabase = cmd.getOptionValue('d');
-    } else if (project != null && instance != null && database != null) {
-      fullyQualifiedDatabase =
-          String.format("projects/%s/instances/%s/databases/%s", project, instance, database);
-    } else {
-      throw new IllegalArgumentException(
-          "You must either set all the environment variables GOOGLE_CLOUD_PROJECT, SPANNER_INSTANCE and SPANNER_DATABASE, or specify a value for the command line argument --database");
-    }
-
-    LatencyBenchmark benchmark = new LatencyBenchmark(DatabaseId.of(fullyQualifiedDatabase));
-    if (cmd.hasOption("create_results_table")) {
-      benchmark.createResultsTableIfNotExists();
-    }
-    benchmark.run(cmd);
+    return parser.parse(options, args);
   }
 
   private final DatabaseId databaseId;

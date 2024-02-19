@@ -1,0 +1,20 @@
+on:
+  push:
+    branches:
+      - postgresql-dialect
+  pull_request:
+  workflow_dispatch:
+name: benchmark-tests
+jobs:
+  java-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+      - name: Run Java Latency Benchmark tests
+        working-directory: ./benchmarks/latency-comparisons/java
+        run: mvn test -B
