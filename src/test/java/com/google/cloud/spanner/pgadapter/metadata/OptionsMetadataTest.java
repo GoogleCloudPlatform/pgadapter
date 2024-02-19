@@ -590,13 +590,13 @@ public class OptionsMetadataTest {
   @Test
   public void testBuildConnectionUrlWithEmulator() {
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter",
+        "cloudspanner://localhost:9010/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;usePlainText=true",
         OptionsMetadata.newBuilder()
             .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
             .build()
             .buildConnectionURL("projects/my-project/instances/my-instance/databases/my-database"));
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter",
+        "cloudspanner://localhost:9010/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;usePlainText=true",
         OptionsMetadata.newBuilder()
             .setRequireAuthentication()
             .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
