@@ -57,6 +57,9 @@ public class OptionsMetadata {
   public static String USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME =
       "pgadapter.use_virtual_grpc_transport_threads";
 
+  /** The environment variable used by Spanner to specify the emulator host:port. */
+  private static final String SPANNER_EMULATOR_HOST_ENV_VAR = "SPANNER_EMULATOR_HOST";
+
   static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
 
   /**
@@ -941,27 +944,38 @@ public class OptionsMetadata {
     // Check if it is a full database name, or only a database ID.
     DatabaseName databaseName = getDatabaseName(database);
     String host = commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT, "");
+    boolean usePlainText = false;
+    if (Strings.isNullOrEmpty(host)
+        && !Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))) {
+      host = environment.get(SPANNER_EMULATOR_HOST_ENV_VAR);
+      usePlainText = true;
+    }
     String endpoint;
     if (host.isEmpty()) {
       endpoint = "cloudspanner:/";
     } else {
       endpoint = "cloudspanner://" + host + "/";
+      String finalHost = host;
       logger.log(
           Level.INFO,
           () ->
               String.format(
                   "PG Adapter will connect to the following Cloud Spanner service endpoint: %s",
-                  host));
+                  finalHost));
     }
 
     // Note that Credentials here is the credentials file, not the actual credentials
     String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
-    if (!shouldAuthenticate() && environment.get("SPANNER_EMULATOR_HOST") == null) {
+    if (!shouldAuthenticate()
+        && Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))) {
       String credentials = buildCredentialsFile();
       if (!Strings.isNullOrEmpty(credentials)) {
         url = String.format("%s;credentials=%s", url, credentials);
       }
+    }
+    if (usePlainText) {
+      url += ";usePlainText=true";
     }
 
     return url;
