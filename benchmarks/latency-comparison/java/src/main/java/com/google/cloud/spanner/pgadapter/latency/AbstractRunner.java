@@ -19,17 +19,32 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 abstract class AbstractRunner implements BenchmarkRunner {
+  private final AtomicInteger operationCounter = new AtomicInteger();
+
+  protected void incOperations() {
+    operationCounter.incrementAndGet();
+  }
+
   protected List<Duration> collectResults(
       ExecutorService service,
       List<Future<List<Duration>>> results,
       int numClients,
       int numOperations)
       throws Exception {
+    int totalOperations = numClients * numOperations;
     service.shutdown();
+    while (!service.isTerminated()) {
+      //noinspection BusyWait
+      Thread.sleep(1000L);
+      System.out.printf("\r%d/%d", operationCounter.get(), totalOperations);
+    }
+    System.out.println();
     if (!service.awaitTermination(60L, TimeUnit.MINUTES)) {
       throw new TimeoutException();
     }
@@ -38,5 +53,13 @@ abstract class AbstractRunner implements BenchmarkRunner {
       allResults.addAll(result.get());
     }
     return allResults;
+  }
+
+  protected void randomWait(int waitMillis) throws InterruptedException {
+    if (waitMillis <= 0) {
+      return;
+    }
+    int randomMillis = ThreadLocalRandom.current().nextInt(waitMillis * 2);
+    Thread.sleep(randomMillis);
   }
 }

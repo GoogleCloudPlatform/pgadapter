@@ -41,3 +41,11 @@ Run a benchmark with 32 parallel clients each executing 5,000 operations:
 ```shell
 mvn clean compile exec:java -Dexec.args="--clients=32 --operations=5000"
 ```
+
+
+Run a benchmark with 32 parallel clients each executing 1 query per second.
+Each client executes 100 queries:
+
+```shell
+mvn clean compile exec:java -Dexec.args="--clients=32 --operations=100 --wait 1000"
+```
