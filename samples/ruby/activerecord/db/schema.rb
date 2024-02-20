@@ -47,6 +47,17 @@ ActiveRecord::Schema[7.0].define(version: 1) do
     t.bigint "lock_version", null: false
   end
 
+  create_table "ticket_sales", id: :bigint, default: -> { "nextval('ticket_sale_seq'::text)" }, comment: "", force: :cascade do |t|
+    t.string "concert_id", limit: 36
+    t.string "customer_name"
+    t.decimal "price"
+    t.string "seats", array: true
+    t.datetime "created_at", precision: nil
+    t.datetime "updated_at", precision: nil
+    t.bigint "lock_version", null: false
+    t.index [], name: "IDX_ticket_sales_concert_id_N_CAE2285D7AEE904D"
+  end
+
   create_table "tracks", primary_key: ["album_id", "track_number"], comment: "", force: :cascade do |t|
     t.string "album_id", limit: 36, null: false
     t.bigint "track_number", null: false
@@ -68,4 +79,5 @@ ActiveRecord::Schema[7.0].define(version: 1) do
   add_foreign_key "albums", "singers", primary_key: "singer_id"
   add_foreign_key "concerts", "singers", primary_key: "singer_id"
   add_foreign_key "concerts", "venues", primary_key: "venue_id"
+  add_foreign_key "ticket_sales", "concerts", primary_key: "concert_id"
 end

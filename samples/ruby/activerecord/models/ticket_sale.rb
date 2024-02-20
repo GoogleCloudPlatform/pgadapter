@@ -10,9 +10,6 @@ require_relative 'singer'
 require_relative 'venue'
 
 # Model for Concert.
-class Concert < ActiveRecord::Base
-  belongs_to :singer
-  belongs_to :venue
-
-  has_many :ticket_sales
+class TicketSale < ActiveRecord::Base
+  belongs_to :concert
 end
