@@ -50,5 +50,6 @@ public class SelectCurrentSettingStatementTest {
     assertThrows(PGException.class, () -> parse("select current_setting ('foo', true, 1)"));
     assertThrows(PGException.class, () -> parse("select current_setting ('foo', true), 1"));
     assertThrows(PGException.class, () -> parse("select current_setting ('foo.bar.baz', true)"));
+    assertThrows(PGException.class, () -> parse("select current_setting('foo-bar')"));
   }
 }

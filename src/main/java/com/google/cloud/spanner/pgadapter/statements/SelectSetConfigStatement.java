@@ -79,19 +79,11 @@ public class SelectSetConfigStatement extends IntermediatePortalStatement {
       throw PGExceptionFactory.newPGException("missing '(' for set_config", SQLState.SyntaxError);
     }
     QuotedString setting = parser.readSingleQuotedString();
-    if (setting == null) {
-      throw PGExceptionFactory.newPGException(
-          "missing or invalid setting name", SQLState.SyntaxError);
-    }
     if (!parser.eatToken(",")) {
       throw PGExceptionFactory.newPGException(
           "missing ',' after setting name", SQLState.SyntaxError);
     }
     QuotedString value = parser.readSingleQuotedString();
-    if (value == null) {
-      throw PGExceptionFactory.newPGException(
-          "missing or invalid setting value", SQLState.SyntaxError);
-    }
     if (!parser.eatToken(",")) {
       throw PGExceptionFactory.newPGException(
           "missing ',' after setting value", SQLState.SyntaxError);

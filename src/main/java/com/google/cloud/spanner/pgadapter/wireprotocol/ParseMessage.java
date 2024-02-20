@@ -256,11 +256,15 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   }
 
   @Override
-  void buffer(BackendConnection backendConnection) {
+  void buffer(BackendConnection backendConnection) throws Exception {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
       throw new IllegalStateException("Must close statement before reusing name.");
     }
-    this.connection.registerStatement(this.name, this.statement);
+    if (this.statement.hasException()) {
+      handleError(statement.getException());
+    } else {
+      this.connection.registerStatement(this.name, this.statement);
+    }
   }
 
   @Override

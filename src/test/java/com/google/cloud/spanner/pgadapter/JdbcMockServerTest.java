@@ -4248,6 +4248,23 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectSetConfigInvalidTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery(
+                          "select set_config('timezone', 'non-existent-timezone', false)"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          exception.getServerErrorMessage().getSQLState(), SQLState.RaiseException.toString());
+    }
+  }
+
+  @Test
   public void testSelectCurrentSettingTimezone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'IST'");
@@ -4257,6 +4274,34 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
         assertFalse(resultSet.next());
       }
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingInvalidName() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery("select current_setting('invalid-setting-name')"));
+      assertEquals(SQLState.SyntaxError.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingMissingNotOk() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery("select current_setting('non_existing_setting')"));
+      assertEquals(SQLState.RaiseException.toString(), exception.getSQLState());
     }
   }
 
