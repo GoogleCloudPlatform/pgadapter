@@ -12,30 +12,41 @@ to use `ActiveRecord` in general.
 See [Limitations](#limitations) for a full list of known limitations when working with `ActiveRecord`.
 
 ## Running the Sample
-The sample application automatically starts PGAdapter in a Docker container. You must have Docker
-installed on your local system to run the sample. Furthermore, you must configure the following.
+The sample application automatically starts PGAdapter and the Spanner emulator in a Docker
+container. You must have Docker installed on your local system to run the sample.
+
+```shell
+bundle exec rake run
+```
+
+The database is automatically created on the emulator when the application is started. This is
+handled by the `gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator` Docker image. See the
+[PGAdapter emulator documentation](../../../docs/emulator.md) for more information about connecting
+PGAdapter to the emulator.
+
+## Running the Sample on real Cloud Spanner
+You can also run the sample on a real Cloud Spanner PostgreSQL database instead of the emulator.
+The sample application will automatically start PGAdapter in a Docker container and connect to your
+Cloud Spanner database. For this, you need to follow these configuration steps
 
 1. Set the environment variable `GOOGLE_APPLICATION_CREDENTIALS` to point to a valid (service) account file
    that should be used to run the sample.
 2. Modify the `config/database.yml` file so it points to your database.
-3. If you already have PostgreSQL running on your local host on port 5432: Modify the port number in the
-   `database.yml` to for example 5433. This port number will be used to start PGAdapter.
 
 Alternatively, you can also set the following environment variables to configure the database and port number:
 
 ```shell
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-PGPORT=5432
 PGDATABASE=projects/my-project/instances/my-instance/databases/my-database
 ```
 
 Make sure the database that you point the sample to is empty, as the sample application will
 automatically create the required data model in that database.
 
-Run the sample with the following command:
+Run the sample on Cloud Spanner with the following command:
 
 ```shell
-bundle exec rake run
+bundle exec rake run_prod
 ```
 
 
