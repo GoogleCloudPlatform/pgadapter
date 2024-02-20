@@ -61,6 +61,8 @@ def create_pgadapter_container(credentials)
   puts "Waiting for PGAdapter to be ready..."
   container.wait_for_tcp_port(5432)
   puts "PGAdapter running on port #{container.mapped_port(5432)}"
+  # Sleep 2 seconds to be absolutely sure that PGAdapter has started.
+  sleep(2)
   container
 end
 
@@ -77,6 +79,7 @@ def create_pgadapter_and_emulator_container
   puts "Waiting for PGAdapter to be ready..."
   container.wait_for_tcp_port(5432)
   puts "PGAdapter running on port #{container.mapped_port(5432)}"
+  # Sleep 2 seconds to be absolutely sure that PGAdapter has started.
   sleep(2)
   container
 end
