@@ -26,6 +26,8 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.PREPA
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.RELEASE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.ROLLBACK;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SAVEPOINT;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SELECT_CURRENT_SETTING;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SELECT_SET_CONFIG;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW_DATABASE_DDL;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.TRUNCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.VACUUM;
@@ -51,6 +53,8 @@ import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
 import com.google.cloud.spanner.pgadapter.statements.ReleaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.RollbackToStatement;
 import com.google.cloud.spanner.pgadapter.statements.SavepointStatement;
+import com.google.cloud.spanner.pgadapter.statements.SelectCurrentSettingStatement;
+import com.google.cloud.spanner.pgadapter.statements.SelectSetConfigStatement;
 import com.google.cloud.spanner.pgadapter.statements.ShowDatabaseDdlStatement;
 import com.google.cloud.spanner.pgadapter.statements.TruncateStatement;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
@@ -212,6 +216,20 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
             originalStatement);
       } else if (isCommand(SHOW_DATABASE_DDL, originalStatement.getSql())) {
         return new ShowDatabaseDdlStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(SELECT_CURRENT_SETTING, originalStatement.getSql())) {
+        return new SelectCurrentSettingStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(SELECT_SET_CONFIG, originalStatement.getSql())) {
+        return new SelectSetConfigStatement(
             connectionHandler,
             connectionHandler.getServer().getOptions(),
             name,

@@ -4233,6 +4233,34 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectSetConfigTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select set_config('timezone', 'ist', false)")) {
+        assertTrue(resultSet.next());
+        assertEquals("ist", resultSet.getString("set_config"));
+        assertFalse(resultSet.next());
+      }
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_setting('timezone')")) {
+        assertTrue(resultSet.next());
+        assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testSetNames() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set names 'utf8'");
