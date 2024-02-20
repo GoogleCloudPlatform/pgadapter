@@ -1,3 +1,6 @@
-psycopg2-binary~=2.9.3
-pytz~=2022.1
-Django~=4.1.8
+psycopg-binary==3.1.18
+pytz==2024.1
+Django==4.2.10
+google==3.0.0
+google.auth==2.28.0
+testcontainers==3.7.1
