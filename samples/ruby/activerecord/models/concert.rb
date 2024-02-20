@@ -7,6 +7,7 @@
 # https://opensource.org/licenses/MIT.
 
 require_relative 'singer'
+require_relative 'ticket_sale'
 require_relative 'venue'
 
 # Model for Concert.
