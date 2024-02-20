@@ -68,6 +68,8 @@ modifiers for `timestamptz` data types (e.g. `timestamptz(6)`).
 This initialization code is only required for executing migrations. You may omit this from your
 initialization code when you are not running migrations.
 
+This sample application has this initialization code in the `config/environment.rb` file.
+
 ```ruby
 # Make sure that the PostgreSQL-adapter uses timestamptz without any type modifiers.
 ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.datetime_type = :timestamptz
@@ -98,9 +100,9 @@ end
 
 ### database.yml
 The following is the `database.yml` that is used by this sample. It uses the standard
-`PGHOST`, `PGPORT` and `PGDATABASE` environment variables. Note that PGAdapter will
-automatically be started on the value that is set in `PGPORT`. Ensure that you set this
-environment variable to an available port on your system.
+`PGHOST`, `PGPORT` and `PGDATABASE` environment variables. Note that the sample application
+starts PGAdapter automatically on a random port, and the `PGPORT` environment variable is
+automatically updated to use this port.
 
 ```yaml
 default: &default

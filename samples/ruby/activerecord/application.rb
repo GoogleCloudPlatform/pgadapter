@@ -85,8 +85,6 @@ class Application
       puts "#{concert.name} at #{concert.venue.name}"
       puts "  Start time: #{concert.start_time}"
       puts "  Venue description: #{concert.venue.description}"
-      # Add a deliberate error to verify the test runner
-      puts "  Venue description: #{concert.venue.foo}"
     end
   end
 
