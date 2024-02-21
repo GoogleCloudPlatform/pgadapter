@@ -398,13 +398,13 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     String pgSql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar, col_jsonb "
             + "from all_types "
-            + "where col_bigint=1 "
-            + "and col_bool='TRUE' "
-            + "and col_float8=3.14 "
-            + "and col_numeric=6.626 "
-            + String.format("and col_timestamptz='%s' ", timestampString)
-            + "and col_varchar='test' "
-            + "and col_jsonb='{\"key\": \"value\"}'";
+            + "where col_bigint=('1'::int8) "
+            + "and col_bool=('TRUE') "
+            + "and col_float8=('3.14'::double precision) "
+            + "and col_numeric=('6.626'::numeric) "
+            + "and col_timestamptz=('2022-02-16 14:18:02.123457+01') "
+            + "and col_varchar=('test') "
+            + "and col_jsonb=('{\"key\": \"value\"}')";
     String jdbcSql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar, col_jsonb "
             + "from all_types "
