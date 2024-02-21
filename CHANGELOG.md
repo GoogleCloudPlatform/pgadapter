@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.31.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.30.0...v0.31.0) (2024-02-21)
+
+
+### Features
+
+* support set_config and current_setting ([#1437](https://github.com/GoogleCloudPlatform/pgadapter/issues/1437)) ([59d3250](https://github.com/GoogleCloudPlatform/pgadapter/commit/59d3250467ec988d546082e3fce9e955019ca5b4))
+
+
+### Bug Fixes
+
+* respect the SPANNER_EMULATOR_HOST env var ([#1432](https://github.com/GoogleCloudPlatform/pgadapter/issues/1432)) ([2f059f7](https://github.com/GoogleCloudPlatform/pgadapter/commit/2f059f7dc034a546bd3244923b159cfd2a0259d7))
+
+
+### Dependencies
+
+* remove junit dependency from compile path ([#1423](https://github.com/GoogleCloudPlatform/pgadapter/issues/1423)) ([9c315d1](https://github.com/GoogleCloudPlatform/pgadapter/commit/9c315d1ed41b97ffef69492d21b7939803bdd512))
+
+
+### Documentation
+
+* Ruby ActiveRecord bit-reversed sequence sample ([#1434](https://github.com/GoogleCloudPlatform/pgadapter/issues/1434)) ([176dd15](https://github.com/GoogleCloudPlatform/pgadapter/commit/176dd150f3e5baf5fbd8a37ef7a63edfa49d1a28))
+* run Ruby ActiveRecord sample on emulator ([#1433](https://github.com/GoogleCloudPlatform/pgadapter/issues/1433)) ([cd6c9dc](https://github.com/GoogleCloudPlatform/pgadapter/commit/cd6c9dc9ae3492b9c561ca892cbbf518645be623))
+
 ## [0.30.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.29.1...v0.30.0) (2024-02-16)
 
 
