@@ -4233,6 +4233,106 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectSetConfigTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select set_config('timezone', 'ist', false)")) {
+        assertTrue(resultSet.next());
+        assertEquals("ist", resultSet.getString("set_config"));
+        assertFalse(resultSet.next());
+      }
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
+    }
+  }
+
+  @Test
+  public void testSelectSetConfigInvalidTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery(
+                          "select set_config('timezone', 'non-existent-timezone', false)"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          exception.getServerErrorMessage().getSQLState(), SQLState.RaiseException.toString());
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_setting('timezone')")) {
+        assertTrue(resultSet.next());
+        assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingInvalidName() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery("select current_setting('invalid-setting-name')"));
+      assertEquals(SQLState.SyntaxError.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingMissingNotOk() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery("select current_setting('non_existing_setting')"));
+      assertEquals(SQLState.RaiseException.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingMissingOk_settingIsMissing() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select current_setting('non_existing_setting', true)")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingMissingOk_settingIsPresent() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_setting('timezone', true)")) {
+        assertTrue(resultSet.next());
+        assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testSetNames() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set names 'utf8'");

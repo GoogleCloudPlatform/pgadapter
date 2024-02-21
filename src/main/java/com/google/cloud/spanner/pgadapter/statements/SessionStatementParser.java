@@ -172,26 +172,37 @@ public class SessionStatementParser {
   }
 
   static class ShowStatement extends SessionStatement {
+    final String header;
+    final boolean missingOk;
 
     static ShowStatement createShowAll() {
       return new ShowStatement(null);
     }
 
     ShowStatement(TableOrIndexName name) {
+      this(name, null, false);
+    }
+
+    ShowStatement(TableOrIndexName name, String header, boolean missingOk) {
       super(name);
+      this.header = header;
+      this.missingOk = missingOk;
     }
 
     @Override
     public StatementResult execute(SessionState sessionState) {
       if (name != null) {
+        String value;
+        if (missingOk) {
+          PGSetting pgSetting = sessionState.tryGet(extension, name);
+          value = pgSetting == null ? null : pgSetting.getSetting();
+        } else {
+          value = sessionState.get(extension, name).getSetting();
+        }
         return new QueryResult(
             ClientSideResultSet.forRows(
                 Type.struct(StructField.of(getKey(), Type.string())),
-                ImmutableList.of(
-                    Struct.newBuilder()
-                        .set(getKey())
-                        .to(sessionState.get(extension, name).getSetting())
-                        .build())));
+                ImmutableList.of(Struct.newBuilder().set(getKey()).to(value).build())));
       }
       return new QueryResult(
           ClientSideResultSet.forRows(
