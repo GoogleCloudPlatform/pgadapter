@@ -922,7 +922,11 @@ public class ITJdbcTest implements IntegrationTest {
 
       // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations'
       // when it tries to delete all data using a normal transaction.
-      connection.createStatement().execute("delete from all_types");
+      connection
+          .createStatement()
+          .execute(
+              "delete from all_types"
+                  + (IntegrationTest.isRunningOnEmulator() ? " where true" : ""));
     }
   }
 
