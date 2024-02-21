@@ -45,7 +45,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.1</version>
+      <version>42.7.2</version>
     </dependency>
     <!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
     <dependency>
