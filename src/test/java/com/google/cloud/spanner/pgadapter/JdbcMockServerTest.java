@@ -4306,6 +4306,33 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectCurrentSettingMissingOk_settingIsMissing() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select current_setting('non_existing_setting', true)")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingMissingOk_settingIsPresent() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_setting('timezone', true)")) {
+        assertTrue(resultSet.next());
+        assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testSetNames() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set names 'utf8'");

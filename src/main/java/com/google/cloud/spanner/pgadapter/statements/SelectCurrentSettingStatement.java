@@ -79,10 +79,6 @@ public class SelectCurrentSettingStatement extends IntermediatePortalStatement {
           "missing '(' for current_setting", SQLState.SyntaxError);
     }
     QuotedString setting = parser.readSingleQuotedString();
-    if (setting == null) {
-      throw PGExceptionFactory.newPGException(
-          "missing or invalid setting name", SQLState.SyntaxError);
-    }
     boolean missingOk = false;
     if (parser.eatToken(",")) {
       String missingOkString = parser.readKeyword().toLowerCase(Locale.ENGLISH);

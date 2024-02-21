@@ -16,13 +16,10 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
-import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.Futures;
-import java.util.concurrent.Future;
 
 public class InvalidStatement extends IntermediatePortalStatement {
 
@@ -46,10 +43,5 @@ public class InvalidStatement extends IntermediatePortalStatement {
         ImmutableList.of(),
         ImmutableList.of());
     setException(PGExceptionFactory.toPGException(exception));
-  }
-
-  @Override
-  public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
-    return Futures.immediateFailedFuture(getException());
   }
 }
