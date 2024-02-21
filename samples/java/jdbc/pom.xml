@@ -56,7 +56,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.30.0</version>
+      <version>0.31.0</version>
     </dependency>
     <!-- [END pgadapter_and_jdbc_dependency] -->
     <dependency>
