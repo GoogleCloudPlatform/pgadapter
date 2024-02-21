@@ -318,7 +318,12 @@ public class ITJdbcTest implements IntegrationTest {
           statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
         }
         statement.setDouble(++index, 3.14d);
-        statement.setInt(++index, 1);
+        // TODO: Remove when Spangres supports casting to int4
+        if (isSimpleMode) {
+          statement.setLong(++index, 1);
+        } else {
+          statement.setInt(++index, 1);
+        }
         statement.setBigDecimal(++index, new BigDecimal("3.14"));
         statement.setTimestamp(
             ++index, Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp());
@@ -382,9 +387,12 @@ public class ITJdbcTest implements IntegrationTest {
           assertArrayEquals(
               new String[] {"string1", null, "string2"},
               (String[]) resultSet.getArray(++index).getArray());
-          assertArrayEquals(
-              new String[] {"{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"},
-              (String[]) resultSet.getArray(++index).getArray());
+          // TODO: Remove when Spangres supports casting to int4
+          if (!isSimpleMode) {
+            assertArrayEquals(
+                new String[] {"{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"},
+                (String[]) resultSet.getArray(++index).getArray());
+          }
 
           assertFalse(resultSet.next());
         }
@@ -412,7 +420,12 @@ public class ITJdbcTest implements IntegrationTest {
           statement.setBytes(++index, "bytes_test".getBytes(StandardCharsets.UTF_8));
         }
         statement.setDouble(++index, 10.1);
-        statement.setInt(++index, 100);
+        // TODO: Remove when the emulator supports casting to int4
+        if (isSimpleMode) {
+          statement.setLong(++index, 100);
+        } else {
+          statement.setInt(++index, 100);
+        }
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
         statement.setTimestamp(
             ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
@@ -438,7 +451,11 @@ public class ITJdbcTest implements IntegrationTest {
         }
         statement.setArray(
             ++index, connection.createArrayOf("float8", new Double[] {3.14d, null, -99.8}));
-        statement.setArray(++index, connection.createArrayOf("int", new Integer[] {-1, null, -2}));
+        // TODO: Remove when Spangres supports casting to int4
+        statement.setArray(
+            ++index,
+            connection.createArrayOf(
+                isSimpleMode ? "bigint" : "int", new Integer[] {-1, null, -2}));
         statement.setArray(
             ++index,
             connection.createArrayOf(
@@ -461,15 +478,28 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setArray(
             ++index,
             connection.createArrayOf("varchar", new String[] {"string1", null, "string2"}));
-        statement.setArray(
-            ++index,
-            connection.createArrayOf(
-                "jsonb",
-                new String[] {
-                  "{\"key1\": \"value1\", \"key2\": \"value2\"}",
-                  null,
-                  "{\"key1\": \"value3\", \"key2\": \"value4\"}"
-                }));
+        // TODO: Remove when the emulator supports casting to int4
+        if (!isSimpleMode) {
+          statement.setArray(
+              ++index,
+              connection.createArrayOf(
+                  "jsonb",
+                  new String[] {
+                    "{\"key1\": \"value1\", \"key2\": \"value2\"}",
+                    null,
+                    "{\"key1\": \"value3\", \"key2\": \"value4\"}"
+                  }));
+        } else {
+          statement.setArray(
+              ++index,
+              connection.createArrayOf(
+                  "varchar",
+                  new String[] {
+                    "{\"key1\": \"value1\", \"key2\": \"value2\"}",
+                    null,
+                    "{\"key1\": \"value3\", \"key2\": \"value4\"}"
+                  }));
+        }
 
         assertEquals(1, statement.executeUpdate());
       }
@@ -545,13 +575,16 @@ public class ITJdbcTest implements IntegrationTest {
         assertArrayEquals(
             new String[] {"string1", null, "string2"},
             (String[]) resultSet.getArray(++index).getArray());
-        assertArrayEquals(
-            new String[] {
-              "{\"key1\": \"value1\", \"key2\": \"value2\"}",
-              null,
-              "{\"key1\": \"value3\", \"key2\": \"value4\"}"
-            },
-            (String[]) resultSet.getArray(++index).getArray());
+        // TODO: Remove when Spangres supports casting to int4
+        if (!isSimpleMode) {
+          assertArrayEquals(
+              new String[] {
+                "{\"key1\": \"value1\", \"key2\": \"value2\"}",
+                null,
+                "{\"key1\": \"value3\", \"key2\": \"value4\"}"
+              },
+              (String[]) resultSet.getArray(++index).getArray());
+        }
 
         assertFalse(resultSet.next());
       }
@@ -583,7 +616,12 @@ public class ITJdbcTest implements IntegrationTest {
           statement.setBytes(++index, "updated".getBytes(StandardCharsets.UTF_8));
         }
         statement.setDouble(++index, 3.14d * 2d);
-        statement.setInt(++index, 2);
+        // TODO: Remove when Spangres supports casting to int4
+        if (isSimpleMode) {
+          statement.setLong(++index, 2);
+        } else {
+          statement.setInt(++index, 2);
+        }
         statement.setBigDecimal(++index, new BigDecimal("10.0"));
         // Note that PostgreSQL does not support nanosecond precision, so the JDBC driver therefore
         // truncates this value before it is sent to PG.
@@ -727,7 +765,7 @@ public class ITJdbcTest implements IntegrationTest {
             assertThrows(PSQLException.class, preparedStatement::executeQuery);
         if (preferQueryMode.equals("simple")) {
           assertEquals(
-              "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=1'",
+              "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=('1'::int8)'",
               exception.getMessage());
         } else {
           assertEquals(

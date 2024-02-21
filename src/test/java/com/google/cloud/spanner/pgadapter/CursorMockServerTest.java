@@ -196,7 +196,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
     int totalRows = 0;
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of("select * from random where some_col='some-value'"),
+            Statement.of("select * from random where some_col=('some-value')"),
             new RandomResultSetGenerator(numRows).generate()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
