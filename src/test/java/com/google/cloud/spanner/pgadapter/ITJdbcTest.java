@@ -318,8 +318,8 @@ public class ITJdbcTest implements IntegrationTest {
           statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
         }
         statement.setDouble(++index, 3.14d);
-        // TODO: Remove when the emulator supports casting to int4
-        if (isSimpleMode && IntegrationTest.isRunningOnEmulator()) {
+        // TODO: Remove when Spangres supports casting to int4
+        if (isSimpleMode) {
           statement.setLong(++index, 1);
         } else {
           statement.setInt(++index, 1);
@@ -387,8 +387,8 @@ public class ITJdbcTest implements IntegrationTest {
           assertArrayEquals(
               new String[] {"string1", null, "string2"},
               (String[]) resultSet.getArray(++index).getArray());
-          // TODO: Remove when the emulator supports casting to int4
-          if (!(isSimpleMode && IntegrationTest.isRunningOnEmulator())) {
+          // TODO: Remove when Spangres supports casting to int4
+          if (!isSimpleMode) {
             assertArrayEquals(
                 new String[] {"{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"},
                 (String[]) resultSet.getArray(++index).getArray());
@@ -421,7 +421,7 @@ public class ITJdbcTest implements IntegrationTest {
         }
         statement.setDouble(++index, 10.1);
         // TODO: Remove when the emulator supports casting to int4
-        if (isSimpleMode && IntegrationTest.isRunningOnEmulator()) {
+        if (isSimpleMode) {
           statement.setLong(++index, 100);
         } else {
           statement.setInt(++index, 100);
@@ -451,12 +451,11 @@ public class ITJdbcTest implements IntegrationTest {
         }
         statement.setArray(
             ++index, connection.createArrayOf("float8", new Double[] {3.14d, null, -99.8}));
-        // TODO: Remove when the emulator supports casting to int4
+        // TODO: Remove when Spangres supports casting to int4
         statement.setArray(
             ++index,
             connection.createArrayOf(
-                isSimpleMode && IntegrationTest.isRunningOnEmulator() ? "bigint" : "int",
-                new Integer[] {-1, null, -2}));
+                isSimpleMode ? "bigint" : "int", new Integer[] {-1, null, -2}));
         statement.setArray(
             ++index,
             connection.createArrayOf(
@@ -480,7 +479,7 @@ public class ITJdbcTest implements IntegrationTest {
             ++index,
             connection.createArrayOf("varchar", new String[] {"string1", null, "string2"}));
         // TODO: Remove when the emulator supports casting to int4
-        if (!(isSimpleMode && IntegrationTest.isRunningOnEmulator())) {
+        if (!isSimpleMode) {
           statement.setArray(
               ++index,
               connection.createArrayOf(
@@ -576,8 +575,8 @@ public class ITJdbcTest implements IntegrationTest {
         assertArrayEquals(
             new String[] {"string1", null, "string2"},
             (String[]) resultSet.getArray(++index).getArray());
-        // TODO: Remove when the emulator supports casting to int4
-        if (!(isSimpleMode && IntegrationTest.isRunningOnEmulator())) {
+        // TODO: Remove when Spangres supports casting to int4
+        if (!isSimpleMode) {
           assertArrayEquals(
               new String[] {
                 "{\"key1\": \"value1\", \"key2\": \"value2\"}",
@@ -617,8 +616,8 @@ public class ITJdbcTest implements IntegrationTest {
           statement.setBytes(++index, "updated".getBytes(StandardCharsets.UTF_8));
         }
         statement.setDouble(++index, 3.14d * 2d);
-        // TODO: Remove when the emulator supports casting to int4
-        if (isSimpleMode && IntegrationTest.isRunningOnEmulator()) {
+        // TODO: Remove when Spangres supports casting to int4
+        if (isSimpleMode) {
           statement.setLong(++index, 2);
         } else {
           statement.setInt(++index, 2);
@@ -923,11 +922,7 @@ public class ITJdbcTest implements IntegrationTest {
 
       // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations'
       // when it tries to delete all data using a normal transaction.
-      connection
-          .createStatement()
-          .execute(
-              "delete from all_types"
-                  + (IntegrationTest.isRunningOnEmulator() ? " where true" : ""));
+      connection.createStatement().execute("delete from all_types");
     }
   }
 
