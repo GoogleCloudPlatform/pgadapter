@@ -443,12 +443,9 @@ public class OptionsMetadata {
           || numChannels != null
           || databaseRole != null
           || autoConfigEmulator
-<<<<<<< HEAD
           || useVirtualThreads
-          || useVirtualGrpcTransportThreads) {
-=======
+          || useVirtualGrpcTransportThreads
           || disableInternalRetries) {
->>>>>>> 4ebaf915 (feat: add option for disabling retries)
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -462,7 +459,6 @@ public class OptionsMetadata {
         if (autoConfigEmulator) {
           jdbcOptionBuilder.append("autoConfigEmulator=true;");
         }
-<<<<<<< HEAD
         if (useVirtualThreads) {
           jdbcOptionBuilder
               .append(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME)
@@ -472,10 +468,9 @@ public class OptionsMetadata {
           jdbcOptionBuilder
               .append(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME)
               .append("=true;");
-=======
+        }
         if (disableInternalRetries) {
           jdbcOptionBuilder.append("retryAbortsInternally=false;");
->>>>>>> 4ebaf915 (feat: add option for disabling retries)
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
