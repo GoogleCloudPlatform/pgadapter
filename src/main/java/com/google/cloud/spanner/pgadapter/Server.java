@@ -22,7 +22,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.devtools.cloudtrace.v2.AttributeValue;
 import com.google.devtools.cloudtrace.v2.TruncatableString;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
+import io.opentelemetry.sdk.metrics.SdkMeterProvider;
+import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
@@ -110,6 +113,10 @@ public class Server {
                   sdkTracerProviderBuilder
                       .setSampler(sampler)
                       .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()))
+          .addMeterProviderCustomizer(
+              (sdkMeterProviderBuilder, configProperties) -> sdkMeterProviderBuilder
+                  .registerMetricReader(PeriodicMetricReader.builder(OtlpGrpcMetricExporter.builder().build())
+                      .build()))
           .build()
           .getOpenTelemetrySdk();
     } catch (IOException exception) {
