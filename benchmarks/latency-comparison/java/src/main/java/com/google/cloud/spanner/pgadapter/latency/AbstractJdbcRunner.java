@@ -40,12 +40,13 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
   }
 
   @Override
-  public List<Duration> execute(String sql, int numClients, int numOperations) {
+  public List<Duration> execute(String sql, int numClients, int numOperations, int waitMillis) {
     try {
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
       ExecutorService service = Executors.newFixedThreadPool(numClients);
       for (int client = 0; client < numClients; client++) {
-        results.add(service.submit(() -> runBenchmark(createUrl(), sql, numOperations)));
+        results.add(
+            service.submit(() -> runBenchmark(createUrl(), sql, numOperations, waitMillis)));
       }
       return collectResults(service, results, numClients, numOperations);
     } catch (Throwable t) {
@@ -55,17 +56,21 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
 
   protected abstract String createUrl();
 
-  private List<Duration> runBenchmark(String url, String sql, int numOperations) {
+  private List<Duration> runBenchmark(String url, String sql, int numOperations, int waitMillis) {
     List<Duration> results = new ArrayList<>(numOperations);
     try (Connection connection = DriverManager.getConnection(url)) {
       // Execute one query to make sure everything has been warmed up.
       executeQuery(connection, sql);
 
       for (int i = 0; i < numOperations; i++) {
+        randomWait(waitMillis);
         results.add(executeQuery(connection, sql));
+        incOperations();
       }
     } catch (SQLException exception) {
       throw SpannerExceptionFactory.newSpannerException(exception);
+    } catch (InterruptedException interruptedException) {
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     }
     return results;
   }

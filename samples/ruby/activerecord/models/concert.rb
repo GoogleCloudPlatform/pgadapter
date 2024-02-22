@@ -7,10 +7,13 @@
 # https://opensource.org/licenses/MIT.
 
 require_relative 'singer'
+require_relative 'ticket_sale'
 require_relative 'venue'
 
 # Model for Concert.
 class Concert < ActiveRecord::Base
   belongs_to :singer
   belongs_to :venue
+
+  has_many :ticket_sales
 end

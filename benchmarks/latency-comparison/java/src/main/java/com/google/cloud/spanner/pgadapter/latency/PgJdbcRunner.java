@@ -32,7 +32,7 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
   }
 
   @Override
-  public List<Duration> execute(String sql, int numClients, int numOperations) {
+  public List<Duration> execute(String sql, int numClients, int numOperations, int waitMillis) {
     // Silence the PGAdapter logging.
     Logger root = Logger.getLogger("");
     root.setLevel(Level.WARNING);
@@ -41,16 +41,18 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
     }
     // Start PGAdapter in-process.
     OptionsMetadata options =
-        new OptionsMetadata(
-            new String[] {
-              "-p", databaseId.getInstanceId().getProject(),
-              "-i", databaseId.getInstanceId().getInstance(),
-              "-dir=", "-s=0"
-            });
+        OptionsMetadata.newBuilder()
+            .setProject(databaseId.getInstanceId().getProject())
+            .setInstance(databaseId.getInstanceId().getInstance())
+            .disableUnixDomainSockets()
+            .setPort(0)
+            .useVirtualThreads()
+            .useVirtualGrpcTransportThreads()
+            .build();
     proxyServer = new ProxyServer(options);
     try {
       proxyServer.startServer();
-      return super.execute(sql, numClients, numOperations);
+      return super.execute(sql, numClients, numOperations, waitMillis);
     } catch (Throwable t) {
       throw SpannerExceptionFactory.asSpannerException(t);
     } finally {

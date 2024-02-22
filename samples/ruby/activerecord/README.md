@@ -12,30 +12,41 @@ to use `ActiveRecord` in general.
 See [Limitations](#limitations) for a full list of known limitations when working with `ActiveRecord`.
 
 ## Running the Sample
-The sample application automatically starts PGAdapter in a Docker container. You must have Docker
-installed on your local system to run the sample. Furthermore, you must configure the following.
+The sample application automatically starts PGAdapter and the Spanner emulator in a Docker
+container. You must have Docker installed on your local system to run the sample.
+
+```shell
+bundle exec rake run
+```
+
+The database is automatically created on the emulator when the application is started. This is
+handled by the `gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator` Docker image. See the
+[PGAdapter emulator documentation](../../../docs/emulator.md) for more information about connecting
+PGAdapter to the emulator.
+
+## Running the Sample on real Cloud Spanner
+You can also run the sample on a real Cloud Spanner PostgreSQL database instead of the emulator.
+The sample application will automatically start PGAdapter in a Docker container and connect to your
+Cloud Spanner database. For this, you need to follow these configuration steps
 
 1. Set the environment variable `GOOGLE_APPLICATION_CREDENTIALS` to point to a valid (service) account file
    that should be used to run the sample.
 2. Modify the `config/database.yml` file so it points to your database.
-3. If you already have PostgreSQL running on your local host on port 5432: Modify the port number in the
-   `database.yml` to for example 5433. This port number will be used to start PGAdapter.
 
 Alternatively, you can also set the following environment variables to configure the database and port number:
 
 ```shell
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-PGPORT=5432
 PGDATABASE=projects/my-project/instances/my-instance/databases/my-database
 ```
 
 Make sure the database that you point the sample to is empty, as the sample application will
 automatically create the required data model in that database.
 
-Run the sample with the following command:
+Run the sample on Cloud Spanner with the following command:
 
 ```shell
-bundle exec rake run
+bundle exec rake run_prod
 ```
 
 
@@ -56,6 +67,8 @@ modifiers for `timestamptz` data types (e.g. `timestamptz(6)`).
 
 This initialization code is only required for executing migrations. You may omit this from your
 initialization code when you are not running migrations.
+
+This sample application has this initialization code in the `config/environment.rb` file.
 
 ```ruby
 # Make sure that the PostgreSQL-adapter uses timestamptz without any type modifiers.
@@ -87,9 +100,9 @@ end
 
 ### database.yml
 The following is the `database.yml` that is used by this sample. It uses the standard
-`PGHOST`, `PGPORT` and `PGDATABASE` environment variables. Note that PGAdapter will
-automatically be started on the value that is set in `PGPORT`. Ensure that you set this
-environment variable to an available port on your system.
+`PGHOST`, `PGPORT` and `PGDATABASE` environment variables. Note that the sample application
+starts PGAdapter automatically on a random port, and the `PGPORT` environment variable is
+automatically updated to use this port.
 
 ```yaml
 default: &default
@@ -123,7 +136,7 @@ The following limitations are currently known:
 |--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Schema Dumper                  | Cloud Spanner does not support all PostgreSQL `pg_catalog` tables. Using `ActiveRecord::SchemaDumper` to get export the current schema is not guaranteed to include all objects in the database.                                                                                                                                                         |
 | DDL Transactions               | Cloud Spanner does not support DDL statements in a transaction. Add `"spanner.ddl_transaction_mode": "AutocommitExplicitTransaction"` to the `variables` section in your `database.yml` file to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). See [config/database.yml](config/database.yml) for an example. |
-| Generated primary keys         | Manually assign a value to the primary key column in your code. The recommended primary key type is a random UUID. Sequences / SERIAL / IDENTITY columns are currently not supported.                                                                                                                                                                    |
+| Generated primary keys         | The `serial` data type is not supported. Use bit-reversed sequences to auto-generate primary keys.                                                                                                                                                                                                                                                       |
 | Upsert                         | `upsert` and `upsert_all` are not supported.                                                                                                                                                                                                                                                                                                             |
 | SELECT ... FOR UPDATE          | Pessimistic locking / `SELECT ... FOR UPDATE` is not supported.                                                                                                                                                                                                                                                                                          |
 | Transaction isolation level    | Only isolation level `:serializable` is supported.                                                                                                                                                                                                                                                                                                       |
@@ -133,10 +146,36 @@ Dumping the schema of a database is not guaranteed to produce a complete result.
 no workaround for this limitation.
 
 ### Generated Primary Keys
-Generated primary keys are not supported and should be replaced with primary key definitions that
-are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
-for more information on choosing a good primary key. This sample uses random UUIDs that are generated
-by the client and stored as strings for primary keys.
+The `serial` data type is currently not supported.
+Generated primary keys can however be used in combination with bit-reversed sequences.
+
+The [TicketSale](models/ticket_sale.rb) model in this sample uses an auto-generated primary key.
+The [table definition](db/migrate/01_create_tables.rb) for this model looks like this:
+
+```ruby
+execute "create sequence ticket_sale_seq
+         bit_reversed_positive
+         skip range 1 1000
+         start counter with 50000;"
+
+create_table :ticket_sales, id: false, primary_key: :id do |t|
+   t.column :id, "bigint not null primary key default nextval('ticket_sale_seq')"
+   t.references :concert, foreign_key: {primary_key: :concert_id},
+                type: :string, limit: 36, index: false
+   t.string :customer_name
+   t.numeric :price
+   t.string :seats, array: true
+   t.datetime :created_at
+   t.datetime :updated_at
+   t.integer :lock_version, null: false
+end
+```
+
+See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
+for more information on choosing a good primary key. Most models in this sample use
+random UUIDs that are generated by the client and stored as strings for primary keys.
+
+Example:
 
 ```ruby
 Singer.create({singer_id: SecureRandom.uuid,

@@ -40,7 +40,7 @@ public class JavaClientRunner extends AbstractRunner {
   }
 
   @Override
-  public List<Duration> execute(String sql, int numClients, int numOperations) {
+  public List<Duration> execute(String sql, int numClients, int numOperations, int waitMillis) {
     SpannerOptions options =
         SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject()).build();
     try (Spanner spanner = options.getService()) {
@@ -49,7 +49,8 @@ public class JavaClientRunner extends AbstractRunner {
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
       ExecutorService service = Executors.newFixedThreadPool(numClients);
       for (int client = 0; client < numClients; client++) {
-        results.add(service.submit(() -> runBenchmark(databaseClient, sql, numOperations)));
+        results.add(
+            service.submit(() -> runBenchmark(databaseClient, sql, numOperations, waitMillis)));
       }
       return collectResults(service, results, numClients, numOperations);
     } catch (Throwable t) {
@@ -58,13 +59,19 @@ public class JavaClientRunner extends AbstractRunner {
   }
 
   private List<Duration> runBenchmark(
-      DatabaseClient databaseClient, String sql, int numOperations) {
+      DatabaseClient databaseClient, String sql, int numOperations, int waitMillis) {
     List<Duration> results = new ArrayList<>(numOperations);
     // Execute one query to make sure everything has been warmed up.
     executeQuery(databaseClient, sql);
 
     for (int i = 0; i < numOperations; i++) {
-      results.add(executeQuery(databaseClient, sql));
+      try {
+        randomWait(waitMillis);
+        results.add(executeQuery(databaseClient, sql));
+        incOperations();
+      } catch (InterruptedException interruptedException) {
+        throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+      }
     }
     return results;
   }

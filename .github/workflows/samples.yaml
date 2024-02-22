@@ -68,3 +68,17 @@ jobs:
         run: |
           npm install
           npm start
+  ruby-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      - run: ruby --version
+      - name: Run Ruby on Rails ActiveRecord Sample tests
+        working-directory: ./samples/ruby/activerecord
+        run: |
+          bundle install
+          bundle exec rake run

@@ -33,7 +33,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.29.1</version>
+      <version>0.31.0</version>
     </dependency>
     <!-- Hibernate core dependency -->
     <dependency>
@@ -45,7 +45,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.1</version>
+      <version>42.7.2</version>
     </dependency>
     <!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
     <dependency>
@@ -57,7 +57,7 @@
     <dependency>
       <groupId>io.hypersistence</groupId>
       <artifactId>hypersistence-utils-hibernate-63</artifactId>
-      <version>3.7.2</version>
+      <version>3.7.3</version>
     </dependency>
     <!-- Add testcontainers, so we can run a Docker container with PGAdapter+Spanner Emulator -->
     <dependency>
