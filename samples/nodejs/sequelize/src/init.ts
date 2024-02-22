@@ -74,6 +74,12 @@ export async function createDataModel() {
              id bigint not null primary key default nextval('singers_seq'),
              "firstName" varchar,
              "lastName" varchar,
+             "fullName" varchar generated always as (
+                CASE WHEN "firstName" IS NULL THEN "lastName"
+                     WHEN "lastName"  IS NULL THEN "firstName"
+                     ELSE "firstName" || ' ' || "lastName"
+                END) stored,
+             "active" boolean,
              "createdAt" timestamptz,
              "updatedAt" timestamptz
            );
@@ -81,10 +87,10 @@ export async function createDataModel() {
            create table "Albums" (
              id bigint not null primary key default nextval('albums_seq'),
              title varchar,
-             "singerId" bigint,
+             "SingerId" bigint,
              "createdAt" timestamptz,
              "updatedAt" timestamptz,
-             constraint fk_albums_singers foreign key ("singerId") references "Singers" (id)
+             constraint fk_albums_singers foreign key ("SingerId") references "Singers" (id)
            )`,
       {type: QueryTypes.RAW})
 }

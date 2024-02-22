@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {sequelize, shutdownSequelize, startSequelize} from './init'
-import {initSinger, Singer} from '../models/singer';
+import {shutdownSequelize, startSequelize} from './init'
+import {Album, initModels, Singer} from '../models/models';
 
 async function main() {
   await startSequelize();
 
-  initSinger();
+  initModels();
   // Create a new singer record.
   const singer = await Singer.create({ firstName: "Jane", lastName: "Doe" });
-  console.log(`Created a new singer record with ID ${singer.id}`);
+  console.log(`Created a new singer record with ID ${singer.id} at ${singer.createdAt}`);
+  const album = await Album.create({title: "My first Album", SingerId: singer.id});
+  console.log(`Created a new album record with ID ${album.id}`);
 
   await shutdownSequelize();
 }
