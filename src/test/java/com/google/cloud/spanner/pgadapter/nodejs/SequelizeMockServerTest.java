@@ -28,7 +28,9 @@ import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -163,6 +165,32 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().hasBegin());
     assertTrue(request.getTransaction().getBegin().hasReadWrite());
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testErrorInTransaction() throws Exception {
+    String sql = "SELECT * FROM non_existing_table";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND.withDescription("Table not found").asRuntimeException()));
+
+    String output = runTest("testErrorInTransaction", getHost(), pgServer.getLocalPort());
+
+    assertEquals(
+        "Users: 1,Alice\n"
+            + "Transaction error: SequelizeDatabaseError: Table not found - Statement: 'SELECT * FROM non_existing_table'\n",
+        output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest request = executeSqlRequests.get(0);
+    assertTrue(request.getTransaction().hasId());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 
   static String runTest(String testName, String host, int port)

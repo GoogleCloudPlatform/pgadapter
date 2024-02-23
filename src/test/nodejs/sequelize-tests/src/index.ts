@@ -25,7 +25,6 @@ function runTest(host: string, port: number, database: string, test: (client) =>
     },
     timestamps: false,
     omitNull: false,
-    retry: { max: 5 },
     pool: {
       max: 50, min: 10, acquire: 2000, idle: 20000,
     },
@@ -71,6 +70,21 @@ async function testSelectUsersInTransaction(client) {
   }
 }
 
+async function testErrorInTransaction(client) {
+  try {
+    await client.transaction(async tx => {
+      const rows = await client.query("SELECT * FROM users", { type: QueryTypes.SELECT, transaction: tx });
+      console.log(`Users: ${Object.values(rows[0])}`);
+      await client.query("SELECT * FROM non_existing_table", {
+        type: QueryTypes.SELECT,
+        transaction: tx
+      });
+    });
+  } catch (e) {
+    console.log(`Transaction error: ${e}`);
+  }
+}
+
 require('yargs')
 .demand(4)
 .command(
@@ -84,6 +98,12 @@ require('yargs')
     'Executes SELECT * FROM users in a transaction',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testSelectUsersInTransaction)
+)
+.command(
+    'testErrorInTransaction <host> <port> <database>',
+    'Executes a statement in a transaction that fails',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testErrorInTransaction)
 )
 .wrap(120)
 .recommendCommands()

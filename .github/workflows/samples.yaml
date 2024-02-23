@@ -68,6 +68,11 @@ jobs:
         run: |
           npm install
           npm start
+      - name: Run Sequelize Sample tests
+        working-directory: ./samples/nodejs/sequelize
+        run: |
+          npm install
+          npm start
   ruby-samples:
     runs-on: ubuntu-latest
     steps:
