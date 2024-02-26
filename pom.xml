@@ -37,6 +37,7 @@
     <excludedIntegrationTests/>
 
     <junixsocket.version>2.8.3</junixsocket.version>
+    <opentelemetry.exporter.version>0.27.0</opentelemetry.exporter.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -141,7 +142,12 @@
     <dependency>
       <groupId>com.google.cloud.opentelemetry</groupId>
       <artifactId>exporter-trace</artifactId>
-      <version>0.23.0</version>
+      <version>${opentelemetry.exporter.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.opentelemetry</groupId>
+      <artifactId>exporter-metrics</artifactId>
+      <version>${opentelemetry.exporter.version}</version>
     </dependency>
     <dependency>
       <groupId>org.jetbrains.kotlin</groupId>

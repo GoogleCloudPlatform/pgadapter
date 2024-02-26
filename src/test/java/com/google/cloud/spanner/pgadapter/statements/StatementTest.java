@@ -54,6 +54,7 @@ import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
@@ -90,6 +91,7 @@ public class StatementTest {
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   private static final Tracer NOOP_OTEL = OpenTelemetry.noop().getTracer("test");
+  private static final Metrics NOOP_OTEL_METER = new Metrics(OpenTelemetry.noop());
 
   private static final Runnable DO_NOTHING = () -> {};
 
@@ -189,6 +191,7 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -282,6 +285,7 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -324,6 +328,7 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -434,6 +439,7 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -505,6 +511,7 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
@@ -580,6 +587,7 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -608,6 +616,7 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
@@ -664,6 +673,7 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             DatabaseId.of("p", "i", "d"),
