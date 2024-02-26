@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.auth.Credentials;
+import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
+import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -22,9 +24,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.devtools.cloudtrace.v2.AttributeValue;
 import com.google.devtools.cloudtrace.v2.TruncatableString;
 import io.opentelemetry.api.OpenTelemetry;
-import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
-import io.opentelemetry.sdk.metrics.SdkMeterProvider;
+import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
@@ -107,6 +108,14 @@ public class Server {
             Sampler.parentBased(
                 Sampler.traceIdRatioBased(optionsMetadata.getOpenTelemetryTraceRatio()));
       }
+      MetricExporter cloudMonitoringExporter =
+          GoogleCloudMetricExporter.createWithConfiguration(
+              MetricConfiguration.builder()
+                  // Configure the cloud project id.
+                  .setProjectId(projectId)
+                  // Set the credentials to use when writing to the Cloud Monitoring API
+                  .setCredentials(credentials)
+                  .build());
       return AutoConfiguredOpenTelemetrySdk.builder()
           .addTracerProviderCustomizer(
               (sdkTracerProviderBuilder, configProperties) ->
@@ -114,9 +123,9 @@ public class Server {
                       .setSampler(sampler)
                       .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()))
           .addMeterProviderCustomizer(
-              (sdkMeterProviderBuilder, configProperties) -> sdkMeterProviderBuilder
-                  .registerMetricReader(PeriodicMetricReader.builder(OtlpGrpcMetricExporter.builder().build())
-                      .build()))
+              (sdkMeterProviderBuilder, configProperties) ->
+                  sdkMeterProviderBuilder.registerMetricReader(
+                      PeriodicMetricReader.builder(cloudMonitoringExporter).build()))
           .build()
           .getOpenTelemetrySdk();
     } catch (IOException exception) {

@@ -64,6 +64,7 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClie
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
 import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
@@ -80,6 +81,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.api.trace.StatusCode;
@@ -122,6 +124,8 @@ public class BackendConnection {
   private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
 
   private final Tracer tracer;
+
+  private final Metrics meter;
 
   private final Deque<Context> statementContext = new ConcurrentLinkedDeque<>();
 
@@ -250,13 +254,15 @@ public class BackendConnection {
     private final String command;
     private final Function<Statement, Statement> statementBinder;
     private final boolean analyze;
+    private final Attributes metricAttributes;
 
     Execute(
         String command,
         ParsedStatement parsedStatement,
         Statement statement,
-        Function<Statement, Statement> statementBinder) {
-      this(command, parsedStatement, statement, statementBinder, false);
+        Function<Statement, Statement> statementBinder,
+        DatabaseId databaseId) {
+      this(command, parsedStatement, statement, statementBinder, databaseId, false);
     }
 
     Execute(
@@ -264,11 +270,13 @@ public class BackendConnection {
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder,
+        DatabaseId databaseId,
         boolean analyze) {
       super(parsedStatement, statement);
       this.command = command;
       this.statementBinder = statementBinder;
       this.analyze = analyze;
+      this.metricAttributes = ExtendedQueryProtocolHandler.getMetricAttributes(databaseId);
     }
 
     @Override
@@ -472,6 +480,7 @@ public class BackendConnection {
         Stopwatch stopwatch = Stopwatch.createStarted();
         StatementResult result = spannerConnection.execute(statement);
         Duration executionDuration = stopwatch.elapsed();
+        meter.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         logger.log(
             Level.FINER,
             Logging.format(
@@ -838,6 +847,7 @@ public class BackendConnection {
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
       Tracer tracer,
+      Metrics meter,
       String connectionId,
       Runnable closeAllPortals,
       DatabaseId databaseId,
@@ -846,6 +856,7 @@ public class BackendConnection {
       OptionsMetadata optionsMetadata,
       Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.tracer = tracer;
+    this.meter = meter;
     this.connectionId = connectionId;
     this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
@@ -945,14 +956,15 @@ public class BackendConnection {
       ParsedStatement parsedStatement,
       Statement statement,
       Function<Statement, Statement> statementBinder) {
-    Execute execute = new Execute(command, parsedStatement, statement, statementBinder);
+    Execute execute = new Execute(command, parsedStatement, statement, statementBinder, databaseId);
     bufferedStatements.add(execute);
     return execute.result;
   }
 
   public ListenableFuture<StatementResult> analyze(
       String command, ParsedStatement parsedStatement, Statement statement) {
-    Execute execute = new Execute(command, parsedStatement, statement, Function.identity(), true);
+    Execute execute =
+        new Execute(command, parsedStatement, statement, Function.identity(), databaseId, true);
     bufferedStatements.add(execute);
     return execute.result;
   }

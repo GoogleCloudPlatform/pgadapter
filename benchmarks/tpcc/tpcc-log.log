@@ -1,44 +1,71 @@
-2024-02-21T15:01:31.365+11:00  INFO 1682 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : Starting BenchmarkApplication using Java 17.0.2 with PID 1682 (/Users/hengfeng/src/github/pgadapter/benchmarks/tpcc/target/classes started by hengfeng in /Users/hengfeng/src/github/pgadapter/benchmarks/tpcc)
-2024-02-21T15:01:31.368+11:00  INFO 1682 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : No active profile set, falling back to 1 default profile: "default"
-2024-02-21T15:01:31.617+11:00  INFO 1682 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : Started BenchmarkApplication in 0.375 seconds (process running for 0.556)
-2024-02-21T15:01:31.848+11:00  INFO 1682 --- [main] .s.b.a.l.ConditionEvaluationReportLogger : 
+2024-02-26T17:21:23.887+11:00  INFO 90301 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : Starting BenchmarkApplication using Java 17.0.2 with PID 90301 (/Users/hengfeng/src/github/pgadapter/benchmarks/tpcc/target/classes started by hengfeng in /Users/hengfeng/src/github/pgadapter/benchmarks/tpcc)
+2024-02-26T17:21:23.890+11:00  INFO 90301 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : No active profile set, falling back to 1 default profile: "default"
+2024-02-26T17:21:24.119+11:00  INFO 90301 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : Started BenchmarkApplication in 0.386 seconds (process running for 0.546)
+2024-02-26T17:21:24.223+11:00  INFO 90301 --- [main] c.g.cloud.spanner.pgadapter.ProxyServer  : Server started on port 57121
+2024-02-26T17:21:24.223+11:00  INFO 90301 --- [main] c.g.c.p.tpcc.BenchmarkApplication        : Starting benchmark
+2024-02-26T17:21:24.224+11:00  INFO 90301 --- [pool-5-thread-1] c.g.c.p.tpcc.AbstractBenchmarkRunner     : Starting benchmark runner: PGAdapter benchmark
+2024-02-26T17:21:24.253+11:00  INFO 90301 --- [spanner-postgres-adapter-proxy-listener] c.g.c.s.pgadapter.ConnectionHandler      : Connection handler with ID ConnectionHandler-0 created for client 127.0.0.1
+2024-02-26T17:21:24.254+11:00  INFO 90301 --- [ConnectionHandler-0] c.g.c.s.pgadapter.ConnectionHandler      : [ConnectionHandler-0]: [Run] Connection handler with ID ConnectionHandler-0 starting for client 127.0.0.1 with thread Thread[ConnectionHandler-0,5,main]
+2024-02-26T17:21:24.260+11:00  INFO 90301 --- [ConnectionHandler-0] c.g.c.s.pgadapter.ConnectionHandler      : [ConnectionHandler-0]: [SetWellKnownClient] Well-known client JDBC detected for connection 1.
+2024-02-26T17:21:24.322+11:00  INFO 90301 --- [ConnectionHandler-0] i.opentelemetry.api.GlobalOpenTelemetry  : AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2024-02-26T17:22:26.340+11:00  WARN 90301 --- [PeriodicMetricReader-1] i.o.s.m.export.PeriodicMetricReader      : Exporter threw an Exception
 
-Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
-2024-02-21T15:01:31.859+11:00 ERROR 1682 --- [main] o.s.boot.SpringApplication               : Application run failed
-
-java.lang.IllegalStateException: Failed to execute CommandLineRunner
-	at org.springframework.boot.SpringApplication.callRunner(SpringApplication.java:774) ~[spring-boot-3.1.5.jar:3.1.5]
-	at org.springframework.boot.SpringApplication.lambda$callRunners$3(SpringApplication.java:755) ~[spring-boot-3.1.5.jar:3.1.5]
-	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183) ~[na:na]
-	at java.base/java.util.stream.SortedOps$SizedRefSortingSink.end(SortedOps.java:357) ~[na:na]
-	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:510) ~[na:na]
-	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499) ~[na:na]
-	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150) ~[na:na]
-	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173) ~[na:na]
-	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234) ~[na:na]
-	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596) ~[na:na]
-	at org.springframework.boot.SpringApplication.callRunners(SpringApplication.java:750) ~[spring-boot-3.1.5.jar:3.1.5]
-	at org.springframework.boot.SpringApplication.run(SpringApplication.java:323) ~[spring-boot-3.1.5.jar:3.1.5]
-	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1306) ~[spring-boot-3.1.5.jar:3.1.5]
-	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1295) ~[spring-boot-3.1.5.jar:3.1.5]
-	at com.google.cloud.pgadapter.tpcc.BenchmarkApplication.main(BenchmarkApplication.java:30) ~[classes/:na]
-Caused by: java.lang.RuntimeException: java.nio.file.NoSuchFileException: /Users/loite/Downloads/appdev-soda-spanner-staging.json
-	at com.google.cloud.spanner.pgadapter.Server.setupOpenTelemetry(Server.java:115) ~[google-cloud-spanner-pgadapter-0.27.2-SNAPSHOT.jar:0.27.2-SNAPSHOT]
-	at com.google.cloud.spanner.pgadapter.ProxyServer.<init>(ProxyServer.java:89) ~[google-cloud-spanner-pgadapter-0.27.2-SNAPSHOT.jar:0.27.2-SNAPSHOT]
-	at com.google.cloud.pgadapter.tpcc.BenchmarkApplication.startPGAdapter(BenchmarkApplication.java:179) ~[classes/:na]
-	at com.google.cloud.pgadapter.tpcc.BenchmarkApplication.run(BenchmarkApplication.java:53) ~[classes/:na]
-	at org.springframework.boot.SpringApplication.callRunner(SpringApplication.java:771) ~[spring-boot-3.1.5.jar:3.1.5]
+com.google.api.gax.rpc.AbortedException: io.grpc.StatusRuntimeException: ABORTED: Errors during metric descriptor creation: {(metric: workload.googleapis.com/spanner/pgadapter/roundtrip_latencies, error: Too many concurrent edits to the project configuration. Please try again.)}.
+	at com.google.api.gax.rpc.ApiExceptionFactory.createException(ApiExceptionFactory.java:104) ~[gax-2.42.0.jar:2.42.0]
+	at com.google.api.gax.rpc.ApiExceptionFactory.createException(ApiExceptionFactory.java:41) ~[gax-2.42.0.jar:2.42.0]
+	at com.google.api.gax.grpc.GrpcApiExceptionFactory.create(GrpcApiExceptionFactory.java:86) ~[gax-grpc-2.42.0.jar:2.42.0]
+	at com.google.api.gax.grpc.GrpcApiExceptionFactory.create(GrpcApiExceptionFactory.java:66) ~[gax-grpc-2.42.0.jar:2.42.0]
+	at com.google.api.gax.grpc.GrpcExceptionCallable$ExceptionTransformingFuture.onFailure(GrpcExceptionCallable.java:97) ~[gax-grpc-2.42.0.jar:2.42.0]
+	at com.google.api.core.ApiFutures$1.onFailure(ApiFutures.java:84) ~[api-common-2.25.0.jar:2.25.0]
+	at com.google.common.util.concurrent.Futures$CallbackListener.run(Futures.java:1127) ~[guava-32.1.3-jre.jar:na]
+	at com.google.common.util.concurrent.DirectExecutor.execute(DirectExecutor.java:31) ~[guava-32.1.3-jre.jar:na]
+	at com.google.common.util.concurrent.AbstractFuture.executeListener(AbstractFuture.java:1286) ~[guava-32.1.3-jre.jar:na]
+	at com.google.common.util.concurrent.AbstractFuture.complete(AbstractFuture.java:1055) ~[guava-32.1.3-jre.jar:na]
+	at com.google.common.util.concurrent.AbstractFuture.setException(AbstractFuture.java:807) ~[guava-32.1.3-jre.jar:na]
+	at io.grpc.stub.ClientCalls$GrpcFuture.setException(ClientCalls.java:568) ~[grpc-stub-1.61.0.jar:1.61.0]
+	at io.grpc.stub.ClientCalls$UnaryStreamToFuture.onClose(ClientCalls.java:538) ~[grpc-stub-1.61.0.jar:1.61.0]
+	at io.grpc.PartialForwardingClientCallListener.onClose(PartialForwardingClientCallListener.java:39) ~[grpc-api-1.61.0.jar:1.61.0]
+	at io.grpc.ForwardingClientCallListener.onClose(ForwardingClientCallListener.java:23) ~[grpc-api-1.61.0.jar:1.61.0]
+	at io.grpc.ForwardingClientCallListener$SimpleForwardingClientCallListener.onClose(ForwardingClientCallListener.java:40) ~[grpc-api-1.61.0.jar:1.61.0]
+	at com.google.api.gax.grpc.ChannelPool$ReleasingClientCall$1.onClose(ChannelPool.java:570) ~[gax-grpc-2.42.0.jar:2.42.0]
+	at io.grpc.internal.ClientCallImpl.closeObserver(ClientCallImpl.java:574) ~[grpc-core-1.61.0.jar:1.61.0]
+	at io.grpc.internal.ClientCallImpl.access$300(ClientCallImpl.java:72) ~[grpc-core-1.61.0.jar:1.61.0]
+	at io.grpc.internal.ClientCallImpl$ClientStreamListenerImpl$1StreamClosed.runInternal(ClientCallImpl.java:742) ~[grpc-core-1.61.0.jar:1.61.0]
+	at io.grpc.internal.ClientCallImpl$ClientStreamListenerImpl$1StreamClosed.runInContext(ClientCallImpl.java:723) ~[grpc-core-1.61.0.jar:1.61.0]
+	at io.grpc.internal.ContextRunnable.run(ContextRunnable.java:37) ~[grpc-core-1.61.0.jar:1.61.0]
+	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133) ~[grpc-core-1.61.0.jar:1.61.0]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:833) ~[na:na]
+	Suppressed: com.google.api.gax.rpc.AsyncTaskException: Asynchronous task failed
+		at com.google.api.gax.rpc.ApiExceptions.callAndTranslateApiException(ApiExceptions.java:57) ~[gax-2.42.0.jar:2.42.0]
+		at com.google.api.gax.rpc.UnaryCallable.call(UnaryCallable.java:112) ~[gax-2.42.0.jar:2.42.0]
+		at com.google.cloud.monitoring.v3.MetricServiceClient.createTimeSeries(MetricServiceClient.java:1906) ~[google-cloud-monitoring-3.36.0.jar:3.36.0]
+		at com.google.cloud.monitoring.v3.MetricServiceClient.createTimeSeries(MetricServiceClient.java:1838) ~[google-cloud-monitoring-3.36.0.jar:3.36.0]
+		at com.google.cloud.opentelemetry.metric.CloudMetricClientImpl.createTimeSeries(CloudMetricClientImpl.java:40) ~[exporter-metrics-0.27.0.jar:na]
+		at com.google.cloud.opentelemetry.metric.InternalMetricExporter.createTimeSeriesBatch(InternalMetricExporter.java:217) ~[exporter-metrics-0.27.0.jar:na]
+		at com.google.cloud.opentelemetry.metric.InternalMetricExporter.export(InternalMetricExporter.java:202) ~[exporter-metrics-0.27.0.jar:na]
+		at com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter.export(GoogleCloudMetricExporter.java:90) ~[exporter-metrics-0.27.0.jar:na]
+		at io.opentelemetry.sdk.metrics.export.PeriodicMetricReader$Scheduled.doRun(PeriodicMetricReader.java:167) ~[opentelemetry-sdk-metrics-1.35.0.jar:1.35.0]
+		at io.opentelemetry.sdk.metrics.export.PeriodicMetricReader$Scheduled.run(PeriodicMetricReader.java:153) ~[opentelemetry-sdk-metrics-1.35.0.jar:1.35.0]
+		at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539) ~[na:na]
+		at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:305) ~[na:na]
+		at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305) ~[na:na]
+		... 3 common frames omitted
+Caused by: io.grpc.StatusRuntimeException: ABORTED: Errors during metric descriptor creation: {(metric: workload.googleapis.com/spanner/pgadapter/roundtrip_latencies, error: Too many concurrent edits to the project configuration. Please try again.)}.
+	at io.grpc.Status.asRuntimeException(Status.java:533) ~[grpc-api-1.61.0.jar:1.61.0]
 	... 14 common frames omitted
-Caused by: java.nio.file.NoSuchFileException: /Users/loite/Downloads/appdev-soda-spanner-staging.json
-	at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92) ~[na:na]
-	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:106) ~[na:na]
-	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111) ~[na:na]
-	at java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:218) ~[na:na]
-	at java.base/java.nio.file.Files.newByteChannel(Files.java:380) ~[na:na]
-	at java.base/java.nio.file.Files.newByteChannel(Files.java:432) ~[na:na]
-	at java.base/java.nio.file.spi.FileSystemProvider.newInputStream(FileSystemProvider.java:422) ~[na:na]
-	at java.base/java.nio.file.Files.newInputStream(Files.java:160) ~[na:na]
-	at com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.getTelemetryCredentials(OptionsMetadata.java:1341) ~[google-cloud-spanner-pgadapter-0.27.2-SNAPSHOT.jar:0.27.2-SNAPSHOT]
-	at com.google.cloud.spanner.pgadapter.Server.setupOpenTelemetry(Server.java:82) ~[google-cloud-spanner-pgadapter-0.27.2-SNAPSHOT.jar:0.27.2-SNAPSHOT]
-	... 18 common frames omitted
 
+2024-02-26T17:28:13.030+11:00  INFO 90301 --- [pool-5-thread-1] c.g.c.p.tpcc.AbstractBenchmarkRunner     : Rolling back new_order transaction
+2024-02-26T17:31:35.813+11:00  INFO 90301 --- [pool-5-thread-1] c.g.c.p.tpcc.AbstractBenchmarkRunner     : Stopping benchmark runner: PGAdapter benchmark
+2024-02-26T17:31:35.819+11:00  INFO 90301 --- [main] c.g.cloud.spanner.pgadapter.ProxyServer  : Server on socket ServerSocket[addr=localhost/127.0.0.1,localport=57121] is stopping
+2024-02-26T17:31:35.820+11:00  INFO 90301 --- [main] c.g.cloud.spanner.pgadapter.ProxyServer  : Server socket on socket ServerSocket[addr=localhost/127.0.0.1,localport=57121] closed
+2024-02-26T17:31:35.820+11:00  INFO 90301 --- [spanner-postgres-adapter-proxy-listener] c.g.cloud.spanner.pgadapter.ProxyServer  : Socket exception on socket ServerSocket[addr=localhost/127.0.0.1,localport=57121]: java.net.SocketException: Socket closed. This is normal when the server is stopped.
+2024-02-26T17:31:35.820+11:00  INFO 90301 --- [main] c.g.cloud.spanner.pgadapter.ProxyServer  : Server on socket ServerSocket[addr=localhost/0:0:0:0:0:0:0:1,localport=57121] is stopping
+2024-02-26T17:31:35.820+11:00  INFO 90301 --- [spanner-postgres-adapter-proxy-listener] c.g.cloud.spanner.pgadapter.ProxyServer  : Socket ServerSocket[addr=localhost/127.0.0.1,localport=57121] stopped
+2024-02-26T17:31:35.820+11:00  INFO 90301 --- [spanner-postgres-adapter-proxy-listener] c.g.cloud.spanner.pgadapter.ProxyServer  : Socket exception on socket ServerSocket[addr=localhost/0:0:0:0:0:0:0:1,localport=57121]: java.net.SocketException: Socket closed. This is normal when the server is stopped.
+2024-02-26T17:31:35.820+11:00  INFO 90301 --- [spanner-postgres-adapter-proxy-listener] c.g.cloud.spanner.pgadapter.ProxyServer  : Socket ServerSocket[addr=localhost/0:0:0:0:0:0:0:1,localport=57121] stopped
+2024-02-26T17:31:35.820+11:00  INFO 90301 --- [main] c.g.cloud.spanner.pgadapter.ProxyServer  : Server socket on socket ServerSocket[addr=localhost/0:0:0:0:0:0:0:1,localport=57121] closed
+2024-02-26T17:31:35.820+11:00  INFO 90301 --- [spanner-postgres-adapter-proxy-listener] io.opentelemetry.sdk.OpenTelemetrySdk    : Multiple shutdown calls
+2024-02-26T17:31:35.822+11:00  INFO 90301 --- [ConnectionHandler-0] c.g.c.s.pgadapter.ConnectionHandler      : [ConnectionHandler-0]: [RunConnection] Closing connection handler with ID ConnectionHandler-0
+2024-02-26T17:31:35.822+11:00  INFO 90301 --- [ConnectionHandler-0] c.g.c.s.pgadapter.ConnectionHandler      : [ConnectionHandler-0]: [RunConnection] Connection handler with ID ConnectionHandler-0 closed
