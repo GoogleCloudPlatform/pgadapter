@@ -33,6 +33,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ReadContext;
 import com.google.cloud.spanner.ResultSet;
@@ -97,6 +98,7 @@ import org.postgresql.util.ByteConverter;
 public class ProtocolTest {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+  private static final DatabaseId DATABASE_ID = DatabaseId.of("p", "i", "d");
 
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private ConnectionHandler connectionHandler;
@@ -1115,6 +1117,7 @@ public class ProtocolTest {
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
+    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
@@ -1152,6 +1155,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
+    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
@@ -1244,6 +1248,7 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);

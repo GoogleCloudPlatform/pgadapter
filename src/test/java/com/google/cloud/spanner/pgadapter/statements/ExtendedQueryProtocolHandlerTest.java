@@ -21,6 +21,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -45,6 +46,8 @@ import org.mockito.junit.MockitoRule;
 
 @RunWith(JUnit4.class)
 public class ExtendedQueryProtocolHandlerTest {
+  private static final DatabaseId DATABASE_ID = DatabaseId.of("p", "i", "d");
+
   @Rule public MockitoRule rule = MockitoJUnit.rule();
 
   @Mock private ProxyServer server;
@@ -65,6 +68,7 @@ public class ExtendedQueryProtocolHandlerTest {
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
 
+    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     ExtendedQueryProtocolHandler handler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     handler.buffer(parseMessage);
@@ -82,6 +86,7 @@ public class ExtendedQueryProtocolHandlerTest {
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
     when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     ParseMessage parseMessage = mock(ParseMessage.class);
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
@@ -113,6 +118,7 @@ public class ExtendedQueryProtocolHandlerTest {
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
     when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     ParseMessage parseMessage = mock(ParseMessage.class);
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
@@ -144,6 +150,7 @@ public class ExtendedQueryProtocolHandlerTest {
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
     when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     ParseMessage parseMessage = mock(ParseMessage.class);
 
     ExtendedQueryProtocolHandler handler =

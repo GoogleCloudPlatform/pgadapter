@@ -76,6 +76,7 @@ public class ExtendedQueryProtocolHandler {
         new BackendConnection(
             tracer,
             meter,
+            metricAttributes,
             connectionHandler.getTraceConnectionId().toString(),
             connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
@@ -110,13 +111,12 @@ public class ExtendedQueryProtocolHandler {
     return backendConnection;
   }
 
-  public static Attributes getMetricAttributes(DatabaseId databaseId) {
+  @VisibleForTesting
+  static Attributes getMetricAttributes(DatabaseId databaseId) {
     AttributesBuilder attributesBuilder = Attributes.builder();
-    if (databaseId != null) {
-      attributesBuilder.put("database", databaseId.getDatabase());
-      attributesBuilder.put("instance_id", databaseId.getInstanceId().getInstance());
-      attributesBuilder.put("project_id", databaseId.getInstanceId().getProject());
-    }
+    attributesBuilder.put("database", databaseId.getDatabase());
+    attributesBuilder.put("instance_id", databaseId.getInstanceId().getInstance());
+    attributesBuilder.put("project_id", databaseId.getInstanceId().getProject());
     return attributesBuilder.build();
   }
 

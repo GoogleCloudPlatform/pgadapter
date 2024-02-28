@@ -261,8 +261,8 @@ public class BackendConnection {
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder,
-        DatabaseId databaseId) {
-      this(command, parsedStatement, statement, statementBinder, databaseId, false);
+        Attributes metricAttributes) {
+      this(command, parsedStatement, statement, statementBinder, metricAttributes, false);
     }
 
     Execute(
@@ -270,13 +270,13 @@ public class BackendConnection {
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder,
-        DatabaseId databaseId,
+        Attributes metricAttributes,
         boolean analyze) {
       super(parsedStatement, statement);
       this.command = command;
       this.statementBinder = statementBinder;
       this.analyze = analyze;
-      this.metricAttributes = ExtendedQueryProtocolHandler.getMetricAttributes(databaseId);
+      this.metricAttributes = metricAttributes;
     }
 
     @Override
@@ -843,11 +843,13 @@ public class BackendConnection {
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
+  private final Attributes metricAttributes;
 
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
       Tracer tracer,
       Metrics meter,
+      Attributes metricAttributes,
       String connectionId,
       Runnable closeAllPortals,
       DatabaseId databaseId,
@@ -857,6 +859,7 @@ public class BackendConnection {
       Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.tracer = tracer;
     this.meter = meter;
+    this.metricAttributes = metricAttributes;
     this.connectionId = connectionId;
     this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
@@ -956,7 +959,8 @@ public class BackendConnection {
       ParsedStatement parsedStatement,
       Statement statement,
       Function<Statement, Statement> statementBinder) {
-    Execute execute = new Execute(command, parsedStatement, statement, statementBinder, databaseId);
+    Execute execute =
+        new Execute(command, parsedStatement, statement, statementBinder, metricAttributes);
     bufferedStatements.add(execute);
     return execute.result;
   }
@@ -964,7 +968,8 @@ public class BackendConnection {
   public ListenableFuture<StatementResult> analyze(
       String command, ParsedStatement parsedStatement, Statement statement) {
     Execute execute =
-        new Execute(command, parsedStatement, statement, Function.identity(), databaseId, true);
+        new Execute(
+            command, parsedStatement, statement, Function.identity(), metricAttributes, true);
     bufferedStatements.add(execute);
     return execute.result;
   }
