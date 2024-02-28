@@ -28,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.trace.Span;
@@ -65,12 +66,20 @@ public class ExtendedQueryProtocolHandler {
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
     this.connectionId = connectionHandler.getTraceConnectionId().toString();
-    this.tracer =
-        connectionHandler
-            .getServer()
-            .getOpenTelemetry()
-            .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
-    this.meter = new Metrics(connectionHandler.getServer().getOpenTelemetry());
+    if (connectionHandler.getServer().getOptions().isEnableOpenTelemetry()) {
+      this.tracer =
+          connectionHandler
+              .getServer()
+              .getOpenTelemetry()
+              .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
+    } else {
+      this.tracer = OpenTelemetry.noop().getTracer("tracing_disabled");
+    }
+    if (connectionHandler.getServer().getOptions().isEnableOpenTelemetryMetrics()) {
+      this.meter = new Metrics(connectionHandler.getServer().getOpenTelemetry());
+    } else {
+      this.meter = new Metrics(OpenTelemetry.noop());
+    }
     this.metricAttributes = getMetricAttributes(connectionHandler.getDatabaseId());
     this.backendConnection =
         new BackendConnection(
@@ -92,12 +101,20 @@ public class ExtendedQueryProtocolHandler {
       ConnectionHandler connectionHandler, BackendConnection backendConnection) {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
     this.connectionId = connectionHandler.getTraceConnectionId().toString();
-    this.tracer =
-        connectionHandler
-            .getServer()
-            .getOpenTelemetry()
-            .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
-    this.meter = new Metrics(connectionHandler.getServer().getOpenTelemetry());
+    if (connectionHandler.getServer().getOptions().isEnableOpenTelemetry()) {
+      this.tracer =
+          connectionHandler
+              .getServer()
+              .getOpenTelemetry()
+              .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
+    } else {
+      this.tracer = OpenTelemetry.noop().getTracer("disabled_tracing");
+    }
+    if (connectionHandler.getServer().getOptions().isEnableOpenTelemetryMetrics()) {
+      this.meter = new Metrics(connectionHandler.getServer().getOpenTelemetry());
+    } else {
+      this.meter = new Metrics(OpenTelemetry.noop());
+    }
     this.metricAttributes = getMetricAttributes(connectionHandler.getDatabaseId());
     this.backendConnection = Preconditions.checkNotNull(backendConnection);
   }

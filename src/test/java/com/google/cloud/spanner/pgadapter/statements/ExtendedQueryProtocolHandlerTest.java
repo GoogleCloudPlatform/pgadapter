@@ -27,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -59,6 +60,7 @@ public class ExtendedQueryProtocolHandlerTest {
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
+    when(server.getOptions()).thenReturn(OptionsMetadata.newBuilder().build());
   }
 
   @Test

@@ -114,7 +114,9 @@ public class ProtocolTest {
   @Mock private ResultSet resultSet;
 
   @Before
-  public void setupMocks() {}
+  public void setupMocks() {
+    when(server.getOptions()).thenReturn(OptionsMetadata.newBuilder().build());
+  }
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];
