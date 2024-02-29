@@ -21,14 +21,12 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
 import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
-import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.trace.Span;
@@ -55,44 +53,27 @@ public class ExtendedQueryProtocolHandler {
   private final BackendConnection backendConnection;
 
   private final String connectionId;
-  private final Tracer tracer;
-  private final Metrics meter;
   private volatile Span span;
   private volatile Scope scope;
   private volatile Stopwatch stopwatch;
-  private final Attributes metricAttributes;
 
   /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
-    this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
-    this.connectionId = connectionHandler.getTraceConnectionId().toString();
-    if (connectionHandler.getServer().getOptions().isEnableOpenTelemetry()) {
-      this.tracer =
-          connectionHandler
-              .getServer()
-              .getOpenTelemetry()
-              .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
-    } else {
-      this.tracer = OpenTelemetry.noop().getTracer("tracing_disabled");
-    }
-    if (connectionHandler.getServer().getOptions().isEnableOpenTelemetryMetrics()) {
-      this.meter = new Metrics(connectionHandler.getServer().getOpenTelemetry());
-    } else {
-      this.meter = new Metrics(OpenTelemetry.noop());
-    }
-    this.metricAttributes = getMetricAttributes(connectionHandler.getDatabaseId());
-    this.backendConnection =
+    this(
+        connectionHandler,
         new BackendConnection(
-            tracer,
-            meter,
-            metricAttributes,
+            connectionHandler
+                .getServer()
+                .getTracer(ConnectionHandler.class.getName(), getVersion()),
+            connectionHandler.getServer().getMetrics(),
+            createMetricAttributes(connectionHandler.getDatabaseId()),
             connectionHandler.getTraceConnectionId().toString(),
             connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
             connectionHandler::getWellKnownClient,
             connectionHandler.getServer().getOptions(),
-            () -> connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler));
+            () -> connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler)));
   }
 
   /** Constructor only intended for testing. */
@@ -101,26 +82,7 @@ public class ExtendedQueryProtocolHandler {
       ConnectionHandler connectionHandler, BackendConnection backendConnection) {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
     this.connectionId = connectionHandler.getTraceConnectionId().toString();
-    if (connectionHandler.getServer().getOptions().isEnableOpenTelemetry()) {
-      this.tracer =
-          connectionHandler
-              .getServer()
-              .getOpenTelemetry()
-              .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
-    } else {
-      this.tracer = OpenTelemetry.noop().getTracer("disabled_tracing");
-    }
-    if (connectionHandler.getServer().getOptions().isEnableOpenTelemetryMetrics()) {
-      this.meter = new Metrics(connectionHandler.getServer().getOpenTelemetry());
-    } else {
-      this.meter = new Metrics(OpenTelemetry.noop());
-    }
-    this.metricAttributes = getMetricAttributes(connectionHandler.getDatabaseId());
     this.backendConnection = Preconditions.checkNotNull(backendConnection);
-  }
-
-  public Tracer getTracer() {
-    return tracer;
   }
 
   /** Returns the backend PG connection for this query handler. */
@@ -128,8 +90,12 @@ public class ExtendedQueryProtocolHandler {
     return backendConnection;
   }
 
+  public Tracer getTracer() {
+    return backendConnection.getTracer();
+  }
+
   @VisibleForTesting
-  static Attributes getMetricAttributes(DatabaseId databaseId) {
+  static Attributes createMetricAttributes(DatabaseId databaseId) {
     AttributesBuilder attributesBuilder = Attributes.builder();
     attributesBuilder.put("database", databaseId.getDatabase());
     attributesBuilder.put("instance_id", databaseId.getInstanceId().getInstance());
@@ -156,7 +122,8 @@ public class ExtendedQueryProtocolHandler {
     if (span == null) {
       stopwatch = Stopwatch.createStarted();
       span =
-          tracer
+          getBackendConnection()
+              .getTracer()
               .spanBuilder("query_protocol_handler")
               .setNoParent()
               .setAttribute("pgadapter.query_protocol", isExtendedProtocol ? "extended" : "simple")
@@ -284,7 +251,10 @@ public class ExtendedQueryProtocolHandler {
       scope.close();
       span.end();
       span = null;
-      meter.recordPGAdapterLatency(stopwatch.elapsed().toMillis(), metricAttributes);
+      backendConnection
+          .getMetrics()
+          .recordPGAdapterLatency(
+              stopwatch.elapsed().toMillis(), backendConnection.getMetricAttributes());
     }
   }
 

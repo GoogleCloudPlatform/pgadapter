@@ -32,11 +32,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.spanner.DatabaseClient;
-import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
-import com.google.cloud.spanner.ReadContext;
-import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -62,6 +58,7 @@ import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandle
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
@@ -82,13 +79,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.json.simple.parser.JSONParser;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
@@ -98,7 +92,6 @@ import org.postgresql.util.ByteConverter;
 public class ProtocolTest {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
-  private static final DatabaseId DATABASE_ID = DatabaseId.of("p", "i", "d");
 
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private ConnectionHandler connectionHandler;
@@ -111,12 +104,6 @@ public class ProtocolTest {
   @Mock private IntermediatePortalStatement intermediatePortalStatement;
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private DataOutputStream outputStream;
-  @Mock private ResultSet resultSet;
-
-  @Before
-  public void setupMocks() {
-    when(server.getOptions()).thenReturn(OptionsMetadata.newBuilder().build());
-  }
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];
@@ -183,7 +170,6 @@ public class ProtocolTest {
 
   @Test
   public void testQueryUsesPSQLStatementWhenPSQLModeSelectedMessage() throws Exception {
-    JSONParser parser = new JSONParser();
     byte[] messageMetadata = {'Q', 0, 0, 0, 24};
     String payload = "SELECT * FROM users\0";
     byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
@@ -1116,10 +1102,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
-    when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
-    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
@@ -1155,10 +1138,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
-    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
-    when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
@@ -1250,9 +1230,7 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
-    when(connectionHandler.getDatabaseId()).thenReturn(DATABASE_ID);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
-    when(server.getOpenTelemetry()).thenReturn(OpenTelemetry.noop());
     when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);
     when(intermediatePortalStatement.getCommandTag()).thenReturn("INSERT");
@@ -1260,6 +1238,8 @@ public class ProtocolTest {
     when(intermediatePortalStatement.getStatementResult()).thenReturn(new UpdateCount(1L));
     when(intermediatePortalStatement.getUpdateCount()).thenReturn(1L);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.TRANSACTION);
+    when(backendConnection.getTracer()).thenReturn(OpenTelemetry.noop().getTracer("mock-tracer"));
+    when(backendConnection.getMetrics()).thenReturn(new Metrics(OpenTelemetry.noop()));
     OptionsMetadata options = mock(OptionsMetadata.class);
     when(server.getOptions()).thenReturn(options);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1944,31 +1924,5 @@ public class ProtocolTest {
     verify(connectionHandler).setStatus(ConnectionStatus.TERMINATED);
     byte[] resultBytes = result.toByteArray();
     assertEquals('E', resultBytes[0]);
-  }
-
-  private void setupQueryInformationSchemaResults() {
-    DatabaseClient databaseClient = mock(DatabaseClient.class);
-    ReadContext singleUseReadContext = mock(ReadContext.class);
-    when(databaseClient.singleUse()).thenReturn(singleUseReadContext);
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    when(connection.getDatabaseClient()).thenReturn(databaseClient);
-    ResultSet spannerType = mock(ResultSet.class);
-    when(spannerType.getString("column_name")).thenReturn("key", "value");
-    when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    when(spannerType.next()).thenReturn(true, true, false);
-    when(singleUseReadContext.executeQuery(
-            ArgumentMatchers.argThat(
-                statement ->
-                    statement != null && statement.getSql().startsWith("SELECT column_name"))))
-        .thenReturn(spannerType);
-
-    ResultSet countResult = mock(ResultSet.class);
-    when(countResult.getLong(0)).thenReturn(2L);
-    when(countResult.next()).thenReturn(true, false);
-    when(singleUseReadContext.executeQuery(
-            ArgumentMatchers.argThat(
-                statement ->
-                    statement != null && statement.getSql().startsWith("SELECT COUNT(*)"))))
-        .thenReturn(countResult);
   }
 }
