@@ -87,6 +87,7 @@ import org.postgresql.core.PGStream;
 import org.postgresql.core.QueryExecutorBase;
 import org.postgresql.core.v3.QueryExecutorImpl;
 import org.postgresql.jdbc.PgConnection;
+import org.postgresql.util.PSQLException;
 
 @RunWith(Parameterized.class)
 public class CopyInMockServerTest extends AbstractMockServerTest {
@@ -937,6 +938,12 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar('x');
       stream.sendInteger4(4);
       stream.flush();
+    } catch (PSQLException exception) {
+      // Ignore any exceptions about not being able to close the connection properly.
+      // These happen from time to time as we are deliberately messing with the connection.
+      if (!exception.getMessage().contains("Unable to close connection properly")) {
+        throw exception;
+      }
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
