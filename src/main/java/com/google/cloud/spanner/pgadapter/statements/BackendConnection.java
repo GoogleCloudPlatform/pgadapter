@@ -1491,7 +1491,10 @@ public class BackendConnection {
       }
       Span runBatchSpan = createSpan("execute_batch_on_spanner", null);
       try (Scope ignoreRunBatchSpan = runBatchSpan.makeCurrent()) {
+        Stopwatch stopwatch = Stopwatch.createStarted();
         long[] counts = spannerConnection.runBatch();
+        Duration executionDuration = stopwatch.elapsed();
+        meter.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         if (batchType == StatementType.DDL) {
           counts = extractDdlUpdateCounts(statementResults, counts);
         }
