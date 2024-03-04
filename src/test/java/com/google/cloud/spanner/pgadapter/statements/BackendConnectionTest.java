@@ -85,7 +85,7 @@ public class BackendConnectionTest {
   private static final Runnable DO_NOTHING = () -> {};
   private static final DatabaseId DATABASE_ID = DatabaseId.of("p", "i", "d");
   private static final Attributes METRIC_ATTRIBUTES =
-      ExtendedQueryProtocolHandler.getMetricAttributes(DATABASE_ID);
+      ExtendedQueryProtocolHandler.createMetricAttributes(DATABASE_ID);
 
   @Test
   public void testExtractDdlUpdateCounts() {

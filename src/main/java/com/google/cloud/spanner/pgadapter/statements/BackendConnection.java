@@ -125,7 +125,9 @@ public class BackendConnection {
 
   private final Tracer tracer;
 
-  private final Metrics meter;
+  private final Metrics metrics;
+
+  private final Attributes metricAttributes;
 
   private final Deque<Context> statementContext = new ConcurrentLinkedDeque<>();
 
@@ -254,15 +256,13 @@ public class BackendConnection {
     private final String command;
     private final Function<Statement, Statement> statementBinder;
     private final boolean analyze;
-    private final Attributes metricAttributes;
 
     Execute(
         String command,
         ParsedStatement parsedStatement,
         Statement statement,
-        Function<Statement, Statement> statementBinder,
-        Attributes metricAttributes) {
-      this(command, parsedStatement, statement, statementBinder, metricAttributes, false);
+        Function<Statement, Statement> statementBinder) {
+      this(command, parsedStatement, statement, statementBinder, false);
     }
 
     Execute(
@@ -270,13 +270,11 @@ public class BackendConnection {
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder,
-        Attributes metricAttributes,
         boolean analyze) {
       super(parsedStatement, statement);
       this.command = command;
       this.statementBinder = statementBinder;
       this.analyze = analyze;
-      this.metricAttributes = metricAttributes;
     }
 
     @Override
@@ -480,7 +478,7 @@ public class BackendConnection {
         Stopwatch stopwatch = Stopwatch.createStarted();
         StatementResult result = spannerConnection.execute(statement);
         Duration executionDuration = stopwatch.elapsed();
-        meter.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
+        metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         logger.log(
             Level.FINER,
             Logging.format(
@@ -638,9 +636,7 @@ public class BackendConnection {
 
         // Make sure both the front-end CopyDataReceiver and the backend MutationWriter processes
         // have finished before we proceed.
-        //noinspection UnstableApiUsage
         Futures.successfulAsList(copyDataReceiverFuture, statementResultFuture).get();
-        //noinspection UnstableApiUsage
         Futures.allAsList(copyDataReceiverFuture, statementResultFuture).get();
       } catch (ExecutionException executionException) {
         result.setException(executionException.getCause());
@@ -843,12 +839,11 @@ public class BackendConnection {
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
-  private final Attributes metricAttributes;
 
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
       Tracer tracer,
-      Metrics meter,
+      Metrics metrics,
       Attributes metricAttributes,
       String connectionId,
       Runnable closeAllPortals,
@@ -858,7 +853,7 @@ public class BackendConnection {
       OptionsMetadata optionsMetadata,
       Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.tracer = tracer;
-    this.meter = meter;
+    this.metrics = metrics;
     this.metricAttributes = metricAttributes;
     this.connectionId = connectionId;
     this.closeAllPortals = closeAllPortals;
@@ -928,6 +923,20 @@ public class BackendConnection {
     return this.connectionState;
   }
 
+  @VisibleForTesting
+  public Tracer getTracer() {
+    return this.tracer;
+  }
+
+  @VisibleForTesting
+  public Metrics getMetrics() {
+    return this.metrics;
+  }
+
+  Attributes getMetricAttributes() {
+    return metricAttributes;
+  }
+
   private Span createSpan(String name, Statement statement) {
     return createSpan(name, statement, null);
   }
@@ -959,17 +968,14 @@ public class BackendConnection {
       ParsedStatement parsedStatement,
       Statement statement,
       Function<Statement, Statement> statementBinder) {
-    Execute execute =
-        new Execute(command, parsedStatement, statement, statementBinder, metricAttributes);
+    Execute execute = new Execute(command, parsedStatement, statement, statementBinder);
     bufferedStatements.add(execute);
     return execute.result;
   }
 
   public ListenableFuture<StatementResult> analyze(
       String command, ParsedStatement parsedStatement, Statement statement) {
-    Execute execute =
-        new Execute(
-            command, parsedStatement, statement, Function.identity(), metricAttributes, true);
+    Execute execute = new Execute(command, parsedStatement, statement, Function.identity(), true);
     bufferedStatements.add(execute);
     return execute.result;
   }

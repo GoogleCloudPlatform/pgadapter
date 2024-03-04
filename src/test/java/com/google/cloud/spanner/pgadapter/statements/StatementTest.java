@@ -97,7 +97,7 @@ public class StatementTest {
   private static final Runnable DO_NOTHING = () -> {};
   private static final DatabaseId DATABASE_ID = DatabaseId.of("p", "i", "d");
   private static final Attributes METRIC_ATTRIBUTES =
-      ExtendedQueryProtocolHandler.getMetricAttributes(DATABASE_ID);
+      ExtendedQueryProtocolHandler.createMetricAttributes(DATABASE_ID);
 
   private static ParsedStatement parse(String sql) {
     return PARSER.parse(Statement.of(sql));
@@ -521,7 +521,7 @@ public class StatementTest {
         new BackendConnection(
             NOOP_OTEL,
             NOOP_OTEL_METER,
-            ExtendedQueryProtocolHandler.getMetricAttributes(databaseId),
+            ExtendedQueryProtocolHandler.createMetricAttributes(databaseId),
             UUID.randomUUID().toString(),
             DO_NOTHING,
             databaseId,
@@ -629,7 +629,7 @@ public class StatementTest {
         new BackendConnection(
             NOOP_OTEL,
             NOOP_OTEL_METER,
-            ExtendedQueryProtocolHandler.getMetricAttributes(databaseId),
+            ExtendedQueryProtocolHandler.createMetricAttributes(databaseId),
             UUID.randomUUID().toString(),
             DO_NOTHING,
             databaseId,
@@ -688,7 +688,7 @@ public class StatementTest {
         new BackendConnection(
             NOOP_OTEL,
             NOOP_OTEL_METER,
-            ExtendedQueryProtocolHandler.getMetricAttributes(databaseId),
+            ExtendedQueryProtocolHandler.createMetricAttributes(databaseId),
             UUID.randomUUID().toString(),
             DO_NOTHING,
             databaseId,
