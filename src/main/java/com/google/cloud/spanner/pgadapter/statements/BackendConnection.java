@@ -1500,7 +1500,7 @@ public class BackendConnection {
         Stopwatch stopwatch = Stopwatch.createStarted();
         long[] counts = spannerConnection.runBatch();
         Duration executionDuration = stopwatch.elapsed();
-        meter.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
+        metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         if (batchType == StatementType.DDL) {
           counts = extractDdlUpdateCounts(statementResults, counts);
         }
