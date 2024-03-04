@@ -54,6 +54,7 @@ import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
@@ -61,6 +62,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Tracer;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -90,8 +92,12 @@ public class StatementTest {
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   private static final Tracer NOOP_OTEL = OpenTelemetry.noop().getTracer("test");
+  private static final Metrics NOOP_OTEL_METER = new Metrics(OpenTelemetry.noop());
 
   private static final Runnable DO_NOTHING = () -> {};
+  private static final DatabaseId DATABASE_ID = DatabaseId.of("p", "i", "d");
+  private static final Attributes METRIC_ATTRIBUTES =
+      ExtendedQueryProtocolHandler.createMetricAttributes(DATABASE_ID);
 
   private static ParsedStatement parse(String sql) {
     return PARSER.parse(Statement.of(sql));
@@ -189,6 +195,8 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -282,6 +290,8 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -324,6 +334,8 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -434,6 +446,8 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -502,12 +516,15 @@ public class StatementTest {
             CopyStatement.create(
                 connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
+    DatabaseId databaseId = DatabaseId.of("p", "i", "d");
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            ExtendedQueryProtocolHandler.createMetricAttributes(databaseId),
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            databaseId,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             options,
@@ -580,6 +597,8 @@ public class StatementTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
             connectionHandler.getDatabaseId(),
@@ -605,12 +624,15 @@ public class StatementTest {
     when(backendConnection.getSessionState()).thenReturn(sessionState);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
+    DatabaseId databaseId = DatabaseId.of("p", "i", "d");
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            ExtendedQueryProtocolHandler.createMetricAttributes(databaseId),
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            databaseId,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             options,
@@ -661,12 +683,15 @@ public class StatementTest {
     SessionState sessionState = new SessionState(options);
     when(backendConnection.getSessionState()).thenReturn(sessionState);
     setupQueryInformationSchemaResults();
+    DatabaseId databaseId = DatabaseId.of("p", "i", "d");
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            ExtendedQueryProtocolHandler.createMetricAttributes(databaseId),
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            databaseId,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             options,
