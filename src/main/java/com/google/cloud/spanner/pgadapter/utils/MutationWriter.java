@@ -457,6 +457,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         case BOOL:
           size++;
           break;
+        case FLOAT32:
+          size += 4;
+          break;
         case FLOAT64:
         case INT64:
           size += 8;
@@ -482,6 +485,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
           switch (value.getType().getArrayElementType().getCode()) {
             case BOOL:
               size += value.getBoolArray().size();
+              break;
+            case FLOAT32:
+              size += value.getFloat32Array().size() * 4;
               break;
             case FLOAT64:
               size += value.getFloat64Array().size() * 8;

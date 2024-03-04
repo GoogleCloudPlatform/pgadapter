@@ -246,6 +246,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
           Oid.INT8,
           Oid.BOOL,
           Oid.BYTEA,
+          Oid.FLOAT4,
           Oid.FLOAT8,
           Oid.INT4,
           Oid.NUMERIC,

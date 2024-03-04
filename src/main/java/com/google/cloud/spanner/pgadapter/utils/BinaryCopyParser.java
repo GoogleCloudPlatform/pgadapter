@@ -25,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
+import com.google.cloud.spanner.pgadapter.parsers.FloatParser;
 import com.google.cloud.spanner.pgadapter.parsers.JsonbParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
@@ -270,6 +271,8 @@ class BinaryCopyParser implements CopyInParser {
         case PG_NUMERIC:
           return Value.pgNumeric(
               field.data == null ? null : NumericParser.toNumericString(field.data));
+        case FLOAT32:
+          return Value.float32(field.data == null ? null : FloatParser.toFloat(field.data));
         case FLOAT64:
           return Value.float64(field.data == null ? null : DoubleParser.toDouble(field.data));
         case STRING:
@@ -293,6 +296,8 @@ class BinaryCopyParser implements CopyInParser {
               return Value.boolArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case INT64:
               return Value.int64Array(cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case FLOAT32:
+              return Value.float32Array(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case FLOAT64:
               return Value.float64Array(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case PG_NUMERIC:

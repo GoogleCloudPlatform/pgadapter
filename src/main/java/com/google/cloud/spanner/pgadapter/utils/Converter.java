@@ -27,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
+import com.google.cloud.spanner.pgadapter.parsers.FloatParser;
 import com.google.cloud.spanner.pgadapter.parsers.JsonbParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
@@ -161,6 +162,8 @@ public class Converter implements AutoCloseable {
         return BinaryParser.convertToPG(sessionState, outputStream, result, position, format);
       case DATE:
         return DateParser.convertToPG(result, position, format);
+      case FLOAT32:
+        return FloatParser.convertToPG(result, position, format);
       case FLOAT64:
         return DoubleParser.convertToPG(result, position, format);
       case INT64:

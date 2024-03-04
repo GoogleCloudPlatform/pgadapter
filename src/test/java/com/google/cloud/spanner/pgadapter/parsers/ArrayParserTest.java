@@ -162,6 +162,19 @@ public class ArrayParserTest {
   }
 
   @Test
+  public void testFloat32() {
+    assertEquals(
+        Arrays.asList(3.14f, null, -99.99f),
+        new ArrayParser(
+                "{3.14,null,-99.99}".getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT,
+                mock(SessionState.class),
+                Type.float32(),
+                Oid.FLOAT4)
+            .item);
+  }
+
+  @Test
   public void testFloat64() {
     assertEquals(
         Arrays.asList(3.14d, null, -99.99),

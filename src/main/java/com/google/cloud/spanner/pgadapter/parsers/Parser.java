@@ -177,6 +177,8 @@ public abstract class Parser<T> {
         return new BinaryParser(result, columnarPosition);
       case DATE:
         return new DateParser(result, columnarPosition);
+      case FLOAT32:
+        return new FloatParser(result, columnarPosition);
       case FLOAT64:
         return new DoubleParser(result, columnarPosition);
       case INT64:
@@ -214,6 +216,8 @@ public abstract class Parser<T> {
         return new BinaryParser(result);
       case DATE:
         return new DateParser(result);
+      case FLOAT32:
+        return new FloatParser(result);
       case FLOAT64:
         return new DoubleParser(result);
       case INT64:
@@ -248,6 +252,8 @@ public abstract class Parser<T> {
         return Oid.INT8;
       case PG_NUMERIC:
         return Oid.NUMERIC;
+      case FLOAT32:
+        return Oid.FLOAT4;
       case FLOAT64:
         return Oid.FLOAT8;
       case STRING:
@@ -268,6 +274,8 @@ public abstract class Parser<T> {
             return Oid.INT8_ARRAY;
           case PG_NUMERIC:
             return Oid.NUMERIC_ARRAY;
+          case FLOAT32:
+            return Oid.FLOAT4_ARRAY;
           case FLOAT64:
             return Oid.FLOAT8_ARRAY;
           case STRING:
@@ -308,6 +316,7 @@ public abstract class Parser<T> {
       case Oid.DATE:
         return Type.date();
       case Oid.FLOAT4:
+        return Type.float32();
       case Oid.FLOAT8:
         return Type.float64();
       case Oid.INT2:
@@ -364,6 +373,8 @@ public abstract class Parser<T> {
         return Oid.INT8;
       case NUMERIC:
         return Oid.NUMERIC;
+      case FLOAT32:
+        return Oid.FLOAT4;
       case FLOAT64:
         return Oid.FLOAT8;
       case STRING:
