@@ -105,9 +105,9 @@ jobs:
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
-        run: mvn test -B -Ptest-all
+        run: mvn test -B -Ptest-all -Denforcer.skip=true -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
       - name: Run unit tests with virtual threads
-        run: mvn test -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true -B -Ptest-all
+        run: mvn test -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true -Denforcer.skip=true -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -B -Ptest-all
       - name: Auth
         uses: google-github-actions/auth@v2
         with:
@@ -117,7 +117,7 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
       - name: Run integration tests
-        run: mvn -Denforcer.skip=true verify -B -Dclirr.skip=true -DskipITs=false -DexcludedIntegrationTests="$EXCLUDED_INTEGRATION_TESTS" -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
+        run: mvn verify -B -Denforcer.skip=true -Dclirr.skip=true -DskipITs=false -DexcludedIntegrationTests="$EXCLUDED_INTEGRATION_TESTS" -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
         env:
           POSTGRES_HOST: /pg
           POSTGRES_PORT: 5432

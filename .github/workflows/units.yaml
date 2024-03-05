@@ -48,7 +48,7 @@ jobs:
           distribution: zulu
           java-version: ${{matrix.java}}
       - run: java -version
-      - run: mvn -Denforcer.skip=true -B test
+      - run: mvn -B test -Denforcer.skip=true
   macos:
     runs-on: macos-latest
     env:
