@@ -194,11 +194,11 @@ public class DjangoBasicTest extends DjangoTestSetup {
 
   @Test
   public void testInsertAllTypes() throws Exception {
-
     String sqlUpdate =
         "UPDATE \"all_types\" "
             + "SET \"col_bool\" = true, "
             + "\"col_bytea\" = '\\x68656c6c6f'::bytea, "
+            + "\"col_float4\" = 3.14, "
             + "\"col_float8\" = 26.8, "
             + "\"col_int\" = 13, "
             + "\"col_numeric\" = 95.6000000000000, "
@@ -212,6 +212,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "(\"col_bigint\", "
             + "\"col_bool\", "
             + "\"col_bytea\", "
+            + "\"col_float4\", "
             + "\"col_float8\", "
             + "\"col_int\", "
             + "\"col_numeric\", "
@@ -221,7 +222,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "\"col_jsonb\") "
             + "VALUES (6, "
             + "true, "
-            + "'\\x68656c6c6f'::bytea, 26.8, 13, "
+            + "'\\x68656c6c6f'::bytea, 3.14, 26.8, 13, "
             + "95.6000000000000, "
             + "'2018-12-25T09:29:36+00:00'::timestamptz, '1998-10-02'::date, "
             + "'some text', "
@@ -247,6 +248,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "(\"col_bigint\", "
             + "\"col_bool\", "
             + "\"col_bytea\", "
+            + "\"col_float4\", "
             + "\"col_float8\", "
             + "\"col_int\", "
             + "\"col_numeric\", "
@@ -254,7 +256,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "\"col_date\", "
             + "\"col_varchar\", "
             + "\"col_jsonb\") "
-            + "VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)";
+            + "VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)";
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
     String expectedOutput = "Insert Successful\n";
@@ -280,6 +282,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "\"all_types\".\"col_bigint\", "
             + "\"all_types\".\"col_bool\", "
             + "\"all_types\".\"col_bytea\", "
+            + "\"all_types\".\"col_float4\", "
             + "\"all_types\".\"col_float8\", "
             + "\"all_types\".\"col_int\", "
             + "\"all_types\".\"col_numeric\", "
@@ -293,6 +296,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "\"all_types\".\"col_bool\" IS NULL AND "
             + "\"all_types\".\"col_bytea\" IS NULL AND "
             + "\"all_types\".\"col_date\" IS NULL AND "
+            + "\"all_types\".\"col_float4\" IS NULL AND "
             + "\"all_types\".\"col_float8\" IS NULL AND "
             + "\"all_types\".\"col_int\" IS NULL AND "
             + "\"all_types\".\"col_jsonb\" = 'null' AND "
@@ -307,6 +311,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
         "{'col_bigint': None, "
             + "'col_bool': None, "
             + "'col_bytea': None, "
+            + "'col_float4': None, "
             + "'col_float8': None, "
             + "'col_int': None, "
             + "'col_numeric': None, "
@@ -324,11 +329,11 @@ public class DjangoBasicTest extends DjangoTestSetup {
 
   @Test
   public void testSelectAllTypes() throws Exception {
-
     String sqlQuery =
         "SELECT \"all_types\".\"col_bigint\", "
             + "\"all_types\".\"col_bool\", "
             + "\"all_types\".\"col_bytea\", "
+            + "\"all_types\".\"col_float4\", "
             + "\"all_types\".\"col_float8\", "
             + "\"all_types\".\"col_int\", "
             + "\"all_types\".\"col_numeric\", "
@@ -344,6 +349,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
         "col_bigint : 1 , "
             + "col_bool : True , "
             + "col_bytea : b'test' , "
+            + "col_float4 : 3.14 , "
             + "col_float8 : 3.14 , "
             + "col_int : 100 , "
             + "col_numeric : 6.626 , "

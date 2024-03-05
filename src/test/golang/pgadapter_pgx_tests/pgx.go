@@ -135,6 +135,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	var bigintValue int64
 	var boolValue bool
 	var byteaValue []byte
+	var float4Value float32
 	var float8Value float64
 	var intValue int
 	var numericValue pgtype.Numeric // pgx by default maps numeric to string
@@ -147,24 +148,25 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	if oid != 0 {
 		formats := make(pgx.QueryResultFormatsByOID)
 		for _, o := range []uint32{
-			pgtype.Int8OID, pgtype.BoolOID, pgtype.ByteaOID, pgtype.Float8OID, pgtype.Int4OID,
-			pgtype.NumericOID, pgtype.TimestamptzOID, pgtype.DateOID, pgtype.VarcharOID,
-			pgtype.JSONBOID, pgtype.Int8ArrayOID, pgtype.BoolArrayOID, pgtype.ByteaArrayOID,
-			pgtype.Float8ArrayOID, pgtype.Int4ArrayOID, pgtype.NumericArrayOID,
-			pgtype.TimestamptzArrayOID, pgtype.DateArrayOID,
+			pgtype.Int8OID, pgtype.BoolOID, pgtype.ByteaOID, pgtype.Float4OID, pgtype.Float8OID,
+			pgtype.Int4OID, pgtype.NumericOID, pgtype.TimestamptzOID, pgtype.DateOID,
+			pgtype.VarcharOID, pgtype.JSONBOID, pgtype.Int8ArrayOID, pgtype.BoolArrayOID,
+			pgtype.ByteaArrayOID, pgtype.Float4ArrayOID, pgtype.Float8ArrayOID, pgtype.Int4ArrayOID,
+			pgtype.NumericArrayOID, pgtype.TimestamptzArrayOID, pgtype.DateArrayOID,
 			pgtype.VarcharArrayOID, pgtype.JSONBArrayOID} {
 			formats[o] = conn.ConnInfo().ResultFormatCodeForOID(o)
 		}
 		formats[uint32(oid)] = format
-		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1", formats)
+		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1", formats)
 	} else {
-		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1")
+		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1")
 	}
-	var arrayBigint, arrayBool, arrayBytea, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
+	var arrayBigint, arrayBool, arrayBytea, arrayFloat4, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
 	err = row.Scan(
 		&bigintValue,
 		&boolValue,
 		&byteaValue,
+		&float4Value,
 		&float8Value,
 		&intValue,
 		&numericValue,
@@ -175,6 +177,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		&arrayBigint,
 		&arrayBool,
 		&arrayBytea,
+		&arrayFloat4,
 		&arrayFloat8,
 		&arrayInt,
 		&arrayNumeric,
@@ -193,6 +196,9 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	if g, w := byteaValue, []byte("test"); !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := float4Value, float32(3.14); g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	if g, w := float8Value, 3.14; g != w {
@@ -323,9 +329,9 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	insertSql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, " +
-		"col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) " +
-		"values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)"
+	insertSql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, " +
+		"col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) " +
+		"values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)"
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
 	numeric1 := pgtype.Numeric{}
@@ -340,10 +346,11 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	date2 := pgtype.Date{}
 	_ = date2.Set("1970-01-01")
 
-	tag, err = conn.Exec(ctx, insertSql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}",
+	tag, err = conn.Exec(ctx, insertSql, 100, true, []byte("test_bytes"), float32(3.14), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}",
 		pgtype.Int8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Int8{{Int: 100, Status: pgtype.Present}, {Status: pgtype.Null}, {Int: 200, Status: pgtype.Present}}},
 		pgtype.BoolArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Bool{{Bool: true, Status: pgtype.Present}, {Status: pgtype.Null}, {Bool: false, Status: pgtype.Present}}},
 		[][]byte{[]byte("bytes1"), nil, []byte("bytes2")},
+		pgtype.Float4Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float4{{Float: float32(3.14), Status: pgtype.Present}, {Status: pgtype.Null}, {Float: float32(6.626), Status: pgtype.Present}}},
 		pgtype.Float8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float8{{Float: 3.14, Status: pgtype.Present}, {Status: pgtype.Null}, {Float: 6.626, Status: pgtype.Present}}},
 		pgtype.Int8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Int8{{Int: -1, Status: pgtype.Present}, {Status: pgtype.Null}, {Int: -2, Status: pgtype.Present}}},
 		pgtype.NumericArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Numeric{numeric1, {Status: pgtype.Null}, numeric2}},
@@ -399,8 +406,8 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
-		"values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *"
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
+		"values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *"
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
@@ -410,13 +417,14 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 	if strings.Contains(connString, "prefer_simple_protocol=true") {
 		// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
 		// backend yet.
-		row = conn.QueryRow(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string", "{\"key\": \"value\"}")
+		row = conn.QueryRow(ctx, sql, 100, true, []byte("test_bytes"), float32(3.14), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string", "{\"key\": \"value\"}")
 	} else {
-		row = conn.QueryRow(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}")
+		row = conn.QueryRow(ctx, sql, 100, true, []byte("test_bytes"), float32(3.14), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}")
 	}
 	var bigintValue int64
 	var boolValue bool
 	var byteaValue []byte
+	var float4Value float32
 	var float8Value float64
 	var intValue int
 	var numericValue pgtype.Numeric // pgx by default maps numeric to string
@@ -424,12 +432,13 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 	var dateValue time.Time
 	var varcharValue string
 	var jsonbValue string
-	var arrayBigint, arrayBool, arrayBytea, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
+	var arrayBigint, arrayBool, arrayBytea, arrayFloat4, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
 
 	err = row.Scan(
 		&bigintValue,
 		&boolValue,
 		&byteaValue,
+		&float4Value,
 		&float8Value,
 		&intValue,
 		&numericValue,
@@ -440,6 +449,7 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 		&arrayBigint,
 		&arrayBool,
 		&arrayBytea,
+		&arrayFloat4,
 		&arrayFloat8,
 		&arrayInt,
 		&arrayNumeric,
@@ -458,6 +468,9 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	if g, w := byteaValue, []byte("test"); !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := float4Value, float32(3.14); g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	if g, w := float8Value, 3.14; g != w {
@@ -839,13 +852,13 @@ func TestCopyIn(connString string) *C.char {
 	jsonb := pgtype.JSONB{}
 	jsonb.Set("{\"key\": \"value\"}")
 	rows := [][]interface{}{
-		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test", jsonb},
-		{2, nil, nil, nil, nil, nil, nil, nil, nil, nil},
+		{1, true, []byte{1, 2, 3}, float32(3.14), 3.14, 10, numeric, timestamptz, date, "test", jsonb},
+		{2, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil},
 	}
 	count, err := conn.CopyFrom(
 		ctx,
 		pgx.Identifier{"all_types"},
-		[]string{"col_bigint", "col_bool", "col_bytea", "col_float8", "col_int", "col_numeric", "col_timestamptz", "col_date", "col_varchar", "col_jsonb"},
+		[]string{"col_bigint", "col_bool", "col_bytea", "col_float4", "col_float8", "col_int", "col_numeric", "col_timestamptz", "col_date", "col_varchar", "col_jsonb"},
 		pgx.CopyFromRows(rows),
 	)
 	if err != nil {

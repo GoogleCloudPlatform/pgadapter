@@ -199,6 +199,15 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
           .addRows(
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
+                  .addValues(Value.newBuilder().setStringValue("float4").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT8)).build())
                   .addValues(Value.newBuilder().setStringValue("float8").build())
                   .addValues(Value.newBuilder().setStringValue("b").build())
@@ -317,6 +326,16 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setStringValue("a").build())
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_float4").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
                   .build())
           .addRows(
               ListValue.newBuilder()

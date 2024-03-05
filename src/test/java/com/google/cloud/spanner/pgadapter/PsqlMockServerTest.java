@@ -291,9 +291,9 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "BEGIN\n"
             + "DECLARE CURSOR\n"
-            + " col_bigint | col_bool | col_bytea  | col_float8 | col_int | col_numeric |        col_timestamptz        |  col_date  | col_varchar |    col_jsonb     | col_array_bigint | col_array_bool |              col_array_bytea               |  col_array_float8  |  col_array_int   | col_array_numeric  |                      col_array_timestamptz                      |          col_array_date          |     col_array_varchar      |                    col_array_jsonb                     \n"
-            + "------------+----------+------------+------------+---------+-------------+-------------------------------+------------+-------------+------------------+------------------+----------------+--------------------------------------------+--------------------+------------------+--------------------+-----------------------------------------------------------------+----------------------------------+----------------------------+--------------------------------------------------------\n"
-            + "          1 | t        | \\x74657374 |       3.14 |     100 |       6.626 | 2022-02-16 14:18:02.123456+01 | 2022-03-29 | test        | {\"key\": \"value\"} | {1,NULL,2}       | {t,NULL,f}     | {\"\\\\x627974657331\",NULL,\"\\\\x627974657332\"} | {3.14,NULL,-99.99} | {-100,NULL,-200} | {6.626,NULL,-3.14} | {\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"} | {\"2023-02-20\",NULL,\"2000-01-01\"} | {\"string1\",NULL,\"string2\"} | {\"{\\\"key\\\": \\\"value1\\\"}\",NULL,\"{\\\"key\\\": \\\"value2\\\"}\"}\n"
+            + " col_bigint | col_bool | col_bytea  | col_float4 | col_float8 | col_int | col_numeric |        col_timestamptz        |  col_date  | col_varchar |    col_jsonb     | col_array_bigint | col_array_bool |              col_array_bytea               |  col_array_float4  |  col_array_float8  |  col_array_int   | col_array_numeric  |                      col_array_timestamptz                      |          col_array_date          |     col_array_varchar      |                    col_array_jsonb                     \n"
+            + "------------+----------+------------+------------+------------+---------+-------------+-------------------------------+------------+-------------+------------------+------------------+----------------+--------------------------------------------+--------------------+--------------------+------------------+--------------------+-----------------------------------------------------------------+----------------------------------+----------------------------+--------------------------------------------------------\n"
+            + "          1 | t        | \\x74657374 |       3.14 |       3.14 |     100 |       6.626 | 2022-02-16 14:18:02.123456+01 | 2022-03-29 | test        | {\"key\": \"value\"} | {1,NULL,2}       | {t,NULL,f}     | {\"\\\\x627974657331\",NULL,\"\\\\x627974657332\"} | {3.14,NULL,-99.99} | {3.14,NULL,-99.99} | {-100,NULL,-200} | {6.626,NULL,-3.14} | {\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"} | {\"2023-02-20\",NULL,\"2000-01-01\"} | {\"string1\",NULL,\"string2\"} | {\"{\\\"key\\\": \\\"value1\\\"}\",NULL,\"{\\\"key\\\": \\\"value2\\\"}\"}\n"
             + "(1 row)\n"
             + "\n"
             + "CLOSE CURSOR",
@@ -342,11 +342,7 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
             Triple.of(
                 (Function<ValueBinder<Builder>, Builder>)
                     builderValueBinder ->
-                        builderValueBinder.toFloat64Array(
-                            Arrays.asList(
-                                Float.valueOf(3.14f).doubleValue(),
-                                null,
-                                Float.valueOf(6.626f).doubleValue())),
+                        builderValueBinder.toFloat32Array(Arrays.asList(3.14f, null, 6.626f)),
                 "float4[]",
                 "'{3.14,null,6.626}'"),
             Triple.of(

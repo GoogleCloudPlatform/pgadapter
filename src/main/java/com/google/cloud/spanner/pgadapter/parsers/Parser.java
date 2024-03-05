@@ -395,6 +395,8 @@ public abstract class Parser<T> {
             return Oid.INT8_ARRAY;
           case NUMERIC:
             return Oid.NUMERIC_ARRAY;
+          case FLOAT32:
+            return Oid.FLOAT4_ARRAY;
           case FLOAT64:
             return Oid.FLOAT8_ARRAY;
           case STRING:

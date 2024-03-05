@@ -163,7 +163,7 @@ async function testSelectAllTypes(client) {
     return stringValue;
   });
   try {
-    const queryText = 'SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb ' +
+    const queryText = 'SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb ' +
         'FROM AllTypes';
     const result = await client.query(queryText);
     console.log(`Selected ${JSON.stringify(result.rows[0])}`);

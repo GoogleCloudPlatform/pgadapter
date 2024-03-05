@@ -231,7 +231,9 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   @Test
   public void testUpdateAllDataTypes() throws IOException, InterruptedException {
     String sql =
-        "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float8=$3, col_int=$4, col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_varchar = $10";
+        "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float4=$3, col_float8=$4, col_int=$5, "
+            + "col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 "
+            + "WHERE col_varchar = $11";
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -240,20 +242,22 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p2")
                 .to(ByteArray.copyFrom("test_bytes"))
                 .bind("p3")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p4")
-                .to(1L)
+                .to(3.14d)
                 .bind("p5")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(1L)
                 .bind("p6")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p7")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p8")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p9")
-                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
+                .to("test_string")
                 .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
+                .bind("p11")
                 .to("test")
                 .build(),
             1L));
@@ -288,18 +292,20 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test_bytes"))
                 .bind("p4")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p5")
-                .to(100)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(100)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p10")
+                .to("test_string")
+                .bind("p11")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .build(),
             1L));
@@ -342,6 +348,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p10")
                 .to((com.google.cloud.spanner.Value) null)
+                .bind("p11")
+                .to((com.google.cloud.spanner.Value) null)
                 .build(),
             1L));
 
@@ -375,18 +383,20 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test"))
                 .bind("p4")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p5")
-                .to(100L)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(100L)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z"))
                 .bind("p9")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p10")
+                .to("test")
+                .bind("p11")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .build(),
             ResultSet.newBuilder()
@@ -399,6 +409,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.BOOL,
                                         TypeCode.BYTES,
+                                        TypeCode.FLOAT32,
                                         TypeCode.FLOAT64,
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
@@ -593,20 +604,23 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     Mutation mutation = request.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(2, mutation.getInsert().getValuesCount());
-    assertEquals(10, mutation.getInsert().getColumnsCount());
+    assertEquals(11, mutation.getInsert().getColumnsCount());
+
+    int index = -1;
     ListValue insert = mutation.getInsert().getValues(0);
-    assertEquals("1", insert.getValues(0).getStringValue());
-    assertTrue(insert.getValues(1).getBoolValue());
+    assertEquals("1", insert.getValues(++index).getStringValue());
+    assertTrue(insert.getValues(++index).getBoolValue());
     assertEquals(
         Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
-        insert.getValues(2).getStringValue());
-    assertEquals(3.14, insert.getValues(3).getNumberValue(), 0.0);
-    assertEquals("10", insert.getValues(4).getStringValue());
-    assertEquals("6.626", insert.getValues(5).getStringValue());
-    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(6).getStringValue());
-    assertEquals("2022-07-01", insert.getValues(7).getStringValue());
-    assertEquals("test", insert.getValues(8).getStringValue());
-    assertEquals("{\"key\":\"value\"}", insert.getValues(9).getStringValue());
+        insert.getValues(++index).getStringValue());
+    assertEquals(3.14f, (float) insert.getValues(++index).getNumberValue(), 0.0f);
+    assertEquals(3.14, insert.getValues(++index).getNumberValue(), 0.0);
+    assertEquals("10", insert.getValues(++index).getStringValue());
+    assertEquals("6.626", insert.getValues(++index).getStringValue());
+    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(++index).getStringValue());
+    assertEquals("2022-07-01", insert.getValues(++index).getStringValue());
+    assertEquals("test", insert.getValues(++index).getStringValue());
+    assertEquals("{\"key\":\"value\"}", insert.getValues(++index).getStringValue());
 
     insert = mutation.getInsert().getValues(1);
     assertEquals("2", insert.getValues(0).getStringValue());
@@ -627,8 +641,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
     String result = execute("TestBinaryCopyOut", createConnectionString());
     assertEquals(
-        "1\tTrue\tdGVzdA==\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]\n"
-            + "NULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
+        "1\tTrue\tdGVzdA==\t3.14\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]\n"
+            + "NULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
             + "Success\n",
         result);
   }
@@ -648,8 +662,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
     String result = execute("TestTextCopyOut", createConnectionString());
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
-            + "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
+            + "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
             + "Success\n",
         result);
   }
@@ -696,6 +710,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -716,18 +731,20 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                   .bind("p3")
                   .to(ByteArray.copyFrom("test_bytes"))
                   .bind("p4")
-                  .to(3.14d)
+                  .to(3.14f)
                   .bind("p5")
-                  .to(100)
+                  .to(3.14d)
                   .bind("p6")
-                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                  .to(100)
                   .bind("p7")
-                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                   .bind("p8")
-                  .to(Date.parseDate("2022-04-02"))
+                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                   .bind("p9")
-                  .to("test_string")
+                  .to(Date.parseDate("2022-04-02"))
                   .bind("p10")
+                  .to("test_string")
+                  .bind("p11")
                   .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                   .build(),
               1L));
@@ -748,8 +765,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     for (int i = 1; i <= 2; i++) {
       ExecuteSqlRequest executeRequest = requests.get(i);
       assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-      assertEquals(10, executeRequest.getParamTypesCount());
-      assertEquals(10, executeRequest.getParams().getFieldsCount());
+      assertEquals(11, executeRequest.getParamTypesCount());
+      assertEquals(11, executeRequest.getParams().getFieldsCount());
     }
 
     List<ParseMessage> parseMessages =
@@ -777,7 +794,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             .collect(Collectors.toList());
     assertEquals(2, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(10, bindMessage.getParameters().length);
+    assertEquals(11, bindMessage.getParameters().length);
     List<ExecuteMessage> executeMessages =
         pgServer.getDebugMessages().stream()
             .filter(msg -> msg instanceof ExecuteMessage)
@@ -801,18 +818,20 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                   .bind("p3")
                   .to(ByteArray.copyFrom("test_bytes"))
                   .bind("p4")
-                  .to(3.14d)
+                  .to(3.14f)
                   .bind("p5")
-                  .to(100L)
+                  .to(3.14d)
                   .bind("p6")
-                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                  .to(100L)
                   .bind("p7")
-                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                   .bind("p8")
-                  .to(Date.parseDate("2022-04-02"))
+                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                   .bind("p9")
-                  .to("test_string")
+                  .to(Date.parseDate("2022-04-02"))
                   .bind("p10")
+                  .to("test_string")
+                  .bind("p11")
                   .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                   .build(),
               1L));
@@ -874,8 +893,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   private static String getInsertAllTypesSql() {
     return "INSERT INTO all_types "
-        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+        + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
   }
 
   private static Statement createBatchInsertStatement(int index) {
@@ -887,18 +906,20 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
         .bind("p3")
         .to(ByteArray.copyFrom(index + "test_bytes"))
         .bind("p4")
-        .to(3.14d + index)
+        .to(3.14f + index)
         .bind("p5")
-        .to(index)
+        .to(3.14d + index)
         .bind("p6")
-        .to(com.google.cloud.spanner.Value.pgNumeric(index + ".123"))
+        .to(index)
         .bind("p7")
-        .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", index)))
+        .to(com.google.cloud.spanner.Value.pgNumeric(index + ".123"))
         .bind("p8")
-        .to(Date.parseDate(String.format("2022-04-%02d", index + 1)))
+        .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", index)))
         .bind("p9")
-        .to("test_string" + index)
+        .to(Date.parseDate(String.format("2022-04-%02d", index + 1)))
         .bind("p10")
+        .to("test_string" + index)
+        .bind("p11")
         .to(com.google.cloud.spanner.Value.pgJsonb(String.format("{\"key\":\"value%d\"}", index)))
         .build();
   }
