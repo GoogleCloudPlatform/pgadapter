@@ -69,7 +69,7 @@ jobs:
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run integration tests
-        run: mvn -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true verify -B -Dclirr.skip=true -DskipUnits=true -DskipITs=false
+        run: mvn -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true verify -B -Denforcer.skip=true -Dclirr.skip=true -DskipUnits=true -DskipITs=false -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
         env:
           POSTGRES_HOST: /pg
           POSTGRES_PORT: 5432
