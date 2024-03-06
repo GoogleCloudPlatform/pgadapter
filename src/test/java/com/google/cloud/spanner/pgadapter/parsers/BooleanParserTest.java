@@ -56,16 +56,52 @@ public class BooleanParserTest {
     assertTrue(BooleanParser.toBoolean("tr"));
     assertTrue(BooleanParser.toBoolean("t"));
 
+    assertTrue(BooleanParser.toBoolean("TRUE"));
+    assertTrue(BooleanParser.toBoolean("TRU"));
+    assertTrue(BooleanParser.toBoolean("TR"));
+    assertTrue(BooleanParser.toBoolean("T"));
+
+    assertTrue(BooleanParser.toBoolean("on"));
+    assertTrue(BooleanParser.toBoolean("On"));
+    assertTrue(BooleanParser.toBoolean("ON"));
+
     assertFalse(BooleanParser.toBoolean("false"));
     assertFalse(BooleanParser.toBoolean("fals"));
     assertFalse(BooleanParser.toBoolean("fal"));
     assertFalse(BooleanParser.toBoolean("fa"));
     assertFalse(BooleanParser.toBoolean("f"));
 
+    assertFalse(BooleanParser.toBoolean("FALSE"));
+    assertFalse(BooleanParser.toBoolean("FALS"));
+    assertFalse(BooleanParser.toBoolean("FAL"));
+    assertFalse(BooleanParser.toBoolean("FA"));
+    assertFalse(BooleanParser.toBoolean("F"));
+
+    assertFalse(BooleanParser.toBoolean("off"));
+    assertFalse(BooleanParser.toBoolean("OFF"));
+    assertFalse(BooleanParser.toBoolean("Off"));
+    assertFalse(BooleanParser.toBoolean("Of"));
+    assertFalse(BooleanParser.toBoolean("OF"));
+    assertFalse(BooleanParser.toBoolean("of"));
+
+    assertTrue(BooleanParser.toBoolean("1"));
+    assertFalse(BooleanParser.toBoolean("0"));
+
+    assertTrue(BooleanParser.toBoolean("yes"));
+    assertTrue(BooleanParser.toBoolean("ye"));
+    assertTrue(BooleanParser.toBoolean("y"));
+    assertFalse(BooleanParser.toBoolean("no"));
+    assertFalse(BooleanParser.toBoolean("n"));
+    assertTrue(BooleanParser.toBoolean("Yes"));
+    assertFalse(BooleanParser.toBoolean("nO"));
+    assertTrue(BooleanParser.toBoolean("YES"));
+    assertFalse(BooleanParser.toBoolean("NO"));
+
     assertThrows(PGException.class, () -> BooleanParser.toBoolean("foo"));
     assertThrows(
         PGException.class,
         () -> new BooleanParser("bar".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+    assertThrows(PGException.class, () -> BooleanParser.toBoolean("2"));
   }
 
   @Test
