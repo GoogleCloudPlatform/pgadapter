@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.google.api.gax.rpc.ResourceExhaustedException;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -114,6 +115,14 @@ public class ITOpenTelemetryTest implements IntegrationTest {
         }
       }
       assertTrue(foundTrace);
+    } catch (ResourceExhaustedException resourceExhaustedException) {
+      if (resourceExhaustedException
+          .getMessage()
+          .contains("Quota exceeded for quota metric 'Read requests (free)'")) {
+        // Ignore and allow the test to succeed.
+      } else {
+        throw resourceExhaustedException;
+      }
     }
   }
 
