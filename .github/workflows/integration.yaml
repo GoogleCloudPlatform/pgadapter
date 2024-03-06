@@ -71,6 +71,10 @@ jobs:
         if: github.event.schedule=='14 3 * * *'
         run: |
           echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
+      # TODO: Remove
+      - id: set-staging-endpoint-for-float32
+        run: |
+          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
       - id: set-excluded-integration-tests
         if: github.event_name == 'pull_request'
         run: |
