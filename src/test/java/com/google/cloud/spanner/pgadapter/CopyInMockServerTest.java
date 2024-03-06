@@ -721,9 +721,10 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\n")));
       assertTrue(
+          exception.getMessage(),
           exception
               .getMessage()
-              .contains("Row length mismatched. Expected 3 columns, but only found 1"));
+              .contains("Invalid COPY data: Row length mismatch. Expected 3 values, but got 1."));
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);

@@ -545,7 +545,7 @@ public class StatementTest {
     PGException thrown = assertThrows(PGException.class, statement::getUpdateCount);
     assertEquals(SQLState.DataException, thrown.getSQLState());
     assertEquals(
-        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
+        "Invalid COPY data: Row length mismatch. Expected 2 values, but got 1.",
         thrown.getMessage());
 
     statement.close();
@@ -725,7 +725,7 @@ public class StatementTest {
     PGException thrown = assertThrows(PGException.class, copyStatement::getUpdateCount);
     assertEquals(SQLState.DataException, thrown.getSQLState());
     assertEquals(
-        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
+        "Invalid COPY data: Row length mismatch. Expected 2 values, but got 1.",
         thrown.getMessage());
 
     copyStatement.close();
