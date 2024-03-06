@@ -464,7 +464,7 @@ func TestPrepareStatement(connString string) *C.char {
 	if err != nil {
 		return C.CString(err.Error())
 	}
-	if g, w := len(sd.ParamOIDs), 10; g != w {
+	if g, w := len(sd.ParamOIDs), 11; g != w {
 		return C.CString(fmt.Sprintf("param type count mismatch:\n Got: %v\nWant: %v", g, w))
 	}
 	wantParamTypes := []int{

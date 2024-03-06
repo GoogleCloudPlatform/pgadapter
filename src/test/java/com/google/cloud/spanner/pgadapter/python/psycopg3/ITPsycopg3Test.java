@@ -106,6 +106,8 @@ public class ITPsycopg3Test implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -127,6 +129,8 @@ public class ITPsycopg3Test implements IntegrationTest {
                 .set("col_array_bytea")
                 .toBytesArray(
                     Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float4")
+                .toFloat32Array(Arrays.asList(3.14f, null, -99.99f))
                 .set("col_array_float8")
                 .toFloat64Array(Arrays.asList(3.14d, null, -99.99))
                 .set("col_array_int")
@@ -189,6 +193,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -199,6 +204,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -216,6 +222,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -226,6 +233,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -254,6 +262,13 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            // psycopg3 uses Python floats for both float4 and float8.
+            // That means that when using the binary protocol, the actual 64-bit float value
+            // is sent to the server, which again causes rounding issues when the value is
+            // converted to a 32-bit float.
+            + String.format(
+                "col_float4: %s\n",
+                format == DataFormat.POSTGRESQL_TEXT ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -264,6 +279,10 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                format == DataFormat.POSTGRESQL_TEXT ? "3.14" : "3.140000104904175",
+                format == DataFormat.POSTGRESQL_TEXT ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -335,6 +354,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -345,6 +365,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -523,6 +544,11 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            // psycopg3 uses Python floats for both float4 and float8.
+            // That means that when using the binary protocol, the actual 64-bit float value
+            // is sent to the server, which again causes rounding issues when the value is
+            // converted to a 32-bit float.
+            + "col_float4: 3.140000104904175\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -533,6 +559,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.140000104904175, None, -99.98999786376953]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -544,6 +571,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -554,6 +582,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -579,6 +608,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -589,6 +619,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -600,6 +631,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -610,6 +642,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -636,6 +669,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -646,6 +680,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -656,6 +691,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -666,6 +702,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -708,6 +745,8 @@ public class ITPsycopg3Test implements IntegrationTest {
                 .to((Boolean) null)
                 .set("col_bytea")
                 .to((ByteArray) null)
+                .set("col_float4")
+                .to((Float) null)
                 .set("col_float8")
                 .to((Double) null)
                 .set("col_int")
@@ -728,6 +767,8 @@ public class ITPsycopg3Test implements IntegrationTest {
                 .toBoolArray((boolean[]) null)
                 .set("col_array_bytea")
                 .toBytesArray(null)
+                .set("col_array_float4")
+                .toFloat32Array((float[]) null)
                 .set("col_array_float8")
                 .toFloat64Array((double[]) null)
                 .set("col_array_int")

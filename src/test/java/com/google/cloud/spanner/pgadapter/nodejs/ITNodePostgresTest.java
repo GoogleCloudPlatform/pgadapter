@@ -82,6 +82,7 @@ public class ITNodePostgresTest implements IntegrationTest {
             + "col_bigint bigint not null primary key, "
             + "col_bool bool, "
             + "col_bytea bytea, "
+            + "col_float4 float4, "
             + "col_float8 float8, "
             + "col_int int, "
             + "col_numeric numeric, "
@@ -112,6 +113,8 @@ public class ITNodePostgresTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -141,6 +144,8 @@ public class ITNodePostgresTest implements IntegrationTest {
                 .to((Boolean) null)
                 .set("col_bytea")
                 .to((ByteArray) null)
+                .set("col_float4")
+                .to((Float) null)
                 .set("col_float8")
                 .to((Double) null)
                 .set("col_int")
@@ -229,6 +234,7 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(
           ByteArray.copyFrom("some random string".getBytes(StandardCharsets.UTF_8)),
           resultSet.getBytes("col_bytea"));
+      assertEquals(3.14f, resultSet.getFloat("col_float4"), 0.0f);
       assertEquals(3.14d, resultSet.getDouble("col_float8"), 0.0d);
       assertEquals(100, resultSet.getLong("col_int"));
       assertEquals("234.54235", resultSet.getString("col_numeric"));
@@ -255,6 +261,7 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(1L, resultSet.getLong("col_bigint"));
       assertTrue(resultSet.isNull("col_bool"));
       assertTrue(resultSet.isNull("col_bytea"));
+      assertTrue(resultSet.isNull("col_float4"));
       assertTrue(resultSet.isNull("col_float8"));
       assertTrue(resultSet.isNull("col_int"));
       assertTrue(resultSet.isNull("col_numeric"));
@@ -284,6 +291,7 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(
           ByteArray.copyFrom("some random string".getBytes(StandardCharsets.UTF_8)),
           resultSet.getBytes("col_bytea"));
+      assertEquals(3.14f, resultSet.getFloat("col_float4"), 0.0f);
       assertEquals(3.14d, resultSet.getDouble("col_float8"), 0.0d);
       assertEquals(100, resultSet.getLong("col_int"));
       assertEquals("234.54235", resultSet.getString("col_numeric"));
@@ -298,6 +306,7 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(2L, resultSet.getLong("col_bigint"));
       assertTrue(resultSet.isNull("col_bool"));
       assertTrue(resultSet.isNull("col_bytea"));
+      assertTrue(resultSet.isNull("col_float4"));
       assertTrue(resultSet.isNull("col_float8"));
       assertTrue(resultSet.isNull("col_int"));
       assertTrue(resultSet.isNull("col_numeric"));
@@ -320,6 +329,7 @@ public class ITNodePostgresTest implements IntegrationTest {
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":true,"
             + "\"col_bytea\":{\"type\":\"Buffer\",\"data\":[116,101,115,116]},"
+            + "\"col_float4\":3.14,"
             + "\"col_float8\":3.14,"
             + "\"col_int\":\"100\","
             + "\"col_numeric\":\"6.626\","
@@ -341,6 +351,7 @@ public class ITNodePostgresTest implements IntegrationTest {
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":null,"
             + "\"col_bytea\":null,"
+            + "\"col_float4\":null,"
             + "\"col_float8\":null,"
             + "\"col_int\":null,"
             + "\"col_numeric\":null,"
@@ -401,7 +412,7 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     String output = runTest("testCopyTo", getHost(), testEnv.getServer().getLocalPort());
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
         output);
   }
 

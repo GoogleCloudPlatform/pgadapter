@@ -102,6 +102,8 @@ public class ITNpgsqlTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -123,6 +125,8 @@ public class ITNpgsqlTest implements IntegrationTest {
                 .set("col_array_bytea")
                 .toBytesArray(
                     Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float4")
+                .toFloat32Array(Arrays.asList(3.14f, null, -99.99f))
                 .set("col_array_float8")
                 .toFloat64Array(Arrays.asList(3.14d, null, -99.99))
                 .set("col_array_int")
@@ -340,6 +344,7 @@ public class ITNpgsqlTest implements IntegrationTest {
       assertEquals(1L, resultSet.getLong(col++));
       assertTrue(resultSet.getBoolean(col++));
       assertArrayEquals(new byte[] {1, 2, 3}, resultSet.getBytes(col++).toByteArray());
+      assertEquals(3.14f, resultSet.getFloat(col++), 0.0f);
       assertEquals(3.14d, resultSet.getDouble(col++), 0.0d);
       assertEquals(10L, resultSet.getLong(col++));
       assertEquals("6.626", resultSet.getString(col++));
@@ -353,7 +358,7 @@ public class ITNpgsqlTest implements IntegrationTest {
       assertTrue(resultSet.next());
       col = 0;
       assertEquals(2L, resultSet.getLong(col++));
-      assertEquals(20, resultSet.getColumnCount());
+      assertEquals(22, resultSet.getColumnCount());
       for (col = 1; col < resultSet.getColumnCount(); col++) {
         assertTrue(resultSet.isNull(col));
       }
@@ -368,8 +373,8 @@ public class ITNpgsqlTest implements IntegrationTest {
     addNullRow();
     String result = execute("TestBinaryCopyOut", createConnectionString());
     assertEquals(
-        "1\tTrue\tdGVzdA==\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]\n"
-            + "2\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
+        "1\tTrue\tdGVzdA==\t3.14\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]\n"
+            + "2\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
             + "Success\n",
         result);
   }
@@ -380,8 +385,8 @@ public class ITNpgsqlTest implements IntegrationTest {
     addNullRow();
     String result = execute("TestTextCopyOut", createConnectionString());
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
-            + "2\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
+            + "2\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
             + "Success\n",
         result);
   }
@@ -398,6 +403,8 @@ public class ITNpgsqlTest implements IntegrationTest {
                 .to((Boolean) null)
                 .set("col_bytea")
                 .to((ByteArray) null)
+                .set("col_float4")
+                .to((Float) null)
                 .set("col_float8")
                 .to((Double) null)
                 .set("col_int")
@@ -418,6 +425,8 @@ public class ITNpgsqlTest implements IntegrationTest {
                 .toBoolArray((boolean[]) null)
                 .set("col_array_bytea")
                 .toBytesArray(null)
+                .set("col_array_float4")
+                .toFloat32Array((float[]) null)
                 .set("col_array_float8")
                 .toFloat64Array((double[]) null)
                 .set("col_array_int")

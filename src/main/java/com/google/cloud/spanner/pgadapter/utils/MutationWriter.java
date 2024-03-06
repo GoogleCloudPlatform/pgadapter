@@ -257,10 +257,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         }
         if (record.numColumns() != this.tableColumns.keySet().size()) {
           throw PGExceptionFactory.newPGException(
-              "Invalid COPY data: Row length mismatched. Expected "
-                  + this.tableColumns.keySet().size()
-                  + " columns, but only found "
-                  + record.numColumns(),
+              String.format(
+                  "Invalid COPY data: Row length mismatch. Expected %d values, but got %d.",
+                  this.tableColumns.keySet().size(), record.numColumns()),
               SQLState.DataException);
         }
 

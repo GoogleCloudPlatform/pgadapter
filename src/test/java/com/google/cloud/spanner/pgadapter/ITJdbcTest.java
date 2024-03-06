@@ -127,6 +127,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -148,6 +150,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_array_bytea")
                 .toBytesArray(
                     Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float4")
+                .toFloat32Array(Arrays.asList(3.14f, null, -99.8f))
                 .set("col_array_float8")
                 .toFloat64Array(Arrays.asList(3.14d, null, -99.8))
                 .set("col_array_int")
@@ -407,9 +411,9 @@ public class ITJdbcTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
-                  + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+                  + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setBoolean(++index, true);
@@ -419,6 +423,7 @@ public class ITJdbcTest implements IntegrationTest {
         } else {
           statement.setBytes(++index, "bytes_test".getBytes(StandardCharsets.UTF_8));
         }
+        statement.setFloat(++index, 10.1f);
         statement.setDouble(++index, 10.1);
         // TODO: Remove when the emulator supports casting to int4
         if (isSimpleMode) {
@@ -449,6 +454,8 @@ public class ITJdbcTest implements IntegrationTest {
                     "bytes2".getBytes(StandardCharsets.UTF_8)
                   }));
         }
+        statement.setArray(
+            ++index, connection.createArrayOf("float4", new Float[] {3.14f, null, -99.8f}));
         statement.setArray(
             ++index, connection.createArrayOf("float8", new Double[] {3.14d, null, -99.8}));
         // TODO: Remove when Spangres supports casting to int4
@@ -508,7 +515,7 @@ public class ITJdbcTest implements IntegrationTest {
           connection.createStatement().executeQuery("select * from all_types where col_bigint=2")) {
         assertTrue(resultSet.next());
 
-        assertEquals(20, resultSet.getMetaData().getColumnCount());
+        assertEquals(22, resultSet.getMetaData().getColumnCount());
         int index = 0;
         assertEquals(2, resultSet.getLong(++index));
         assertTrue(resultSet.getBoolean(++index));
@@ -518,6 +525,7 @@ public class ITJdbcTest implements IntegrationTest {
         } else {
           ++index;
         }
+        assertEquals(10.1f, resultSet.getFloat(++index), 0.0f);
         assertEquals(10.1d, resultSet.getDouble(++index), 0.0d);
         assertEquals(100, resultSet.getInt(++index));
         assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
@@ -543,6 +551,8 @@ public class ITJdbcTest implements IntegrationTest {
               },
               (byte[][]) resultSet.getArray(++index).getArray());
         }
+        assertArrayEquals(
+            new Float[] {3.14f, null, -99.8f}, (Float[]) resultSet.getArray(++index).getArray());
         assertArrayEquals(
             new Double[] {3.14d, null, -99.8}, (Double[]) resultSet.getArray(++index).getArray());
         assertArrayEquals(
@@ -599,6 +609,7 @@ public class ITJdbcTest implements IntegrationTest {
             + "col_bool=?, "
             // The PG JDBC driver does not support bytea parameters in simple mode.
             + (isSimpleMode ? "" : "col_bytea=?, ")
+            + "col_float4=?, "
             + "col_float8=?, "
             + "col_int=?, "
             + "col_numeric=?, "
@@ -615,6 +626,7 @@ public class ITJdbcTest implements IntegrationTest {
         if (!isSimpleMode) {
           statement.setBytes(++index, "updated".getBytes(StandardCharsets.UTF_8));
         }
+        statement.setFloat(++index, 3.14f * 2f);
         statement.setDouble(++index, 3.14d * 2d);
         // TODO: Remove when Spangres supports casting to int4
         if (isSimpleMode) {
@@ -652,6 +664,7 @@ public class ITJdbcTest implements IntegrationTest {
         } else {
           ++index;
         }
+        assertEquals(3.14f * 2f, resultSet.getFloat(++index), 0.0f);
         assertEquals(3.14d * 2d, resultSet.getDouble(++index), 0.0d);
         assertEquals(2, resultSet.getInt(++index));
         assertEquals(new BigDecimal("10.0"), resultSet.getBigDecimal(++index));
@@ -812,7 +825,7 @@ public class ITJdbcTest implements IntegrationTest {
       CopyManager copyManager = pgConnection.getCopyAPI();
       long copyCount =
           copyManager.copyIn(
-              "copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
+              "copy all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
               Files.newInputStream(Paths.get("./src/test/resources/all_types_data_small.txt")));
       assertEquals(100L, copyCount);
 
@@ -837,7 +850,7 @@ public class ITJdbcTest implements IntegrationTest {
       CopyManager copyManager = pgConnection.getCopyAPI();
       long copyCount =
           copyManager.copyIn(
-              "copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
+              "copy all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
               Files.newInputStream(Paths.get("./src/test/resources/all_types_data_nulls.txt")));
       assertEquals(1L, copyCount);
 
@@ -871,10 +884,10 @@ public class ITJdbcTest implements IntegrationTest {
               SQLException.class,
               () ->
                   copyManager.copyIn(
-                      "copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
+                      "copy all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
                       Files.newInputStream(Paths.get("./src/test/resources/all_types_data.txt"))));
       assertEquals(
-          "ERROR: Record count: 1819 has exceeded the limit: 1818.\n"
+          "ERROR: Record count: 1667 has exceeded the limit: 1666.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
               + "\n"
@@ -908,7 +921,7 @@ public class ITJdbcTest implements IntegrationTest {
       CopyManager copyManager = pgConnection.getCopyAPI();
       long copyCount =
           copyManager.copyIn(
-              "copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
+              "copy all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
               Files.newInputStream(Paths.get("./src/test/resources/all_types_data.txt")));
       assertEquals(10_000L, copyCount);
 
@@ -1278,6 +1291,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(false)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("foo"))
+                .set("col_float4")
+                .to(-3.14f)
                 .set("col_float8")
                 .to(-3.14d)
                 .set("col_int")
@@ -1299,6 +1314,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_array_bytea")
                 .toBytesArray(
                     Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float4")
+                .toFloat32Array(Arrays.asList(3.14f, null, -99.8f))
                 .set("col_array_float8")
                 .toFloat64Array(Arrays.asList(3.14d, null, -99.8))
                 .set("col_array_int")
@@ -1327,6 +1344,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to((Boolean) null)
                 .set("col_bytea")
                 .to((ByteArray) null)
+                .set("col_float4")
+                .to((Float) null)
                 .set("col_float8")
                 .to((Double) null)
                 .set("col_int")
@@ -1347,6 +1366,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .toBoolArray((boolean[]) null)
                 .set("col_array_bytea")
                 .toBytesArray(null)
+                .set("col_array_float4")
+                .toFloat32Array((float[]) null)
                 .set("col_array_float8")
                 .toFloat64Array((double[]) null)
                 .set("col_array_int")
@@ -1369,6 +1390,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom(""))
+                .set("col_float4")
+                .to(0f)
                 .set("col_float8")
                 .to(0d)
                 .set("col_int")
@@ -1389,6 +1412,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .toBoolArray(ImmutableList.of())
                 .set("col_array_bytea")
                 .toBytesArray(ImmutableList.of())
+                .set("col_array_float4")
+                .toFloat32Array(ImmutableList.of())
                 .set("col_array_float8")
                 .toFloat64Array(ImmutableList.of())
                 .set("col_array_int")
@@ -1411,6 +1436,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom(""))
+                .set("col_float4")
+                .to(0f)
                 .set("col_float8")
                 .to(0d)
                 .set("col_int")
@@ -1431,6 +1458,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .toBoolArray(ImmutableList.of())
                 .set("col_array_bytea")
                 .toBytesArray(ImmutableList.of())
+                .set("col_array_float4")
+                .toFloat32Array(ImmutableList.of())
                 .set("col_array_float8")
                 .toFloat64Array(ImmutableList.of())
                 .set("col_array_int")

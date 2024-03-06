@@ -89,11 +89,11 @@ async function testInsertAutoCommit(client) {
 async function testInsertAllTypes(client) {
   try {
     const queryText = 'INSERT INTO AllTypes ' +
-        '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
-        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)';
+        '(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)';
     const res = await client.query(queryText, [
         1, true, Buffer.from('some random string', 'utf-8'),
-        3.14, 100, 234.54235, new Date(Date.UTC(2022, 6, 22, 18, 15, 42, 11)),
+        3.14, 3.14, 100, 234.54235, new Date(Date.UTC(2022, 6, 22, 18, 15, 42, 11)),
         '2022-07-22', 'some-random-string', { my_key: "my-value" }]);
     console.log(`Inserted ${res.rowCount} row(s)`);
   } catch (e) {
@@ -104,10 +104,10 @@ async function testInsertAllTypes(client) {
 async function testInsertAllTypesNull(client) {
   try {
     const queryText = 'INSERT INTO AllTypes ' +
-        '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
-        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)';
+        '(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)';
     const res = await client.query(queryText, [
-        1, null, null, null, null, null, null, null, null, null]);
+        1, null, null, null, null, null, null, null, null, null, null]);
     console.log(`Inserted ${res.rowCount} row(s)`);
   } catch (e) {
     console.error(`Insert error: ${e}`);
@@ -117,10 +117,10 @@ async function testInsertAllTypesNull(client) {
 async function testInsertAllTypesAllNull(client) {
   try {
     const queryText = 'INSERT INTO AllTypes ' +
-        '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
-        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)';
+        '(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)';
     const res = await client.query(queryText, [
-      null, null, null, null, null, null, null, null, null, null]);
+      null, null, null, null, null, null, null, null, null, null, null]);
     console.log(`Inserted ${res.rowCount} row(s)`);
   } catch (e) {
     console.error(`Insert error: ${e}`);
@@ -132,11 +132,11 @@ async function testInsertAllTypesPreparedStatement(client) {
     const query = {
       name: 'insert-all-types',
       text: 'INSERT INTO AllTypes ' +
-          '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
-          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+          '(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
+          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
       values: [
         1, true, Buffer.from('some random string', 'utf-8'),
-        3.14, 100, 234.54235, new Date(Date.UTC(2022, 6, 22, 18, 15, 42, 11)),
+        3.14, 3.14, 100, 234.54235, new Date(Date.UTC(2022, 6, 22, 18, 15, 42, 11)),
         '2022-07-22', 'some-random-string', { my_key: "my-value" }],
     }
     // Execute the statement twice.
@@ -144,7 +144,7 @@ async function testInsertAllTypesPreparedStatement(client) {
     console.log(`Inserted ${res1.rowCount} row(s)`);
     const res2 = await client.query({
       name: 'insert-all-types',
-      values: [2, null, null, null, null, null, null, null, null, null],
+      values: [2, null, null, null, null, null, null, null, null, null, null],
     });
     console.log(`Inserted ${res2.rowCount} row(s)`);
   } catch (e) {

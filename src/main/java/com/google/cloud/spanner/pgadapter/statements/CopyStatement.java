@@ -286,6 +286,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       case "bigint":
         return Type.int64();
       case "float4":
+      case "real":
         return Type.float32();
       case "float8":
       case "double precision":
