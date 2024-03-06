@@ -763,13 +763,13 @@ func TestCopyIn(connString string) *C.char {
 	jsonb := pgtype.JSONB{}
 	jsonb.Set("{\"key\": \"value\"}")
 	rows := [][]interface{}{
-		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test", jsonb},
-		{2, nil, nil, nil, nil, nil, nil, nil, nil, nil},
+		{1, true, []byte{1, 2, 3}, float32(3.14), 3.14, 10, numeric, timestamptz, date, "test", jsonb},
+		{2, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil},
 	}
 	count, err := conn.CopyFrom(
 		ctx,
 		pgx.Identifier{"all_types"},
-		[]string{"col_bigint", "col_bool", "col_bytea", "col_float8", "col_int", "col_numeric", "col_timestamptz", "col_date", "col_varchar", "col_jsonb"},
+		[]string{"col_bigint", "col_bool", "col_bytea", "col_float4", "col_float8", "col_int", "col_numeric", "col_timestamptz", "col_date", "col_varchar", "col_jsonb"},
 		pgx.CopyFromRows(rows),
 	)
 	if err != nil {

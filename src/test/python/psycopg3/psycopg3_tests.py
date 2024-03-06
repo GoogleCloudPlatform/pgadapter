@@ -17,7 +17,6 @@ import argparse
 from datetime import datetime, date
 from decimal import Decimal
 
-import numpy
 import pytz
 import psycopg
 from psycopg import Copy, Rollback

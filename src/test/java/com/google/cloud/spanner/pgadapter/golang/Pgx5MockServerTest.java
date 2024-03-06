@@ -1101,7 +1101,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
         mockSpanner, "public", "all_types", true);
 
     String sql =
-        "select \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\" "
+        "select \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float4\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\" "
             + "from \"all_types\"";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1113,6 +1113,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -1131,20 +1132,23 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     Mutation mutation = request.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(2, mutation.getInsert().getValuesCount());
-    assertEquals(10, mutation.getInsert().getColumnsCount());
+    assertEquals(11, mutation.getInsert().getColumnsCount());
     ListValue insert = mutation.getInsert().getValues(0);
-    assertEquals("1", insert.getValues(0).getStringValue());
-    assertTrue(insert.getValues(1).getBoolValue());
+
+    int index = -1;
+    assertEquals("1", insert.getValues(++index).getStringValue());
+    assertTrue(insert.getValues(++index).getBoolValue());
     assertEquals(
         Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
-        insert.getValues(2).getStringValue());
-    assertEquals(3.14, insert.getValues(3).getNumberValue(), 0.0);
-    assertEquals("10", insert.getValues(4).getStringValue());
-    assertEquals("6.626", insert.getValues(5).getStringValue());
-    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(6).getStringValue());
-    assertEquals("2022-07-01", insert.getValues(7).getStringValue());
-    assertEquals("test", insert.getValues(8).getStringValue());
-    assertEquals("{\"key\": \"value\"}", insert.getValues(9).getStringValue());
+        insert.getValues(++index).getStringValue());
+    assertEquals(3.14f, (float) insert.getValues(++index).getNumberValue(), 0.0f);
+    assertEquals(3.14, insert.getValues(++index).getNumberValue(), 0.0);
+    assertEquals("10", insert.getValues(++index).getStringValue());
+    assertEquals("6.626", insert.getValues(++index).getStringValue());
+    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(++index).getStringValue());
+    assertEquals("2022-07-01", insert.getValues(++index).getStringValue());
+    assertEquals("test", insert.getValues(++index).getStringValue());
+    assertEquals("{\"key\": \"value\"}", insert.getValues(++index).getStringValue());
 
     insert = mutation.getInsert().getValues(1);
     assertEquals("2", insert.getValues(0).getStringValue());
