@@ -1,7 +1,8 @@
-# Open Telemetry in PGAdapter
+# OpenTelemetry in PGAdapter
 
-PGAdapter supports Open Telemetry tracing. You can enable this by adding the `-enable_otel` command
-line argument when starting PGAdapter.
+PGAdapter supports OpenTelemetry tracing and metrics. You can enable the tracing or the metrics
+by adding the `-enable_otel` or `-enable_otel_metrics` command line argument when starting
+PGAdapter. Tracing and metrics can be enabled at the same time.
 
 Optionally, you can also set a trace sample ratio to limit the number of traces that will be
 collected and set with the `-otel_trace_ratio=<ratio>` command line argument. If you omit this
@@ -16,7 +17,8 @@ docker run \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance \
   -c /credentials.json -x \
-  -enable_otel -otel_trace_ratio=0.1
+  -enable_otel -otel_trace_ratio=0.1 \
+  -enable_otel_metrics
 ```
 
 ## Exporter
@@ -143,6 +145,15 @@ statements consists of the following spans:
    execute this batch request on Cloud Spanner.
 
 ![PGAdapter Cloud Trace - Batch DML example](img/dml_batch_trace_sample.png?raw=true "PGAdapter Cloud Trace - Batch DML example")
+
+## Metrics
+
+The available metrics in PGAdapter are:
+
+* `spanner/pgadapter/roundtrip_latencies`: Latency between PGAdapter receiving a statement from
+   the client and PGAdapter returning the last row of the response to the client.
+* `spanner/pgadapter/client_lib_latencies`: Latency when the Spanner's client library receives
+   a call and returns a response.
 
 ## Frequently Asked Questions
 

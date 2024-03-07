@@ -29,7 +29,7 @@ public class Metrics {
       "Latency when the client library receives a call and returns a response";
   static final String PGADAPTER_LATENCY = "spanner/pgadapter/roundtrip_latencies";
   static final String PGADAPTER_LATENCY_DESCRIPTION =
-      "Latency when the JDBC makes a call and gets a response, measured in PGAdapter";
+      "Latency between PGAdapter receiving a statement from the client and PGAdapter returning the last row of the response to the client";
 
   private final LongHistogram spannerClientLibLatencies;
   private final LongHistogram pgadapterLatencies;
@@ -61,15 +61,11 @@ public class Metrics {
 
   @InternalApi
   public void recordClientLibLatency(long value, Attributes attributes) {
-    if (spannerClientLibLatencies != null) {
-      spannerClientLibLatencies.record(value, attributes);
-    }
+    spannerClientLibLatencies.record(value, attributes);
   }
 
   @InternalApi
   public void recordPGAdapterLatency(long value, Attributes attributes) {
-    if (pgadapterLatencies != null) {
-      pgadapterLatencies.record(value, attributes);
-    }
+    pgadapterLatencies.record(value, attributes);
   }
 }

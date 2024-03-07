@@ -929,12 +929,14 @@ public class ITPsqlTest implements IntegrationTest {
           ZoneId.of("Asia/Tehran"),
           // Changed the use of DST multiple times. Changed offset on 2024-02-29.
           ZoneId.of("Asia/Almaty"),
+          ZoneId.of("Asia/Qostanay"),
           // Rankin_Inlet and Resolute did not observe DST in 1970-1979, but not all databases
           // agree.
           ZoneId.of("America/Rankin_Inlet"),
           ZoneId.of("America/Resolute"),
           ZoneId.of("America/Iqaluit"),
           ZoneId.of("America/Inuvik"),
+          ZoneId.of("America/Scoresbysund"),
           // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
           ZoneId.of("America/Pangnirtung"),
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.

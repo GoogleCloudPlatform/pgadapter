@@ -25,9 +25,11 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -59,6 +61,7 @@ public class ProxyServer extends AbstractApiService {
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
   private final OpenTelemetry openTelemetry;
+  private final Metrics metrics;
   private final Properties properties;
   private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
 
@@ -117,6 +120,10 @@ public class ProxyServer extends AbstractApiService {
       OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties) {
     this.options = optionsMetadata;
     this.openTelemetry = openTelemetry;
+    this.metrics =
+        optionsMetadata.isEnableOpenTelemetryMetrics()
+            ? new Metrics(openTelemetry)
+            : new Metrics(OpenTelemetry.noop());
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
@@ -370,6 +377,16 @@ public class ProxyServer extends AbstractApiService {
 
   public OpenTelemetry getOpenTelemetry() {
     return this.openTelemetry;
+  }
+
+  public Tracer getTracer(String name, String version) {
+    return getOptions().isEnableOpenTelemetry()
+        ? getOpenTelemetry().getTracer(name, version)
+        : OpenTelemetry.noop().getTracer(name, version);
+  }
+
+  public Metrics getMetrics() {
+    return this.metrics;
   }
 
   /** @return the JDBC connection properties that are used by this server */

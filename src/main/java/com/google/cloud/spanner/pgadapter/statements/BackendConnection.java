@@ -125,7 +125,9 @@ public class BackendConnection {
 
   private final Tracer tracer;
 
-  private final Metrics meter;
+  private final Metrics metrics;
+
+  private final Attributes metricAttributes;
 
   private final Deque<Context> statementContext = new ConcurrentLinkedDeque<>();
 
@@ -480,7 +482,7 @@ public class BackendConnection {
         Stopwatch stopwatch = Stopwatch.createStarted();
         StatementResult result = spannerConnection.execute(statement);
         Duration executionDuration = stopwatch.elapsed();
-        meter.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
+        metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         logger.log(
             Level.FINER,
             Logging.format(
@@ -638,9 +640,7 @@ public class BackendConnection {
 
         // Make sure both the front-end CopyDataReceiver and the backend MutationWriter processes
         // have finished before we proceed.
-        //noinspection UnstableApiUsage
         Futures.successfulAsList(copyDataReceiverFuture, statementResultFuture).get();
-        //noinspection UnstableApiUsage
         Futures.allAsList(copyDataReceiverFuture, statementResultFuture).get();
       } catch (ExecutionException executionException) {
         result.setException(executionException.getCause());
@@ -847,7 +847,8 @@ public class BackendConnection {
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
       Tracer tracer,
-      Metrics meter,
+      Metrics metrics,
+      Attributes metricAttributes,
       String connectionId,
       Runnable closeAllPortals,
       DatabaseId databaseId,
@@ -856,7 +857,8 @@ public class BackendConnection {
       OptionsMetadata optionsMetadata,
       Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.tracer = tracer;
-    this.meter = meter;
+    this.metrics = metrics;
+    this.metricAttributes = metricAttributes;
     this.connectionId = connectionId;
     this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
@@ -923,6 +925,20 @@ public class BackendConnection {
   /** Returns the current connection state. */
   public ConnectionState getConnectionState() {
     return this.connectionState;
+  }
+
+  @VisibleForTesting
+  public Tracer getTracer() {
+    return this.tracer;
+  }
+
+  @VisibleForTesting
+  public Metrics getMetrics() {
+    return this.metrics;
+  }
+
+  Attributes getMetricAttributes() {
+    return metricAttributes;
   }
 
   private Span createSpan(String name, Statement statement) {
@@ -1486,7 +1502,10 @@ public class BackendConnection {
       }
       Span runBatchSpan = createSpan("execute_batch_on_spanner", null);
       try (Scope ignoreRunBatchSpan = runBatchSpan.makeCurrent()) {
+        Stopwatch stopwatch = Stopwatch.createStarted();
         long[] counts = spannerConnection.runBatch();
+        Duration executionDuration = stopwatch.elapsed();
+        metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         if (batchType == StatementType.DDL) {
           counts = extractDdlUpdateCounts(statementResults, counts);
         }

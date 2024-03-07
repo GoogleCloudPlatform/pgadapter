@@ -561,6 +561,7 @@ public class OptionsMetadata {
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_ENABLE_OPEN_TELEMETRY = "enable_otel";
+  private static final String OPTION_ENABLE_OPEN_TELEMETRY_METRICS = "enable_otel_metrics";
   private static final String OPTION_OPEN_TELEMETRY_TRACE_RATIO = "otel_trace_ratio";
   private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
@@ -604,6 +605,7 @@ public class OptionsMetadata {
   private final boolean binaryFormat;
   private final boolean authenticate;
   private final boolean enableOpenTelemetry;
+  private final boolean enableOpenTelemetryMetrics;
   private final Double openTelemetryTraceRatio;
   private final SslMode sslMode;
   private final boolean disableAutoDetectClient;
@@ -690,6 +692,7 @@ public class OptionsMetadata {
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
     this.enableOpenTelemetry = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY);
+    this.enableOpenTelemetryMetrics = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
     this.openTelemetryTraceRatio =
         parseOpenTelemetryTraceRatio(commandLine.getOptionValue(OPTION_OPEN_TELEMETRY_TRACE_RATIO));
     this.sslMode = parseSslMode(commandLine.getOptionValue(OPTION_SSL));
@@ -768,6 +771,7 @@ public class OptionsMetadata {
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
     this.enableOpenTelemetry = false;
+    this.enableOpenTelemetryMetrics = false;
     this.openTelemetryTraceRatio = null;
     this.sslMode = SslMode.Disable;
     this.disableAutoDetectClient = false;
@@ -1136,6 +1140,8 @@ public class OptionsMetadata {
         "Whether you wish the proxy to perform an authentication step.");
     options.addOption(null, OPTION_ENABLE_OPEN_TELEMETRY, false, "Enable OpenTelemetry tracing.");
     options.addOption(
+        null, OPTION_ENABLE_OPEN_TELEMETRY_METRICS, false, "Enable OpenTelemetry metrics.");
+    options.addOption(
         null,
         OPTION_OPEN_TELEMETRY_TRACE_RATIO,
         true,
@@ -1473,6 +1479,10 @@ public class OptionsMetadata {
 
   public boolean isEnableOpenTelemetry() {
     return this.enableOpenTelemetry;
+  }
+
+  public boolean isEnableOpenTelemetryMetrics() {
+    return this.enableOpenTelemetryMetrics;
   }
 
   public Double getOpenTelemetryTraceRatio() {
