@@ -86,6 +86,7 @@ public class BooleanParser extends Parser<Boolean> {
 
   /** Converts the string to a boolean value according to the PostgreSQL specs. */
   public static boolean toBoolean(String value) {
+    value = value == null ? null : value.toLowerCase(Locale.ENGLISH);
     if (TRUE_VALUES.contains(value)) {
       return true;
     } else if (FALSE_VALUES.contains(value)) {
