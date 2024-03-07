@@ -86,6 +86,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -110,11 +112,13 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   @Test
   public void testQuery() throws SQLException {
     String sql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+            + "col_timestamptz, col_date, col_varchar "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
             + "and col_bytea=? "
+            + "and col_float4=? "
             + "and col_float8=? "
             + "and col_int=? "
             + "and col_numeric=? "
@@ -124,7 +128,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         ParameterMetaData metadata = statement.getParameterMetaData();
-        assertEquals(9, metadata.getParameterCount());
+        assertEquals(10, metadata.getParameterCount());
         for (int index = 1; index <= metadata.getParameterCount(); index++) {
           assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
           assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
@@ -133,6 +137,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
         assertEquals(Types.BIT, metadata.getParameterType(++index));
         assertEquals(Types.BINARY, metadata.getParameterType(++index));
+        assertEquals(Types.REAL, metadata.getParameterType(++index));
         assertEquals(Types.DOUBLE, metadata.getParameterType(++index));
         assertEquals(Types.BIGINT, metadata.getParameterType(++index));
         assertEquals(Types.NUMERIC, metadata.getParameterType(++index));
@@ -147,11 +152,13 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   public void testParameterMetaData() throws SQLException {
     for (String sql :
         new String[] {
-          "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+          "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+              + "col_timestamptz, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
               + "and col_bytea=? "
+              + "and col_float4=? "
               + "and col_float8=? "
               + "and col_int=? "
               + "and col_numeric=? "
@@ -160,15 +167,19 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_varchar=? "
               + "and col_jsonb::text=?",
           "insert into all_types "
-              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+              + "col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           "insert into all_types "
-              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-              + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+              + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+              + "col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+              + "col_timestamptz, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
               + "and col_bytea=? "
+              + "and col_float4=? "
               + "and col_float8=? "
               + "and col_int=? "
               + "and col_numeric=? "
@@ -176,13 +187,15 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_date=? "
               + "and col_varchar=? "
               + "and col_jsonb::text=?",
-          "insert into all_types " + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "insert into all_types " + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           "insert into all_types "
-              + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+              + "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+              + "col_timestamptz, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
               + "and col_bytea=? "
+              + "and col_float4=? "
               + "and col_float8=? "
               + "and col_int=? "
               + "and col_numeric=? "
@@ -193,6 +206,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           "update all_types set "
               + "col_bool=?, "
               + "col_bytea=?, "
+              + "col_float4=?, "
               + "col_float8=?, "
               + "col_int=?, "
               + "col_numeric=?, "
@@ -203,6 +217,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           "update all_types set "
               + "col_bool=null, "
               + "col_bytea=null, "
+              + "col_float4=null, "
               + "col_float8=null, "
               + "col_int=null, "
               + "col_numeric=null, "
@@ -213,6 +228,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "where col_bigint=? "
               + "and col_bool=? "
               + "and col_bytea=? "
+              + "and col_float4=? "
               + "and col_float8=? "
               + "and col_int=? "
               + "and col_numeric=? "
@@ -225,6 +241,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "where col_bigint=? "
               + "and col_bool=? "
               + "and col_bytea=? "
+              + "and col_float4=? "
               + "and col_float8=? "
               + "and col_int=? "
               + "and col_numeric=? "
@@ -237,20 +254,21 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
           ParameterMetaData metadata = statement.getParameterMetaData();
           if (sql.startsWith("update all_types set col_bool=?,")) {
-            assertEquals(sql, 9, metadata.getParameterCount());
-          } else {
             assertEquals(sql, 10, metadata.getParameterCount());
+          } else {
+            assertEquals(sql, 11, metadata.getParameterCount());
           }
           for (int index = 1; index <= metadata.getParameterCount(); index++) {
             assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
             assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
           }
           int index = 0;
-          if (metadata.getParameterCount() == 10) {
+          if (metadata.getParameterCount() == 11) {
             assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
           }
           assertEquals(sql, Types.BIT, metadata.getParameterType(++index));
           assertEquals(sql, Types.BINARY, metadata.getParameterType(++index));
+          assertEquals(sql, Types.REAL, metadata.getParameterType(++index));
           assertEquals(sql, Types.DOUBLE, metadata.getParameterType(++index));
           assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
           assertEquals(sql, Types.NUMERIC, metadata.getParameterType(++index));
@@ -330,6 +348,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "where col_bigint=? "
               + "and col_bool=? "
               + "and col_bytea=? "
+              + "and col_float4=? "
               + "and col_float8=? "
               + "and col_int=? "
               + "and col_numeric=? "
@@ -337,11 +356,13 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_date=? "
               + "and col_varchar=?",
           "insert into all_types "
-              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, borked) "
-              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+              + "col_timestamptz, col_date, col_varchar, borked) "
+              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           "update all_types set col_bigint=?, "
               + "col_bool=?, "
               + "col_bytea=?, "
+              + "col_float4=?, "
               + "col_float8=?, "
               + "col_int=?, "
               + "col_numeric=?, "
@@ -353,6 +374,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "where col_bigint=? "
               + "and col_bool=? "
               + "and col_bytea=? "
+              + "and col_float4=? "
               + "and col_float8=? "
               + "and col_int=? "
               + "and col_numeric=? "
@@ -378,6 +400,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
             "col_bigint",
             "col_bool",
             "col_bytea",
+            "col_float4",
             "col_float8",
             "col_int",
             "col_numeric",
@@ -389,6 +412,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
             Types.BIGINT,
             Types.BIT,
             Types.BINARY,
+            Types.REAL,
             Types.DOUBLE,
             Types.BIGINT,
             Types.NUMERIC,
@@ -402,6 +426,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
                 + "where col_bigint=? "
                 + "and col_bool=? "
                 + "and col_bytea=? "
+                + "and col_float4=? "
                 + "and col_float8=? "
                 + "and col_int=? "
                 + "and col_numeric=? "
@@ -413,7 +438,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         ResultSetMetaData metadata = statement.getMetaData();
-        assertEquals(9, metadata.getColumnCount());
+        assertEquals(10, metadata.getColumnCount());
         for (int index = 1; index <= metadata.getColumnCount(); index++) {
           assertEquals(types.get(index - 1).intValue(), metadata.getColumnType(index));
           assertEquals(ResultSetMetaData.columnNullableUnknown, metadata.isNullable(index));
@@ -426,11 +451,13 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   @Test
   public void testSelectWithParameters() throws SQLException {
     String sql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+            + "col_timestamptz, col_date, col_varchar "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
             + "and col_bytea=? "
+            + "and col_float4=? "
             + "and col_float8=? "
             + "and col_int=? "
             + "and col_numeric=? "
@@ -448,6 +475,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setLong(++index, 1);
         statement.setBoolean(++index, true);
         statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
+        statement.setFloat(++index, 3.14f);
         statement.setDouble(++index, 3.14d);
         statement.setInt(++index, 1);
         statement.setBigDecimal(++index, new BigDecimal("3.14"));
@@ -463,6 +491,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           assertEquals(1, resultSet.getLong(++index));
           assertTrue(resultSet.getBoolean(++index));
           assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+          assertEquals(3.14f, resultSet.getFloat(++index), 0.0f);
           assertEquals(3.14d, resultSet.getDouble(++index), 0.0d);
           assertEquals(1, resultSet.getInt(++index));
           assertEquals(new BigDecimal("3.14"), resultSet.getBigDecimal(++index));
@@ -484,8 +513,9 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+                  + "col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         // This forces the PG JDBC driver to use binary transfer mode for the results, and will
         // also cause it to send a DescribeStatement message.
         statement.unwrap(PgStatement.class).setPrepareThreshold(-1);
@@ -494,6 +524,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setLong(++index, 2);
         statement.setBoolean(++index, true);
         statement.setBytes(++index, "bytes_test".getBytes(StandardCharsets.UTF_8));
+        statement.setFloat(++index, 10.1f);
         statement.setDouble(++index, 10.1);
         statement.setInt(++index, 100);
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
@@ -514,6 +545,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertTrue(resultSet.getBoolean(++index));
         assertArrayEquals(
             "bytes_test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+        assertEquals(10.1f, resultSet.getFloat(++index), 0.0f);
         assertEquals(10.1d, resultSet.getDouble(++index), 0.0d);
         assertEquals(100, resultSet.getInt(++index));
         assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
@@ -534,6 +566,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         "update all_types set "
             + "col_bool=?, "
             + "col_bytea=?, "
+            + "col_float4=?, "
             + "col_float8=?, "
             + "col_int=?, "
             + "col_numeric=?, "
@@ -551,6 +584,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         int index = 0;
         statement.setBoolean(++index, false);
         statement.setBytes(++index, "updated".getBytes(StandardCharsets.UTF_8));
+        statement.setDouble(++index, 3.14f * 2f);
         statement.setDouble(++index, 3.14d * 2d);
         statement.setInt(++index, 2);
         statement.setBigDecimal(++index, new BigDecimal("10.0"));
@@ -574,6 +608,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertEquals(1, resultSet.getLong(++index));
         assertFalse(resultSet.getBoolean(++index));
         assertArrayEquals("updated".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+        assertEquals(3.14f * 2f, resultSet.getFloat(++index), 0.0f);
         assertEquals(3.14d * 2d, resultSet.getDouble(++index), 0.0d);
         assertEquals(2, resultSet.getInt(++index));
         assertEquals(new BigDecimal("10.0"), resultSet.getBigDecimal(++index));
@@ -596,8 +631,9 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
+                  + "col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         // This forces the PG JDBC driver to use binary transfer mode for the results, and will
         // also cause it to send a DescribeStatement message.
         statement.unwrap(PgStatement.class).setPrepareThreshold(-1);
@@ -606,6 +642,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
         statement.setNull(++index, Types.BINARY);
+        statement.setNull(++index, Types.REAL);
         statement.setNull(++index, Types.DOUBLE);
         statement.setNull(++index, Types.INTEGER);
         statement.setNull(++index, Types.NUMERIC);
@@ -628,6 +665,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertFalse(resultSet.getBoolean(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getBytes(++index));
+        assertTrue(resultSet.wasNull());
+        assertEquals(0f, resultSet.getFloat(++index), 0.0f);
         assertTrue(resultSet.wasNull());
         assertEquals(0d, resultSet.getDouble(++index), 0.0d);
         assertTrue(resultSet.wasNull());
