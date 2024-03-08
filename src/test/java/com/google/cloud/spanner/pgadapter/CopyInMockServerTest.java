@@ -997,7 +997,22 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals("", errors);
-    assertEquals(" C \n---\n 2\n(1 row)\n", output);
+    // Newer versions of psql return the output from all statements.
+    assertTrue(
+        output,
+        (" C \n"
+                    + "---\n"
+                    + " 1\n"
+                    + "(1 row)\n"
+                    + "\n"
+                    + "COPY 1\n"
+                    + "COPY 1\n"
+                    + " C \n"
+                    + "---\n"
+                    + " 2\n"
+                    + "(1 row)\n")
+                .equals(output)
+            || " C \n---\n 2\n(1 row)\n".equals(output));
     int res = process.waitFor();
     assertEquals(0, res);
 
@@ -1109,7 +1124,11 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals("ERROR:  Statement is invalid.", errors);
-    assertEquals("", output);
+    // Newer versions of psql include the output before the error occurred.
+    assertTrue(
+        output,
+        (" C \n" + "---\n" + " 1\n" + "(1 row)\n" + "\n" + "COPY 1").equals(output)
+            || output.isEmpty());
     int res = process.waitFor();
     assertEquals(0, res);
 
