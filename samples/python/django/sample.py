@@ -9,6 +9,9 @@ from django.db.transaction import atomic
 from django.db.models import IntegerField, CharField, BooleanField
 from django.db.models.functions import Cast
 import random
+from pgadapter import start_pgadapter
+
+
 x = 0
 
 def create_sample_singer(singer_id):
@@ -191,22 +194,28 @@ def jsonb_filter():
 
 
 if __name__ == "__main__":
+  # Start PGAdapter in an embedded container.
+  container, port = start_pgadapter("emulator-project",
+                                    "test-instance",
+                                    True,
+                                    None)
+  os.environ.setdefault('PGPORT', str(port))
 
   try:
     tables_created = False
 
-    #setting up django
+    # Setting up django
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'setting')
     django.setup()
     print('Django Setup Created')
 
-    #creating the tables if they don't exist
+    # Creating the tables if they don't exist
     create_tables()
     print('Tables corresponding to data models created')
 
     tables_created = True
 
-    #importing the models
+    # Importing the models
     from sample_app.model import Singer, Album, Track, Concert, Venue
 
     print('Starting Django Test')
