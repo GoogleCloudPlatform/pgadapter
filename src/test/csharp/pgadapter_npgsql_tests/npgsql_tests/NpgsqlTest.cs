@@ -477,7 +477,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
-                    new () {Value = UseFloat4 ? 3.14f + i : (double) 3.14f + i},
+                    new () {Value = UseFloat4 ? (object?) (3.14f + i) : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -517,7 +517,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
-                    new () {Value = UseFloat4 ? 3.14f + i : (double) 3.14f + i},
+                    new () {Value = UseFloat4 ? (object?) (3.14f + i) : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -603,7 +603,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
-                    new () {Value = UseFloat4 ? 3.14f + i : (double) 3.14f + i},
+                    new () {Value = UseFloat4 ? (object?) (3.14f + i) : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -782,7 +782,14 @@ public class NpgsqlTest
             writer.Write(1L);
             writer.Write(true);
             writer.Write(new byte[] {1,2,3});
-            writer.Write(UseFloat4 ? 3.14f : (double) 3.14f);
+            if (UseFloat4)
+            {
+                writer.Write(3.14f);
+            }
+            else
+            {
+                writer.Write((double) 3.14f);
+            }
             writer.Write(3.14d);
             writer.Write(10);
             writer.Write(6.626m);
@@ -1167,7 +1174,7 @@ public class NpgsqlTest
             cmd.Parameters[index++].Value = 100L + i;
             cmd.Parameters[index++].Value = true;
             cmd.Parameters[index++].Value = Encoding.UTF8.GetBytes("test_bytes");
-            cmd.Parameters[index++].Value = UseFloat4 ? 3.14f : (double) 3.14f;
+            cmd.Parameters[index++].Value = UseFloat4 ? (object?) 3.14f : (double) 3.14f;
             cmd.Parameters[index++].Value = 3.14d;
             cmd.Parameters[index++].Value = 100;
             cmd.Parameters[index++].Value = 6.626m;
