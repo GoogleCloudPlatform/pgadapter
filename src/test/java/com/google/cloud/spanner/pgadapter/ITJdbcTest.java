@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -423,7 +424,11 @@ public class ITJdbcTest implements IntegrationTest {
         } else {
           statement.setBytes(++index, "bytes_test".getBytes(StandardCharsets.UTF_8));
         }
-        statement.setFloat(++index, 10.1f);
+        if (useFloat4InTests()) {
+          statement.setFloat(++index, 10.1f);
+        } else {
+          statement.setDouble(++index, 10.1f);
+        }
         statement.setDouble(++index, 10.1);
         // TODO: Remove when the emulator supports casting to int4
         if (isSimpleMode) {
@@ -454,8 +459,15 @@ public class ITJdbcTest implements IntegrationTest {
                     "bytes2".getBytes(StandardCharsets.UTF_8)
                   }));
         }
-        statement.setArray(
-            ++index, connection.createArrayOf("float4", new Float[] {3.14f, null, -99.8f}));
+        if (useFloat4InTests()) {
+          statement.setArray(
+              ++index, connection.createArrayOf("float4", new Float[] {3.14f, null, -99.8f}));
+        } else {
+          statement.setArray(
+              ++index,
+              connection.createArrayOf(
+                  "float8", new Double[] {(double) 3.14f, null, (double) -99.8f}));
+        }
         statement.setArray(
             ++index, connection.createArrayOf("float8", new Double[] {3.14d, null, -99.8}));
         // TODO: Remove when Spangres supports casting to int4
@@ -551,8 +563,14 @@ public class ITJdbcTest implements IntegrationTest {
               },
               (byte[][]) resultSet.getArray(++index).getArray());
         }
-        assertArrayEquals(
-            new Float[] {3.14f, null, -99.8f}, (Float[]) resultSet.getArray(++index).getArray());
+        if (useFloat4InTests()) {
+          assertArrayEquals(
+              new Float[] {3.14f, null, -99.8f}, (Float[]) resultSet.getArray(++index).getArray());
+        } else {
+          assertArrayEquals(
+              new Double[] {(double) 3.14f, null, (double) -99.8f},
+              (Double[]) resultSet.getArray(++index).getArray());
+        }
         assertArrayEquals(
             new Double[] {3.14d, null, -99.8}, (Double[]) resultSet.getArray(++index).getArray());
         assertArrayEquals(
@@ -626,7 +644,11 @@ public class ITJdbcTest implements IntegrationTest {
         if (!isSimpleMode) {
           statement.setBytes(++index, "updated".getBytes(StandardCharsets.UTF_8));
         }
-        statement.setFloat(++index, 3.14f * 2f);
+        if (useFloat4InTests()) {
+          statement.setFloat(++index, 3.14f * 2f);
+        } else {
+          statement.setDouble(++index, 3.14f * 2f);
+        }
         statement.setDouble(++index, 3.14d * 2d);
         // TODO: Remove when Spangres supports casting to int4
         if (isSimpleMode) {

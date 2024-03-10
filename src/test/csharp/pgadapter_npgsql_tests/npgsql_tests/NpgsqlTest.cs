@@ -14,6 +14,7 @@
 
 using System.Data;
 using Npgsql;
+using Npgsql.Internal.Postgres;
 using NpgsqlTypes;
 using System.Globalization;
 using System.Reflection;
@@ -34,6 +35,8 @@ public class NpgsqlTest
         var test = new NpgsqlTest(args[0], args[1]);
         test.Execute();
     }
+
+    private static bool UseFloat4 => "700".Equals(Environment.GetEnvironmentVariable("PGADAPTER_FLOAT4_OID"));
 
     private string Test { get; }
     
@@ -198,9 +201,12 @@ public class NpgsqlTest
                     Console.WriteLine($"Value mismatch: Got '{stringValue}', Want: 'test'");
                     return;
                 }
-                if (Math.Abs(reader.GetFloat(++index) - 3.14f) > 0.0f)
+                var f = UseFloat4
+                    ? reader.GetFloat(++index)
+                    : (float) reader.GetDouble(++index);
+                if (Math.Abs(f - 3.14f) > 0.0f)
                 {
-                    Console.WriteLine($"Value mismatch: Got '{reader.GetFloat(index)}', Want: 3.14");
+                    Console.WriteLine($"Value mismatch: Got '{f}', Want: 3.14");
                     return;
                 }
                 if (Math.Abs(reader.GetDouble(++index) - 3.14d) > 0.0d)
@@ -261,7 +267,7 @@ public class NpgsqlTest
             {
                 new () {Value = true},
                 new () {Value = Encoding.UTF8.GetBytes("test_bytes")},
-                new () {Value = 3.14f},
+                new () {Value = UseFloat4 ? 3.14f : (double) 3.14f},
                 new () {Value = 3.14d},
                 new () {Value = 1},
                 new () {Value = 6.626m},
@@ -296,7 +302,7 @@ public class NpgsqlTest
                 new () {Value = 100L},
                 new () {Value = true},
                 new () {Value = Encoding.UTF8.GetBytes("test_bytes")},
-                new () {Value = 3.14f},
+                new () {Value = UseFloat4 ? 3.14f : (double) 3.14f},
                 new () {Value = 3.14d},
                 new () {Value = 100},
                 new () {Value = 6.626m},
@@ -365,7 +371,7 @@ public class NpgsqlTest
                 new () {Value = 1L},
                 new () {Value = true},
                 new () {Value = Encoding.UTF8.GetBytes("test")},
-                new () {Value = 3.14f},
+                new () {Value = UseFloat4 ? 3.14f : (double) 3.14f},
                 new () {Value = 3.14d},
                 new () {Value = 100},
                 new () {Value = 6.626m},
@@ -400,9 +406,12 @@ public class NpgsqlTest
                     Console.WriteLine($"Value mismatch: Got '{stringValue}', Want: 'test'");
                     return;
                 }
-                if (Math.Abs(reader.GetFloat(++index) - 3.14f) > 0.0f)
+                var f = UseFloat4
+                    ? reader.GetFloat(++index)
+                    : (float) reader.GetDouble(++index);
+                if (Math.Abs(f - 3.14f) > 0.0f)
                 {
-                    Console.WriteLine($"Value mismatch: Got '{reader.GetFloat(index)}', Want: 3.14");
+                    Console.WriteLine($"Value mismatch: Got '{f}', Want: 3.14");
                     return;
                 }
                 if (Math.Abs(reader.GetDouble(++index) - 3.14d) > 0.0d)
@@ -468,7 +477,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
-                    new () {Value = 3.14f + i},
+                    new () {Value = UseFloat4 ? 3.14f + i : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -508,7 +517,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
-                    new () {Value = 3.14f + i},
+                    new () {Value = UseFloat4 ? 3.14f + i : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -594,7 +603,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
-                    new () {Value = 3.14f + i},
+                    new () {Value = UseFloat4 ? 3.14f + i : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -773,7 +782,7 @@ public class NpgsqlTest
             writer.Write(1L);
             writer.Write(true);
             writer.Write(new byte[] {1,2,3});
-            writer.Write(3.14f);
+            writer.Write(UseFloat4 ? 3.14f : (double) 3.14f);
             writer.Write(3.14d);
             writer.Write(10);
             writer.Write(6.626m);
@@ -892,7 +901,10 @@ public class NpgsqlTest
                 }
                 else
                 {
-                    Console.Write(reader.Read<float>(NpgsqlDbType.Real).ToString(nfi));
+                    var f = UseFloat4
+                        ? reader.Read<float>(NpgsqlDbType.Real)
+                        : (float) reader.Read<double>(NpgsqlDbType.Double);
+                    Console.Write(f.ToString(nfi));
                 }
                 Console.Write("\t");
                 if (reader.IsNull)
@@ -1003,7 +1015,10 @@ public class NpgsqlTest
                 }
                 else
                 {
-                    var floats = reader.Read<List<float?>>(NpgsqlDbType.Array | NpgsqlDbType.Real);
+                    var floats = UseFloat4 
+                        ? reader.Read<List<float?>>(NpgsqlDbType.Array | NpgsqlDbType.Real) 
+                        : reader.Read<List<double?>>(NpgsqlDbType.Array | NpgsqlDbType.Double)
+                            .Select(d => (float?) d).ToList();
                     Console.Write("[" + string.Join(", ", floats.Select(f => f?.ToString(nfi))) + "]");
                 }
                 Console.Write("\t");
@@ -1137,7 +1152,7 @@ public class NpgsqlTest
             cmd.Parameters.Add(null, NpgsqlDbType.Bigint);
             cmd.Parameters.Add(null, NpgsqlDbType.Boolean);
             cmd.Parameters.Add(null, NpgsqlDbType.Bytea);
-            cmd.Parameters.Add(null, NpgsqlDbType.Real);
+            cmd.Parameters.Add(null, UseFloat4 ? NpgsqlDbType.Real : NpgsqlDbType.Double);
             cmd.Parameters.Add(null, NpgsqlDbType.Double);
             cmd.Parameters.Add(null, NpgsqlDbType.Integer);
             cmd.Parameters.Add(null, NpgsqlDbType.Numeric);
@@ -1152,7 +1167,7 @@ public class NpgsqlTest
             cmd.Parameters[index++].Value = 100L + i;
             cmd.Parameters[index++].Value = true;
             cmd.Parameters[index++].Value = Encoding.UTF8.GetBytes("test_bytes");
-            cmd.Parameters[index++].Value = 3.14f;
+            cmd.Parameters[index++].Value = UseFloat4 ? 3.14f : (double) 3.14f;
             cmd.Parameters[index++].Value = 3.14d;
             cmd.Parameters[index++].Value = 100;
             cmd.Parameters[index++].Value = 6.626m;
@@ -1199,7 +1214,7 @@ public class NpgsqlTest
                     new() { Value = id },
                     new() { Value = true },
                     new() { Value = Encoding.UTF8.GetBytes("test_bytes") },
-                    new() { Value = 3.14f },
+                    new() { Value = UseFloat4 ? 3.14f : (double) 3.14f },
                     new() { Value = 3.14d },
                     new() { Value = 100 },
                     new() { Value = 6.626m },

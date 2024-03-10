@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.nodejs;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -82,7 +83,7 @@ public class ITNodePostgresTest implements IntegrationTest {
             + "col_bigint bigint not null primary key, "
             + "col_bool bool, "
             + "col_bytea bytea, "
-            + "col_float4 float4, "
+            + String.format("col_float4 %s, ", useFloat4InTests() ? "float4" : "float8")
             + "col_float8 float8, "
             + "col_int int, "
             + "col_numeric numeric, "
@@ -234,7 +235,12 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(
           ByteArray.copyFrom("some random string".getBytes(StandardCharsets.UTF_8)),
           resultSet.getBytes("col_bytea"));
-      assertEquals(3.14f, resultSet.getFloat("col_float4"), 0.0f);
+      assertEquals(
+          3.14f,
+          useFloat4InTests()
+              ? resultSet.getFloat("col_float4")
+              : (float) resultSet.getDouble("col_float4"),
+          0.0f);
       assertEquals(3.14d, resultSet.getDouble("col_float8"), 0.0d);
       assertEquals(100, resultSet.getLong("col_int"));
       assertEquals("234.54235", resultSet.getString("col_numeric"));
@@ -291,7 +297,12 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(
           ByteArray.copyFrom("some random string".getBytes(StandardCharsets.UTF_8)),
           resultSet.getBytes("col_bytea"));
-      assertEquals(3.14f, resultSet.getFloat("col_float4"), 0.0f);
+      assertEquals(
+          3.14f,
+          useFloat4InTests()
+              ? resultSet.getFloat("col_float4")
+              : (float) resultSet.getDouble("col_float4"),
+          0.0f);
       assertEquals(3.14d, resultSet.getDouble("col_float8"), 0.0d);
       assertEquals(100, resultSet.getLong("col_int"));
       assertEquals("234.54235", resultSet.getString("col_numeric"));
@@ -329,7 +340,7 @@ public class ITNodePostgresTest implements IntegrationTest {
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":true,"
             + "\"col_bytea\":{\"type\":\"Buffer\",\"data\":[116,101,115,116]},"
-            + "\"col_float4\":3.14,"
+            + String.format("\"col_float4\":%s,", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "\"col_float8\":3.14,"
             + "\"col_int\":\"100\","
             + "\"col_numeric\":\"6.626\","
@@ -412,7 +423,9 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     String output = runTest("testCopyTo", getHost(), testEnv.getServer().getLocalPort());
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        String.format(
+            "1\tt\t\\\\x74657374\t%s\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+            useFloat4InTests() ? "3.14" : "3.140000104904175"),
         output);
   }
 

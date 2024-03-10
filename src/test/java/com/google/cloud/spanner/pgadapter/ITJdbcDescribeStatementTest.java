@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -137,7 +138,11 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
         assertEquals(Types.BIT, metadata.getParameterType(++index));
         assertEquals(Types.BINARY, metadata.getParameterType(++index));
-        assertEquals(Types.REAL, metadata.getParameterType(++index));
+        if (useFloat4InTests()) {
+          assertEquals(Types.REAL, metadata.getParameterType(++index));
+        } else {
+          assertEquals(Types.DOUBLE, metadata.getParameterType(++index));
+        }
         assertEquals(Types.DOUBLE, metadata.getParameterType(++index));
         assertEquals(Types.BIGINT, metadata.getParameterType(++index));
         assertEquals(Types.NUMERIC, metadata.getParameterType(++index));
@@ -268,7 +273,11 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           }
           assertEquals(sql, Types.BIT, metadata.getParameterType(++index));
           assertEquals(sql, Types.BINARY, metadata.getParameterType(++index));
-          assertEquals(sql, Types.REAL, metadata.getParameterType(++index));
+          if (useFloat4InTests()) {
+            assertEquals(sql, Types.REAL, metadata.getParameterType(++index));
+          } else {
+            assertEquals(sql, Types.DOUBLE, metadata.getParameterType(++index));
+          }
           assertEquals(sql, Types.DOUBLE, metadata.getParameterType(++index));
           assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
           assertEquals(sql, Types.NUMERIC, metadata.getParameterType(++index));
@@ -412,7 +421,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
             Types.BIGINT,
             Types.BIT,
             Types.BINARY,
-            Types.REAL,
+            useFloat4InTests() ? Types.REAL : Types.DOUBLE,
             Types.DOUBLE,
             Types.BIGINT,
             Types.NUMERIC,
@@ -475,7 +484,11 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setLong(++index, 1);
         statement.setBoolean(++index, true);
         statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
-        statement.setFloat(++index, 3.14f);
+        if (useFloat4InTests()) {
+          statement.setFloat(++index, 3.14f);
+        } else {
+          statement.setDouble(++index, 3.14f);
+        }
         statement.setDouble(++index, 3.14d);
         statement.setInt(++index, 1);
         statement.setBigDecimal(++index, new BigDecimal("3.14"));
@@ -524,7 +537,11 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setLong(++index, 2);
         statement.setBoolean(++index, true);
         statement.setBytes(++index, "bytes_test".getBytes(StandardCharsets.UTF_8));
-        statement.setFloat(++index, 10.1f);
+        if (useFloat4InTests()) {
+          statement.setFloat(++index, 10.1f);
+        } else {
+          statement.setDouble(++index, 10.1f);
+        }
         statement.setDouble(++index, 10.1);
         statement.setInt(++index, 100);
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
@@ -642,7 +659,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
         statement.setNull(++index, Types.BINARY);
-        statement.setNull(++index, Types.REAL);
+        statement.setNull(++index, useFloat4InTests() ? Types.REAL : Types.DOUBLE);
         statement.setNull(++index, Types.DOUBLE);
         statement.setNull(++index, Types.INTEGER);
         statement.setNull(++index, Types.NUMERIC);

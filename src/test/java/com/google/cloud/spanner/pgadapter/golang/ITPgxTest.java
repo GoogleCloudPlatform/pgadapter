@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -47,6 +48,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.core.Oid;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -199,12 +201,16 @@ public class ITPgxTest implements IntegrationTest {
     testEnv.write(
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
-    assertNull(pgxTest.TestInsertAllDataTypes(createConnString()));
+    assertNull(
+        pgxTest.TestInsertAllDataTypes(
+            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
   }
 
   @Test
   public void testPrepareStatement() {
-    assertNull(pgxTest.TestPrepareStatement(createConnString()));
+    assertNull(
+        pgxTest.TestPrepareStatement(
+            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
   }
 
   @Test

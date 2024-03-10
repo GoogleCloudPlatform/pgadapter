@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -40,6 +41,7 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.core.Oid;
 
 /**
  * Tests PGAdapter using the native Go pgx driver in simple query mode. The Go code can be found in
@@ -189,7 +191,9 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
             + "('{\"{\\\"key\\\": \\\"value1\\\"}\",NULL,\"{\\\"key\\\": \\\"value2\\\"}\"}'))";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
-    String res = pgxTest.TestInsertAllDataTypes(createConnString());
+    String res =
+        pgxTest.TestInsertAllDataTypes(
+            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8);
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);

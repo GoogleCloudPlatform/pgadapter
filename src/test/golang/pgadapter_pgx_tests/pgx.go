@@ -227,38 +227,38 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	wantInt8Array := pgtype.Int8Array{
-		Elements: []pgtype.Int8{{1, pgtype.Present}, {0, pgtype.Null}, {2, pgtype.Present}},
+		Elements:   []pgtype.Int8{{1, pgtype.Present}, {0, pgtype.Null}, {2, pgtype.Present}},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayBigint, wantInt8Array; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	wantBoolArray := pgtype.BoolArray{
-		Elements: []pgtype.Bool{{true, pgtype.Present}, {false, pgtype.Null}, {false, pgtype.Present}},
+		Elements:   []pgtype.Bool{{true, pgtype.Present}, {false, pgtype.Null}, {false, pgtype.Present}},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayBool, wantBoolArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	wantByteaArray := pgtype.ByteaArray{
-		Elements: []pgtype.Bytea{{[]byte("bytes1"), pgtype.Present}, {nil, pgtype.Null}, {[]byte("bytes2"), pgtype.Present}},
+		Elements:   []pgtype.Bytea{{[]byte("bytes1"), pgtype.Present}, {nil, pgtype.Null}, {[]byte("bytes2"), pgtype.Present}},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayBytea, wantByteaArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	wantFloat8Array := pgtype.Float8Array{
-		Elements: []pgtype.Float8{{3.14, pgtype.Present}, {0, pgtype.Null}, {-99.99, pgtype.Present}},
+		Elements:   []pgtype.Float8{{3.14, pgtype.Present}, {0, pgtype.Null}, {-99.99, pgtype.Present}},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayFloat8, wantFloat8Array; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	// int (int4) values are automatically converted to bigint (int8) values in Cloud Spanner.
 	wantInt4Array := pgtype.Int8Array{
-		Elements: []pgtype.Int8{{-100, pgtype.Present}, {0, pgtype.Null}, {-200, pgtype.Present}},
+		Elements:   []pgtype.Int8{{-100, pgtype.Present}, {0, pgtype.Null}, {-200, pgtype.Present}},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayInt, wantInt4Array; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
@@ -267,27 +267,27 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	var wantNumericValue2 pgtype.Numeric
 	_ = wantNumericValue2.Scan("-3.14")
 	wantNumericArray := pgtype.NumericArray{
-		Elements: []pgtype.Numeric{wantNumericValue1, {Status: pgtype.Null}, wantNumericValue2},
+		Elements:   []pgtype.Numeric{wantNumericValue1, {Status: pgtype.Null}, wantNumericValue2},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayNumeric, wantNumericArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	wantDateValue1, _ := time.Parse("2006-01-02", "2023-02-20")
 	wantDateValue2, _ := time.Parse("2006-01-02", "2000-01-01")
 	wantDateArray := pgtype.DateArray{
-		Elements: []pgtype.Date{{wantDateValue1, pgtype.Present, 0}, {time.Time{}, pgtype.Null, 0}, {wantDateValue2, pgtype.Present, 0}},
+		Elements:   []pgtype.Date{{wantDateValue1, pgtype.Present, 0}, {time.Time{}, pgtype.Null, 0}, {wantDateValue2, pgtype.Present, 0}},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayDate, wantDateArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	wantTimestamptzValue1, _ := time.Parse(time.RFC3339Nano, "2022-02-16T16:18:02.123456+00:00")
 	wantTimestamptzValue2, _ := time.Parse(time.RFC3339Nano, "2000-01-01T00:00:00+00:00")
 	wantTimestamptzArray := pgtype.TimestamptzArray{
-		Elements: []pgtype.Timestamptz{{wantTimestamptzValue1, pgtype.Present, 0}, {time.Time{}, pgtype.Null, 0}, {wantTimestamptzValue2, pgtype.Present, 0}},
+		Elements:   []pgtype.Timestamptz{{wantTimestamptzValue1, pgtype.Present, 0}, {time.Time{}, pgtype.Null, 0}, {wantTimestamptzValue2, pgtype.Present, 0}},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	gotVal1 := arrayTimestamptz.(pgtype.TimestamptzArray).Elements[0].Time.UTC().String()
 	wantVal1 := wantTimestamptzArray.Elements[0].Time.UTC().String()
 	gotVal2 := arrayTimestamptz.(pgtype.TimestamptzArray).Elements[1].Time.UTC().String()
@@ -299,9 +299,9 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	wantVarcharArray := pgtype.VarcharArray{
-		Elements: []pgtype.Varchar{{"string1", pgtype.Present}, {"", pgtype.Null}, {"string2", pgtype.Present}},
+		Elements:   []pgtype.Varchar{{"string1", pgtype.Present}, {"", pgtype.Null}, {"string2", pgtype.Present}},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayVarchar, wantVarcharArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
@@ -310,9 +310,9 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	wantJsonb2 := pgtype.JSONB{}
 	wantJsonb2.Scan("{\"key\": \"value2\"}")
 	wantJsonbArray := pgtype.JSONBArray{
-		Elements: []pgtype.JSONB{wantJsonb1, {nil, pgtype.Null}, wantJsonb2},
+		Elements:   []pgtype.JSONB{wantJsonb1, {nil, pgtype.Null}, wantJsonb2},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present}
+		Status:     pgtype.Present}
 	if g, w := arrayJsonb, wantJsonbArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
@@ -321,7 +321,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 }
 
 //export TestInsertAllDataTypes
-func TestInsertAllDataTypes(connString string) *C.char {
+func TestInsertAllDataTypes(connString string, float4Oid int) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -346,11 +346,21 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	date2 := pgtype.Date{}
 	_ = date2.Set("1970-01-01")
 
-	tag, err = conn.Exec(ctx, insertSql, 100, true, []byte("test_bytes"), float32(3.14), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}",
+	var float4Value interface{}
+	var float4Array interface{}
+	if float4Oid == pgtype.Float4OID {
+		float4Value = float32(3.14)
+		float4Array = pgtype.Float4Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float4{{Float: float32(3.14), Status: pgtype.Present}, {Status: pgtype.Null}, {Float: float32(6.626), Status: pgtype.Present}}}
+	} else {
+		float4Value = float64(float32(3.14))
+		float4Array = pgtype.Float8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float8{{Float: float64(float32(3.14)), Status: pgtype.Present}, {Status: pgtype.Null}, {Float: float64(float32(6.626)), Status: pgtype.Present}}}
+	}
+
+	tag, err = conn.Exec(ctx, insertSql, 100, true, []byte("test_bytes"), float4Value, 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}",
 		pgtype.Int8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Int8{{Int: 100, Status: pgtype.Present}, {Status: pgtype.Null}, {Int: 200, Status: pgtype.Present}}},
 		pgtype.BoolArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Bool{{Bool: true, Status: pgtype.Present}, {Status: pgtype.Null}, {Bool: false, Status: pgtype.Present}}},
 		[][]byte{[]byte("bytes1"), nil, []byte("bytes2")},
-		pgtype.Float4Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float4{{Float: float32(3.14), Status: pgtype.Present}, {Status: pgtype.Null}, {Float: float32(6.626), Status: pgtype.Present}}},
+		float4Array,
 		pgtype.Float8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float8{{Float: 3.14, Status: pgtype.Present}, {Status: pgtype.Null}, {Float: 6.626, Status: pgtype.Present}}},
 		pgtype.Int8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Int8{{Int: -1, Status: pgtype.Present}, {Status: pgtype.Null}, {Int: -2, Status: pgtype.Present}}},
 		pgtype.NumericArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Numeric{numeric1, {Status: pgtype.Null}, numeric2}},
@@ -540,7 +550,7 @@ func TestUpdateAllDataTypes(connString string) *C.char {
 }
 
 //export TestPrepareStatement
-func TestPrepareStatement(connString string) *C.char {
+func TestPrepareStatement(connString string, float4Oid int) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -548,19 +558,20 @@ func TestPrepareStatement(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	sql := "UPDATE all_types SET col_int=$1, col_bool=$2, col_bytea=$3, col_float8=$4, " +
-		"col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_bigint=$10"
+	sql := "UPDATE all_types SET col_int=$1, col_bool=$2, col_bytea=$3, col_float4=$4, col_float8=$5, " +
+		"col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 WHERE col_bigint=$11"
 	sd, err := conn.Prepare(ctx, "update_all_types", sql)
 	if err != nil {
 		return C.CString(err.Error())
 	}
-	if g, w := len(sd.ParamOIDs), 10; g != w {
+	if g, w := len(sd.ParamOIDs), 11; g != w {
 		return C.CString(fmt.Sprintf("param type count mismatch:\n Got: %v\nWant: %v", g, w))
 	}
 	wantParamTypes := []int{
 		pgtype.Int8OID,
 		pgtype.BoolOID,
 		pgtype.ByteaOID,
+		float4Oid,
 		pgtype.Float8OID,
 		pgtype.NumericOID,
 		pgtype.TimestamptzOID,

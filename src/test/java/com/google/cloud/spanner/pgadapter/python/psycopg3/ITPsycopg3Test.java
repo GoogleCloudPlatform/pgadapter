@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.python.psycopg3;
 
 import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.getOnlyAllTypesDdl;
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.DIRECTORY_NAME;
 import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.execute;
 import static org.junit.Assert.assertArrayEquals;
@@ -193,7 +194,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
-            + "col_float4: 3.14\n"
+            + String.format("col_float4: %s\n", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -204,7 +205,10 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
-            + "col_array_float4: [3.14, None, -99.99]\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                useFloat4InTests() ? "3.14" : "3.140000104904175",
+                useFloat4InTests() ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -222,7 +226,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
-            + "col_float4: 3.14\n"
+            + String.format("col_float4: %s\n", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -233,7 +237,10 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
-            + "col_array_float4: [3.14, None, -99.99]\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                useFloat4InTests() ? "3.14" : "3.140000104904175",
+                useFloat4InTests() ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -268,7 +275,9 @@ public class ITPsycopg3Test implements IntegrationTest {
             // converted to a 32-bit float.
             + String.format(
                 "col_float4: %s\n",
-                format == DataFormat.POSTGRESQL_TEXT ? "3.14" : "3.140000104904175")
+                format == DataFormat.POSTGRESQL_TEXT && useFloat4InTests()
+                    ? "3.14"
+                    : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -281,8 +290,12 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
             + String.format(
                 "col_array_float4: [%s, None, %s]\n",
-                format == DataFormat.POSTGRESQL_TEXT ? "3.14" : "3.140000104904175",
-                format == DataFormat.POSTGRESQL_TEXT ? "-99.99" : "-99.98999786376953")
+                format == DataFormat.POSTGRESQL_TEXT && useFloat4InTests()
+                    ? "3.14"
+                    : "3.140000104904175",
+                format == DataFormat.POSTGRESQL_TEXT && useFloat4InTests()
+                    ? "-99.99"
+                    : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -608,7 +621,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
-            + "col_float4: 3.14\n"
+            + String.format("col_float4: %s\n", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -619,7 +632,10 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
-            + "col_array_float4: [3.14, None, -99.99]\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                useFloat4InTests() ? "3.14" : "3.140000104904175",
+                useFloat4InTests() ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -669,7 +685,7 @@ public class ITPsycopg3Test implements IntegrationTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
-            + "col_float4: 3.14\n"
+            + String.format("col_float4: %s\n", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -680,7 +696,10 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
-            + "col_array_float4: [3.14, None, -99.99]\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                useFloat4InTests() ? "3.14" : "3.140000104904175",
+                useFloat4InTests() ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"

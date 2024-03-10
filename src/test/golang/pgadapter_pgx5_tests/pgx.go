@@ -450,7 +450,7 @@ func TestUpdateAllDataTypes(connString string) *C.char {
 }
 
 //export TestPrepareStatement
-func TestPrepareStatement(connString string) *C.char {
+func TestPrepareStatement(connString string, float4Oid int) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -471,7 +471,7 @@ func TestPrepareStatement(connString string) *C.char {
 		pgtype.Int8OID,
 		pgtype.BoolOID,
 		pgtype.ByteaOID,
-		pgtype.Float4OID,
+		float4Oid,
 		pgtype.Float8OID,
 		pgtype.NumericOID,
 		pgtype.TimestamptzOID,
