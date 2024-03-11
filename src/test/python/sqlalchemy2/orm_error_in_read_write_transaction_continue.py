@@ -13,6 +13,7 @@ with Session(engine) as session:
       col_bigint=1,
       col_bool=True,
       col_bytea=bytes("test bytes", "utf-8"),
+      col_float4=3.14,
       col_float8=3.14,
       col_int=100,
       col_numeric=decimal.Decimal("6.626"),

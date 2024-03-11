@@ -101,10 +101,10 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
 
     String actualOutput = execute("select_all_types.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "row: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
+        "row: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'), "
             + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
             + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}, "
-            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], "
+            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], [3.14, None, -99.99], "
             + "[-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], "
             + "[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], "
             + "[datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], "
@@ -119,18 +119,18 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
 
     String actualOutput = execute("select_parameterized.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "first execution: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
+        "first execution: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'), "
             + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
             + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}, "
-            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], "
+            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], [3.14, None, -99.99], "
             + "[-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], "
             + "[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], "
             + "[datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], "
             + "['string1', None, 'string2'], [{'key': 'value1'}, None, {'key': 'value2'}]]\n"
-            + "second execution: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
+            + "second execution: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'), "
             + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
             + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}, "
-            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], "
+            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], [3.14, None, -99.99], "
             + "[-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], "
             + "[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], "
             + "[datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], "
