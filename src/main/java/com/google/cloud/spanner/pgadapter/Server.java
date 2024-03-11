@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.auth.Credentials;
+import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
+import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -23,6 +25,9 @@ import com.google.devtools.cloudtrace.v2.AttributeValue;
 import com.google.devtools.cloudtrace.v2.TruncatableString;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
+import io.opentelemetry.sdk.metrics.export.MetricExporter;
+import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
@@ -56,7 +61,8 @@ public class Server {
 
   /** Creates an {@link OpenTelemetry} object from the given options. */
   static OpenTelemetry setupOpenTelemetry(OptionsMetadata optionsMetadata) {
-    if (!optionsMetadata.isEnableOpenTelemetry()) {
+    if (!optionsMetadata.isEnableOpenTelemetry()
+        && !optionsMetadata.isEnableOpenTelemetryMetrics()) {
       return OpenTelemetry.noop();
     }
 
@@ -73,45 +79,62 @@ public class Server {
       System.setProperty("otel.service.name", "pgadapter");
     }
 
-    TraceConfiguration.Builder builder =
-        TraceConfiguration.builder().setDeadline(Duration.ofSeconds(60L));
-    String projectId = optionsMetadata.getTelemetryProjectId();
-    if (projectId != null) {
-      builder.setProjectId(projectId);
-    }
     try {
+      String projectId = optionsMetadata.getTelemetryProjectId();
       Credentials credentials = optionsMetadata.getTelemetryCredentials();
-      if (credentials != null) {
-        builder.setCredentials(credentials);
+      AutoConfiguredOpenTelemetrySdkBuilder openTelemetryBuilder =
+          AutoConfiguredOpenTelemetrySdk.builder();
+      if (optionsMetadata.isEnableOpenTelemetry()) {
+        TraceConfiguration.Builder builder =
+            TraceConfiguration.builder().setDeadline(Duration.ofSeconds(60L));
+        if (projectId != null) {
+          builder.setProjectId(projectId);
+        }
+        if (credentials != null) {
+          builder.setCredentials(credentials);
+        }
+        builder.setFixedAttributes(
+            ImmutableMap.of(
+                "service.name",
+                AttributeValue.newBuilder()
+                    .setStringValue(
+                        TruncatableString.newBuilder()
+                            .setValue(
+                                Objects.requireNonNull(
+                                    getOpenTelemetrySetting("otel.service.name")))
+                            .build())
+                    .build()));
+        TraceConfiguration configuration = builder.build();
+        SpanExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
+        Sampler sampler;
+        if (optionsMetadata.getOpenTelemetryTraceRatio() == null) {
+          sampler = Sampler.parentBased(Sampler.traceIdRatioBased(0.05d));
+        } else {
+          sampler =
+              Sampler.parentBased(
+                  Sampler.traceIdRatioBased(optionsMetadata.getOpenTelemetryTraceRatio()));
+        }
+        openTelemetryBuilder.addTracerProviderCustomizer(
+            (sdkTracerProviderBuilder, configProperties) ->
+                sdkTracerProviderBuilder
+                    .setSampler(sampler)
+                    .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()));
       }
-      builder.setFixedAttributes(
-          ImmutableMap.of(
-              "service.name",
-              AttributeValue.newBuilder()
-                  .setStringValue(
-                      TruncatableString.newBuilder()
-                          .setValue(
-                              Objects.requireNonNull(getOpenTelemetrySetting("otel.service.name")))
-                          .build())
-                  .build()));
-      TraceConfiguration configuration = builder.build();
-      SpanExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
-      Sampler sampler;
-      if (optionsMetadata.getOpenTelemetryTraceRatio() == null) {
-        sampler = Sampler.parentBased(Sampler.traceIdRatioBased(0.05d));
-      } else {
-        sampler =
-            Sampler.parentBased(
-                Sampler.traceIdRatioBased(optionsMetadata.getOpenTelemetryTraceRatio()));
+      if (optionsMetadata.isEnableOpenTelemetryMetrics()) {
+        MetricExporter cloudMonitoringExporter =
+            GoogleCloudMetricExporter.createWithConfiguration(
+                MetricConfiguration.builder()
+                    // Configure the cloud project id.
+                    .setProjectId(projectId)
+                    // Set the credentials to use when writing to the Cloud Monitoring API
+                    .setCredentials(credentials)
+                    .build());
+        openTelemetryBuilder.addMeterProviderCustomizer(
+            (sdkMeterProviderBuilder, configProperties) ->
+                sdkMeterProviderBuilder.registerMetricReader(
+                    PeriodicMetricReader.builder(cloudMonitoringExporter).build()));
       }
-      return AutoConfiguredOpenTelemetrySdk.builder()
-          .addTracerProviderCustomizer(
-              (sdkTracerProviderBuilder, configProperties) ->
-                  sdkTracerProviderBuilder
-                      .setSampler(sampler)
-                      .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()))
-          .build()
-          .getOpenTelemetrySdk();
+      return openTelemetryBuilder.build().getOpenTelemetrySdk();
     } catch (IOException exception) {
       throw new RuntimeException(exception);
     }

@@ -6,7 +6,7 @@ require (
 	github.com/jackc/pgtype v1.14.2
 	github.com/shopspring/decimal v1.3.1
 	gorm.io/datatypes v1.2.0
-	gorm.io/driver/postgres v1.5.6
+	gorm.io/driver/postgres v1.5.7
 	gorm.io/gorm v1.25.7
 )
 

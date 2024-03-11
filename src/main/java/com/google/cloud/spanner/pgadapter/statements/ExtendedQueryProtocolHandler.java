@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.Server.getVersion;
 
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
@@ -25,7 +26,9 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMess
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
@@ -50,29 +53,27 @@ public class ExtendedQueryProtocolHandler {
   private final BackendConnection backendConnection;
 
   private final String connectionId;
-  private final Tracer tracer;
   private volatile Span span;
   private volatile Scope scope;
+  private volatile Stopwatch stopwatch;
 
   /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
-    this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
-    this.connectionId = connectionHandler.getTraceConnectionId().toString();
-    this.tracer =
-        connectionHandler
-            .getServer()
-            .getOpenTelemetry()
-            .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
-    this.backendConnection =
+    this(
+        connectionHandler,
         new BackendConnection(
-            tracer,
+            connectionHandler
+                .getServer()
+                .getTracer(ConnectionHandler.class.getName(), getVersion()),
+            connectionHandler.getServer().getMetrics(),
+            createMetricAttributes(connectionHandler.getDatabaseId()),
             connectionHandler.getTraceConnectionId().toString(),
             connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
             connectionHandler::getWellKnownClient,
             connectionHandler.getServer().getOptions(),
-            () -> connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler));
+            () -> connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler)));
   }
 
   /** Constructor only intended for testing. */
@@ -81,21 +82,25 @@ public class ExtendedQueryProtocolHandler {
       ConnectionHandler connectionHandler, BackendConnection backendConnection) {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
     this.connectionId = connectionHandler.getTraceConnectionId().toString();
-    this.tracer =
-        connectionHandler
-            .getServer()
-            .getOpenTelemetry()
-            .getTracer(ExtendedQueryProtocolHandler.class.getName(), getVersion());
     this.backendConnection = Preconditions.checkNotNull(backendConnection);
-  }
-
-  public Tracer getTracer() {
-    return tracer;
   }
 
   /** Returns the backend PG connection for this query handler. */
   public BackendConnection getBackendConnection() {
     return backendConnection;
+  }
+
+  public Tracer getTracer() {
+    return backendConnection.getTracer();
+  }
+
+  @VisibleForTesting
+  static Attributes createMetricAttributes(DatabaseId databaseId) {
+    AttributesBuilder attributesBuilder = Attributes.builder();
+    attributesBuilder.put("database", databaseId.getDatabase());
+    attributesBuilder.put("instance_id", databaseId.getInstanceId().getInstance());
+    attributesBuilder.put("project_id", databaseId.getInstanceId().getProject());
+    return attributesBuilder.build();
   }
 
   /** Returns a copy of the currently buffered messages in this handler. */
@@ -115,8 +120,10 @@ public class ExtendedQueryProtocolHandler {
 
   public void maybeStartSpan(boolean isExtendedProtocol) {
     if (span == null) {
+      stopwatch = Stopwatch.createStarted();
       span =
-          tracer
+          getBackendConnection()
+              .getTracer()
               .spanBuilder("query_protocol_handler")
               .setNoParent()
               .setAttribute("pgadapter.query_protocol", isExtendedProtocol ? "extended" : "simple")
@@ -244,6 +251,10 @@ public class ExtendedQueryProtocolHandler {
       scope.close();
       span.end();
       span = null;
+      backendConnection
+          .getMetrics()
+          .recordPGAdapterLatency(
+              stopwatch.elapsed().toMillis(), backendConnection.getMetricAttributes());
     }
   }
 

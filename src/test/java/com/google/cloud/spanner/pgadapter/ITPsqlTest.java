@@ -929,12 +929,14 @@ public class ITPsqlTest implements IntegrationTest {
           ZoneId.of("Asia/Tehran"),
           // Changed the use of DST multiple times. Changed offset on 2024-02-29.
           ZoneId.of("Asia/Almaty"),
+          ZoneId.of("Asia/Qostanay"),
           // Rankin_Inlet and Resolute did not observe DST in 1970-1979, but not all databases
           // agree.
           ZoneId.of("America/Rankin_Inlet"),
           ZoneId.of("America/Resolute"),
           ZoneId.of("America/Iqaluit"),
           ZoneId.of("America/Inuvik"),
+          ZoneId.of("America/Scoresbysund"),
           // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
           ZoneId.of("America/Pangnirtung"),
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
@@ -1065,13 +1067,14 @@ public class ITPsqlTest implements IntegrationTest {
             + " -d "
             + POSTGRES_DATABASE
             + " -c \"copy (select (random()*9223372036854775807)::bigint, "
-            + "  random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, "
+            + "  random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, (random()*123456789)::float4, random()*123456789, "
             + "  (random()*999999)::int, (random()*999999999999)::numeric, now()-random()*interval '250 year', "
             + "  (current_date-random()*interval '400 year')::date, md5(random()::text || clock_timestamp()::text)::varchar,"
             + "  ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb, "
             + "  array[(random()*1000000000)::bigint, null, (random()*1000000000)::bigint],\n"
             + "  array[random()<0.5, null, random()<0.5],\n"
             + "  array[md5(random()::text ||clock_timestamp()::text)::bytea, null, md5(random()::text ||clock_timestamp()::text)::bytea],\n"
+            + "  array[(random()*123456789)::float4, null, (random()*123456789)::float4],\n"
             + "  array[random()*123456789, null, random()*123456789],\n"
             + "  array[(random()*999999)::int, null, (random()*999999)::int],\n"
             + "  array[(random()*999999)::numeric, null, (random()*999999)::numeric],\n"

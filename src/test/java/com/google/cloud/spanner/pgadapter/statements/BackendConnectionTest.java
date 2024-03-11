@@ -59,9 +59,11 @@ import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatemen
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Tracer;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -76,10 +78,14 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class BackendConnectionTest {
   private static final Tracer NOOP_OTEL = OpenTelemetry.noop().getTracer("test");
+  private static final Metrics NOOP_OTEL_METER = new Metrics(OpenTelemetry.noop());
   private final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   private static final NoResult NO_RESULT = new NoResult();
   private static final Runnable DO_NOTHING = () -> {};
+  private static final DatabaseId DATABASE_ID = DatabaseId.of("p", "i", "d");
+  private static final Attributes METRIC_ATTRIBUTES =
+      ExtendedQueryProtocolHandler.createMetricAttributes(DATABASE_ID);
 
   @Test
   public void testExtractDdlUpdateCounts() {
@@ -117,9 +123,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -157,9 +165,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -198,9 +208,11 @@ public class BackendConnectionTest {
     BackendConnection onlyDmlStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -215,9 +227,11 @@ public class BackendConnectionTest {
     BackendConnection onlyCopyStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -230,9 +244,11 @@ public class BackendConnectionTest {
     BackendConnection dmlAndCopyStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -247,9 +263,11 @@ public class BackendConnectionTest {
     BackendConnection onlySelectStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -264,9 +282,11 @@ public class BackendConnectionTest {
     BackendConnection onlyClientSideStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -281,9 +301,11 @@ public class BackendConnectionTest {
     BackendConnection onlyUnknownStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -298,9 +320,11 @@ public class BackendConnectionTest {
     BackendConnection dmlAndSelectStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -315,9 +339,11 @@ public class BackendConnectionTest {
     BackendConnection copyAndSelectStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -332,9 +358,11 @@ public class BackendConnectionTest {
     BackendConnection copyAndUnknownStatements =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             spannerConnection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -365,9 +393,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -405,9 +435,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -444,9 +476,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -473,9 +507,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -514,9 +550,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -545,9 +583,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             options,
@@ -574,9 +614,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             options,
@@ -604,9 +646,11 @@ public class BackendConnectionTest {
       BackendConnection backendConnection =
           new BackendConnection(
               NOOP_OTEL,
+              NOOP_OTEL_METER,
+              METRIC_ATTRIBUTES,
               UUID.randomUUID().toString(),
               DO_NOTHING,
-              DatabaseId.of("p", "i", "d"),
+              DATABASE_ID,
               connection,
               () -> WellKnownClient.UNSPECIFIED,
               mock(OptionsMetadata.class),
@@ -630,9 +674,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -662,9 +708,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -692,9 +740,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -721,9 +771,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -760,9 +812,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
@@ -798,9 +852,11 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
             UUID.randomUUID().toString(),
             DO_NOTHING,
-            DatabaseId.of("p", "i", "d"),
+            DATABASE_ID,
             connection,
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),

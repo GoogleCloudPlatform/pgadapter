@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.csharp;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
@@ -199,6 +200,15 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
           .addRows(
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
+                  .addValues(Value.newBuilder().setStringValue("float4").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT8)).build())
                   .addValues(Value.newBuilder().setStringValue("float8").build())
                   .addValues(Value.newBuilder().setStringValue("b").build())
@@ -317,6 +327,16 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setStringValue("a").build())
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_float4").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
                   .build())
           .addRows(
               ListValue.newBuilder()
@@ -526,6 +546,9 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     String[] runCommand = new String[] {"dotnet", "run", test, connectionString};
     builder.command(runCommand);
     builder.directory(new File("./src/test/csharp/pgadapter_npgsql_tests/npgsql_tests"));
+    builder
+        .environment()
+        .put("PGADAPTER_FLOAT4_OID", String.valueOf(useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
     Process process = builder.start();
     String output = readAll(process.getInputStream());
     String errors = readAll(process.getErrorStream());
