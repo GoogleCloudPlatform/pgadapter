@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -47,6 +48,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.core.Oid;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -134,6 +136,8 @@ public class ITPgxTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -155,6 +159,8 @@ public class ITPgxTest implements IntegrationTest {
                 .set("col_array_bytea")
                 .toBytesArray(
                     Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float4")
+                .toFloat32Array(Arrays.asList(3.14f, null, -99.99f))
                 .set("col_array_float8")
                 .toFloat64Array(Arrays.asList(3.14d, null, -99.99d))
                 .set("col_array_int")
@@ -195,12 +201,16 @@ public class ITPgxTest implements IntegrationTest {
     testEnv.write(
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
-    assertNull(pgxTest.TestInsertAllDataTypes(createConnString()));
+    assertNull(
+        pgxTest.TestInsertAllDataTypes(
+            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
   }
 
   @Test
   public void testPrepareStatement() {
-    assertNull(pgxTest.TestPrepareStatement(createConnString()));
+    assertNull(
+        pgxTest.TestPrepareStatement(
+            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
   }
 
   @Test

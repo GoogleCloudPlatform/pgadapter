@@ -62,7 +62,7 @@ public class OpenTelemetryMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         while (resultSet.next()) {
-          assertEquals(18, resultSet.getMetaData().getColumnCount());
+          assertEquals(20, resultSet.getMetaData().getColumnCount());
         }
       }
     }

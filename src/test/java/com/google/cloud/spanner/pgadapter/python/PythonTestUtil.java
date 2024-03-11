@@ -14,10 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.python;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 import java.util.Scanner;
+import org.postgresql.core.Oid;
 
 public class PythonTestUtil {
 
@@ -47,6 +49,9 @@ public class PythonTestUtil {
     builder.command(command);
     builder.directory(directory);
     builder.environment().put("VIRTUAL_ENV", directoryName + "/venv");
+    builder
+        .environment()
+        .put("PGADAPTER_FLOAT4_OID", String.valueOf(useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
     builder
         .environment()
         .put(
