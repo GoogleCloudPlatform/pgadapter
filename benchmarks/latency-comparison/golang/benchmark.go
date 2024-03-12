@@ -99,12 +99,12 @@ func main() {
 		sql = querySql
 	}
 	fmt.Println("Running pgx v5 benchmark using TCP against PGAdapter")
-	pgxTcpRunTimes, err := runners.RunPgx(*db, sql, readWrite, *numOperations, *numClients, *host, *port, false)
+	pgxTcpRunTimes, err := runners.RunPgx(*db, sql, readWrite, *numOperations, *numClients, *wait, *host, *port, false)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Running pgx v4 benchmark using TCP against PGAdapter")
-	pgxV4TcpRunTimes, err := runners.RunPgxV4(*db, sql, readWrite, *numOperations, *numClients, *host, *port, false)
+	pgxV4TcpRunTimes, err := runners.RunPgxV4(*db, sql, readWrite, *numOperations, *numClients, *wait, *host, *port, false)
 	if err != nil {
 		panic(err)
 	}
@@ -113,19 +113,19 @@ func main() {
 	var pgxV4UdsRunTimes []float64
 	if *uds {
 		fmt.Println("Running pgx v5 benchmark using Unix Domain Socket against PGAdapter")
-		pgxUdsRunTimes, err = runners.RunPgx(*db, sql, readWrite, *numOperations, *numClients, *dir, *udsPort, true)
+		pgxUdsRunTimes, err = runners.RunPgx(*db, sql, readWrite, *numOperations, *numClients, *wait, *dir, *udsPort, true)
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println("Running pgx v4 benchmark using Unix Domain Socket against PGAdapter")
-		pgxV4UdsRunTimes, err = runners.RunPgxV4(*db, sql, readWrite, *numOperations, *numClients, *dir, *udsPort, true)
+		pgxV4UdsRunTimes, err = runners.RunPgxV4(*db, sql, readWrite, *numOperations, *numClients, *wait, *dir, *udsPort, true)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	fmt.Println("Running native Cloud Spanner client library benchmark")
-	clientLibRunTimes, err := runners.RunClientLib(*db, sql, readWrite, *numOperations, *numClients)
+	clientLibRunTimes, err := runners.RunClientLib(*db, sql, readWrite, *numOperations, *numClients, *wait)
 	if err != nil {
 		panic(err)
 	}

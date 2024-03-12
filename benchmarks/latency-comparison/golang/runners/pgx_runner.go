@@ -23,7 +23,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func RunPgx(database, sql string, readWrite bool, numOperations, numClients int, host string, port int, useUnixSocket bool) ([]float64, error) {
+func RunPgx(database, sql string, readWrite bool, numOperations, numClients, wait int, host string, port int, useUnixSocket bool) ([]float64, error) {
 	ctx := context.Background()
 	var err error
 
@@ -62,6 +62,7 @@ func RunPgx(database, sql string, readWrite bool, numOperations, numClients int,
 		go func() error {
 			defer wg.Done()
 			for n := 0; n < numOperations; n++ {
+				randWait(wait)
 				if readWrite {
 					runTimes[clientIndex*numOperations+n], err = executePgxUpdate(ctx, conns[clientIndex], sql)
 				} else {

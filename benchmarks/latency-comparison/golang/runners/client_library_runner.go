@@ -34,7 +34,7 @@ func init() {
 	m = &sync.Mutex{}
 }
 
-func RunClientLib(db, sql string, readWrite bool, numOperations, numClients int) ([]float64, error) {
+func RunClientLib(db, sql string, readWrite bool, numOperations, numClients, wait int) ([]float64, error) {
 	ctx := context.Background()
 	client, err := spanner.NewClient(ctx, db)
 	if err != nil {
@@ -61,7 +61,12 @@ func RunClientLib(db, sql string, readWrite bool, numOperations, numClients int)
 		go func() error {
 			defer wg.Done()
 			for n := 0; n < numOperations; n++ {
-				runTimes[clientIndex*numOperations+n], err = executeClientLibQuery(ctx, client, sql)
+				randWait(wait)
+				if readWrite {
+					runTimes[clientIndex*numOperations+n], err = executeClientLibUpdate(ctx, client, sql)
+				} else {
+					runTimes[clientIndex*numOperations+n], err = executeClientLibQuery(ctx, client, sql)
+				}
 				if err != nil {
 					return err
 				}
@@ -122,6 +127,13 @@ func executeClientLibUpdate(ctx context.Context, client *spanner.Client, sql str
 	}
 	end := float64(time.Since(start).Microseconds()) / 1e3
 	return end, nil
+}
+
+func randWait(wait int) {
+	m.Lock()
+	sleep := rand.Intn(2 * wait)
+	m.Unlock()
+	time.Sleep(time.Duration(sleep) * time.Millisecond)
 }
 
 func randId(n int64) int64 {
