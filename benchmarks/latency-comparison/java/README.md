@@ -34,6 +34,7 @@ The benchmark application accepts the following command line arguments:
 * --clients: The number of parallel clients that execute queries. Defaults to 16.
 * --operations: The number of operations (queries) that each client executes. Defaults to 1,000.
 * --transaction: The type of transaction to execute. Must be either READ_ONLY or READ_WRITE. Defaults to READ_ONLY.
+* --wait: The wait time in milliseconds between each operation. Defaults to 0.
 
 ## Examples
 

@@ -24,6 +24,8 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 var rnd *rand.Rand
 var m *sync.Mutex
 
@@ -32,7 +34,7 @@ func init() {
 	m = &sync.Mutex{}
 }
 
-func RunClientLib(db, sql string, numOperations, numClients int) ([]float64, error) {
+func RunClientLib(db, sql string, readWrite bool, numOperations, numClients int) ([]float64, error) {
 	ctx := context.Background()
 	client, err := spanner.NewClient(ctx, db)
 	if err != nil {
@@ -41,8 +43,14 @@ func RunClientLib(db, sql string, numOperations, numClients int) ([]float64, err
 	defer client.Close()
 
 	// Run one query to warm up.
-	if _, err := executeClientLibQuery(ctx, client, sql); err != nil {
-		return nil, err
+	if readWrite {
+		if _, err := executeClientLibUpdate(ctx, client, sql); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := executeClientLibQuery(ctx, client, sql); err != nil {
+			return nil, err
+		}
 	}
 
 	runTimes := make([]float64, numOperations*numClients)
@@ -97,8 +105,37 @@ func executeClientLibQuery(ctx context.Context, client *spanner.Client, sql stri
 	return end, nil
 }
 
+func executeClientLibUpdate(ctx context.Context, client *spanner.Client, sql string) (float64, error) {
+	start := time.Now()
+	stmt := spanner.Statement{
+		SQL: sql,
+		Params: map[string]interface{}{
+			"p1": randString(),
+			"p2": randId(100000),
+		},
+	}
+	if _, err := client.ReadWriteTransaction(ctx, func(ctx context.Context, transaction *spanner.ReadWriteTransaction) error {
+		_, err := transaction.Update(ctx, stmt)
+		return err
+	}); err != nil {
+		return 0, err
+	}
+	end := float64(time.Since(start).Microseconds()) / 1e3
+	return end, nil
+}
+
 func randId(n int64) int64 {
 	m.Lock()
 	defer m.Unlock()
 	return rnd.Int63n(n)
+}
+
+func randString() string {
+	b := make([]byte, 64)
+	m.Lock()
+	defer m.Unlock()
+	for i := range b {
+		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
+	}
+	return string(b)
 }
