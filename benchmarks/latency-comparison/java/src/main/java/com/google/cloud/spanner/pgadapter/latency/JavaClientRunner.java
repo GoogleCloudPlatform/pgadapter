@@ -40,7 +40,8 @@ public class JavaClientRunner extends AbstractRunner {
   }
 
   @Override
-  public List<Duration> execute(String sql, int numClients, int numOperations, int waitMillis) {
+  public List<Duration> execute(
+      TransactionType transactionType, int numClients, int numOperations, int waitMillis) {
     SpannerOptions options =
         SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject()).build();
     try (Spanner spanner = options.getService()) {
@@ -50,7 +51,8 @@ public class JavaClientRunner extends AbstractRunner {
       ExecutorService service = Executors.newFixedThreadPool(numClients);
       for (int client = 0; client < numClients; client++) {
         results.add(
-            service.submit(() -> runBenchmark(databaseClient, sql, numOperations, waitMillis)));
+            service.submit(
+                () -> runBenchmark(databaseClient, transactionType, numOperations, waitMillis)));
       }
       return collectResults(service, results, numClients, numOperations);
     } catch (Throwable t) {
@@ -59,15 +61,18 @@ public class JavaClientRunner extends AbstractRunner {
   }
 
   private List<Duration> runBenchmark(
-      DatabaseClient databaseClient, String sql, int numOperations, int waitMillis) {
+      DatabaseClient databaseClient,
+      TransactionType transactionType,
+      int numOperations,
+      int waitMillis) {
     List<Duration> results = new ArrayList<>(numOperations);
     // Execute one query to make sure everything has been warmed up.
-    executeQuery(databaseClient, sql);
+    executeTransaction(databaseClient, transactionType);
 
     for (int i = 0; i < numOperations; i++) {
       try {
         randomWait(waitMillis);
-        results.add(executeQuery(databaseClient, sql));
+        results.add(executeTransaction(databaseClient, transactionType));
         incOperations();
       } catch (InterruptedException interruptedException) {
         throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
@@ -76,8 +81,20 @@ public class JavaClientRunner extends AbstractRunner {
     return results;
   }
 
-  private Duration executeQuery(DatabaseClient client, String sql) {
+  private Duration executeTransaction(DatabaseClient client, TransactionType transactionType) {
     Stopwatch watch = Stopwatch.createStarted();
+    switch (transactionType) {
+      case READ_ONLY:
+        executeReadOnlyTransaction(client, transactionType.getSql());
+        break;
+      case READ_WRITE:
+        executeReadWriteTransaction(client, transactionType.getSql());
+        break;
+    }
+    return watch.elapsed();
+  }
+
+  private void executeReadOnlyTransaction(DatabaseClient client, String sql) {
     try (ResultSet resultSet =
         client
             .singleUse()
@@ -96,6 +113,19 @@ public class JavaClientRunner extends AbstractRunner {
         }
       }
     }
-    return watch.elapsed();
+  }
+
+  private void executeReadWriteTransaction(DatabaseClient client, String sql) {
+    client
+        .readWriteTransaction()
+        .run(
+            transaction ->
+                transaction.executeUpdate(
+                    Statement.newBuilder(sql)
+                        .bind("p1")
+                        .to(generateRandomString())
+                        .bind("p2")
+                        .to(ThreadLocalRandom.current().nextInt(100000))
+                        .build()));
   }
 }
