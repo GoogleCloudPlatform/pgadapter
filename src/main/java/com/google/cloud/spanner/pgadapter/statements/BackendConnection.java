@@ -256,7 +256,6 @@ public class BackendConnection {
     private final String command;
     private final Function<Statement, Statement> statementBinder;
     private final boolean analyze;
-    private final Attributes metricAttributes;
 
     Execute(
         String command,
@@ -278,7 +277,6 @@ public class BackendConnection {
       this.command = command;
       this.statementBinder = statementBinder;
       this.analyze = analyze;
-      this.metricAttributes = ExtendedQueryProtocolHandler.getMetricAttributes(databaseId);
     }
 
     @Override
