@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
+import com.google.cloud.spanner.pgadapter.latency.BenchmarkRunner.TransactionType;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,6 +30,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -76,6 +78,11 @@ public class LatencyBenchmark {
         true,
         "The wait time in milliseconds between each query that is executed by each client. Defaults to 0. "
             + "Set this to for example 1000 to have each client execute 1 query per second.");
+    options.addOption(
+        "t",
+        "transaction",
+        true,
+        "The type of transaction to execute. Must be either READ_ONLY or READ_WRITE. Defaults to READ_ONLY.");
     options.addOption("skip_pg", false, "Skip PostgreSQL JDBC benchmarks.");
     options.addOption("skip_jdbc", false, "Skip Cloud Spanner JDBC benchmarks.");
     options.addOption("skip_spanner", false, "Skip Cloud Spanner client library benchmarks.");
@@ -103,6 +110,10 @@ public class LatencyBenchmark {
         commandLine.hasOption('o') ? Integer.parseInt(commandLine.getOptionValue('o')) : 1000;
     int waitMillis =
         commandLine.hasOption('w') ? Integer.parseInt(commandLine.getOptionValue('w')) : 0;
+    TransactionType transactionType =
+        commandLine.hasOption('t')
+            ? TransactionType.valueOf(commandLine.getOptionValue('t').toUpperCase(Locale.ENGLISH))
+            : TransactionType.READ_ONLY;
     boolean runPg = !commandLine.hasOption("skip_pg");
     boolean runJdbc = !commandLine.hasOption("skip_jdbc");
     boolean runSpanner = !commandLine.hasOption("skip_spanner");
@@ -113,6 +124,7 @@ public class LatencyBenchmark {
     System.out.printf("Database: %s\n", databaseId);
     System.out.printf("Clients: %d\n", clients);
     System.out.printf("Operations: %d\n", operations);
+    System.out.printf("Transaction type: %s\n", transactionType);
     System.out.printf("Wait between queries: %dms\n", waitMillis);
 
     List<Duration> pgJdbcResults = null;
@@ -120,12 +132,7 @@ public class LatencyBenchmark {
       System.out.println();
       System.out.println("Running benchmark for PostgreSQL JDBC driver");
       PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
-      pgJdbcResults =
-          pgJdbcRunner.execute(
-              "select col_varchar from latency_test where col_bigint=?",
-              clients,
-              operations,
-              waitMillis);
+      pgJdbcResults = pgJdbcRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
     List<Duration> jdbcResults = null;
@@ -133,12 +140,7 @@ public class LatencyBenchmark {
       System.out.println();
       System.out.println("Running benchmark for Cloud Spanner JDBC driver");
       JdbcRunner jdbcRunner = new JdbcRunner(databaseId);
-      jdbcResults =
-          jdbcRunner.execute(
-              "select col_varchar from latency_test where col_bigint=?",
-              clients,
-              operations,
-              waitMillis);
+      jdbcResults = jdbcRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
     List<Duration> javaClientResults = null;
@@ -147,11 +149,7 @@ public class LatencyBenchmark {
       System.out.println("Running benchmark for Java Client Library");
       JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId);
       javaClientResults =
-          javaClientRunner.execute(
-              "select col_varchar from latency_test where col_bigint=$1",
-              clients,
-              operations,
-              waitMillis);
+          javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
     printResults("PostgreSQL JDBC Driver", pgJdbcResults);
