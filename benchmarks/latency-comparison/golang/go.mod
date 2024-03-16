@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/spanner v1.47.0
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/jackc/pgx/v4 v4.18.2
-	github.com/jackc/pgx/v5 v5.3.1
+	github.com/jackc/pgx/v5 v5.5.4
 	github.com/montanaflynn/stats v0.7.0
 	github.com/testcontainers/testcontainers-go v0.20.1
 	golang.org/x/oauth2 v0.10.0
@@ -72,5 +72,5 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/grpc v1.58.3 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 )
