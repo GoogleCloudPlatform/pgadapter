@@ -15,8 +15,10 @@ package runners
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/api/iterator"
@@ -53,7 +55,10 @@ func RunClientLib(db, sql string, readWrite bool, numOperations, numClients, wai
 		}
 	}
 
-	runTimes := make([]float64, numOperations*numClients)
+	var ops atomic.Int64
+	var finished atomic.Bool
+	totalOps := numOperations * numClients
+	runTimes := make([]float64, totalOps)
 	wg := sync.WaitGroup{}
 	wg.Add(numClients)
 	for c := 0; c < numClients; c++ {
@@ -70,11 +75,15 @@ func RunClientLib(db, sql string, readWrite bool, numOperations, numClients, wai
 				if err != nil {
 					return err
 				}
+				ops.Add(1)
 			}
 			return nil
 		}()
 	}
+	printProgress(&finished, &ops, totalOps)
 	wg.Wait()
+	finished.Store(true)
+	fmt.Printf("\r%d/%d\n\n", ops.Load(), totalOps)
 	return runTimes, nil
 }
 
@@ -129,7 +138,19 @@ func executeClientLibUpdate(ctx context.Context, client *spanner.Client, sql str
 	return end, nil
 }
 
+func printProgress(finished *atomic.Bool, ops *atomic.Int64, totalOps int) {
+	go func() {
+		for !finished.Load() {
+			time.Sleep(time.Second)
+			fmt.Printf("\r%d/%d", ops.Load(), totalOps)
+		}
+	}()
+}
+
 func randWait(wait int) {
+	if wait <= 0 {
+		return
+	}
 	m.Lock()
 	sleep := rand.Intn(2 * wait)
 	m.Unlock()

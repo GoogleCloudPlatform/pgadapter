@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -54,7 +55,10 @@ func RunPgx(database, sql string, readWrite bool, numOperations, numClients, wai
 		}
 	}
 
-	runTimes := make([]float64, numOperations*numClients)
+	var ops atomic.Int64
+	var finished atomic.Bool
+	totalOps := numOperations * numClients
+	runTimes := make([]float64, totalOps)
 	wg := sync.WaitGroup{}
 	wg.Add(numClients)
 	for c := 0; c < numClients; c++ {
@@ -71,11 +75,15 @@ func RunPgx(database, sql string, readWrite bool, numOperations, numClients, wai
 				if err != nil {
 					return err
 				}
+				ops.Add(1)
 			}
 			return nil
 		}()
 	}
+	printProgress(&finished, &ops, totalOps)
 	wg.Wait()
+	finished.Store(true)
+	fmt.Printf("\r%d/%d\n\n", ops.Load(), totalOps)
 	return runTimes, nil
 }
 
