@@ -38,18 +38,18 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   private final PreparedType type;
   private final String name;
-  private final IntermediateStatement statement;
+  private IntermediateStatement statement;
   private Future<StatementResult> describePortalMetadata;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
     this.name = this.readAll();
-    if (this.type == PreparedType.Portal) {
-      this.statement = this.connection.getPortal(this.name);
-    } else {
-      this.statement = this.connection.getStatement(this.name);
-    }
+//    if (this.type == PreparedType.Portal) {
+//      this.statement = this.connection.getPortal(this.name);
+//    } else {
+//      this.statement = this.connection.getStatement(this.name);
+//    }
   }
 
   /** Constructor for manually created Describe messages from the simple query protocol. */
@@ -66,16 +66,21 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     super(connection, 4, manuallyCreatedToken);
     this.type = type;
     this.name = name;
-    if (this.type == PreparedType.Portal) {
-      this.statement = this.connection.getPortal(this.name);
-    } else {
-      this.statement = this.connection.getStatement(this.name);
-    }
+//    if (this.type == PreparedType.Portal) {
+//      this.statement = this.connection.getPortal(this.name);
+//    } else {
+//      this.statement = this.connection.getStatement(this.name);
+//    }
   }
 
   @SuppressWarnings("unchecked")
   @Override
   void buffer(BackendConnection backendConnection) {
+    if (this.type == PreparedType.Portal) {
+      this.statement = this.connection.getPortal(this.name);
+    } else {
+      this.statement = this.connection.getStatement(this.name);
+    }
     if (this.type == PreparedType.Portal && this.statement.containsResultSet()) {
       describePortalMetadata = this.statement.describeAsync(backendConnection);
     } else if (this.type == PreparedType.Statement) {

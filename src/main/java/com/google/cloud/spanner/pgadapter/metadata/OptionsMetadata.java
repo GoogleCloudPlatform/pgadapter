@@ -646,7 +646,7 @@ public class OptionsMetadata {
     this.osName = osName;
     this.commandLine = buildOptions(args);
     this.credentials = credentials;
-    this.sessionPoolOptions = sessionPoolOptions;
+    this.sessionPoolOptions = sessionPoolOptions == null ? null : sessionPoolOptions.toBuilder().setTrackStackTraceOfSessionCheckout(false).build();
     this.commandMetadataParser = new CommandMetadataParser();
     if (this.commandLine.hasOption(OPTION_AUTHENTICATE)
         && this.commandLine.hasOption(OPTION_CREDENTIALS_FILE)

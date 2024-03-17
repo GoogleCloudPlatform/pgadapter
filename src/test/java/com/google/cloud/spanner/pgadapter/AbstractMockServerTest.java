@@ -1200,7 +1200,7 @@ public abstract class AbstractMockServerTest {
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
         .setCredentials(NoCredentials.getInstance());
     optionsConfigurator.accept(builder);
-    pgServer = new ProxyServer(builder.build(), openTelemetry);
+    pgServer = new NonBlockingProxyServer(builder.build(), openTelemetry);
     pgServer.startServer();
   }
 

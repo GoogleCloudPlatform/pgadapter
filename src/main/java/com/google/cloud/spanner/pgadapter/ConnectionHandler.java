@@ -25,6 +25,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Instance;
 import com.google.cloud.spanner.InstanceAdminClient;
 import com.google.cloud.spanner.InstanceNotFoundException;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
@@ -55,6 +56,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -107,7 +109,7 @@ public class ConnectionHandler implements Runnable {
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
   private final ProxyServer server;
-  private Socket socket;
+  protected Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Cache<String, Future<DescribeResult>> autoDescribedStatementsCache =
       CacheBuilder.newBuilder()
@@ -129,7 +131,7 @@ public class ConnectionHandler implements Runnable {
   /** Randomly generated UUID that is included in tracing to identify a connection. */
   private final UUID traceConnectionId = UUID.randomUUID();
 
-  private ConnectionMetadata connectionMetadata;
+  protected ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private int invalidMessagesCount;
   private Connection spannerConnection;
@@ -207,6 +209,10 @@ public class ConnectionHandler implements Runnable {
     if (options.getSessionPoolOptions() != null) {
       connectionOptionsBuilder =
           connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
+    } else {
+      connectionOptionsBuilder.setSessionPoolOptions(SessionPoolOptions.newBuilder()
+          .setTrackStackTraceOfSessionCheckout(false)
+          .build());
     }
     ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
     Connection spannerConnection = connectionOptions.getConnection();
@@ -359,18 +365,29 @@ public class ConnectionHandler implements Runnable {
     TERMINATED
   }
 
+  public BootstrapMessage readBootstrapMessage() throws Exception {
+    return BootstrapMessage.create(this);
+  }
+
+  public ControlMessage readControlMessage() throws Exception {
+    return ControlMessage.create(this);
+  }
+
+  protected ConnectionMetadata createConnectionMetadata() throws IOException {
+    return new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream());
+  }
+
   /**
    * Starts listening for incoming messages on the network socket. Returns RESTART_WITH_SSL if the
    * listening process should be restarted with SSL.
    */
   private RunConnectionState runConnection(boolean ssl) {
     RunConnectionState result = RunConnectionState.TERMINATED;
-    try (ConnectionMetadata connectionMetadata =
-        new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream())) {
+    try (ConnectionMetadata connectionMetadata = createConnectionMetadata()) {
       this.connectionMetadata = connectionMetadata;
 
       try {
-        this.message = this.server.recordMessage(BootstrapMessage.create(this));
+        this.message = this.server.recordMessage(readBootstrapMessage());
         if (!ssl
             && getServer().getOptions().getSslMode().isSslEnabled()
             && this.message instanceof SSLMessage) {
@@ -429,7 +446,7 @@ public class ConnectionHandler implements Runnable {
           if (this.spannerConnection != null) {
             this.spannerConnection.close();
           }
-          this.socket.close();
+          closeSocket();
         } catch (SpannerException | IOException e) {
           logger.log(
               Level.WARNING,
@@ -449,6 +466,10 @@ public class ConnectionHandler implements Runnable {
       }
     }
     return result;
+  }
+
+  protected void closeSocket() throws IOException {
+    this.socket.close();
   }
 
   boolean checkValidConnection(boolean ssl) throws Exception {
@@ -773,11 +794,11 @@ public class ConnectionHandler implements Runnable {
     return extendedQueryProtocolHandler;
   }
 
-  public synchronized ConnectionStatus getStatus() {
+  public ConnectionStatus getStatus() {
     return status;
   }
 
-  public synchronized void setStatus(ConnectionStatus status) {
+  public void setStatus(ConnectionStatus status) {
     this.status = status;
   }
 

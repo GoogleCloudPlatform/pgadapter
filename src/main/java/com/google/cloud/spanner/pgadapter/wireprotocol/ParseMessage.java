@@ -85,7 +85,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     }
     this.statement =
         createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
-    connection.maybeDetermineWellKnownClient(this);
+//    connection.maybeDetermineWellKnownClient(this);
   }
 
   /**
@@ -257,6 +257,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
 
   @Override
   void buffer(BackendConnection backendConnection) throws Exception {
+    connection.maybeDetermineWellKnownClient(this);
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
       throw new IllegalStateException("Must close statement before reusing name.");
     }

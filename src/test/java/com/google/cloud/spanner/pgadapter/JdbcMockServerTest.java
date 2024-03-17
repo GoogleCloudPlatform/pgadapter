@@ -54,6 +54,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.GetDatabaseDdlResponse;
@@ -92,6 +93,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -5414,17 +5416,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Ignore("Only used for manual performance testing")
   @Test
   public void testBasePerformance() throws SQLException {
-    final int numRuns = 1000;
+    final int numResults = 1000;
+    final int numRuns = 100_000;
     String sql = "select * from random_benchmark";
     RandomResultSetGenerator generator = new RandomResultSetGenerator(10, Dialect.POSTGRESQL);
-    for (int run = 0; run < numRuns; run++) {
-      mockSpanner.putStatementResult(
-          StatementResult.query(Statement.of(sql + run), generator.generate()));
+    for (int run = 0; run < numResults; run++) {
+      byte[] bytes = new byte[200];
+      ThreadLocalRandom.current().nextBytes(bytes);
+      mockSpanner.putStatementResults(StatementResult.query(Statement.of(sql + run),
+          com.google.spanner.v1.ResultSet.newBuilder()
+              .setMetadata(ResultSetMetadata.newBuilder()
+                  .setRowType(StructType.newBuilder()
+                      .addFields(Field.newBuilder().setType(Type.newBuilder().setCode(TypeCode.STRING).build()).setName("f1").build())
+                      .build())
+                  .build())
+              .addRows(ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue(BaseEncoding.base64().encode(bytes)).build())
+                  .build())
+              .build()));
+//      mockSpanner.putStatementResult(
+//          StatementResult.query(Statement.of(sql + run), generator.generate()));
     }
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       Stopwatch watch = Stopwatch.createStarted();
       for (int run = 0; run < numRuns; run++) {
-        try (ResultSet resultSet = connection.createStatement().executeQuery(sql + run)) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql + ThreadLocalRandom.current().nextInt(numResults))) {
           while (resultSet.next()) {
             // ignore
           }

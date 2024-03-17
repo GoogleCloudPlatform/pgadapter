@@ -37,11 +37,17 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.StandardSocketOptions;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
@@ -77,7 +83,7 @@ public class ProxyServer extends AbstractApiService {
    */
   private final List<ServerSocket> serverSockets = Collections.synchronizedList(new LinkedList<>());
 
-  private int localPort;
+  protected int localPort;
 
   /** The server will keep track of all messages it receives if it started in DEBUG mode. */
   private static final int MAX_DEBUG_MESSAGES = 100_000;
@@ -86,7 +92,7 @@ public class ProxyServer extends AbstractApiService {
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
-  private final ThreadFactory threadFactory;
+  protected final ThreadFactory threadFactory;
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -358,7 +364,7 @@ public class ProxyServer extends AbstractApiService {
    *
    * @param handler The handler currently in use.
    */
-  private void register(ConnectionHandler handler) {
+  protected void register(ConnectionHandler handler) {
     this.handlers.add(handler);
   }
 

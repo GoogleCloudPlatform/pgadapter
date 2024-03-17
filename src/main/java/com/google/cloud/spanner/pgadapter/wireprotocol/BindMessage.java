@@ -40,7 +40,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   private final List<Short> formatCodes;
   private final List<Short> resultFormatCodes;
   private final byte[][] parameters;
-  private final IntermediatePortalStatement statement;
+  private IntermediatePortalStatement statement;
 
   /** Constructor for Bind messages that are received from the front-end. */
   public BindMessage(ConnectionHandler connection) throws Exception {
@@ -50,11 +50,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.formatCodes = getFormatCodes(this.inputStream);
     this.parameters = getParameters(this.inputStream);
     this.resultFormatCodes = getFormatCodes(this.inputStream);
-    IntermediatePreparedStatement statement = connection.getStatement(statementName);
-    this.statement =
-        statement.createPortal(
-            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
-    this.connection.registerPortal(this.portalName, this.statement);
+//    IntermediatePreparedStatement statement = connection.getStatement(statementName);
+//    this.statement =
+//        statement.createPortal(
+//            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+//    this.connection.registerPortal(this.portalName, this.statement);
   }
 
   /** Constructor for Bind messages that are constructed to execute a Query message. */
@@ -75,11 +75,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.formatCodes = ImmutableList.of();
     this.resultFormatCodes = ImmutableList.of();
     this.parameters = Preconditions.checkNotNull(parameters);
-    IntermediatePreparedStatement statement = connection.getStatement(statementName);
-    this.statement =
-        statement.createPortal(
-            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
-    this.connection.registerPortal(this.portalName, this.statement);
+//    IntermediatePreparedStatement statement = connection.getStatement(statementName);
+//    this.statement =
+//        statement.createPortal(
+//            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+//    this.connection.registerPortal(this.portalName, this.statement);
   }
 
   boolean hasParameterValues() {
@@ -88,6 +88,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   void buffer(BackendConnection backendConnection) {
+    IntermediatePreparedStatement statement = connection.getStatement(statementName);
+    this.statement =
+        statement.createPortal(
+            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+    this.connection.registerPortal(this.portalName, this.statement);
     if (isExtendedProtocol() && !this.statement.getPreparedStatement().isDescribed()) {
       try {
         // Make sure all parameters have been described, so we always send typed parameters to Cloud
