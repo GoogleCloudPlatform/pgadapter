@@ -83,7 +83,7 @@ public class ITPgClassTest implements IntegrationTest {
                 "'\"public\".\"albums\".\"IDX_albums_singer_id_%",
                 "IDX_albums_singer_id_%", "i", 1, 0),
             new PgClassRow("'\"public\".\"albums\".\"PRIMARY_KEY\"'", "PRIMARY_KEY", "i", 1, 0),
-            new PgClassRow("'\"public\".\"all_types\"'", "all_types", "r", 20, 0),
+            new PgClassRow("'\"public\".\"all_types\"'", "all_types", "r", 22, 0),
             new PgClassRow("'\"public\".\"all_types\".\"PRIMARY_KEY\"'", "PRIMARY_KEY", "i", 1, 0),
             new PgClassRow(
                 "'\"public\".\"all_types\".\"idx_col_varchar_int\"'",

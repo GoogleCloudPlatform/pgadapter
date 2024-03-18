@@ -116,6 +116,8 @@ public class PgAdapterTestEnv {
               + "col_bigint bigint not null primary key, "
               + "col_bool bool, "
               + "col_bytea bytea, "
+              + String.format(
+                  "col_float4 %s, ", System.getProperty("pgadapter.test_float4_type", "float4"))
               + "col_float8 float8, "
               + "col_int int, "
               + "col_numeric numeric, "
@@ -126,6 +128,9 @@ public class PgAdapterTestEnv {
               + "col_array_bigint bigint[], "
               + "col_array_bool bool[], "
               + "col_array_bytea bytea[], "
+              + String.format(
+                  "col_array_float4 %s[], ",
+                  System.getProperty("pgadapter.test_float4_type", "float4"))
               + "col_array_float8 float8[], "
               + "col_array_int int[], "
               + "col_array_numeric numeric[], "
@@ -133,6 +138,10 @@ public class PgAdapterTestEnv {
               + "col_array_date date[], "
               + "col_array_varchar varchar(100)[], "
               + "col_array_jsonb jsonb[])");
+
+  public static boolean useFloat4InTests() {
+    return "float4".equals(System.getProperty("pgadapter.test_float4_type", "float4"));
+  }
 
   public static ImmutableList<String> getOnlyAllTypesDdl() {
     return DEFAULT_DATA_MODEL.subList(1, 2);

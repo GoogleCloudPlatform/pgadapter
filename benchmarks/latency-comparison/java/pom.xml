@@ -35,7 +35,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.7.4</version>
+    <version>1.7.6</version>
   </parent>
 
   <dependencyManagement>
@@ -43,14 +43,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.33.0</version>
+        <version>26.34.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.35.0</version>
+        <version>1.36.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -70,12 +70,12 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.31.0</version>
+      <version>0.31.1</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.2</version>
+      <version>42.7.3</version>
       <scope>compile</scope>
     </dependency>
     <dependency>

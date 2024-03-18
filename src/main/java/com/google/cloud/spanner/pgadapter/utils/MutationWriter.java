@@ -257,10 +257,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         }
         if (record.numColumns() != this.tableColumns.keySet().size()) {
           throw PGExceptionFactory.newPGException(
-              "Invalid COPY data: Row length mismatched. Expected "
-                  + this.tableColumns.keySet().size()
-                  + " columns, but only found "
-                  + record.numColumns(),
+              String.format(
+                  "Invalid COPY data: Row length mismatch. Expected %d values, but got %d.",
+                  this.tableColumns.keySet().size(), record.numColumns()),
               SQLState.DataException);
         }
 
@@ -457,6 +456,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         case BOOL:
           size++;
           break;
+        case FLOAT32:
+          size += 4;
+          break;
         case FLOAT64:
         case INT64:
           size += 8;
@@ -482,6 +484,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
           switch (value.getType().getArrayElementType().getCode()) {
             case BOOL:
               size += value.getBoolArray().size();
+              break;
+            case FLOAT32:
+              size += value.getFloat32Array().size() * 4;
               break;
             case FLOAT64:
               size += value.getFloat64Array().size() * 8;

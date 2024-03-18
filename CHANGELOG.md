@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.31.0...v0.31.1) (2024-03-07)
+
+
+### Bug Fixes
+
+* boolean parser was case sensitive ([#1490](https://github.com/GoogleCloudPlatform/pgadapter/issues/1490)) ([5e97378](https://github.com/GoogleCloudPlatform/pgadapter/commit/5e97378775e63e5786dd30bdf55aa7f29da91d76))
+
 ## [0.31.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.30.0...v0.31.0) (2024-02-21)
 
 

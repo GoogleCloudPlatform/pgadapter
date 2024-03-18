@@ -37,7 +37,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.7.4</version>
+    <version>1.7.6</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -71,7 +71,7 @@
             <dependency>
               <groupId>org.postgresql</groupId>
               <artifactId>postgresql</artifactId>
-              <version>42.7.2</version>
+              <version>42.7.3</version>
             </dependency>
           </dependencies>
         </plugin>
