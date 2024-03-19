@@ -59,6 +59,7 @@ public class ITOpenTelemetryTest implements IntegrationTest {
         OptionsMetadata.newBuilder()
             .setProject(testEnv.getProjectId())
             .setEnableOpenTelemetry()
+            .setEnableOpenTelemetryMetrics()
             .setOpenTelemetryTraceRatio(1.0);
     if (testEnv.getCredentials() != null) {
       openTelemetryOptionsBuilder.setCredentials(
