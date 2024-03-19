@@ -34,7 +34,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -261,13 +260,13 @@ public class ProxyServer extends AbstractApiService {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.DEADLINE_EXCEEDED, "Timeout while waiting for TCP server to start");
     }
-    ServerSocket tcpSocket = new ServerSocket();
+    ServerSocket tcpSocket =
+        new ServerSocket(
+            this.localPort == 0 ? this.options.getProxyPort() : this.localPort,
+            this.options.getMaxBacklog(),
+            address);
     // Optimize for latency (2), then bandwidth (1) and then connection time (0).
     tcpSocket.setPerformancePreferences(0, 2, 1);
-    tcpSocket.bind(
-        new InetSocketAddress(
-            address, this.localPort == 0 ? this.options.getProxyPort() : this.localPort),
-        this.options.getMaxBacklog());
     this.serverSockets.add(tcpSocket);
     this.localPort = tcpSocket.getLocalPort();
     tcpStartedLatch.countDown();
