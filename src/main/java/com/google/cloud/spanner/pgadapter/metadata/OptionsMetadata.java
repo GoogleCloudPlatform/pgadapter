@@ -91,6 +91,7 @@ public class OptionsMetadata {
     private boolean disableInternalRetries;
     private boolean requireAuthentication;
     private boolean enableOpenTelemetry;
+    private boolean enableOpenTelemetryMetrics;
     private Double openTelemetryTraceRatio;
     private boolean skipLocalhostCheck;
     private boolean useVirtualThreads;
@@ -264,6 +265,12 @@ public class OptionsMetadata {
       return this;
     }
 
+    /** Enables OpenTelemetry metrics for PGAdapter. */
+    public Builder setEnableOpenTelemetryMetrics() {
+      this.enableOpenTelemetryMetrics = true;
+      return this;
+    }
+
     /**
      * PGAdapter by default only allows connections from localhost. Call this method to disable this
      * check. You should only allow connections from private networks, unless you are also using SSL
@@ -419,6 +426,9 @@ public class OptionsMetadata {
       }
       if (enableOpenTelemetry) {
         addOption(args, OPTION_ENABLE_OPEN_TELEMETRY);
+      }
+      if (enableOpenTelemetryMetrics) {
+        addOption(args, OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
       }
       if (openTelemetryTraceRatio != null) {
         addLongOption(

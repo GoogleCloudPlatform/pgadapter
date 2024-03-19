@@ -208,6 +208,10 @@ public class ConnectionHandler implements Runnable {
       connectionOptionsBuilder =
           connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
     }
+    if (options.isEnableOpenTelemetryMetrics()) {
+      connectionOptionsBuilder =
+          connectionOptionsBuilder.setOpenTelemetry(server.getOpenTelemetry());
+    }
     ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
     Connection spannerConnection = connectionOptions.getConnection();
     try {

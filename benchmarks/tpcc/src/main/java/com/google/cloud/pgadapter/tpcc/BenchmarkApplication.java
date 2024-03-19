@@ -6,6 +6,7 @@ import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoadStatus;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoader;
 import com.google.cloud.spanner.SessionPoolOptions;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Stopwatch;
@@ -169,6 +170,10 @@ public class BenchmarkApplication implements CommandLineRunner {
       builder
           .setEnableOpenTelemetry()
           .setOpenTelemetryTraceRatio(pgAdapterConfiguration.getOpenTelemetrySampleRate());
+    }
+    if (pgAdapterConfiguration.isEnableOpenTelemetryMetrics()) {
+      SpannerOptions.enableOpenTelemetryMetrics();
+      builder.setEnableOpenTelemetryMetrics();
     }
     if (pgAdapterConfiguration.isDisableInternalRetries()) {
       builder.setDisableInternalRetries();

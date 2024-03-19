@@ -14,6 +14,8 @@ public class PGAdapterConfiguration {
 
   private boolean enableOpenTelemetry;
 
+  private boolean enableOpenTelemetryMetrics;
+
   private double openTelemetrySampleRate;
 
   private boolean disableInternalRetries;
@@ -46,6 +48,14 @@ public class PGAdapterConfiguration {
 
   public void setEnableOpenTelemetry(boolean enableOpenTelemetry) {
     this.enableOpenTelemetry = enableOpenTelemetry;
+  }
+
+  public boolean isEnableOpenTelemetryMetrics() {
+    return enableOpenTelemetryMetrics;
+  }
+
+  public void setEnableOpenTelemetryMetrics(boolean enableOpenTelemetryMetrics) {
+    this.enableOpenTelemetryMetrics = enableOpenTelemetryMetrics;
   }
 
   public double getOpenTelemetrySampleRate() {
