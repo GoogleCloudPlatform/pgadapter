@@ -36,7 +36,7 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
     super(connection);
     this.name = this.readAll();
     this.maxRows = this.inputStream.readInt();
-//    this.statement = this.connection.getPortal(this.name);
+    //    this.statement = this.connection.getPortal(this.name);
     this.cleanupAfterExecute = true;
     this.commandTag = null;
   }
@@ -56,10 +56,10 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
     super(connection, 8, manuallyCreatedToken);
     this.name = name;
     this.maxRows = maxRows;
-//    this.statement = this.connection.getPortal(this.name);
-//    if (commandTag != null) {
-//      this.statement.setCommandTag(commandTag);
-//    }
+    //    this.statement = this.connection.getPortal(this.name);
+    //    if (commandTag != null) {
+    //      this.statement.setCommandTag(commandTag);
+    //    }
     this.cleanupAfterExecute = cleanupAfterExecute;
     this.commandTag = commandTag;
   }

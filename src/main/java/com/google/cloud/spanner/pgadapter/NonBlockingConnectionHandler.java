@@ -21,13 +21,21 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
 
 public class NonBlockingConnectionHandler extends ConnectionHandler {
-  private static final Logger logger = Logger.getLogger(NonBlockingConnectionHandler.class.getName());
+  private static final int DEFAULT_BUFFER_CAPACITY = 1 << 13;
+
+  private static final Logger logger =
+      Logger.getLogger(NonBlockingConnectionHandler.class.getName());
+
+  private final ByteBuffer headerBuffer = ByteBuffer.allocateDirect(5);
+
+  private ByteBuffer messageBuffer = ByteBuffer.allocateDirect(DEFAULT_BUFFER_CAPACITY);
 
   private final BlockingQueue<BootstrapMessage> bootstrapMessages = new LinkedBlockingQueue<>();
 
@@ -43,7 +51,23 @@ public class NonBlockingConnectionHandler extends ConnectionHandler {
     super(server, channel.socket());
     this.channel = channel;
     this.connectionInputStream.connect(connectionInputStreamBuffer);
-    this.connectionMetadata = new ConnectionMetadata(connectionInputStream, new ChannelOutputStream(channel));
+    this.connectionMetadata =
+        new ConnectionMetadata(connectionInputStream, new ChannelOutputStream(channel));
+  }
+
+  ByteBuffer getHeaderBuffer() {
+    this.headerBuffer.rewind();
+    return this.headerBuffer;
+  }
+
+  ByteBuffer getMessageBuffer(int length) {
+    if (this.messageBuffer.capacity() < length) {
+      this.messageBuffer = ByteBuffer.allocateDirect(length);
+    } else {
+      this.messageBuffer.rewind();
+      this.messageBuffer.limit(length);
+    }
+    return this.messageBuffer;
   }
 
   PipedOutputStream getConnectionInputStreamBuffer() {
@@ -83,5 +107,4 @@ public class NonBlockingConnectionHandler extends ConnectionHandler {
   public ControlMessage readControlMessage() throws Exception {
     return this.controlMessages.take();
   }
-
 }

@@ -46,15 +46,14 @@ public class NonBlockingProxyServer extends ProxyServer {
 
   private final ServerSocketChannel serverSocketChannel;
 
-  public NonBlockingProxyServer(
-      OptionsMetadata optionsMetadata,
-      OpenTelemetry openTelemetry) throws IOException {
+  public NonBlockingProxyServer(OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry)
+      throws IOException {
     this(optionsMetadata, openTelemetry, new Properties());
   }
 
   public NonBlockingProxyServer(
-      OptionsMetadata optionsMetadata,
-      OpenTelemetry openTelemetry, Properties properties) throws IOException {
+      OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties)
+      throws IOException {
     super(optionsMetadata, openTelemetry, properties);
     this.acceptSelector = Selector.open();
     // this.acceptSelector = AFUNIXSelectorProvider.provider().openSelector();
@@ -63,52 +62,57 @@ public class NonBlockingProxyServer extends ProxyServer {
     // this.serverSocketChannel = AFUNIXServerSocketChannel.open();
     this.serverSocketChannel = ServerSocketChannel.open();
     this.serverSocketChannel.configureBlocking(false);
-    this.serverSocketChannel.register(this.acceptSelector, this.serverSocketChannel.validOps(), null);
+    this.serverSocketChannel.register(
+        this.acceptSelector, this.serverSocketChannel.validOps(), null);
     ServerSocket socket = this.serverSocketChannel.socket();
 
     // File file = new File("/Users/loite/latency_test.tmp");
     // socket.bind(AFUNIXSocketAddress.of(file));
     int port = getLocalPort() == 0 ? getOptions().getProxyPort() : getLocalPort();
-    socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), getOptions().getMaxBacklog());
+    socket.bind(
+        new InetSocketAddress(InetAddress.getLoopbackAddress(), port),
+        getOptions().getMaxBacklog());
     this.localPort = socket.getLocalPort();
   }
 
   @Override
   protected void doStart() {
     try {
-      Thread listenerThread = new Thread("spanner-postgres-adapter-proxy-listener") {
-        @Override
-        public void run() {
-          try {
-            runListeningServer();
-          } catch (Exception exception) {
-            logger.log(
-                Level.WARNING,
-                exception,
-                () ->
-                    String.format(
-                        "Server on port %s stopped by exception: %s",
-                        getLocalPort(), exception));
-          }
-        }
-      };
+      Thread listenerThread =
+          new Thread("spanner-postgres-adapter-proxy-listener") {
+            @Override
+            public void run() {
+              try {
+                runListeningServer();
+              } catch (Exception exception) {
+                logger.log(
+                    Level.WARNING,
+                    exception,
+                    () ->
+                        String.format(
+                            "Server on port %s stopped by exception: %s",
+                            getLocalPort(), exception));
+              }
+            }
+          };
       listenerThread.start();
-      Thread readerThread = new Thread("spanner-postgres-adapter-reader") {
-        @Override
-        public void run() {
-          try {
-            runServer();
-          } catch (Exception exception) {
-            logger.log(
-                Level.WARNING,
-                exception,
-                () ->
-                    String.format(
-                        "Server on port %s stopped by exception: %s",
-                        getLocalPort(), exception));
-          }
-        }
-      };
+      Thread readerThread =
+          new Thread("spanner-postgres-adapter-reader") {
+            @Override
+            public void run() {
+              try {
+                runServer();
+              } catch (Exception exception) {
+                logger.log(
+                    Level.WARNING,
+                    exception,
+                    () ->
+                        String.format(
+                            "Server on port %s stopped by exception: %s",
+                            getLocalPort(), exception));
+              }
+            }
+          };
       readerThread.start();
       notifyStarted();
     } catch (Throwable throwable) {
@@ -175,31 +179,25 @@ public class NonBlockingProxyServer extends ProxyServer {
 
     try {
       if (handler.getStatus() == ConnectionStatus.UNAUTHENTICATED) {
-        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-        do {
-          channel.read(lengthBuffer);
-        } while (lengthBuffer.hasRemaining());
+        ByteBuffer lengthBuffer = read(4, channel);
+        lengthBuffer.rewind();
         int length = ByteConverter.int4(lengthBuffer.array(), 0);
-        ByteBuffer dataBuffer = ByteBuffer.allocate(length);
-        dataBuffer.put(lengthBuffer.array());
-        do {
-          channel.read(dataBuffer);
-        } while (dataBuffer.hasRemaining());
+        ByteBuffer dataBuffer = read(length, lengthBuffer, channel);
         handler.getConnectionInputStreamBuffer().write(dataBuffer.array());
         handler.addBootstrapMessage(BootstrapMessage.create(handler));
       } else {
         // All control messages has a 1-byte type + 4 byte length.
-        ByteBuffer headerBuffer = ByteBuffer.allocate(5);
-        do {
-          channel.read(headerBuffer);
-        } while (headerBuffer.hasRemaining());
-        int length = ByteConverter.int4(headerBuffer.array(), 1);
-        ByteBuffer dataBuffer = ByteBuffer.allocate(length + 1);
-        dataBuffer.put(headerBuffer.array());
-        do {
-          channel.read(dataBuffer);
-        } while (dataBuffer.hasRemaining());
-        handler.getConnectionInputStreamBuffer().write(dataBuffer.array());
+        ByteBuffer headerBuffer = read(handler.getHeaderBuffer(), channel);
+        byte[] dst = new byte[4];
+        headerBuffer.position(1);
+        headerBuffer.get(dst);
+        int length = ByteConverter.int4(dst, 0);
+        headerBuffer.rewind();
+        ByteBuffer message = read(handler.getMessageBuffer(length + 1), headerBuffer, channel);
+        message.rewind();
+        dst = new byte[length + 1];
+        message.get(dst);
+        handler.getConnectionInputStreamBuffer().write(dst);
         handler.addControlMessage(ControlMessage.create(handler));
       }
     } catch (ClosedChannelException ignore) {
@@ -209,4 +207,28 @@ public class NonBlockingProxyServer extends ProxyServer {
     }
   }
 
+  private ByteBuffer read(int length, SocketChannel channel) throws IOException {
+    return read(length, null, channel);
+  }
+
+  private ByteBuffer read(ByteBuffer destination, SocketChannel channel) throws IOException {
+    return read(destination, null, channel);
+  }
+
+  private ByteBuffer read(int length, ByteBuffer header, SocketChannel channel) throws IOException {
+    ByteBuffer destination = ByteBuffer.allocate(length);
+    return read(destination, header, channel);
+  }
+
+  private ByteBuffer read(ByteBuffer destination, ByteBuffer header, SocketChannel channel)
+      throws IOException {
+    if (header != null) {
+      destination.put(header);
+    }
+    do {
+      channel.read(destination);
+    } while (destination.hasRemaining());
+
+    return destination;
+  }
 }

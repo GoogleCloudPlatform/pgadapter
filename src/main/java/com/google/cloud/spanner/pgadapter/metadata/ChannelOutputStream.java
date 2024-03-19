@@ -43,6 +43,4 @@ public class ChannelOutputStream extends OutputStream {
     Preconditions.checkArgument(off + len < b.length);
     this.channel.write(ByteBuffer.wrap(b, off, len));
   }
-
-
 }

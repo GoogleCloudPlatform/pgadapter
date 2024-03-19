@@ -5423,24 +5423,40 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     for (int run = 0; run < numResults; run++) {
       byte[] bytes = new byte[200];
       ThreadLocalRandom.current().nextBytes(bytes);
-      mockSpanner.putStatementResults(StatementResult.query(Statement.of(sql + run),
-          com.google.spanner.v1.ResultSet.newBuilder()
-              .setMetadata(ResultSetMetadata.newBuilder()
-                  .setRowType(StructType.newBuilder()
-                      .addFields(Field.newBuilder().setType(Type.newBuilder().setCode(TypeCode.STRING).build()).setName("f1").build())
-                      .build())
-                  .build())
-              .addRows(ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue(BaseEncoding.base64().encode(bytes)).build())
-                  .build())
-              .build()));
-//      mockSpanner.putStatementResult(
-//          StatementResult.query(Statement.of(sql + run), generator.generate()));
+      mockSpanner.putStatementResults(
+          StatementResult.query(
+              Statement.of(sql + run),
+              com.google.spanner.v1.ResultSet.newBuilder()
+                  .setMetadata(
+                      ResultSetMetadata.newBuilder()
+                          .setRowType(
+                              StructType.newBuilder()
+                                  .addFields(
+                                      Field.newBuilder()
+                                          .setType(
+                                              Type.newBuilder().setCode(TypeCode.STRING).build())
+                                          .setName("f1")
+                                          .build())
+                                  .build())
+                          .build())
+                  .addRows(
+                      ListValue.newBuilder()
+                          .addValues(
+                              Value.newBuilder()
+                                  .setStringValue(BaseEncoding.base64().encode(bytes))
+                                  .build())
+                          .build())
+                  .build()));
+      //      mockSpanner.putStatementResult(
+      //          StatementResult.query(Statement.of(sql + run), generator.generate()));
     }
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       Stopwatch watch = Stopwatch.createStarted();
       for (int run = 0; run < numRuns; run++) {
-        try (ResultSet resultSet = connection.createStatement().executeQuery(sql + ThreadLocalRandom.current().nextInt(numResults))) {
+        try (ResultSet resultSet =
+            connection
+                .createStatement()
+                .executeQuery(sql + ThreadLocalRandom.current().nextInt(numResults))) {
           while (resultSet.next()) {
             // ignore
           }

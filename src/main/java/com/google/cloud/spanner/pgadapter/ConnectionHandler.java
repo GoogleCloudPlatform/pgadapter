@@ -210,9 +210,8 @@ public class ConnectionHandler implements Runnable {
       connectionOptionsBuilder =
           connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
     } else {
-      connectionOptionsBuilder.setSessionPoolOptions(SessionPoolOptions.newBuilder()
-          .setTrackStackTraceOfSessionCheckout(false)
-          .build());
+      connectionOptionsBuilder.setSessionPoolOptions(
+          SessionPoolOptions.newBuilder().setTrackStackTraceOfSessionCheckout(false).build());
     }
     ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
     Connection spannerConnection = connectionOptions.getConnection();

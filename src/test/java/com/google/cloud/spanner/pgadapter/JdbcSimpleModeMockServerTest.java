@@ -77,7 +77,12 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   @Parameters(name = "useDomainSocket = {0}")
   public static Object[] data() {
     OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
-    return options.isDomainSocketEnabled() ? new Object[] {/*true, */false} : new Object[] {false};
+    return options.isDomainSocketEnabled()
+        ? new Object[] {
+            /*true, */
+          false
+        }
+        : new Object[] {false};
   }
 
   /**

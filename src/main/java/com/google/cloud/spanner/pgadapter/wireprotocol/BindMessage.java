@@ -50,11 +50,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.formatCodes = getFormatCodes(this.inputStream);
     this.parameters = getParameters(this.inputStream);
     this.resultFormatCodes = getFormatCodes(this.inputStream);
-//    IntermediatePreparedStatement statement = connection.getStatement(statementName);
-//    this.statement =
-//        statement.createPortal(
-//            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
-//    this.connection.registerPortal(this.portalName, this.statement);
+    //    IntermediatePreparedStatement statement = connection.getStatement(statementName);
+    //    this.statement =
+    //        statement.createPortal(
+    //            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+    //    this.connection.registerPortal(this.portalName, this.statement);
   }
 
   /** Constructor for Bind messages that are constructed to execute a Query message. */
@@ -75,11 +75,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.formatCodes = ImmutableList.of();
     this.resultFormatCodes = ImmutableList.of();
     this.parameters = Preconditions.checkNotNull(parameters);
-//    IntermediatePreparedStatement statement = connection.getStatement(statementName);
-//    this.statement =
-//        statement.createPortal(
-//            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
-//    this.connection.registerPortal(this.portalName, this.statement);
+    //    IntermediatePreparedStatement statement = connection.getStatement(statementName);
+    //    this.statement =
+    //        statement.createPortal(
+    //            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+    //    this.connection.registerPortal(this.portalName, this.statement);
   }
 
   boolean hasParameterValues() {
