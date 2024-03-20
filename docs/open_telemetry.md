@@ -155,6 +155,9 @@ The available metrics in PGAdapter are:
 * `spanner/pgadapter/client_lib_latencies`: Latency when the Spanner's client library receives
    a call and returns a response.
 
+In addition, [client library's metrics](https://github.com/googleapis/java-spanner/tree/main?tab=readme-ov-file#available-client-side-metrics) are avaialble for use when the
+`-enable_otel_metrics` command line argument is provided.
+
 ## Frequently Asked Questions
 
 #### How can I find all the statements that were executed on the same connection as the trace I'm looking at?
