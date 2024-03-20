@@ -797,7 +797,7 @@ public class PgCatalog {
             + "                 group by c.constraint_catalog, c.constraint_schema,\n"
             + "                          c.constraint_name) fck on tc.constraint_catalog=fck.constraint_catalog and tc.constraint_schema=fck.constraint_schema and tc.constraint_name=fck.constraint_name\n"
             + "left outer join information_schema.check_constraints cc on cc.constraint_catalog=tc.constraint_catalog and cc.constraint_schema=tc.constraint_schema and cc.constraint_name=tc.constraint_name\n"
-            + "where tc.constraint_schema='public' and not substr(tc.constraint_name, 1, length('CK_IS_NOT_NULL_')) = 'CK_IS_NOT_NULL_'\n"
+            + "where tc.constraint_schema not in (select schema_name from information_schema.schemata where schema_owner='spanner_system') and not substr(tc.constraint_name, 1, length('CK_IS_NOT_NULL_')) = 'CK_IS_NOT_NULL_'\n"
             + ")";
 
     public static final String EMPTY_PG_CONSTRAINT_CTE =
