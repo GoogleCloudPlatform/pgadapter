@@ -142,7 +142,7 @@ func printProgress(finished *atomic.Bool, ops *atomic.Int64, totalOps int) {
 	go func() {
 		for !finished.Load() {
 			time.Sleep(time.Second)
-			fmt.Printf("\r%d/%d", ops.Load(), totalOps)
+			fmt.Printf("\r%d/%d        ", ops.Load(), totalOps)
 		}
 	}()
 }
