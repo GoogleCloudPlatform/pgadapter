@@ -90,6 +90,7 @@ public class OptionsMetadata {
     private Credentials credentials;
     private boolean requireAuthentication;
     private boolean enableOpenTelemetry;
+    private boolean enableOpenTelemetryMetrics;
     private Double openTelemetryTraceRatio;
     private boolean skipLocalhostCheck;
     private boolean useVirtualThreads;
@@ -246,6 +247,12 @@ public class OptionsMetadata {
     /** Enables OpenTelemetry tracing for PGAdapter. */
     public Builder setEnableOpenTelemetry() {
       this.enableOpenTelemetry = true;
+      return this;
+    }
+
+    /** Enables OpenTelemetry metrics for PGAdapter. */
+    public Builder setEnableOpenTelemetryMetrics() {
+      this.enableOpenTelemetryMetrics = true;
       return this;
     }
 
@@ -412,6 +419,9 @@ public class OptionsMetadata {
       }
       if (enableOpenTelemetry) {
         addOption(args, OPTION_ENABLE_OPEN_TELEMETRY);
+      }
+      if (enableOpenTelemetryMetrics) {
+        addOption(args, OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
       }
       if (openTelemetryTraceRatio != null) {
         addLongOption(
