@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
@@ -54,9 +55,9 @@ public abstract class WireOutput {
    * exceptions (such as where length) need not be sent for very specific protocols: for those,
    * override this and you will need to send the identifier and log yourself.
    *
-   * @throws Exception
+   * @throws IOException if sending the message fails
    */
-  public void send() throws Exception {
+  public void send() throws IOException {
     send(true);
   }
 
@@ -64,7 +65,7 @@ public abstract class WireOutput {
    * Same as {@link #send()}, but with the option to skip the flush at the end. This is more
    * efficient for responses that contain multiple parts, such as query results.
    */
-  public void send(boolean flush) throws Exception {
+  public void send(boolean flush) throws IOException {
     logger.log(Level.FINEST, Logging.format("Send", this::toString));
     this.outputStream.writeByte(this.getIdentifier());
     if (this.isCompoundResponse()) {
@@ -80,9 +81,9 @@ public abstract class WireOutput {
    * Override this method to include post-processing and metadata in the sending process. Template
    * method for send.
    *
-   * @throws Exception
+   * @throws IOException if sending the message fails
    */
-  protected abstract void sendPayload() throws Exception;
+  protected abstract void sendPayload() throws IOException;
 
   /**
    * Override this to specify the byte which represents the protocol for the specific message. Used

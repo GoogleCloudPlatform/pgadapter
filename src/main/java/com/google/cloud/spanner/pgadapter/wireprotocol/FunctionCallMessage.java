@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.List;
 
@@ -35,7 +36,7 @@ public class FunctionCallMessage extends ControlMessage {
   private final byte[][] arguments;
   private final Short resultFormatCode;
 
-  public FunctionCallMessage(ConnectionHandler connection) throws Exception {
+  public FunctionCallMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.functionID = this.inputStream.readInt();
     this.argumentFormatCodes = getFormatCodes(this.inputStream);

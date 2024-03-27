@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -27,7 +28,7 @@ public class SyncMessage extends ControlMessage {
 
   public static final char IDENTIFIER = 'S';
 
-  public SyncMessage(ConnectionHandler connection) throws Exception {
+  public SyncMessage(ConnectionHandler connection) throws IOException {
     super(connection);
   }
 

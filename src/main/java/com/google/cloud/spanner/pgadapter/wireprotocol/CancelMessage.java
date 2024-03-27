@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -32,7 +33,7 @@ public class CancelMessage extends BootstrapMessage {
   private final int connectionId;
   private final int secret;
 
-  public CancelMessage(ConnectionHandler connection) throws Exception {
+  public CancelMessage(ConnectionHandler connection) throws IOException {
     super(connection, MESSAGE_LENGTH);
     this.connectionId = this.inputStream.readInt();
     this.secret = this.inputStream.readInt();

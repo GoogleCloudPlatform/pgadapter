@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.text.MessageFormat;
 import org.postgresql.core.Oid;
 
@@ -81,7 +82,7 @@ public class RowDescriptionResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  protected void sendPayload() throws IOException {
     this.outputStream.writeShort(this.columnCount);
     DataFormat defaultFormat = DataFormat.getDataFormat(0, this.statement, this.mode, this.options);
     for (int columnIndex = 0; /* columns start at 0 */

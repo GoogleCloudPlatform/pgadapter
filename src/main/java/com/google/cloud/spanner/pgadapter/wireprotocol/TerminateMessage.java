@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Closes a connection. */
@@ -24,7 +25,7 @@ public class TerminateMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'X';
 
-  public TerminateMessage(ConnectionHandler connection) throws Exception {
+  public TerminateMessage(ConnectionHandler connection) throws IOException {
     super(connection);
   }
 

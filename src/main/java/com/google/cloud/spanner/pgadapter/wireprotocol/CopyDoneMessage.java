@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -31,7 +32,7 @@ public class CopyDoneMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'c';
   private final CopyStatement statement;
 
-  public CopyDoneMessage(ConnectionHandler connection) throws Exception {
+  public CopyDoneMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.statement = connection.getActiveCopyStatement();
   }

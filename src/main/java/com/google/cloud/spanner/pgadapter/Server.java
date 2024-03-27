@@ -52,7 +52,7 @@ public class Server {
     try {
       OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
       OpenTelemetry openTelemetry = setupOpenTelemetry(optionsMetadata);
-      ProxyServer server = new ProxyServer(optionsMetadata, openTelemetry);
+      ProxyServer server = new NonBlockingProxyServer(optionsMetadata, openTelemetry);
       server.startServer();
     } catch (Exception e) {
       printError(e, System.err, System.out);

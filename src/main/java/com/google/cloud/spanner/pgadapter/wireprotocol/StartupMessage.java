@@ -43,7 +43,7 @@ public class StartupMessage extends BootstrapMessage {
   private final boolean authenticate;
   private final Map<String, String> parameters;
 
-  public StartupMessage(ConnectionHandler connection, int length) throws Exception {
+  public StartupMessage(ConnectionHandler connection, int length) throws IOException {
     super(connection, length);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
     String rawParameters = this.readAll();
@@ -63,6 +63,7 @@ public class StartupMessage extends BootstrapMessage {
       createConnectionAndSendStartupMessage(
           this.connection, this.parameters.get(DATABASE_KEY), this.parameters, null);
     } else {
+      this.connection.setStatus(ConnectionStatus.AUTHENTICATING, this.parameters);
       new AuthenticationCleartextPasswordResponse(this.outputStream).send();
     }
   }
@@ -108,25 +109,7 @@ public class StartupMessage extends BootstrapMessage {
         connection.getSecret(),
         connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState(),
         connection.getWellKnownClient().createStartupNoticeResponses(connection));
-    connection.setStatus(ConnectionStatus.AUTHENTICATED);
-  }
-
-  /** Here we expect the nextHandler to be {@link PasswordMessage} if we authenticate. */
-  @Override
-  public void nextHandler() throws Exception {
-    if (authenticate) {
-      char protocol = (char) inputStream.readUnsignedByte();
-      if (protocol != PasswordMessage.IDENTIFIER) {
-        throw new IOException(
-            "Unexpected response, expected '"
-                + PasswordMessage.IDENTIFIER
-                + "', but got: "
-                + protocol);
-      }
-      this.connection.setMessageState(new PasswordMessage(this.connection, this.parameters));
-    } else {
-      super.nextHandler();
-    }
+    connection.setStatus(ConnectionStatus.AUTHENTICATED, parameters);
   }
 
   @Override

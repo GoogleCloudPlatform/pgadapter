@@ -22,6 +22,7 @@ import static org.junit.Assume.assumeFalse;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.SocketException;
 import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -118,25 +119,31 @@ public class DomainSocketsTest extends AbstractMockServerTest {
     assumeFalse(
         "Skip test if the test container allows creating files in the root directory", canCreate);
 
-    doStartMockSpannerAndPgAdapterServers(
-        null, builder -> builder.setUnixDomainSocketDirectory("/"));
-
-    // Verify that we cannot connect to the invalid (not permitted) domain socket.
-    assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl("/.s.PGSQL.%d")));
-
-    // Verify that the TCP socket does work.
-    String sql = "SELECT 1";
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format(
-                "jdbc:postgresql://localhost:%d/my-db?preferQueryMode=simple",
-                pgServer.getLocalPort()))) {
-      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        assertTrue(resultSet.next());
-        assertEquals(1L, resultSet.getLong(1));
-        assertFalse(resultSet.next());
-      }
-    }
+    assertThrows(
+        SocketException.class,
+        () ->
+            doStartMockSpannerAndPgAdapterServers(
+                null, builder -> builder.setUnixDomainSocketDirectory("/")));
+    //    doStartMockSpannerAndPgAdapterServers(
+    //        null, builder -> builder.setUnixDomainSocketDirectory("/"));
+    //
+    //    // Verify that we cannot connect to the invalid (not permitted) domain socket.
+    //    assertThrows(SQLException.class, () ->
+    // DriverManager.getConnection(createUrl("/.s.PGSQL.%d")));
+    //
+    //    // Verify that the TCP socket does work.
+    //    String sql = "SELECT 1";
+    //    try (Connection connection =
+    //        DriverManager.getConnection(
+    //            String.format(
+    //                "jdbc:postgresql://localhost:%d/my-db?preferQueryMode=simple",
+    //                pgServer.getLocalPort()))) {
+    //      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+    //        assertTrue(resultSet.next());
+    //        assertEquals(1L, resultSet.getLong(1));
+    //        assertFalse(resultSet.next());
+    //      }
+    //    }
 
     stopMockSpannerAndPgAdapterServers();
   }

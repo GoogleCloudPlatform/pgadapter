@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 @InternalApi
@@ -77,7 +78,7 @@ public class CopyDataResponse extends WireOutput {
   }
 
   @Override
-  public void send(boolean flush) throws Exception {
+  public void send(boolean flush) throws IOException {
     if (converter != null) {
       this.length = 4 + converter.convertResultSetRowToDataRowResponse();
     }
@@ -85,7 +86,7 @@ public class CopyDataResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  protected void sendPayload() throws IOException {
     if (this.format == DataFormat.POSTGRESQL_TEXT) {
       this.outputStream.write(this.stringData.getBytes(StandardCharsets.UTF_8));
       this.outputStream.write(this.rowTerminator);

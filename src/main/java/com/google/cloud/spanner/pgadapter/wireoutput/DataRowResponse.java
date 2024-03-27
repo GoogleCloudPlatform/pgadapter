@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import java.io.DataOutputStream;
+import java.io.IOException;
 
 /** Sends to the client specific row contents. */
 @InternalApi
@@ -30,13 +31,14 @@ public class DataRowResponse extends WireOutput {
     this.converter = converter;
   }
 
-  public void send(boolean flush) throws Exception {
+  @Override
+  public void send(boolean flush) throws IOException {
     this.length = HEADER_LENGTH + converter.convertResultSetRowToDataRowResponse();
     super.send(flush);
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  protected void sendPayload() throws IOException {
     converter.writeBuffer(this.outputStream);
   }
 

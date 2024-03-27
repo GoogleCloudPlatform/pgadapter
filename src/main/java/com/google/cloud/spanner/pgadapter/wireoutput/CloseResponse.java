@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Assures to the client that a portal got closed successfully. */
@@ -27,7 +28,7 @@ public class CloseResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  protected void sendPayload() throws IOException {
     // Do nothing
   }
 

@@ -61,7 +61,7 @@ public class PasswordMessage extends ControlMessage {
   private final String password;
 
   public PasswordMessage(ConnectionHandler connection, Map<String, String> parameters)
-      throws Exception {
+      throws IOException {
     super(connection);
     this.parameters = parameters;
     this.username = parameters.get(USER_KEY);

@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 public class EmptyQueryResponse extends WireOutput {
@@ -23,7 +24,7 @@ public class EmptyQueryResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {}
+  protected void sendPayload() throws IOException {}
 
   @Override
   public byte getIdentifier() {

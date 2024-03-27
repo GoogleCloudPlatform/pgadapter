@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CloseCompleteResponse;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Close the designated statement. */
@@ -30,7 +31,7 @@ public class CloseMessage extends ControlMessage {
   private String name;
   private IntermediateStatement statement;
 
-  public CloseMessage(ConnectionHandler connection) throws Exception {
+  public CloseMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
     this.name = this.readAll();

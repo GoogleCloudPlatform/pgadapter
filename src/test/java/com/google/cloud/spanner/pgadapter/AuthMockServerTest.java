@@ -150,6 +150,9 @@ public class AuthMockServerTest extends AbstractMockServerTest {
         assertEquals(1, resultSet.getInt(1));
         assertFalse(resultSet.next());
       }
+    } catch (SQLException sqlException) {
+      System.out.println(pgServer.getDebugMessages());
+      sqlException.printStackTrace();
     }
 
     PasswordMessage passwordMessage =

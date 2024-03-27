@@ -49,7 +49,7 @@ public class SSLMessage extends BootstrapMessage {
 
   @Override
   public void nextHandler() throws Exception {
-    this.connection.setMessageState(BootstrapMessage.create(this.connection));
+    this.connection.setMessageState(this.connection.readBootstrapMessage());
   }
 
   @Override
