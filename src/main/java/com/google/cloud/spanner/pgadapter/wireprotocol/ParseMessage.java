@@ -60,6 +60,7 @@ import com.google.cloud.spanner.pgadapter.statements.TruncateStatement;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Creates a prepared statement. */
@@ -73,7 +74,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   private final IntermediatePreparedStatement statement;
   private final int[] parameterDataTypes;
 
-  public ParseMessage(ConnectionHandler connection) throws Exception {
+  public ParseMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.name = this.readString();
     Statement originalStatement = Statement.of(this.readString());
@@ -261,10 +262,9 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
       throw new IllegalStateException("Must close statement before reusing name.");
     }
+    this.connection.registerStatement(this.name, this.statement);
     if (this.statement.hasException()) {
       handleError(statement.getException());
-    } else {
-      this.connection.registerStatement(this.name, this.statement);
     }
   }
 

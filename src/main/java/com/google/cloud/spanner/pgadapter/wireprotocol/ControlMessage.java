@@ -113,9 +113,9 @@ public abstract class ControlMessage extends WireMessage {
    *
    * @param connection The connection handler object setup with the ability to send/receive.
    * @return The constructed wire message given the input message.
-   * @throws Exception If construction or reading fails.
+   * @throws IOException If construction or reading fails.
    */
-  public static ControlMessage create(ConnectionHandler connection) throws Exception {
+  public static ControlMessage create(ConnectionHandler connection) throws IOException {
     boolean validMessage = true;
     char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
     try {
@@ -141,6 +141,13 @@ public abstract class ControlMessage extends WireMessage {
                 String.format(
                     "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: '%c'",
                     nextMsg));
+        }
+      } else if (connection.getStatus() == ConnectionStatus.AUTHENTICATING) {
+        switch (nextMsg) {
+          case PasswordMessage.IDENTIFIER:
+            return new PasswordMessage(connection, connection.getConnectionParameters());
+          default:
+            throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
         }
       } else {
         switch (nextMsg) {
@@ -205,9 +212,9 @@ public abstract class ControlMessage extends WireMessage {
    *
    * @param input The data stream containing the user request.
    * @return A list of format codes.
-   * @throws Exception If reading fails in any way.
+   * @throws IOException If reading fails in any way.
    */
-  protected static List<Short> getFormatCodes(DataInputStream input) throws Exception {
+  protected static List<Short> getFormatCodes(DataInputStream input) throws IOException {
     List<Short> formatCodes = new ArrayList<>();
     short numberOfFormatCodes = input.readShort();
     for (int i = 0; i < numberOfFormatCodes; i++) {
@@ -551,6 +558,8 @@ public abstract class ControlMessage extends WireMessage {
           }
         }
         return rows;
+      } catch (InterruptedException interruptedException) {
+        throw PGExceptionFactory.newQueryCancelledException();
       } finally {
         if (converter != null) {
           converter.close();

@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -41,7 +42,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   private IntermediateStatement statement;
   private Future<StatementResult> describePortalMetadata;
 
-  public DescribeMessage(ConnectionHandler connection) throws Exception {
+  public DescribeMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
     this.name = this.readAll();

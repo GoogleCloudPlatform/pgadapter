@@ -16,11 +16,11 @@ package com.google.cloud.spanner.pgadapter;
 
 import com.google.cloud.spanner.pgadapter.metadata.ChannelOutputStream;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.ForwardingInputStream;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
@@ -41,18 +41,20 @@ public class NonBlockingConnectionHandler extends ConnectionHandler {
 
   private final BlockingQueue<ControlMessage> controlMessages = new LinkedBlockingQueue<>();
 
-  private final PipedInputStream connectionInputStream = new PipedInputStream();
-
-  private final PipedOutputStream connectionInputStreamBuffer = new PipedOutputStream();
+  private final ForwardingInputStream forwardingInputStream = new ForwardingInputStream();
 
   private final SocketChannel channel;
 
-  NonBlockingConnectionHandler(ProxyServer server, SocketChannel channel) throws IOException {
+  NonBlockingConnectionHandler(ProxyServer server, SocketChannel channel) {
     super(server, channel.socket());
     this.channel = channel;
-    this.connectionInputStream.connect(connectionInputStreamBuffer);
-    this.connectionMetadata =
-        new ConnectionMetadata(connectionInputStream, new ChannelOutputStream(channel));
+    setConnectionMetadata(
+        new ConnectionMetadata(forwardingInputStream, new ChannelOutputStream(channel)));
+  }
+
+  @Override
+  void createSSLSocket() throws IOException {
+    throw new IOException("SSL is not supported for non-blocking connection handlers");
   }
 
   ByteBuffer getHeaderBuffer() {
@@ -70,27 +72,33 @@ public class NonBlockingConnectionHandler extends ConnectionHandler {
     return this.messageBuffer;
   }
 
-  PipedOutputStream getConnectionInputStreamBuffer() {
-    return this.connectionInputStreamBuffer;
+  void setRawInputStream(InputStream inputStream) {
+    this.forwardingInputStream.setDelegate(inputStream);
+  }
+
+  @Override
+  public boolean supportsPeekNextByte() {
+    return false;
   }
 
   @Override
   protected ConnectionMetadata createConnectionMetadata() {
-    return this.connectionMetadata;
+    return getConnectionMetadata();
   }
 
   @Override
   protected void closeSocket() throws IOException {
-    System.out.println("Closing channel");
     try {
       this.channel.close();
+    } catch (IOException ioException) {
+      ioException.printStackTrace();
+      throw ioException;
     } catch (Throwable t) {
       t.printStackTrace();
     }
   }
 
   void addBootstrapMessage(BootstrapMessage bootstrapMessage) {
-    System.out.println("Adding bootstrap message " + bootstrapMessage);
     this.bootstrapMessages.add(bootstrapMessage);
   }
 

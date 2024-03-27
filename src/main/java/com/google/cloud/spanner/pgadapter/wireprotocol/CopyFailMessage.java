@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -36,7 +37,7 @@ public class CopyFailMessage extends ControlMessage {
   private final CopyStatement statement;
   private final String errorMessage;
 
-  public CopyFailMessage(ConnectionHandler connection) throws Exception {
+  public CopyFailMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.errorMessage = this.readAll();
     this.statement = connection.getActiveCopyStatement();

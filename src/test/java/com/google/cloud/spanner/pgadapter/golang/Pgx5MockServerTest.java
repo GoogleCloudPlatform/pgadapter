@@ -87,7 +87,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
     return options.isDomainSocketEnabled()
         ? new Object[] {
-            /*true,*/
+          /*true,*/
           false
         }
         : new Object[] {false};

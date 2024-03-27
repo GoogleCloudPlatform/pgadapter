@@ -51,9 +51,9 @@ public abstract class WireMessage {
    *
    * @param input The data stream containing the user request.
    * @return A byte array of user-defined parameters to be bound.
-   * @throws Exception If reading fails in any way.
+   * @throws IOException If reading fails in any way.
    */
-  protected static byte[][] getParameters(DataInputStream input) throws Exception {
+  protected static byte[][] getParameters(DataInputStream input) throws IOException {
     int numberOfParameters = input.readShort();
     byte[][] parameters = new byte[numberOfParameters][];
     for (int i = 0; i < numberOfParameters; i++) {
@@ -122,9 +122,9 @@ public abstract class WireMessage {
    * Metadata is designated as type, length, etc.
    *
    * @return The remainder of the message in String format.
-   * @throws Exception If reading fails in any way.
+   * @throws IOException If reading fails in any way.
    */
-  protected String readAll() throws Exception {
+  protected String readAll() throws IOException {
     return read(this.length - this.getHeaderLength());
   }
 

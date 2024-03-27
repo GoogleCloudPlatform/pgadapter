@@ -19,6 +19,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Executes a portal. */
@@ -32,7 +33,7 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
   private final boolean cleanupAfterExecute;
   private final String commandTag;
 
-  public ExecuteMessage(ConnectionHandler connection) throws Exception {
+  public ExecuteMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.name = this.readAll();
     this.maxRows = this.inputStream.readInt();

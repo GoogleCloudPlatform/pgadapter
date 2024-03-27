@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.base.Preconditions;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 
@@ -82,7 +83,7 @@ public class NoticeResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  protected void sendPayload() throws IOException {
     this.outputStream.writeByte(SEVERITY_FLAG);
     this.outputStream.write(severity.name().getBytes(StandardCharsets.UTF_8));
     this.outputStream.writeByte(NULL_TERMINATOR);

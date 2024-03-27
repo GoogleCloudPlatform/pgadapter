@@ -122,6 +122,7 @@ public class ConnectionHandler implements Runnable {
   private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
       new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
+  private Map<String, String> connectionParameters;
   private Thread thread;
   private final int connectionId;
   private final int secret;
@@ -132,7 +133,7 @@ public class ConnectionHandler implements Runnable {
   /** Randomly generated UUID that is included in tracing to identify a connection. */
   private final UUID traceConnectionId = UUID.randomUUID();
 
-  protected ConnectionMetadata connectionMetadata;
+  private ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private int invalidMessagesCount;
   private Connection spannerConnection;
@@ -566,7 +567,7 @@ public class ConnectionHandler implements Runnable {
    * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  void handleError(PGException exception) throws Exception {
+  void handleError(PGException exception) throws IOException {
     logger.log(
         Level.WARNING,
         exception,
@@ -791,8 +792,16 @@ public class ConnectionHandler implements Runnable {
     this.invalidMessagesCount = 0;
   }
 
+  public boolean supportsPeekNextByte() {
+    return true;
+  }
+
   public ConnectionMetadata getConnectionMetadata() {
     return connectionMetadata;
+  }
+
+  protected void setConnectionMetadata(ConnectionMetadata connectionMetadata) {
+    this.connectionMetadata = connectionMetadata;
   }
 
   public ExtendedQueryProtocolHandler getExtendedQueryProtocolHandler() {
@@ -805,6 +814,15 @@ public class ConnectionHandler implements Runnable {
 
   public void setStatus(ConnectionStatus status) {
     this.status = status;
+  }
+
+  public void setStatus(ConnectionStatus status, Map<String, String> connectionParameters) {
+    this.status = status;
+    this.connectionParameters = connectionParameters;
+  }
+
+  public Map<String, String> getConnectionParameters() {
+    return this.connectionParameters;
   }
 
   public WellKnownClient getWellKnownClient() {
@@ -914,6 +932,7 @@ public class ConnectionHandler implements Runnable {
   /** Status of a {@link ConnectionHandler} */
   public enum ConnectionStatus {
     UNAUTHENTICATED,
+    AUTHENTICATING,
     AUTHENTICATED,
     COPY_IN,
     COPY_DONE,

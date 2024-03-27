@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStateme
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.List;
@@ -43,7 +44,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   private IntermediatePortalStatement statement;
 
   /** Constructor for Bind messages that are received from the front-end. */
-  public BindMessage(ConnectionHandler connection) throws Exception {
+  public BindMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.portalName = this.readString();
     this.statementName = this.readString();

@@ -34,13 +34,18 @@ public class ChannelOutputStream extends OutputStream {
       b1 = new byte[1];
     }
     b1[0] = (byte) b;
-    this.channel.write(ByteBuffer.wrap(b1));
+    write(b1, 0, 1);
   }
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
     Preconditions.checkArgument(off >= 0);
-    Preconditions.checkArgument(off + len < b.length);
-    this.channel.write(ByteBuffer.wrap(b, off, len));
+    Preconditions.checkArgument(off + len <= b.length);
+    int remainingLength = len;
+    while (remainingLength > 0) {
+      int written = this.channel.write(ByteBuffer.wrap(b, off, remainingLength));
+      remainingLength -= written;
+      off += written;
+    }
   }
 }

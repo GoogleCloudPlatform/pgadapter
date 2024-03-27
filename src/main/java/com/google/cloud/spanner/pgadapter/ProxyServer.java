@@ -358,7 +358,7 @@ public class ProxyServer extends AbstractApiService {
    *
    * @param handler The handler currently in use.
    */
-  protected void register(ConnectionHandler handler) {
+  public void register(ConnectionHandler handler) {
     this.handlers.add(handler);
   }
 
@@ -377,6 +377,10 @@ public class ProxyServer extends AbstractApiService {
 
   public OpenTelemetry getOpenTelemetry() {
     return this.openTelemetry;
+  }
+
+  public ThreadFactory getThreadFactory() {
+    return this.threadFactory;
   }
 
   public Tracer getTracer(String name, String version) {
