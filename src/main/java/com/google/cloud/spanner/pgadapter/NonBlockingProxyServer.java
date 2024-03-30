@@ -61,17 +61,20 @@ public class NonBlockingProxyServer extends ProxyServer {
     listenersBuilder.add(tcpListener);
 
     if (optionsMetadata.isDomainSocketEnabled()) {
-      File tempDir = new File(optionsMetadata.getSocketFile(getLocalPort()));
-      if (tempDir.getParentFile() != null && !tempDir.getParentFile().exists()) {
+      File socketFile = new File(optionsMetadata.getSocketFile(getLocalPort()));
+      if (socketFile.getParentFile() != null && !socketFile.getParentFile().exists()) {
         //noinspection ResultOfMethodCallIgnored
-        tempDir.getParentFile().mkdirs();
+        socketFile.getParentFile().mkdirs();
+      }
+      if (socketFile.exists() && !socketFile.delete()) {
+        throw new IOException("Failed to re-create socket file");
       }
       NonBlockingServerListener listener =
           createServerListener(
               AFUNIXSelectorProvider.provider().openSelector(),
               AFUNIXSelectorProvider.provider().openSelector(),
               AFUNIXServerSocketChannel.open(),
-              AFUNIXSocketAddress.of(tempDir),
+              AFUNIXSocketAddress.of(socketFile),
               ++index);
       listenersBuilder.add(listener);
     }

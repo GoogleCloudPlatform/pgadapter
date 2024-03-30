@@ -109,10 +109,10 @@ class NonBlockingSocketReader implements Runnable {
 
     try {
       if (handler.getStatus() == ConnectionStatus.UNAUTHENTICATED) {
-        ByteBuffer lengthBuffer = read(4, channel);
+        ByteBuffer lengthBuffer = read(4, channel, true);
         lengthBuffer.rewind();
         int length = ByteConverter.int4(lengthBuffer.array(), 0);
-        ByteBuffer dataBuffer = read(length, lengthBuffer, channel);
+        ByteBuffer dataBuffer = read(length, lengthBuffer, channel, true);
         dataBuffer.rewind();
         try (ByteBufferInputStream inputStream = new ByteBufferInputStream(dataBuffer)) {
           handler.setRawInputStream(inputStream);
@@ -121,13 +121,14 @@ class NonBlockingSocketReader implements Runnable {
         }
       } else {
         // All control messages has a 1-byte type + 4 byte length.
-        ByteBuffer headerBuffer = read(handler.getHeaderBuffer(), channel);
+        ByteBuffer headerBuffer = read(handler.getHeaderBuffer(), channel, false);
         byte[] dst = new byte[4];
         headerBuffer.position(1);
         headerBuffer.get(dst);
         int length = ByteConverter.int4(dst, 0);
         headerBuffer.rewind();
-        ByteBuffer message = read(handler.getMessageBuffer(length + 1), headerBuffer, channel);
+        ByteBuffer message =
+            read(handler.getMessageBuffer(length + 1), headerBuffer, channel, false);
         message.rewind();
         try (ByteBufferInputStream inputStream = new ByteBufferInputStream(message)) {
           handler.setRawInputStream(inputStream);
@@ -154,28 +155,39 @@ class NonBlockingSocketReader implements Runnable {
     }
   }
 
-  private static ByteBuffer read(int length, SocketChannel channel) throws IOException {
-    return read(length, null, channel);
-  }
-
-  private static ByteBuffer read(ByteBuffer destination, SocketChannel channel) throws IOException {
-    return read(destination, null, channel);
-  }
-
-  private static ByteBuffer read(int length, ByteBuffer header, SocketChannel channel)
+  private static ByteBuffer read(int length, SocketChannel channel, boolean bootstrap)
       throws IOException {
-    ByteBuffer destination = ByteBuffer.allocate(length);
-    return read(destination, header, channel);
+    return read(length, null, channel, bootstrap);
   }
 
-  private static ByteBuffer read(ByteBuffer destination, ByteBuffer header, SocketChannel channel)
+  private static ByteBuffer read(ByteBuffer destination, SocketChannel channel, boolean bootstrap)
+      throws IOException {
+    return read(destination, null, channel, bootstrap);
+  }
+
+  private static ByteBuffer read(
+      int length, ByteBuffer header, SocketChannel channel, boolean bootstrap) throws IOException {
+    ByteBuffer destination = ByteBuffer.allocate(length);
+    return read(destination, header, channel, bootstrap);
+  }
+
+  private static ByteBuffer read(
+      ByteBuffer destination, ByteBuffer header, SocketChannel channel, boolean bootstrap)
       throws IOException {
     if (header != null) {
       destination.put(header);
     }
-    int read;
+    int read, zeroBytesCounter = 0;
     do {
       read = channel.read(destination);
+      if (read == 0) {
+        zeroBytesCounter++;
+        if (zeroBytesCounter % 1000 == 0) {
+          System.out.println("Read zero bytes " + zeroBytesCounter + " times");
+          System.out.println("Expecting " + destination.capacity() + " bytes");
+          System.out.println("Remaining " + destination.remaining() + " bytes");
+        }
+      }
     } while (read > -1 && destination.hasRemaining());
     if (read == -1) {
       throw new EOFException();
