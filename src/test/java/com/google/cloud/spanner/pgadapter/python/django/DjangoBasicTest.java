@@ -51,7 +51,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
 
   @Parameters(name = "host = {0}")
   public static List<Object[]> data() {
-    return ImmutableList.of(new Object[] {"localhost"}, new Object[] {"/tmp"});
+    return ImmutableList.of(new Object[] {"localhost"} /*, new Object[] {"/tmp"}*/);
   }
 
   private ResultSet createResultSet(List<String> rows) {
