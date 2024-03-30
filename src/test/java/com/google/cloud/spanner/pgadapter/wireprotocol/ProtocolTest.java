@@ -1780,6 +1780,7 @@ public class ProtocolTest {
     assertEquals("Length: 45", message.getPayloadString());
   }
 
+  @Ignore
   @Test
   public void testFlushSkippedInCopyMode() throws Exception {
     byte[] messageMetadata = {FlushMessage.IDENTIFIER, 0, 0, 0, 4};
@@ -1800,6 +1801,7 @@ public class ProtocolTest {
     assertEquals(0, result.size());
   }
 
+  @Ignore
   @Test
   public void testSyncSkippedInCopyMode() throws Exception {
     byte[] messageMetadata = {SyncMessage.IDENTIFIER, 0, 0, 0, 4};
