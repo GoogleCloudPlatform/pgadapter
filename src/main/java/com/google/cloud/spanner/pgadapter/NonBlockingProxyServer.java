@@ -48,19 +48,17 @@ public class NonBlockingProxyServer extends ProxyServer {
     super(optionsMetadata, openTelemetry, properties);
     int index = 0;
     ImmutableList.Builder<NonBlockingServerListener> listenersBuilder = ImmutableList.builder();
-    for (InetAddress address : InetAddress.getAllByName("localhost")) {
-      NonBlockingServerListener listener =
-          createServerListener(
-              Selector.open(),
-              Selector.open(),
-              ServerSocketChannel.open(),
-              new InetSocketAddress(address, getLocalPort()),
-              ++index);
-      if (getLocalPort() == 0) {
-        this.localPort = listener.getServerSocketChannel().socket().getLocalPort();
-      }
-      listenersBuilder.add(listener);
+    NonBlockingServerListener tcpListener =
+        createServerListener(
+            Selector.open(),
+            Selector.open(),
+            ServerSocketChannel.open(),
+            new InetSocketAddress((InetAddress) null, getLocalPort()),
+            ++index);
+    if (getLocalPort() == 0) {
+      this.localPort = tcpListener.getServerSocketChannel().socket().getLocalPort();
     }
+    listenersBuilder.add(tcpListener);
 
     if (optionsMetadata.isDomainSocketEnabled()) {
       File tempDir = new File(optionsMetadata.getSocketFile(getLocalPort()));
