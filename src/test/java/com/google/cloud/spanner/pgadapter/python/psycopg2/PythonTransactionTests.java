@@ -542,10 +542,6 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
         ((ExecuteSqlRequest) (requests.get(6))).getTransaction().getId();
 
     assertEquals(transactionIdForRequest6, transactionIdForRequest5);
-
-    for (WireMessage wm : getWireMessagesOfType(QueryMessage.class)) {
-      System.out.println(wm);
-    }
   }
 
   @Test
