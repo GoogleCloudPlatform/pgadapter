@@ -148,7 +148,7 @@ public class ConnectionHandler implements Runnable {
   private final LinkedList<ParseMessage> skippedAutoDetectParseMessages = new LinkedList<>();
 
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
-  private CopyStatement activeCopyStatement;
+  private volatile CopyStatement activeCopyStatement;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     this(server, socket, null);

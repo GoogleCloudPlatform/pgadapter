@@ -172,15 +172,25 @@ public abstract class ControlMessage extends WireMessage {
           case SyncMessage.IDENTIFIER:
             return new SyncMessage(connection);
           case CopyDoneMessage.IDENTIFIER:
+            return new CopyDoneMessage(connection);
           case CopyDataMessage.IDENTIFIER:
+            return new CopyDataMessage(connection);
           case CopyFailMessage.IDENTIFIER:
-            // Silently skip COPY messages in non-COPY mode. This is consistent with the PG wire
-            // protocol. If we continue to receive COPY messages while in non-COPY mode, we'll
-            // terminate the connection to prevent the server from being flooded with invalid
-            // messages.
-            validMessage = false;
-            // Note: The stream itself is still valid as we received a message that we recognized.
-            return SkipMessage.createForValidStream(connection);
+            return new CopyFailMessage(connection);
+            //          case CopyDoneMessage.IDENTIFIER:
+            //          case CopyDataMessage.IDENTIFIER:
+            //          case CopyFailMessage.IDENTIFIER:
+            //            // Silently skip COPY messages in non-COPY mode. This is consistent with
+            // the PG wire
+            //            // protocol. If we continue to receive COPY messages while in non-COPY
+            // mode, we'll
+            //            // terminate the connection to prevent the server from being flooded with
+            // invalid
+            //            // messages.
+            //            validMessage = false;
+            //            // Note: The stream itself is still valid as we received a message that we
+            // recognized.
+            //            return SkipMessage.createForValidStream(connection);
           default:
             throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
         }

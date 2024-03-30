@@ -103,13 +103,13 @@ public class StartupMessage extends BootstrapMessage {
           .setConnectionStartupValue(
               "spanner", "well_known_client", connection.getWellKnownClient().name());
     }
+    connection.setStatus(ConnectionStatus.AUTHENTICATED, parameters);
     sendStartupMessage(
         connection.getConnectionMetadata().getOutputStream(),
         connection.getConnectionId(),
         connection.getSecret(),
         connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState(),
         connection.getWellKnownClient().createStartupNoticeResponses(connection));
-    connection.setStatus(ConnectionStatus.AUTHENTICATED, parameters);
   }
 
   @Override

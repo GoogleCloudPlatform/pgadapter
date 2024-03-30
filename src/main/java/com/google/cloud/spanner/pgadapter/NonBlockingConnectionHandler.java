@@ -19,6 +19,8 @@ import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.ForwardingInputStream;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.FlushMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -113,6 +115,16 @@ public class NonBlockingConnectionHandler extends ConnectionHandler {
 
   @Override
   public ControlMessage readControlMessage() throws Exception {
-    return this.controlMessages.take();
+    if (getStatus() == ConnectionStatus.COPY_IN) {
+      while (true) {
+        ControlMessage message = this.controlMessages.take();
+        if (message instanceof FlushMessage || message instanceof SyncMessage) {
+          continue;
+        }
+        return message;
+      }
+    } else {
+      return this.controlMessages.take();
+    }
   }
 }
