@@ -64,7 +64,7 @@ public class NonBlockingProxyServer extends ProxyServer {
       File tempDir = new File(optionsMetadata.getSocketFile(getLocalPort()));
       if (tempDir.getParentFile() != null && !tempDir.getParentFile().exists()) {
         //noinspection ResultOfMethodCallIgnored
-        tempDir.mkdirs();
+        tempDir.getParentFile().mkdirs();
       }
       NonBlockingServerListener listener =
           createServerListener(
