@@ -653,11 +653,11 @@ public class ProtocolTest {
     assertArrayEquals(expectedParameters, ((BindMessage) message).getParameters());
     assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
-    assertEquals("select * from foo", ((BindMessage) message).getSql());
-    assertTrue(((BindMessage) message).hasParameterValues());
 
     message.send();
     ((BindMessage) message).flush();
+    assertEquals("select * from foo", ((BindMessage) message).getSql());
+    assertTrue(((BindMessage) message).hasParameterValues());
     verify(connectionHandler).registerPortal(expectedPortalName, intermediatePortalStatement);
 
     // BindCompleteResponse
@@ -842,9 +842,6 @@ public class ProtocolTest {
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(DescribeMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((DescribeMessage) message).getName());
-    assertEquals("select * from foo", ((DescribeMessage) message).getSql());
-
-    verify(connectionHandler).getPortal("some statement");
 
     DescribeMessage messageSpy = (DescribeMessage) spy(message);
     doNothing().when(messageSpy).handleDescribePortal();
@@ -852,6 +849,8 @@ public class ProtocolTest {
     messageSpy.send();
     messageSpy.flush();
 
+    verify(connectionHandler).getPortal("some statement");
+    assertEquals("select * from foo", messageSpy.getSql());
     verify(messageSpy).handleDescribePortal();
   }
 
@@ -881,14 +880,13 @@ public class ProtocolTest {
     assertEquals(DescribeMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((DescribeMessage) message).getName());
 
-    verify(connectionHandler).getStatement("some statement");
-
     DescribeMessage messageSpy = (DescribeMessage) spy(message);
     doNothing().when(messageSpy).handleDescribeStatement();
 
     messageSpy.send();
     messageSpy.flush();
 
+    verify(connectionHandler).getStatement("some statement");
     verify(messageSpy).handleDescribeStatement();
   }
 
@@ -919,6 +917,7 @@ public class ProtocolTest {
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(DescribeMessage.class, message.getClass());
     DescribeMessage describeMessage = (DescribeMessage) message;
+    describeMessage.buffer(backendConnection);
 
     PGException exception =
         assertThrows(PGException.class, describeMessage::handleDescribeStatement);
@@ -954,9 +953,7 @@ public class ProtocolTest {
     assertEquals(expectedStatementName, ((ExecuteMessage) message).getName());
     assertEquals(totalRows, ((ExecuteMessage) message).getMaxRows());
 
-    verify(connectionHandler).getPortal("some portal");
     ExecuteMessage messageSpy = (ExecuteMessage) spy(message);
-
     doNothing()
         .when(messageSpy)
         .sendSpannerResult(any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
@@ -964,6 +961,7 @@ public class ProtocolTest {
     messageSpy.send();
     messageSpy.flush();
 
+    verify(connectionHandler).getPortal("some portal");
     verify(intermediatePortalStatement).executeAsync(backendConnection);
     verify(messageSpy)
         .sendSpannerResult(intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
@@ -1004,12 +1002,11 @@ public class ProtocolTest {
     assertEquals(expectedStatementName, ((ExecuteMessage) message).getName());
     assertEquals(totalRows, ((ExecuteMessage) message).getMaxRows());
 
-    verify(connectionHandler).getPortal("some portal");
     ExecuteMessage messageSpy = (ExecuteMessage) spy(message);
-
     messageSpy.send();
     messageSpy.flush();
 
+    verify(connectionHandler).getPortal("some portal");
     verify(intermediatePortalStatement).executeAsync(backendConnection);
     verify(messageSpy).handleError(testException);
     verify(connectionHandler).cleanUp(intermediatePortalStatement);

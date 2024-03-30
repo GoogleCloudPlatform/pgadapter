@@ -23,6 +23,7 @@ import com.google.cloud.spanner.pgadapter.metadata.ByteBufferInputStream;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.opentelemetry.api.OpenTelemetry;
 import java.io.EOFException;
 import java.io.File;
@@ -42,6 +43,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.newsclub.net.unix.AFUNIXSelectorProvider;
@@ -194,7 +196,9 @@ public class NonBlockingProxyServer extends ProxyServer {
       udsReaderThread.start();
 
       notifyStarted();
+      logger.log(Level.INFO, "Non-blocking server started");
     } catch (Throwable throwable) {
+      logger.log(Level.WARNING, "Non-blocking server failed to start", throwable);
       notifyFailed(throwable);
     }
   }
@@ -202,26 +206,33 @@ public class NonBlockingProxyServer extends ProxyServer {
   @Override
   protected void doStop() {
     try {
-      serverSocketChannel.close();
-      udsServerSocketChannel.close();
       acceptSelector.close();
       udsAcceptSelector.close();
+      logger.log(Level.INFO, "Closed listening selectors");
     } catch (IOException ioException) {
-
+      logger.log(Level.WARNING, "Failed to close selectors", ioException);
     }
     for (ConnectionHandler handler : getConnectionHandlers()) {
       handler.terminate();
     }
+    logger.log(Level.INFO, "Terminated all active connections");
     try {
       SpannerPool.closeSpannerPool();
     } catch (Throwable ignore) {
     }
+    try {
+      serverSocketChannel.close();
+      udsServerSocketChannel.close();
+      logger.log(Level.INFO, "Closed listening sockets");
+    } catch (IOException ioException) {
+      logger.log(Level.WARNING, "Failed to close sockets", ioException);
+    }
     notifyStopped();
+    logger.log(Level.INFO, "Non-blocking listening server stopped");
   }
 
   void runListeningServer(
-      Selector acceptSelector, Selector selector, ServerSocketChannel serverSocketChannel)
-      throws IOException {
+      Selector acceptSelector, Selector selector, ServerSocketChannel serverSocketChannel) {
     while (true) {
       try {
         if (acceptSelector.selectNow() > 0) {
@@ -235,6 +246,7 @@ public class NonBlockingProxyServer extends ProxyServer {
         }
       } catch (ClosedSelectorException ignore) {
         // the server is shutting down.
+        logger.log(Level.INFO, "Listener shutting down");
         break;
       } catch (Throwable unexpectedError) {
         logger.warning(
@@ -261,8 +273,23 @@ public class NonBlockingProxyServer extends ProxyServer {
 
   void runServer(Selector selector) throws IOException {
     Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
-    //noinspection InfiniteLoopStatement
-    while (true) {
+    final AtomicBoolean running = new AtomicBoolean(true);
+    addListener(
+        new Listener() {
+          @Override
+          public void failed(State from, Throwable failure) {
+            super.failed(from, failure);
+            running.set(false);
+          }
+
+          @Override
+          public void terminated(State from) {
+            super.terminated(from);
+            running.set(false);
+          }
+        },
+        MoreExecutors.directExecutor());
+    while (running.get()) {
       if (selector.selectNow() > 0) {
         Set<SelectionKey> keys = selector.selectedKeys();
         for (SelectionKey key : keys) {
@@ -274,7 +301,8 @@ public class NonBlockingProxyServer extends ProxyServer {
             key.cancel();
             key.channel().close();
           } catch (CancelledKeyException ignore) {
-            ignore.printStackTrace();
+            // Ignore and try the next
+            // ignore.printStackTrace();
           } catch (Throwable shouldNotHappen) {
             shouldNotHappen.printStackTrace();
           }
