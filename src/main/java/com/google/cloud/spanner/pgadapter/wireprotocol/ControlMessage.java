@@ -119,7 +119,7 @@ public abstract class ControlMessage extends WireMessage {
     boolean validMessage = true;
     char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
     try {
-      if (connection.getStatus() == ConnectionStatus.COPY_IN) {
+      /*if (connection.getStatus() == ConnectionStatus.COPY_IN) {
         switch (nextMsg) {
           case CopyDoneMessage.IDENTIFIER:
             return new CopyDoneMessage(connection);
@@ -142,7 +142,7 @@ public abstract class ControlMessage extends WireMessage {
                     "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: '%c'",
                     nextMsg));
         }
-      } else if (connection.getStatus() == ConnectionStatus.AUTHENTICATING) {
+      } else*/ if (connection.getStatus() == ConnectionStatus.AUTHENTICATING) {
         switch (nextMsg) {
           case PasswordMessage.IDENTIFIER:
             return new PasswordMessage(connection, connection.getConnectionParameters());
