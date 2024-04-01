@@ -75,6 +75,7 @@ class NonBlockingSocketReader implements Runnable {
     Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
     try {
       Instant lastReadTime = Instant.now();
+      long lastWarningSeconds = 0L;
       while (running.get()) {
         if (selector.selectNow() > 0) {
           lastReadTime = Instant.now();
@@ -104,7 +105,10 @@ class NonBlockingSocketReader implements Runnable {
         } else {
           long secondsSinceLastRead = ChronoUnit.SECONDS.between(lastReadTime, Instant.now());
           if (secondsSinceLastRead > 0L && secondsSinceLastRead % 10L == 0L) {
-            System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
+            if (secondsSinceLastRead != lastWarningSeconds) {
+              System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
+              lastWarningSeconds = secondsSinceLastRead;
+            }
           }
         }
       }

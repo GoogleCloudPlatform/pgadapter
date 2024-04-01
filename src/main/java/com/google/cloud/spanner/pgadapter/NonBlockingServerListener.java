@@ -62,6 +62,7 @@ final class NonBlockingServerListener implements Runnable {
   @Override
   public void run() {
     Instant lastConnection = Instant.now();
+    long lastWarningSeconds = 0L;
     while (true) {
       try {
         acceptSelector.select(1000L);
@@ -75,7 +76,11 @@ final class NonBlockingServerListener implements Runnable {
         keys.clear();
         long secondsSinceLastConnection = ChronoUnit.SECONDS.between(lastConnection, Instant.now());
         if (secondsSinceLastConnection > 0L && secondsSinceLastConnection % 10L == 0L) {
-          logger.log(Level.WARNING, "Seconds since last connection: " + secondsSinceLastConnection);
+          if (secondsSinceLastConnection != lastWarningSeconds) {
+            logger.log(
+                Level.WARNING, "Seconds since last connection: " + secondsSinceLastConnection);
+            lastWarningSeconds = secondsSinceLastConnection;
+          }
         }
       } catch (ClosedSelectorException ignore) {
         // the server is shutting down.
