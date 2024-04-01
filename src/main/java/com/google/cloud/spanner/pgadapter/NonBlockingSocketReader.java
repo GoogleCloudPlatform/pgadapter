@@ -78,38 +78,38 @@ class NonBlockingSocketReader implements Runnable {
       long lastWarningSeconds = 0L;
       while (running.get()) {
         long secondsSinceLastRead = ChronoUnit.SECONDS.between(lastReadTime, Instant.now());
-        //        if (selector.selectNow() > 0 || secondsSinceLastRead > 60L) {
-        selector.selectNow();
-        Set<SelectionKey> keys = selector.selectedKeys();
-        boolean foundReable = false;
-        for (SelectionKey key : keys) {
-          try {
-            if (key.isReadable()) {
-              lastReadTime = Instant.now();
-              foundReable = true;
-              handleRead(key);
+        if (selector.selectNow() > 0 || secondsSinceLastRead > 60L) {
+          //        selector.selectNow();
+          Set<SelectionKey> keys = selector.selectedKeys();
+          boolean foundReable = false;
+          for (SelectionKey key : keys) {
+            try {
+              if (key.isReadable()) {
+                lastReadTime = Instant.now();
+                foundReable = true;
+                handleRead(key);
+              }
+            } catch (EOFException eofException) {
+              logger.log(Level.WARNING, "EOFException for key " + key, eofException);
+              key.cancel();
+              key.channel().close();
+            } catch (CancelledKeyException exception) {
+              // Ignore and try the next
+              logger.log(Level.WARNING, "Key cancelled", exception);
+            } catch (Throwable shouldNotHappen) {
+              logger.log(Level.WARNING, "Socket read failed", shouldNotHappen);
             }
-          } catch (EOFException eofException) {
-            logger.log(Level.WARNING, "EOFException for key " + key, eofException);
-            key.cancel();
-            key.channel().close();
-          } catch (CancelledKeyException exception) {
-            // Ignore and try the next
-            logger.log(Level.WARNING, "Key cancelled", exception);
-          } catch (Throwable shouldNotHappen) {
-            logger.log(Level.WARNING, "Socket read failed", shouldNotHappen);
+          }
+          if (foundReable) {
+            keys.clear();
           }
         }
-        if (foundReable) {
-          keys.clear();
-        }
+        //        if (secondsSinceLastRead > 0L && secondsSinceLastRead % 10L == 0L) {
+        //          if (secondsSinceLastRead != lastWarningSeconds) {
+        //            System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
+        //            lastWarningSeconds = secondsSinceLastRead;
+        //          }
         //        }
-        if (secondsSinceLastRead > 0L && secondsSinceLastRead % 10L == 0L) {
-          if (secondsSinceLastRead != lastWarningSeconds) {
-            System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
-            lastWarningSeconds = secondsSinceLastRead;
-          }
-        }
       }
     } catch (IOException ioException) {
       logger.log(Level.WARNING, "selectNow for reader failed", ioException);
