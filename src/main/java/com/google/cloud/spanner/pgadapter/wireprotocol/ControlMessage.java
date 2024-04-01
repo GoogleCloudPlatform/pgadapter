@@ -62,6 +62,7 @@ import io.opentelemetry.context.Scope;
 import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -117,6 +118,9 @@ public abstract class ControlMessage extends WireMessage {
    */
   public static ControlMessage create(ConnectionHandler connection) throws Exception {
     boolean validMessage = true;
+    InputStream inputStream = connection.getConnectionMetadata().getInputStream();
+    while (inputStream.available() == 0) {}
+
     char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
     try {
       if (connection.getStatus() == ConnectionStatus.COPY_IN) {
