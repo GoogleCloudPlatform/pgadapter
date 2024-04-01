@@ -17,8 +17,6 @@ package com.google.cloud.spanner.pgadapter.metadata;
 import com.google.api.core.InternalApi;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -39,14 +37,8 @@ public class ConnectionMetadata implements AutoCloseable {
    * pushes these as the current streams to use for communication for a connection.
    */
   public ConnectionMetadata(InputStream rawInputStream, OutputStream rawOutputStream) {
-    this.inputStream =
-        new DataInputStream(
-            new BufferedInputStream(
-                Preconditions.checkNotNull(rawInputStream), SOCKET_BUFFER_SIZE));
-    this.outputStream =
-        new DataOutputStream(
-            new BufferedOutputStream(
-                Preconditions.checkNotNull(rawOutputStream), SOCKET_BUFFER_SIZE));
+    this.inputStream = new DataInputStream(Preconditions.checkNotNull(rawInputStream));
+    this.outputStream = new DataOutputStream(Preconditions.checkNotNull(rawOutputStream));
   }
 
   public void markForRestart() {
