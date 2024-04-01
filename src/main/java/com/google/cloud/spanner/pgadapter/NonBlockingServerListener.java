@@ -21,6 +21,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -59,16 +61,22 @@ final class NonBlockingServerListener implements Runnable {
 
   @Override
   public void run() {
+    Instant lastConnection = Instant.now();
     while (true) {
       try {
         acceptSelector.select(1000L);
         Set<SelectionKey> keys = acceptSelector.selectedKeys();
         for (SelectionKey key : keys) {
           if (key.isAcceptable()) {
+            lastConnection = Instant.now();
             handleAccept(readSelector, serverSocketChannel);
           }
         }
         keys.clear();
+        long secondsSinceLastConnection = ChronoUnit.SECONDS.between(Instant.now(), lastConnection);
+        if (secondsSinceLastConnection > 0L && secondsSinceLastConnection % 10L == 0L) {
+          logger.log(Level.WARNING, "Seconds since last connection: " + secondsSinceLastConnection);
+        }
       } catch (ClosedSelectorException ignore) {
         // the server is shutting down.
         logger.log(Level.INFO, "Listener shutting down");
