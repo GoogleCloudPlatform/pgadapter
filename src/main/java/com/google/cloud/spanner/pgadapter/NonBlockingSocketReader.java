@@ -77,7 +77,8 @@ class NonBlockingSocketReader implements Runnable {
       Instant lastReadTime = Instant.now();
       long lastWarningSeconds = 0L;
       while (running.get()) {
-        if (selector.selectNow() > 0) {
+        long secondsSinceLastRead = ChronoUnit.SECONDS.between(lastReadTime, Instant.now());
+        if (selector.selectNow() > 0 || secondsSinceLastRead > 60L) {
           lastReadTime = Instant.now();
           Set<SelectionKey> keys = selector.selectedKeys();
           boolean foundReable = false;
@@ -102,13 +103,11 @@ class NonBlockingSocketReader implements Runnable {
             logger.log(Level.WARNING, "No readable key found");
           }
           keys.clear();
-        } else {
-          long secondsSinceLastRead = ChronoUnit.SECONDS.between(lastReadTime, Instant.now());
-          if (secondsSinceLastRead > 0L && secondsSinceLastRead % 10L == 0L) {
-            if (secondsSinceLastRead != lastWarningSeconds) {
-              System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
-              lastWarningSeconds = secondsSinceLastRead;
-            }
+        }
+        if (secondsSinceLastRead > 0L && secondsSinceLastRead % 10L == 0L) {
+          if (secondsSinceLastRead != lastWarningSeconds) {
+            System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
+            lastWarningSeconds = secondsSinceLastRead;
           }
         }
       }
