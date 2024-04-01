@@ -211,8 +211,10 @@ class NonBlockingSocketReader implements Runnable {
     if (loggedWarning) {
       System.out.println("Finished reading");
     }
-    if (loggedWarning && read == -1) {
-      System.out.println("EOFException after warning");
+    if (read == -1) {
+      if (loggedWarning) {
+        System.out.println("EOFException after warning");
+      }
       throw new EOFException();
     }
 

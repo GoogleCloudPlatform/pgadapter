@@ -61,7 +61,7 @@ final class NonBlockingServerListener implements Runnable {
   public void run() {
     while (true) {
       try {
-        if (acceptSelector.select() > 0) {
+        if (acceptSelector.select(10000L) > 0) {
           Set<SelectionKey> keys = acceptSelector.selectedKeys();
           for (SelectionKey key : keys) {
             if (key.isAcceptable()) {
@@ -69,6 +69,8 @@ final class NonBlockingServerListener implements Runnable {
             }
           }
           keys.clear();
+        } else {
+          System.out.println("Listener waited for 10 seconds without a new connection");
         }
       } catch (ClosedSelectorException ignore) {
         // the server is shutting down.
