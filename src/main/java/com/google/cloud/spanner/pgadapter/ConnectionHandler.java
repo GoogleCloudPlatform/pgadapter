@@ -25,12 +25,14 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Instance;
 import com.google.cloud.spanner.InstanceAdminClient;
 import com.google.cloud.spanner.InstanceNotFoundException;
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.ThreadFactoryUtil;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
@@ -61,6 +63,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -85,7 +88,11 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -257,6 +264,7 @@ public class ConnectionHandler implements Runnable {
     spannerConnection.setSavepointSupport(SavepointSupport.ENABLED);
     this.spannerConnection = spannerConnection;
     this.databaseId = connectionOptions.getDatabaseId();
+    warmupConnection();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
   }
 
@@ -505,6 +513,32 @@ public class ConnectionHandler implements Runnable {
     } catch (Exception exception) {
       this.handleError(PGExceptionFactory.toPGException(exception));
     }
+  }
+
+  private void warmupConnection() {
+    ThreadFactory factory =
+        ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory("connection-warmup", true);
+    int numParallelTasks = 20;
+    Duration warmupTime = Duration.ofMinutes(1L);
+    ExecutorService executor = Executors.newFixedThreadPool(numParallelTasks, factory);
+    for (int i = 0; i < numParallelTasks; i++) {
+      executor.submit(
+          () -> {
+            Stopwatch watch = Stopwatch.createStarted();
+            while (watch.elapsed().compareTo(warmupTime) < 0) {
+              try (ResultSet resultSet =
+                  spannerConnection
+                      .getDatabaseClient()
+                      .singleUse()
+                      .executeQuery(
+                          Statement.of("select " + ThreadLocalRandom.current().nextLong()))) {
+                //noinspection StatementWithEmptyBody
+                while (resultSet.next()) {}
+              }
+            }
+          });
+    }
+    executor.shutdown();
   }
 
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
