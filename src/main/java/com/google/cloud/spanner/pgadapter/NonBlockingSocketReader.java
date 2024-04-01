@@ -102,7 +102,7 @@ class NonBlockingSocketReader implements Runnable {
           }
           keys.clear();
         } else {
-          long secondsSinceLastRead = ChronoUnit.SECONDS.between(Instant.now(), lastReadTime);
+          long secondsSinceLastRead = ChronoUnit.SECONDS.between(lastReadTime, Instant.now());
           if (secondsSinceLastRead > 0L && secondsSinceLastRead % 10L == 0L) {
             System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
           }

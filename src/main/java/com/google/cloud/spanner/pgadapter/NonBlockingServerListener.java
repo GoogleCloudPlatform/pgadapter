@@ -73,7 +73,7 @@ final class NonBlockingServerListener implements Runnable {
           }
         }
         keys.clear();
-        long secondsSinceLastConnection = ChronoUnit.SECONDS.between(Instant.now(), lastConnection);
+        long secondsSinceLastConnection = ChronoUnit.SECONDS.between(lastConnection, Instant.now());
         if (secondsSinceLastConnection > 0L && secondsSinceLastConnection % 10L == 0L) {
           logger.log(Level.WARNING, "Seconds since last connection: " + secondsSinceLastConnection);
         }
