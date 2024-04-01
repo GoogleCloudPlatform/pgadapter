@@ -186,6 +186,7 @@ class NonBlockingSocketReader implements Runnable {
     if (header != null) {
       destination.put(header);
     }
+    boolean loggedWarning = false;
     int read, zeroBytesCounter = 0;
     do {
       read = channel.read(destination);
@@ -195,10 +196,15 @@ class NonBlockingSocketReader implements Runnable {
           System.out.println("Read zero bytes " + zeroBytesCounter + " times");
           System.out.println("Expecting " + destination.capacity() + " bytes");
           System.out.println("Remaining " + destination.remaining() + " bytes");
+          loggedWarning = true;
         }
       }
     } while (read > -1 && destination.hasRemaining());
+    if (loggedWarning) {
+      System.out.println("Finished reading");
+    }
     if (read == -1) {
+      System.out.println("EOFException after warning");
       throw new EOFException();
     }
 
