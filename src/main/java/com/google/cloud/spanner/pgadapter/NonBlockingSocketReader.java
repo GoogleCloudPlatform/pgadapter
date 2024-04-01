@@ -79,19 +79,26 @@ class NonBlockingSocketReader implements Runnable {
         if (selector.selectNow() > 0) {
           lastReadTime = Instant.now();
           Set<SelectionKey> keys = selector.selectedKeys();
+          boolean foundReable = false;
           for (SelectionKey key : keys) {
             try {
               if (key.isReadable()) {
+                foundReable = true;
                 handleRead(key);
               }
             } catch (EOFException eofException) {
+              logger.log(Level.WARNING, "EOFException for key " + key, eofException);
               key.cancel();
               key.channel().close();
-            } catch (CancelledKeyException ignore) {
+            } catch (CancelledKeyException exception) {
               // Ignore and try the next
+              logger.log(Level.WARNING, "Key cancelled", exception);
             } catch (Throwable shouldNotHappen) {
               logger.log(Level.WARNING, "Socket read failed", shouldNotHappen);
             }
+          }
+          if (!foundReable) {
+            logger.log(Level.WARNING, "No readable key found");
           }
           keys.clear();
         } else {
@@ -104,6 +111,7 @@ class NonBlockingSocketReader implements Runnable {
     } catch (IOException ioException) {
       logger.log(Level.WARNING, "selectNow for reader failed", ioException);
     }
+    System.out.println("Reader thread stopped");
   }
 
   static void handleRead(SelectionKey key) throws IOException {
@@ -203,7 +211,7 @@ class NonBlockingSocketReader implements Runnable {
     if (loggedWarning) {
       System.out.println("Finished reading");
     }
-    if (read == -1) {
+    if (loggedWarning && read == -1) {
       System.out.println("EOFException after warning");
       throw new EOFException();
     }
