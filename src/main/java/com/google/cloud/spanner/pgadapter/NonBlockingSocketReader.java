@@ -78,32 +78,32 @@ class NonBlockingSocketReader implements Runnable {
       long lastWarningSeconds = 0L;
       while (running.get()) {
         long secondsSinceLastRead = ChronoUnit.SECONDS.between(lastReadTime, Instant.now());
-        if (selector.selectNow() > 0 || secondsSinceLastRead > 60L) {
-          lastReadTime = Instant.now();
-          Set<SelectionKey> keys = selector.selectedKeys();
-          boolean foundReable = false;
-          for (SelectionKey key : keys) {
-            try {
-              if (key.isReadable()) {
-                foundReable = true;
-                handleRead(key);
-              }
-            } catch (EOFException eofException) {
-              logger.log(Level.WARNING, "EOFException for key " + key, eofException);
-              key.cancel();
-              key.channel().close();
-            } catch (CancelledKeyException exception) {
-              // Ignore and try the next
-              logger.log(Level.WARNING, "Key cancelled", exception);
-            } catch (Throwable shouldNotHappen) {
-              logger.log(Level.WARNING, "Socket read failed", shouldNotHappen);
+        //        if (selector.selectNow() > 0 || secondsSinceLastRead > 60L) {
+        selector.selectNow();
+        Set<SelectionKey> keys = selector.selectedKeys();
+        boolean foundReable = false;
+        for (SelectionKey key : keys) {
+          try {
+            if (key.isReadable()) {
+              lastReadTime = Instant.now();
+              foundReable = true;
+              handleRead(key);
             }
+          } catch (EOFException eofException) {
+            logger.log(Level.WARNING, "EOFException for key " + key, eofException);
+            key.cancel();
+            key.channel().close();
+          } catch (CancelledKeyException exception) {
+            // Ignore and try the next
+            logger.log(Level.WARNING, "Key cancelled", exception);
+          } catch (Throwable shouldNotHappen) {
+            logger.log(Level.WARNING, "Socket read failed", shouldNotHappen);
           }
-          if (!foundReable) {
-            logger.log(Level.WARNING, "No readable key found");
-          }
+        }
+        if (foundReable) {
           keys.clear();
         }
+        //        }
         if (secondsSinceLastRead > 0L && secondsSinceLastRead % 10L == 0L) {
           if (secondsSinceLastRead != lastWarningSeconds) {
             System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
@@ -198,19 +198,27 @@ class NonBlockingSocketReader implements Runnable {
       destination.put(header);
     }
     boolean loggedWarning = false;
-    int read, zeroBytesCounter = 0;
-    do {
-      read = channel.read(destination);
-      if (read == 0) {
-        zeroBytesCounter++;
-        if (zeroBytesCounter % 1000 == 0) {
-          System.out.println("Read zero bytes " + zeroBytesCounter + " times");
-          System.out.println("Expecting " + destination.capacity() + " bytes");
-          System.out.println("Remaining " + destination.remaining() + " bytes");
-          loggedWarning = true;
+    int read = 0, zeroBytesCounter = 0;
+    try {
+      do {
+        read = channel.read(destination);
+        if (read == 0) {
+          zeroBytesCounter++;
+          if (zeroBytesCounter % 1000 == 0) {
+            System.out.println("Read zero bytes " + zeroBytesCounter + " times");
+            System.out.println("Expecting " + destination.capacity() + " bytes");
+            System.out.println("Remaining " + destination.remaining() + " bytes");
+            loggedWarning = true;
+          }
         }
+      } while (read > -1 && destination.hasRemaining());
+    } catch (IOException ioException) {
+      if (loggedWarning) {
+        System.out.println("Error after warning");
+        ioException.printStackTrace();
+        throw ioException;
       }
-    } while (read > -1 && destination.hasRemaining());
+    }
     if (loggedWarning) {
       System.out.println("Finished reading");
     }
