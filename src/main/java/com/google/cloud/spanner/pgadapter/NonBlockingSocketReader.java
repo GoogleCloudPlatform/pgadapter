@@ -33,6 +33,8 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -72,8 +74,10 @@ class NonBlockingSocketReader implements Runnable {
   public void run() {
     Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
     try {
+      Instant lastReadTime = Instant.now();
       while (running.get()) {
         if (selector.selectNow() > 0) {
+          lastReadTime = Instant.now();
           Set<SelectionKey> keys = selector.selectedKeys();
           for (SelectionKey key : keys) {
             try {
@@ -90,6 +94,11 @@ class NonBlockingSocketReader implements Runnable {
             }
           }
           keys.clear();
+        } else {
+          long secondsSinceLastRead = ChronoUnit.SECONDS.between(Instant.now(), lastReadTime);
+          if (secondsSinceLastRead > 0L && secondsSinceLastRead % 10L == 0L) {
+            System.out.printf("Seconds since last read: %d\n", secondsSinceLastRead);
+          }
         }
       }
     } catch (IOException ioException) {
