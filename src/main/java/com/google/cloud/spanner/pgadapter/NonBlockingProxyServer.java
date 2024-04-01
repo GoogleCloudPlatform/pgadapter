@@ -53,8 +53,7 @@ public class NonBlockingProxyServer extends ProxyServer {
             Selector.open(),
             Selector.open(),
             ServerSocketChannel.open(),
-            new InetSocketAddress(
-                InetAddress.getLoopbackAddress() /*(InetAddress) null*/, getLocalPort()),
+            new InetSocketAddress((InetAddress) null, getLocalPort()),
             ++index);
     if (getLocalPort() == 0) {
       this.localPort = tcpListener.getServerSocketChannel().socket().getLocalPort();
