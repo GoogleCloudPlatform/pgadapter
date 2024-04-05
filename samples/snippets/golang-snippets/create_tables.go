@@ -13,6 +13,7 @@ limitations under the License.
 
 package golang_snippets
 
+// [START spanner_create_database]
 import (
 	"context"
 	"fmt"
@@ -22,7 +23,7 @@ import (
 
 func createTables(host string, port int, database string) error {
 	ctx := context.Background()
-	connString := fmt.Sprintf("postgres://uid:pwd@localhost:%d/%s?sslmode=disable", port, database)
+	connString := fmt.Sprintf("postgres://uid:pwd@%s:%d/%s?sslmode=disable", host, port, database)
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		return err
@@ -58,3 +59,5 @@ func createTables(host string, port int, database string) error {
 
 	return nil
 }
+
+// [END spanner_create_database]
