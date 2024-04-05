@@ -23,7 +23,9 @@ import (
 
 func createTables(host string, port int, database string) error {
 	ctx := context.Background()
-	connString := fmt.Sprintf("postgres://uid:pwd@%s:%d/%s?sslmode=disable", host, port, database)
+	connString := fmt.Sprintf(
+		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",
+		host, port, database)
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		return err
@@ -32,21 +34,21 @@ func createTables(host string, port int, database string) error {
 
 	// Create two tables in one batch on Spanner.
 	br := conn.SendBatch(ctx, &pgx.Batch{QueuedQueries: []*pgx.QueuedQuery{
-		{SQL: `CREATE TABLE Singers (
-			     SingerId   bigint NOT NULL,
-			     FirstName  character varying(1024),
-			     LastName   character varying(1024),
-			     SingerInfo bytea,
-			     FullName character varying(2048) GENERATED
-			       ALWAYS AS (FirstName || ' ' || LastName) STORED,
-			     PRIMARY KEY (SingerId)
-               )`},
-		{SQL: `CREATE TABLE Albums (
-                 SingerId     bigint NOT NULL,
-                 AlbumId      bigint NOT NULL,
-                 AlbumTitle   character varying(1024),
-                 PRIMARY KEY (SingerId, AlbumId)
-               ) INTERLEAVE IN PARENT Singers ON DELETE CASCADE`},
+		{SQL: "CREATE TABLE Singers (" +
+			"  SingerId   bigint NOT NULL," +
+			"  FirstName  character varying(1024)," +
+			"  LastName   character varying(1024)," +
+			"  SingerInfo bytea," +
+			"  FullName character varying(2048)" +
+			"           GENERATED ALWAYS AS (FirstName || ' ' || LastName) STORED," +
+			"  PRIMARY KEY (SingerId)" +
+			")"},
+		{SQL: "CREATE TABLE Albums (" +
+			"  SingerId     bigint NOT NULL," +
+			"  AlbumId      bigint NOT NULL," +
+			"  AlbumTitle   character varying(1024)," +
+			"  PRIMARY KEY (SingerId, AlbumId)" +
+			") INTERLEAVE IN PARENT Singers ON DELETE CASCADE"},
 	}})
 	cmd, err := br.Exec()
 	if err != nil {

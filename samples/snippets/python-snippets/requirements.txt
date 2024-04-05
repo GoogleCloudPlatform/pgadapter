@@ -1,0 +1,2 @@
+psycopg~=3.1.18
+testcontainers~=4.2.0
