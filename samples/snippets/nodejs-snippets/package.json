@@ -1,0 +1,23 @@
+{
+  "name": "nodejs-snippets",
+  "version": "0.0.1",
+  "description": "PGAdapter Node.js Snippets",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.12.4",
+    "@types/pg": "^8.11.4",
+    "jest": "^29.7.0",
+    "testcontainers": "^10.8.1",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.4"
+  },
+  "dependencies": {
+    "pg": "^8.11.5"
+  },
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "test": "jest"
+  }
+}
