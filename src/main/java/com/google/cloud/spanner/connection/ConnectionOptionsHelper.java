@@ -22,6 +22,9 @@ import com.google.cloud.spanner.connection.ConnectionOptions.Builder;
 /** Simple helper class to get access to a package-private method in the ConnectionOptions. */
 @InternalApi
 public class ConnectionOptionsHelper {
+  /** Private constructor to prevent instantiation. */
+  private ConnectionOptionsHelper() {}
+
   // TODO: Remove when Builder.setCredentials(..) has been made public.
   public static Builder setCredentials(Builder connectionOptionsBuilder, Credentials credentials) {
     return connectionOptionsBuilder.setCredentials(credentials);
