@@ -20,6 +20,9 @@ import com.google.cloud.spanner.ResultSet;
 @InternalApi
 public class ResultSetHelper {
 
+  /** Private constructor to prevent instantiation. */
+  private ResultSetHelper() {}
+
   /**
    * Converts the given {@link ResultSet} to a {@link DirectExecuteResultSet}. A {@link
    * DirectExecuteResultSet} does not defer the execution of the query to the first {@link
