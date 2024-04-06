@@ -1,0 +1,71 @@
+on:
+  push:
+    branches:
+      - postgresql-dialect
+  pull_request:
+  workflow_dispatch:
+name: snippets
+jobs:
+  psql-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install postgresql-client-14"
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install postgresql-client-14
+      - name: Run psql snippets
+        working-directory: ./samples/snippets/psql-snippets/tests
+        run: ./test_samples.sh
+  java-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+      - name: Run Java Snippets
+        working-directory: ./samples/snippets/java-snippets
+        run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+  go-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.7'
+      - name: Run Go snippets
+        working-directory: ./samples/snippets/golang-snippets
+        run: go test
+  python-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - run: python --version
+      - name: Install pip
+        run: python -m pip install --upgrade pip
+      - name: Run Python snippets
+        working-directory: ./samples/snippets/python-snippets
+        run: |
+          pip install -r requirements.txt
+          python -m unittest
+  nodejs-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --version
+      - name: Run Node.js snippets
+        working-directory: ./samples/snippets/nodejs-snippets
+        run: |
+          npm install
+          npm test
