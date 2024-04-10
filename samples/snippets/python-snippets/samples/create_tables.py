@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# [START spanner_create_database]
 import string
 import psycopg
 
@@ -28,20 +29,20 @@ def create_tables(host: string, port: int, database: string):
 
         # Use a pipeline to execute multiple DDL statements in one batch.
         with conn.pipeline():
-            conn.execute("CREATE TABLE Singers ("
-                         + "  SingerId   bigint NOT NULL,"
-                         + "  FirstName  character varying(1024),"
-                         + "  LastName   character varying(1024),"
-                         + "  SingerInfo bytea,"
-                         + "  FullName character varying(2048) GENERATED "
-                         + "  ALWAYS AS (FirstName || ' ' || LastName) STORED,"
-                         + "  PRIMARY KEY (SingerId)"
+            conn.execute("create table singers ("
+                         + "  singer_id   bigint primary key not null,"
+                         + "  first_name  character varying(1024),"
+                         + "  last_name   character varying(1024),"
+                         + "  singer_info bytea,"
+                         + "  full_name   character varying(2048) generated "
+                         + "  always as (first_name || ' ' || last_name) stored"
                          + ")")
-            conn.execute("CREATE TABLE Albums ("
-                         + "  SingerId     bigint NOT NULL,"
-                         + "  AlbumId      bigint NOT NULL,"
-                         + "  AlbumTitle   character varying(1024),"
-                         + "  PRIMARY KEY (SingerId, AlbumId)"
-                         + ") INTERLEAVE IN PARENT Singers ON DELETE CASCADE")
+            conn.execute("create table albums ("
+                         + "  singer_id     bigint not null,"
+                         + "  album_id      bigint not null,"
+                         + "  album_title   character varying(1024),"
+                         + "  primary key (singer_id, album_id)"
+                         + ") interleave in parent singers on delete cascade")
         print("Created Singers & Albums tables in database: [{database}]"
               .format(database=database))
+# [END spanner_create_database]
