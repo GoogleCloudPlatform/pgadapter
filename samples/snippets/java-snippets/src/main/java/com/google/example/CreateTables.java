@@ -27,22 +27,24 @@ class CreateTables {
       try (Statement statement = connection.createStatement()) {
         // Create two tables in one batch.
         statement.addBatch(
-            "CREATE TABLE Singers ("
-                + "  SingerId   bigint NOT NULL,"
-                + "  FirstName  character varying(1024),"
-                + "  LastName   character varying(1024),"
-                + "  SingerInfo bytea,"
-                + "  FullName character varying(2048) GENERATED "
-                + "  ALWAYS AS (FirstName || ' ' || LastName) STORED,"
-                + "  PRIMARY KEY (SingerId)"
+            "create table singers ("
+                + "  singer_id   bigint primary key not null,"
+                + "  first_name  varchar(1024),"
+                + "  last_name   varchar(1024),"
+                + "  singer_info bytea,"
+                + "  full_name   varchar(2048) generated always as (\n"
+                + "      case when first_name is null then last_name\n"
+                + "          when last_name  is null then first_name\n"
+                + "          else first_name || ' ' || last_name\n"
+                + "      end) stored"
                 + ")");
         statement.addBatch(
-            "CREATE TABLE Albums ("
-                + "  SingerId     bigint NOT NULL,"
-                + "  AlbumId      bigint NOT NULL,"
-                + "  AlbumTitle   character varying(1024),"
-                + "  PRIMARY KEY (SingerId, AlbumId)"
-                + ") INTERLEAVE IN PARENT Singers ON DELETE CASCADE");
+            "create table albums ("
+                + "  singer_id     bigint not null,"
+                + "  album_id      bigint not null,"
+                + "  album_title   varchar,"
+                + "  primary key (singer_id, album_id)"
+                + ") interleave in parent singers on delete cascade");
         statement.executeBatch();
         System.out.println("Created Singers & Albums tables in database: [" + database + "]");
       }

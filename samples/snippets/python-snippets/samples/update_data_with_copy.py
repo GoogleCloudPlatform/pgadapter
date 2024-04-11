@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
+
 # [START spanner_update_data]
 import string
 import psycopg
@@ -28,7 +28,7 @@ def update_data_with_copy(host: string, port: int, database: string):
             # This enables us to use COPY to update data.
             cur.execute("set spanner.copy_upsert=true")
 
-            # COPY uses mutations to insert or update data in Spanner.
+            # COPY uses mutations to insert or update existing data in Spanner.
             with cur.copy("COPY albums (singer_id, album_id, marketing_budget) "
                           "FROM STDIN") as copy:
                 copy.write_row((1, 1, 100000))

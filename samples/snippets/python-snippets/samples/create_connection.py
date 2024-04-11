@@ -28,5 +28,5 @@ def create_connection(host: string, port: int, database: string):
         conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute("select 'Hello world!' as hello")
-            print("Greeting from Cloud Spanner PostgreSQL:", cur.fetchone()[0])
+            print("Greeting from Cloud Spanner PostgreSQL: ", cur.fetchone()[0])
 # [END spanner_create_connection]
