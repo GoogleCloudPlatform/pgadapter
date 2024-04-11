@@ -38,7 +38,20 @@ func TestSamples(t *testing.T) {
 	}
 	port := mappedPort.Int()
 
-	if err := createTables(host, port, "example-db"); err != nil {
+	db := "example-db"
+	if err := createTables(host, port, db); err != nil {
 		t.Fatalf("creating tables failed: %v", err)
+	}
+	if err := createConnection(host, port, db); err != nil {
+		t.Fatalf("creating connection failed: %v", err)
+	}
+	if err := writeDataWithDml(host, port, db); err != nil {
+		t.Fatalf("writing data with dml failed: %v", err)
+	}
+	if err := writeDataWithDmlBatch(host, port, db); err != nil {
+		t.Fatalf("writing data with dml batch failed: %v", err)
+	}
+	if err := writeDataWithCopy(host, port, db); err != nil {
+		t.Fatalf("writing data with copy failed: %v", err)
 	}
 }

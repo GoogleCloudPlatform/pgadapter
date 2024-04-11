@@ -34,21 +34,20 @@ func createTables(host string, port int, database string) error {
 
 	// Create two tables in one batch on Spanner.
 	br := conn.SendBatch(ctx, &pgx.Batch{QueuedQueries: []*pgx.QueuedQuery{
-		{SQL: "CREATE TABLE Singers (" +
-			"  SingerId   bigint NOT NULL," +
-			"  FirstName  character varying(1024)," +
-			"  LastName   character varying(1024)," +
-			"  SingerInfo bytea," +
-			"  FullName character varying(2048)" +
-			"           GENERATED ALWAYS AS (FirstName || ' ' || LastName) STORED," +
-			"  PRIMARY KEY (SingerId)" +
+		{SQL: "create table singers (" +
+			"  singer_id   bigint primary key not null," +
+			"  first_name  character varying(1024)," +
+			"  last_name   character varying(1024)," +
+			"  singer_info bytea," +
+			"  full_name   character varying(2048) generated " +
+			"  always as (first_name || ' ' || last_name) stored" +
 			")"},
-		{SQL: "CREATE TABLE Albums (" +
-			"  SingerId     bigint NOT NULL," +
-			"  AlbumId      bigint NOT NULL," +
-			"  AlbumTitle   character varying(1024)," +
-			"  PRIMARY KEY (SingerId, AlbumId)" +
-			") INTERLEAVE IN PARENT Singers ON DELETE CASCADE"},
+		{SQL: "create table albums (" +
+			"  singer_id     bigint not null," +
+			"  album_id      bigint not null," +
+			"  album_title   character varying(1024)," +
+			"  primary key (singer_id, album_id)" +
+			") interleave in parent singers on delete cascade"},
 	}})
 	cmd, err := br.Exec()
 	if err != nil {
