@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from samples import create_tables, create_connection, write_data_with_dml, write_data_with_dml_batch, \
-    write_data_with_copy
+from samples import create_tables, create_connection, write_data_with_dml, \
+    write_data_with_dml_batch, \
+    write_data_with_copy, query_data, query_data_with_parameter, add_column, \
+    ddl_batch, partitioned_dml, update_data_with_copy, \
+    update_data_with_transaction, tags, read_only_transaction, data_boost, \
+    statement_timeout
 import socket
 import time
 import unittest.mock
@@ -68,7 +72,78 @@ class SampleTest(unittest.TestCase):
         reset_mock_stdout(mock_stdout)
 
         write_data_with_copy.write_data_with_copy(host, port, db)
-        self.assertEqual("Copied 5 singers\nCopied 5 albums\n", mock_stdout.getvalue())
+        self.assertEqual("Copied 5 singers\nCopied 5 albums\n",
+                         mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        query_data.query_data(host, port, db)
+        self.assertEqual("(1, 2, 'Go, Go, Go')\n"
+                         "(2, 2, 'Forever Hold Your Peace')\n"
+                         "(1, 1, 'Total Junk')\n"
+                         "(2, 1, 'Green')\n"
+                         "(2, 3, 'Terrified')\n", mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        query_data_with_parameter.query_data_with_parameter(host, port, db)
+        self.assertEqual("(12, 'Melissa', 'Garcia')\n",
+                         mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        statement_timeout.query_with_timeout(host, port, db)
+        self.assertIn(
+            "error occurred during query execution: deadline exceeded",
+            mock_stdout.getvalue().lower())
+        reset_mock_stdout(mock_stdout)
+
+        add_column.add_column(host, port, db)
+        self.assertEqual("Added marketing_budget column\n",
+                         mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        ddl_batch.ddl_batch(host, port, db)
+        self.assertEqual("Added venues and concerts tables\n",
+                         mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        update_data_with_copy.update_data_with_copy(host, port, db)
+        self.assertEqual("Updated 2 albums\n",
+                         mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        update_data_with_transaction.update_data_with_transaction(
+            host, port, db)
+        self.assertEqual(
+            "Transferred marketing budget from Album 2 to Album 1\n",
+            mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        tags.tags(host, port, db)
+        self.assertEqual("Reduced marketing budget\n",
+                         mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        read_only_transaction.read_only_transaction(host, port, db)
+        self.assertEqual("(1, 1, 'Total Junk')\n"
+                         "(1, 2, 'Go, Go, Go')\n"
+                         "(2, 1, 'Green')\n"
+                         "(2, 2, 'Forever Hold Your Peace')\n"
+                         "(2, 3, 'Terrified')\n"
+                         "(2, 2, 'Forever Hold Your Peace')\n"
+                         "(1, 2, 'Go, Go, Go')\n"
+                         "(2, 1, 'Green')\n"
+                         "(2, 3, 'Terrified')\n"
+                         "(1, 1, 'Total Junk')\n",
+                         mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        data_boost.data_boost(host, port, db)
+        self.assertIn("(17, 'Ethan', 'Miller')\n",
+                      mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        partitioned_dml.execute_partitioned_dml(host, port, db)
+        self.assertEqual("Updated at least 3 albums\n",
+                         mock_stdout.getvalue())
         reset_mock_stdout(mock_stdout)
 
 

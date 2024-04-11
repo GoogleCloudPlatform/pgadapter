@@ -10,15 +10,116 @@ export PGPORT="${HOST_AND_PORT##*:}"
 export PGDATABASE="example-db"
 sleep 2
 
-OUTPUT=$(source ../create_tables.sh)
-EXPECTED_OUTPUT=$(
-  echo "CREATE"
-  echo "CREATE"
-)
-if [ "$OUTPUT" != "$EXPECTED_OUTPUT" ]; then
-  RESULT=1
-  MESSAGE="Received unexpected output: $OUTPUT"
+MESSAGE=""
+
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh create_tables $'CREATE\nCREATE'
 fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh create_connection $'    hello     \n--------------\n Hello world!\n(1 row)'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh write_data_with_dml $'INSERT 0 4'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh write_data_with_dml_batch $'PREPARE\nINSERT 0 1'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh write_data_with_copy $'COPY 5\nCOPY 5'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh query_data $' singer_id | album_id |       album_title       
+-----------+----------+-------------------------
+         1 |        2 | Go, Go, Go
+         2 |        2 | Forever Hold Your Peace
+         1 |        1 | Total Junk
+         2 |        1 | Green
+         2 |        3 | Terrified
+(5 rows)'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh query_data_with_parameter $'PREPARE
+ singer_id | first_name | last_name 
+-----------+------------+-----------
+        12 | Melissa    | Garcia
+(1 row)'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh statement_timeout $'SET
+ singer_id | album_id | album_title 
+-----------+----------+-------------
+(0 rows)'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh add_column $'ALTER'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh ddl_batch $'CREATE\nCREATE'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh update_data_with_copy $'SET\nCOPY 2'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh update_data_with_transaction $'BEGIN\nUPDATE 1\nUPDATE 1\nCOMMIT'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh tags $'BEGIN
+SET
+SET
+ marketing_budget 
+------------------
+           300000
+(1 row)
+
+SET
+UPDATE 1
+COMMIT'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh read_only_transaction $'BEGIN
+SET
+ singer_id | album_id |       album_title       
+-----------+----------+-------------------------
+         1 |        1 | Total Junk
+         1 |        2 | Go, Go, Go
+         2 |        1 | Green
+         2 |        2 | Forever Hold Your Peace
+         2 |        3 | Terrified
+(5 rows)
+
+ singer_id | album_id |       album_title       
+-----------+----------+-------------------------
+         2 |        2 | Forever Hold Your Peace
+         1 |        2 | Go, Go, Go
+         2 |        1 | Green
+         2 |        3 | Terrified
+         1 |        1 | Total Junk
+(5 rows)
+
+COMMIT'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh data_boost $'SET
+ singer_id | first_name | last_name 
+-----------+------------+-----------
+         2 | Catalina   | Smith
+         4 | Lea        | Martin
+        12 | Melissa    | Garcia
+        14 | Jacqueline | Long
+        16 | Sarah      | Wilson
+        18 | Maya       | Patel
+         1 | Marc       | Richards
+         3 | Alice      | Trentor
+         5 | David      | Lomond
+        13 | Russel     | Morales
+        15 | Dylan      | Shaw
+        17 | Ethan      | Miller
+(12 rows)'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh partitioned_dml $'SET\nUPDATE 3'
+fi
+
 
 STOPPED_CONTAINER=$(docker container stop "$CONTAINER")
 if [ "$STOPPED_CONTAINER" != "$CONTAINER" ]; then
@@ -28,5 +129,6 @@ fi
 
 if [ "$MESSAGE" != "" ]; then
   echo "$MESSAGE"
+  echo "$MESSAGE" | tr ' ' '.$'
   exit "$RESULT"
 fi

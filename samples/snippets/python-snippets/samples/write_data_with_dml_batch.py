@@ -24,10 +24,11 @@ def write_data_with_dml_batch(host: string, port: int, database: string):
                                                   database=database)) as conn:
         conn.autocommit = True
         with conn.cursor() as cur:
-            cur.executemany("INSERT INTO singers (singer_id, first_name, last_name) "
+            cur.executemany("INSERT INTO singers "
+                            "(singer_id, first_name, last_name) "
                             "VALUES (%s, %s, %s)",
                             [(16, "Sarah", "Wilson",),
                              (17, "Ethan", "Miller",),
-                             (18, "Maya", "Patel",),])
+                             (18, "Maya", "Patel",), ])
             print("%d records inserted" % cur.rowcount)
 # [END spanner_dml_batch]

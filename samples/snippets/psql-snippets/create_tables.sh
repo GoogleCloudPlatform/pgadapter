@@ -1,27 +1,33 @@
 #!/bin/bash
 
 # Set the connection variables for psql.
+# The following statements use the existing value of the variable if it has
+# already been set, and otherwise assigns a default value.
 PGHOST="${PGHOST:-localhost}"
 PGPORT="${PGPORT:-5432}"
 PGDATABASE="${PGDATABASE:-example-db}"
 
 # Create two tables in one batch.
 psql << SQL
-CREATE TABLE Singers (
-  SingerId   bigint NOT NULL,
-  FirstName  character varying(1024),
-  LastName   character varying(1024),
-  SingerInfo bytea,
-  FullName character varying(2048) GENERATED ALWAYS
-           AS (FirstName || ' ' || LastName) STORED,
-  PRIMARY KEY (SingerId)
+-- Create the singers table
+CREATE TABLE singers (
+  singer_id   bigint not null primary key,
+  first_name  character varying(1024),
+  last_name   character varying(1024),
+  singer_info bytea,
+  full_name   character varying(2048) GENERATED ALWAYS
+          AS (first_name || ' ' || last_name) STORED
 );
 
-CREATE TABLE Albums (
-  SingerId     bigint NOT NULL,
-  AlbumId      bigint NOT NULL,
-  AlbumTitle   character varying(1024),
-  PRIMARY KEY (SingerId, AlbumId)
+-- Create the albums table. This table is interleaved in the parent table
+-- "singers".
+CREATE TABLE albums (
+  singer_id     bigint not null,
+  album_id      bigint not null,
+  album_title   character varying(1024),
+  primary key (singer_id, album_id)
 )
-INTERLEAVE IN PARENT Singers ON DELETE CASCADE;
+-- The 'interleave in parent' clause is a Spanner-specific extension to
+-- open-source PostgreSQL.
+INTERLEAVE IN PARENT singers ON DELETE CASCADE;
 SQL

@@ -12,24 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# [START spanner_dml_getting_started_insert]
+# [START spanner_partitioned_dml]
 import string
 import psycopg
 
 
-def write_data_with_dml(host: string, port: int, database: string):
+def execute_partitioned_dml(host: string, port: int, database: string):
     with psycopg.connect("host={host} port={port} dbname={database} "
                          "sslmode=disable".format(host=host,
                                                   port=port,
                                                   database=database)) as conn:
         conn.autocommit = True
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO singers (singer_id, first_name, last_name)"
-                        " VALUES (%s, %s, %s), (%s, %s, %s), "
-                        "        (%s, %s, %s), (%s, %s, %s)",
-                        (12, "Melissa", "Garcia",
-                         13, "Russel", "Morales",
-                         14, "Jacqueline", "Long",
-                         15, "Dylan", "Shaw",))
-            print("%d records inserted" % cur.rowcount)
-# [END spanner_dml_getting_started_insert]
+            # Change the DML mode that is used by this connection to Partitioned
+            # DML. Partitioned DML is designed for bulk updates and deletes.
+            # See https://cloud.google.com/spanner/docs/dml-partitioned for more
+            # information.
+            cur.execute(
+                "set spanner.autocommit_dml_mode='partitioned_non_atomic'")
+
+            # The following statement will use Partitioned DML.
+            cur.execute("update albums "
+                        "set marketing_budget=0 "
+                        "where marketing_budget is null")
+            print("Updated at least %d albums" % cur.rowcount)
+
+# [END spanner_partitioned_dml]

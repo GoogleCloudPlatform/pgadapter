@@ -12,24 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# [START spanner_dml_getting_started_insert]
+# [START spanner_query_with_parameter]
 import string
 import psycopg
 
 
-def write_data_with_dml(host: string, port: int, database: string):
+def query_data_with_parameter(host: string, port: int, database: string):
     with psycopg.connect("host={host} port={port} dbname={database} "
                          "sslmode=disable".format(host=host,
                                                   port=port,
                                                   database=database)) as conn:
         conn.autocommit = True
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO singers (singer_id, first_name, last_name)"
-                        " VALUES (%s, %s, %s), (%s, %s, %s), "
-                        "        (%s, %s, %s), (%s, %s, %s)",
-                        (12, "Melissa", "Garcia",
-                         13, "Russel", "Morales",
-                         14, "Jacqueline", "Long",
-                         15, "Dylan", "Shaw",))
-            print("%d records inserted" % cur.rowcount)
-# [END spanner_dml_getting_started_insert]
+            cur.execute("SELECT singer_id, first_name, last_name "
+                        "FROM singers "
+                        "WHERE last_name = %s", ("Garcia",))
+            for singer in cur:
+                print(singer)
+# [END spanner_query_with_parameter]

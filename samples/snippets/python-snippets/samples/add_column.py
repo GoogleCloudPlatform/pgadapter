@@ -12,24 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# [START spanner_dml_getting_started_insert]
+# [START spanner_add_column]
 import string
 import psycopg
 
 
-def write_data_with_dml(host: string, port: int, database: string):
+def add_column(host: string, port: int, database: string):
     with psycopg.connect("host={host} port={port} dbname={database} "
                          "sslmode=disable".format(host=host,
                                                   port=port,
                                                   database=database)) as conn:
+        # DDL can only be executed when autocommit=True.
         conn.autocommit = True
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO singers (singer_id, first_name, last_name)"
-                        " VALUES (%s, %s, %s), (%s, %s, %s), "
-                        "        (%s, %s, %s), (%s, %s, %s)",
-                        (12, "Melissa", "Garcia",
-                         13, "Russel", "Morales",
-                         14, "Jacqueline", "Long",
-                         15, "Dylan", "Shaw",))
-            print("%d records inserted" % cur.rowcount)
-# [END spanner_dml_getting_started_insert]
+            cur.execute("ALTER TABLE albums "
+                        "ADD COLUMN marketing_budget bigint")
+            print("Added marketing_budget column")
+# [END spanner_add_column]
