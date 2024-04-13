@@ -6,7 +6,7 @@ require (
 	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240124134511-6f84a1722435
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgtype v1.14.3
-	github.com/shopspring/decimal v1.3.1
+	github.com/shopspring/decimal v1.4.0
 	github.com/testcontainers/testcontainers-go v0.30.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.30.0
 	gorm.io/datatypes v1.2.0
