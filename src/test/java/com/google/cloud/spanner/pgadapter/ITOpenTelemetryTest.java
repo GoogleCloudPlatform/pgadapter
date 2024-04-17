@@ -104,6 +104,8 @@ public class ITOpenTelemetryTest implements IntegrationTest {
             client.listTraces(
                 ListTracesRequest.newBuilder()
                     .setProjectId(testEnv.getProjectId())
+                    // Ignore deprecation for now, as there is no alternative offered (yet?).
+                    //noinspection deprecation
                     .setFilter(SemanticAttributes.DB_STATEMENT + ":\"" + sql + "\"")
                     .build());
         int size = Iterables.size(response.iterateAll());
