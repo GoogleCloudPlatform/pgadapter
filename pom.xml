@@ -36,7 +36,7 @@
     </excludedTests>
     <excludedIntegrationTests/>
 
-    <junixsocket.version>2.9.0</junixsocket.version>
+    <junixsocket.version>2.9.1</junixsocket.version>
     <opentelemetry.exporter.version>0.23.0</opentelemetry.exporter.version>
   </properties>
 
@@ -77,14 +77,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.35.0</version>
+        <version>26.37.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.36.0</version>
+        <version>1.37.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -129,7 +129,7 @@
       <!-- Not managed by opentelemetry-bom -->
       <groupId>io.opentelemetry.semconv</groupId>
       <artifactId>opentelemetry-semconv</artifactId>
-      <version>1.23.1-alpha</version>
+      <version>1.25.0-alpha</version>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
@@ -205,7 +205,7 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.77</version>
+      <version>1.78</version>
     </dependency>
 
     <!-- Test dependencies -->
