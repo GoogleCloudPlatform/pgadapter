@@ -19,6 +19,7 @@ import java.util.logging.LogRecord;
 import java.util.logging.SimpleFormatter;
 import java.util.logging.StreamHandler;
 
+/** Log handler that redirects all output to stderr as long as the log level is higher than INFO. */
 public class StderrHandler extends StreamHandler {
   public StderrHandler() {
     super(System.err, new SimpleFormatter());
@@ -36,5 +37,4 @@ public class StderrHandler extends StreamHandler {
   public void close() {
     flush();
   }
-
 }

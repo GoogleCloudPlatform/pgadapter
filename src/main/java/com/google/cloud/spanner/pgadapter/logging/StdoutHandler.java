@@ -14,15 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.logging;
 
-import com.google.common.collect.ImmutableList;
-import java.io.OutputStream;
-import java.util.List;
-import java.util.logging.Formatter;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.SimpleFormatter;
 import java.util.logging.StreamHandler;
 
+/** Log handler that redirects all output to stdout as long as the log level is INFO or lower. */
 public class StdoutHandler extends StreamHandler {
   public StdoutHandler() {
     super(System.out, new SimpleFormatter());
@@ -40,5 +37,4 @@ public class StdoutHandler extends StreamHandler {
   public void close() {
     flush();
   }
-
 }
