@@ -54,4 +54,19 @@ func TestSamples(t *testing.T) {
 	if err := writeDataWithCopy(host, port, db); err != nil {
 		t.Fatalf("writing data with copy failed: %v", err)
 	}
+	if err := queryData(host, port, db); err != nil {
+		t.Fatalf("query data failed: %v", err)
+	}
+	if err := queryDataWithParameter(host, port, db); err != nil {
+		t.Fatalf("query data with parameter failed: %v", err)
+	}
+	if err := queryDataWithTimeout(host, port, db); err != nil {
+		t.Fatalf("query data with timeout failed: %v", err)
+	}
+	if err := addColumn(host, port, db); err != nil {
+		t.Fatalf("add column failed: %v", err)
+	}
+	if err := ddlBatch(host, port, db); err != nil {
+		t.Fatalf("ddl batch failed: %v", err)
+	}
 }

@@ -90,9 +90,7 @@ class SampleTest(unittest.TestCase):
         reset_mock_stdout(mock_stdout)
 
         statement_timeout.query_with_timeout(host, port, db)
-        self.assertIn(
-            "error occurred during query execution: deadline exceeded",
-            mock_stdout.getvalue().lower())
+        self.assertEqual("", mock_stdout.getvalue().lower())
         reset_mock_stdout(mock_stdout)
 
         add_column.add_column(host, port, db)

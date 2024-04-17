@@ -13,7 +13,7 @@ limitations under the License.
 
 package golang_snippets
 
-// [START spanner_create_database]
+// [START spanner_ddl_batch]
 import (
 	"context"
 	"fmt"
@@ -21,7 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func createTables(host string, port int, database string) error {
+func ddlBatch(host string, port int, database string) error {
 	ctx := context.Background()
 	connString := fmt.Sprintf(
 		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",
@@ -32,36 +32,36 @@ func createTables(host string, port int, database string) error {
 	}
 	defer conn.Close(ctx)
 
-	// Create two tables in one batch on Spanner.
+	// Executing multiple DDL statements as one batch is
+	// more efficient than executing each statement
+	// individually.
 	br := conn.SendBatch(ctx, &pgx.Batch{QueuedQueries: []*pgx.QueuedQuery{
-		{SQL: "create table singers (" +
-			"  singer_id   bigint primary key not null," +
-			"  first_name  character varying(1024)," +
-			"  last_name   character varying(1024)," +
-			"  singer_info bytea," +
-			"  full_name   character varying(2048) generated " +
-			"  always as (first_name || ' ' || last_name) stored" +
+		{SQL: "CREATE TABLE venues (" +
+			"  venue_id    bigint not null primary key," +
+			"  name        varchar(1024)," +
+			"  description jsonb" +
 			")"},
-		{SQL: "create table albums (" +
-			"  singer_id     bigint not null," +
-			"  album_id      bigint not null," +
-			"  album_title   character varying(1024)," +
-			"  primary key (singer_id, album_id)" +
-			") interleave in parent singers on delete cascade"},
+		{SQL: "CREATE TABLE concerts (" +
+			"  concert_id bigint not null primary key ," +
+			"  venue_id   bigint not null," +
+			"  singer_id  bigint not null," +
+			"  start_time timestamptz," +
+			"  end_time   timestamptz," +
+			"  constraint fk_concerts_venues foreign key" +
+			"    (venue_id) references venues (venue_id)," +
+			"  constraint fk_concerts_singers foreign key" +
+			"    (singer_id) references singers (singer_id)" +
+			")"},
 	}})
-	cmd, err := br.Exec()
-	if err != nil {
+	if _, err := br.Exec(); err != nil {
 		return err
-	}
-	if cmd.String() != "CREATE" {
-		return fmt.Errorf("unexpected command tag: %v", cmd.String())
 	}
 	if err := br.Close(); err != nil {
 		return err
 	}
-	fmt.Printf("Created Singers & Albums tables in database: [%s]\n", database)
+	fmt.Println("Added venues and concerts tables")
 
 	return nil
 }
 
-// [END spanner_create_database]
+// [END spanner_ddl_batch]

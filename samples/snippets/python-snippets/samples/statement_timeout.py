@@ -26,10 +26,10 @@ def query_with_timeout(host: string, port: int, database: string):
         conn.autocommit = True
         with conn.cursor() as cur:
             # Set the statement timeout that should be used for all statements
-            # on this connection to 5 milliseconds.
+            # on this connection to 5 seconds.
             # Supported time units are 's' (seconds), 'ms' (milliseconds),
             # 'us' (microseconds), and 'ns' (nanoseconds).
-            cur.execute("set statement_timeout='5ms'")
+            cur.execute("set statement_timeout='5s'")
             try:
                 cur.execute("SELECT singer_id, album_id, album_title "
                             "FROM albums "
