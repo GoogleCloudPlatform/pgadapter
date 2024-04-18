@@ -154,7 +154,7 @@
     },
     {
       "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r'(?:,'p')?(?:,'t')?,'s',''\\)[ \n]+AND (?:n\\.nspname !~ '\\^pg_toast'[ \n]+AND )?c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
-      "output_pattern": "SELECT * FROM information_schema.tables WHERE LOWER(table_name) = LOWER('%s');",
+      "output_pattern": "SELECT * FROM information_schema.tables WHERE table_schema='public' AND LOWER(table_name) = LOWER('%s');",
       "matcher_array": [
         "tablename"
       ],
@@ -162,7 +162,7 @@
     },
     {
       "input_pattern": "(?s)^SELECT n\\.nspname as \"Schema\",\\s*c\\.relname as \"Name\",\\s*CASE c.relkind .* END as \"Type\",\\s*pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\"\\s+FROM pg_catalog\\.pg_class c\\s+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\\s+LEFT JOIN pg_catalog\\.pg_am am ON am\\.oid = c\\.relam\\s+WHERE c\\.relkind IN \\('r','p','t','s',''\\)\\s+AND c.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$' COLLATE pg_catalog\\.default\\s+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
-      "output_pattern": "SELECT * FROM information_schema.tables WHERE LOWER(table_name) = LOWER('%s');",
+      "output_pattern": "SELECT * FROM information_schema.tables WHERE table_schema='public' AND LOWER(table_name) = LOWER('%s');",
       "matcher_array": [
         "tablename"
       ],
@@ -170,7 +170,7 @@
     },
     {
       "input_pattern": "(?s)^SELECT n\\.nspname as \"Schema\",\\s*c\\.relname as \"Name\",\\s*CASE c.relkind .* END as \"Type\",\\s*pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\"\\s+FROM pg_catalog\\.pg_class c\\s+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c.relnamespace\\s+WHERE c.relkind IN \\('r','p','s',''\\)\\s+AND n\\.nspname !~ '\\^pg_toast'\\s+AND c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$' COLLATE pg_catalog\\.default\\s+AND pg_catalog\\.pg_table_is_visible\\(c.oid\\)\\s+ORDER BY 1,2;?$",
-      "output_pattern": "SELECT * FROM information_schema.tables WHERE LOWER(table_name) = LOWER('%s');",
+      "output_pattern": "SELECT * FROM information_schema.tables WHERE table_schema='public' AND LOWER(table_name) = LOWER('%s');",
       "matcher_array": [
         "tablename"
       ],
@@ -184,7 +184,7 @@
     },
     {
       "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\",[ \n]+c2\\.relname as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\\s+(?:LEFT JOIN pg_catalog\\.pg_am am ON am\\.oid = c.relam\\s+)?LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid[ \n]+LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2\\.oid\nWHERE c\\.relkind IN \\('i'(?:,'I')?,'s',''\\)[ \n]+AND (?:n\\.nspname !~ '\\^pg_toast'[ \n]+AND )?c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<indexname>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
-      "output_pattern": "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) = LOWER('%s');",
+      "output_pattern": "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE table_schema='public' AND LOWER(index_name) = LOWER('%s');",
       "matcher_array": [
         "indexname"
       ],
@@ -192,7 +192,7 @@
     },
     {
       "input_pattern": "(?s)^SELECT n\\.nspname as \"Schema\",\\s*c\\.relname as \"Name\",\\s*CASE c\\.relkind WHEN .* END as \"Type\",\\s*pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\",\\s*c2\\.relname as \"Table\"\\s+FROM pg_catalog\\.pg_class c\\s+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace(?:\\s+LEFT JOIN pg_catalog\\.pg_am am ON am\\.oid = c\\.relam)?\\s+LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid\\s+LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2.oid\\s+WHERE c\\.relkind IN \\('i','I','s',''\\)\\s+AND n\\.nspname !~ '\\^pg_toast'\\s+AND c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<indexname>.*)\\)\\$' COLLATE pg_catalog\\.default\\s+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\\s+ORDER BY 1,2;?$",
-      "output_pattern": "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) = LOWER('%s');",
+      "output_pattern": "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE table_schema='public' AND LOWER(index_name) = LOWER('%s');",
       "matcher_array": [
         "indexname"
       ],
@@ -200,7 +200,7 @@
     },
     {
       "input_pattern": "(?s)^SELECT n\\.nspname as \"Schema\",\\s*c\\.relname as \"Name\",\\s*CASE c\\.relkind WHEN .* END as \"Type\",\\s*pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\",\\s*c2\\.relname as \"Table\"\\s+FROM pg_catalog\\.pg_class c\\s+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\\s+LEFT JOIN pg_catalog\\.pg_am am ON am.oid = c\\.relam\\s+LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid\\s+LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2\\.oid\\s+WHERE c\\.relkind IN \\('i','I','s',''\\)\\s+AND c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<indexname>.*)\\)\\$' COLLATE pg_catalog\\.default\\s+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\\s+ORDER BY 1,2;?$",
-      "output_pattern": "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) = LOWER('%s');",
+      "output_pattern": "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE table_schema='public' AND LOWER(index_name) = LOWER('%s');",
       "matcher_array": [
         "indexname"
       ],
@@ -238,7 +238,7 @@
     },
     {
       "input_pattern": "^SELECT pg_catalog\\.quote_ident\\(attname\\)[ \n]+FROM pg_catalog\\.pg_attribute a, pg_catalog\\.pg_class c[ \n]+WHERE c\\.oid = a\\.attrelid[ \n]+AND a\\.attnum > \\d+[ \n]+AND NOT a\\.attisdropped[ \n]+AND substring\\(pg_catalog\\.quote_ident\\(attname\\),\\d+,\\d+\\)='(?<attrprefix>.*)'[ \n]+AND \\(pg_catalog\\.quote_ident\\(relname\\)='(?<tablename>.*)'[ \n]+OR '\"' \\|\\| relname \\|\\| '\"'='.*'\\)[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nLIMIT 1000$",
-      "output_pattern": "SELECT column_name AS quote_ident FROM information_schema.columns WHERE table_name = '%s' AND STARTS_WITH(LOWER(COLUMN_NAME), LOWER('%s')) LIMIT 1000;",
+      "output_pattern": "SELECT column_name AS quote_ident FROM information_schema.columns WHERE table_schema='public' AND table_name = '%s' AND STARTS_WITH(LOWER(COLUMN_NAME), LOWER('%s')) LIMIT 1000;",
       "matcher_array": [
         "tablename",
         "attrprefix"
@@ -255,7 +255,7 @@
     },
     {
       "input_pattern": "^SELECT pg_catalog\\.quote_ident\\(c\\.relname\\) FROM pg_catalog\\.pg_class c WHERE c\\.relkind IN \\('r', 'p'\\) AND substring\\(pg_catalog\\.quote_ident\\(c\\.relname\\),\\d+,\\d+\\)='(?<prefix>.*)' AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\) AND c\\.relnamespace <> \\(SELECT oid FROM pg_catalog\\.pg_namespace WHERE nspname = 'pg_catalog'\\)\nUNION\nSELECT pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.' FROM pg_catalog\\.pg_namespace n WHERE substring\\(pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.',\\d+,\\d+\\)='(.*) AND \\(SELECT pg_catalog\\.count\\(\\*\\) FROM pg_catalog\\.pg_namespace WHERE substring\\(pg_catalog\\.quote_ident\\(nspname\\) \\|\\| '\\.',\\d+,\\d+\\) = substring\\('(.*),\\d+,pg_catalog\\.length\\(pg_catalog\\.quote_ident\\(nspname\\)\\)\\+\\d+\\)\\) > \\d+\nUNION\nSELECT pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.' \\|\\| pg_catalog\\.quote_ident\\(c\\.relname\\) FROM pg_catalog\\.pg_class c, pg_catalog\\.pg_namespace n WHERE c\\.relnamespace = n\\.oid AND c\\.relkind IN \\('r', 'p'\\) AND substring\\(pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.' \\|\\| pg_catalog\\.quote_ident\\(c\\.relname\\),\\d+,\\d+\\)='(.*) AND substring\\(pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.',\\d+,\\d+\\) = substring\\('(.*),\\d+,pg_catalog\\.length\\(pg_catalog\\.quote_ident\\(n\\.nspname\\)\\)\\+\\d+\\) AND \\(SELECT pg_catalog\\.count\\(\\*\\) FROM pg_catalog\\.pg_namespace WHERE substring\\(pg_catalog\\.quote_ident\\(nspname\\) \\|\\| '\\.',\\d+,\\d+\\) = substring\\('(.*),\\d+,pg_catalog\\.length\\(pg_catalog\\.quote_ident\\(nspname\\)\\)\\+\\d+\\)\\) = \\d+\nLIMIT \\d+$",
-      "output_pattern": "SELECT table_name AS quote_ident FROM INFORMATION_SCHEMA.TABLES WHERE STARTS_WITH(LOWER(table_name), LOWER('%s')) LIMIT 1000;",
+      "output_pattern": "SELECT table_name AS quote_ident FROM INFORMATION_SCHEMA.TABLES WHERE table_schema='public' AND STARTS_WITH(LOWER(table_name), LOWER('%s')) LIMIT 1000;",
       "matcher_array": [
         "prefix"
       ],
@@ -263,7 +263,7 @@
     },
     {
       "input_pattern": "^SELECT pg_catalog\\.quote_ident\\(c\\.relname\\) FROM pg_catalog\\.pg_class c WHERE c\\.relkind IN \\('i', 'I'\\) AND substring\\(pg_catalog\\.quote_ident\\(c\\.relname\\),\\d+,\\d+\\)='(?<prefix>.*)' AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\) AND c\\.relnamespace <> \\(SELECT oid FROM pg_catalog\\.pg_namespace WHERE nspname = 'pg_catalog'\\)\nUNION\nSELECT pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.' FROM pg_catalog\\.pg_namespace n WHERE substring\\(pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.',\\d+,\\d+\\)='(.*)' AND \\(SELECT pg_catalog\\.count\\(\\*\\) FROM pg_catalog\\.pg_namespace WHERE substring\\(pg_catalog\\.quote_ident\\(nspname\\) \\|\\| '\\.',\\d+,\\d+\\) = substring\\('(.*)',\\d+,pg_catalog\\.length\\(pg_catalog\\.quote_ident\\(nspname\\)\\)\\+\\d+\\)\\) > \\d+\nUNION\nSELECT pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.' \\|\\| pg_catalog\\.quote_ident\\(c\\.relname\\) FROM pg_catalog\\.pg_class c, pg_catalog\\.pg_namespace n WHERE c\\.relnamespace = n\\.oid AND c\\.relkind IN \\('i', 'I'\\) AND substring\\(pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.' \\|\\| pg_catalog\\.quote_ident\\(c\\.relname\\),\\d+,\\d+\\)='(.*)' AND substring\\(pg_catalog\\.quote_ident\\(n\\.nspname\\) \\|\\| '\\.',\\d+,\\d+\\) = substring\\('(.*)',\\d+,pg_catalog\\.length\\(pg_catalog\\.quote_ident\\(n\\.nspname\\)\\)\\+\\d+\\) AND \\(SELECT pg_catalog\\.count\\(\\*\\) FROM pg_catalog\\.pg_namespace WHERE substring\\(pg_catalog\\.quote_ident\\(nspname\\) \\|\\| '\\.',\\d+,\\d+\\) = substring\\('(.*)',\\d+,pg_catalog\\.length\\(pg_catalog\\.quote_ident\\(nspname\\)\\)\\+\\d+\\)\\) = \\d+\nLIMIT \\d+$",
-      "output_pattern": "SELECT index_name AS quote_ident FROM INFORMATION_SCHEMA.INDEXES WHERE STARTS_WITH(LOWER(index_name), LOWER('%s')) LIMIT 1000;",
+      "output_pattern": "SELECT index_name AS quote_ident FROM INFORMATION_SCHEMA.INDEXES WHERE table_schema='public' AND STARTS_WITH(LOWER(index_name), LOWER('%s')) LIMIT 1000;",
       "matcher_array": [
         "prefix"
       ],

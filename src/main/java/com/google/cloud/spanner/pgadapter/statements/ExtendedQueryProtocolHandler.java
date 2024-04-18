@@ -138,6 +138,8 @@ public class ExtendedQueryProtocolHandler {
    * received.
    */
   public void buffer(AbstractQueryProtocolMessage message) {
+    // Ignore deprecation for now, as there is no alternative offered (yet?).
+    //noinspection deprecation
     addEvent(
         "Received message: '" + message.getIdentifier() + "'",
         Attributes.of(SemanticAttributes.DB_STATEMENT, message.getSql()));
