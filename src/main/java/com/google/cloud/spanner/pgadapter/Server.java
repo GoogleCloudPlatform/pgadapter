@@ -51,7 +51,7 @@ public class Server {
    */
   public static void main(String[] args) {
     try {
-      DefaultLogConfiguration.configureLogging();
+      DefaultLogConfiguration.configureLogging(args);
       OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
       OpenTelemetry openTelemetry = setupOpenTelemetry(optionsMetadata);
       ProxyServer server = new ProxyServer(optionsMetadata, openTelemetry);
