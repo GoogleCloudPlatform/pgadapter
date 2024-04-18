@@ -355,8 +355,30 @@ PGAdapter has the following known limitations at this moment:
 
 ## Logging
 
-PGAdapter uses `java.util.logging` for logging. Create a `logging.properties` file to configure
-logging messages. See the following example for an example to get fine-grained logging.
+PGAdapter uses `java.util.logging` for logging.
+
+### Default Logging
+
+PGAdapter by default configures `java.util.logging` to do the following:
+1. Log messages of level WARNING and higher are logged to `stderr`.
+2. Log messages of level INFO are logged to `stdout`.
+3. Log messages of higher levels than INFO are not logged.
+
+You can supply your own logging configuration with the `-Djava.util.logging.config.file`
+System property. See the next section for an example.
+
+The default log configuration described in this section was introduced in version 0.33.0 of
+PGAdapter. Prior to that, PGAdapter used the default `java.util.logging` configuration, which
+logs everything to `stderr`.
+
+You can disable the default PGAdapter log configuration and go back to the standard
+`java.util.logging` configuration by starting PGAdapter with the command line argument
+`-legacy_logging`.
+
+### Custom Logging Configuration
+
+Create a `logging.properties` file to configure logging messages.
+See the following example for an example to get fine-grained logging.
 
 ```
 handlers=java.util.logging.ConsoleHandler,java.util.logging.FileHandler
