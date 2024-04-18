@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static io.opentelemetry.semconv.ServiceAttributes.SERVICE_NAME;
+
 import com.google.auth.Credentials;
 import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
@@ -24,10 +26,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.devtools.cloudtrace.v2.AttributeValue;
 import com.google.devtools.cloudtrace.v2.TruncatableString;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
+import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
@@ -38,6 +42,7 @@ import java.io.PrintStream;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 
@@ -76,8 +81,9 @@ public class Server {
       System.setProperty("otel.logs.exporter", "none");
     }
     if (getOpenTelemetrySetting("otel.service.name") == null) {
-      System.setProperty("otel.service.name", "pgadapter");
+      System.setProperty("otel.service.name", "pgadapter-" + ThreadLocalRandom.current().nextInt());
     }
+    String serviceName = Objects.requireNonNull(getOpenTelemetrySetting("otel.service.name"));
 
     try {
       String projectId = optionsMetadata.getTelemetryProjectId();
@@ -95,14 +101,9 @@ public class Server {
         }
         builder.setFixedAttributes(
             ImmutableMap.of(
-                "service.name",
+                SERVICE_NAME.getKey(),
                 AttributeValue.newBuilder()
-                    .setStringValue(
-                        TruncatableString.newBuilder()
-                            .setValue(
-                                Objects.requireNonNull(
-                                    getOpenTelemetrySetting("otel.service.name")))
-                            .build())
+                    .setStringValue(TruncatableString.newBuilder().setValue(serviceName).build())
                     .build()));
         TraceConfiguration configuration = builder.build();
         SpanExporter traceExporter = TraceExporter.createWithConfiguration(configuration);
@@ -131,8 +132,10 @@ public class Server {
                     .build());
         openTelemetryBuilder.addMeterProviderCustomizer(
             (sdkMeterProviderBuilder, configProperties) ->
-                sdkMeterProviderBuilder.registerMetricReader(
-                    PeriodicMetricReader.builder(cloudMonitoringExporter).build()));
+                sdkMeterProviderBuilder
+                    .addResource(Resource.create(Attributes.of(SERVICE_NAME, serviceName)))
+                    .registerMetricReader(
+                        PeriodicMetricReader.builder(cloudMonitoringExporter).build()));
       }
       return openTelemetryBuilder.build().getOpenTelemetrySdk();
     } catch (IOException exception) {
