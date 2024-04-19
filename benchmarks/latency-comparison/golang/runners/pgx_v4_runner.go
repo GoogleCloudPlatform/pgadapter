@@ -31,7 +31,7 @@ func RunPgxV4(database, sql string, readWrite bool, numOperations, numClients, w
 	// Connect to Cloud Spanner through PGAdapter.
 	var connString string
 	if useUnixSocket {
-		connString = fmt.Sprintf("host=%s port=%d database=%s", host, port, url.QueryEscape(database))
+		connString = fmt.Sprintf("host=%s port=%d database=%s", host, port, database)
 	} else {
 		connString = fmt.Sprintf("postgres://uid:pwd@%s:%d/%s?sslmode=disable", host, port, url.QueryEscape(database))
 	}
