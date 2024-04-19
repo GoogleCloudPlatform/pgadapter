@@ -37,6 +37,7 @@ import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
@@ -1007,6 +1008,31 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     for (ExecuteBatchDmlRequest.Statement statement : request.getStatementsList()) {
       assertEquals(insertSql, statement.getSql());
     }
+  }
+
+  @Test
+  public void testDdlBatch() {
+    addDdlResponseToSpannerAdmin();
+
+    String res = pgxTest.TestDdlBatch(createConnString());
+
+    assertNull(res);
+    assertEquals(1, mockDatabaseAdmin.getRequests().size());
+    UpdateDatabaseDdlRequest request =
+        (UpdateDatabaseDdlRequest) mockDatabaseAdmin.getRequests().get(0);
+    assertEquals(3, request.getStatementsCount());
+  }
+
+  @Test
+  public void testDdlBatchInTransaction() {
+    addDdlResponseToSpannerAdmin();
+
+    String res = pgxTest.TestDdlBatchInTransaction(createConnString());
+
+    assertNull(res);
+    // No DDL statements should be sent to Spanner, as the DDL batch was being sent in a
+    // transaction.
+    assertEquals(0, mockDatabaseAdmin.getRequests().size());
   }
 
   @Test
