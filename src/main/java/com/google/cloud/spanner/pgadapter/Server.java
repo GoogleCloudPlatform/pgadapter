@@ -21,6 +21,7 @@ import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
+import com.google.cloud.spanner.pgadapter.logging.DefaultLogConfiguration;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.cloudtrace.v2.AttributeValue;
@@ -55,6 +56,7 @@ public class Server {
    */
   public static void main(String[] args) {
     try {
+      DefaultLogConfiguration.configureLogging(args);
       OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
       OpenTelemetry openTelemetry = setupOpenTelemetry(optionsMetadata);
       ProxyServer server = new ProxyServer(optionsMetadata, openTelemetry);
