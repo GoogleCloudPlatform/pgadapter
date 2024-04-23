@@ -947,6 +947,8 @@ public class BackendConnection {
     SpanBuilder builder =
         tracer.spanBuilder(name).setAttribute("pgadapter.connection_id", connectionId);
     if (statement != null) {
+      // Ignore deprecation for now, as there is no alternative offered (yet?).
+      //noinspection deprecation
       builder.setAttribute(SemanticAttributes.DB_STATEMENT, statement.getSql());
     }
     if (currentTransactionId != null) {

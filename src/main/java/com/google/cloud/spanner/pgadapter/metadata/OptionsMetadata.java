@@ -257,6 +257,12 @@ public class OptionsMetadata {
       return this;
     }
 
+    /** Enables OpenTelemetry metrics for PGAdapter. */
+    public Builder setEnableOpenTelemetryMetrics() {
+      this.enableOpenTelemetryMetrics = true;
+      return this;
+    }
+
     /** Sets the trace sampling ratio for OpenTelemetry. */
     public Builder setOpenTelemetryTraceRatio(double ratio) {
       Preconditions.checkArgument(
@@ -600,6 +606,7 @@ public class OptionsMetadata {
   private static final String OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING =
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
+  private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -1303,6 +1310,12 @@ public class OptionsMetadata {
             + "You most probably do not want to turn internal debug mode on. It is only intended for\n"
             + "internal test cases in PGAdapter that need to verify that it receives the correct \n"
             + "wire-protocol messages.");
+    options.addOption(
+        OPTION_LEGACY_LOGGING,
+        "enable_legacy_logging",
+        false,
+        "Enables legacy logging using the default java.util.logging configuration.\n"
+            + "This sends all log output to stderr.");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);

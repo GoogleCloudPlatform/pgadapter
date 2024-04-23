@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.32.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.31.1...v0.32.0) (2024-03-26)
+
+
+### Features
+
+* support client lib's OpenTelemetry metrics ([#1561](https://github.com/GoogleCloudPlatform/pgadapter/issues/1561)) ([027417d](https://github.com/GoogleCloudPlatform/pgadapter/commit/027417d6dbdc2a5da21b45ca475413adfd7a13f1))
+* support float4 data type ([#1481](https://github.com/GoogleCloudPlatform/pgadapter/issues/1481)) ([c2554fc](https://github.com/GoogleCloudPlatform/pgadapter/commit/c2554fc380f34e8dfffaea988df43d1c2d9580bb))
+
+
+### Documentation
+
+* document how to get 32-bit integers in node-postgres ([#1512](https://github.com/GoogleCloudPlatform/pgadapter/issues/1512)) ([d49e678](https://github.com/GoogleCloudPlatform/pgadapter/commit/d49e6781fce027436e08d81219c5d00c407b90a2))
+* sleep 2s to ensure PGAdapter has started ([#1533](https://github.com/GoogleCloudPlatform/pgadapter/issues/1533)) ([8b1475c](https://github.com/GoogleCloudPlatform/pgadapter/commit/8b1475c63321fbf3d2cc2f0a89ac207be7bbcdd1))
+* support read/write tx in latency comparison ([#1532](https://github.com/GoogleCloudPlatform/pgadapter/issues/1532)) ([7c14284](https://github.com/GoogleCloudPlatform/pgadapter/commit/7c1428441406a386f6db11a3d0a54260bacae83a))
+
 ## [0.31.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.31.0...v0.31.1) (2024-03-07)
 
 

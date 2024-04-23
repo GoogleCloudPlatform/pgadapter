@@ -66,7 +66,9 @@ public class ExtendedQueryProtocolHandler {
                 .getServer()
                 .getTracer(ConnectionHandler.class.getName(), getVersion()),
             connectionHandler.getServer().getMetrics(),
-            createMetricAttributes(connectionHandler.getDatabaseId()),
+            createMetricAttributes(
+                connectionHandler.getDatabaseId(),
+                connectionHandler.getTraceConnectionId().toString()),
             connectionHandler.getTraceConnectionId().toString(),
             connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
@@ -95,8 +97,9 @@ public class ExtendedQueryProtocolHandler {
   }
 
   @VisibleForTesting
-  static Attributes createMetricAttributes(DatabaseId databaseId) {
+  static Attributes createMetricAttributes(DatabaseId databaseId, String connectionId) {
     AttributesBuilder attributesBuilder = Attributes.builder();
+    attributesBuilder.put("pgadapter.connection_id", connectionId);
     attributesBuilder.put("database", databaseId.getDatabase());
     attributesBuilder.put("instance_id", databaseId.getInstanceId().getInstance());
     attributesBuilder.put("project_id", databaseId.getInstanceId().getProject());
@@ -138,6 +141,8 @@ public class ExtendedQueryProtocolHandler {
    * received.
    */
   public void buffer(AbstractQueryProtocolMessage message) {
+    // Ignore deprecation for now, as there is no alternative offered (yet?).
+    //noinspection deprecation
     addEvent(
         "Received message: '" + message.getIdentifier() + "'",
         Attributes.of(SemanticAttributes.DB_STATEMENT, message.getSql()));

@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.NoCredentials;
+import com.google.cloud.ServiceOptions;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
@@ -1181,6 +1182,8 @@ public abstract class AbstractMockServerTest {
                                   "x-goog-api-client", Metadata.ASCII_STRING_MARSHALLER));
                       assertNotNull(userAgent);
                       assertTrue(userAgent.contains("pg-adapter"));
+                      assertTrue(
+                          userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
                     }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);

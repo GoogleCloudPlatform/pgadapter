@@ -59,6 +59,7 @@ public class ITOpenTelemetryTest implements IntegrationTest {
         OptionsMetadata.newBuilder()
             .setProject(testEnv.getProjectId())
             .setEnableOpenTelemetry()
+            .setEnableOpenTelemetryMetrics()
             .setOpenTelemetryTraceRatio(1.0);
     if (testEnv.getCredentials() != null) {
       openTelemetryOptionsBuilder.setCredentials(
@@ -103,6 +104,8 @@ public class ITOpenTelemetryTest implements IntegrationTest {
             client.listTraces(
                 ListTracesRequest.newBuilder()
                     .setProjectId(testEnv.getProjectId())
+                    // Ignore deprecation for now, as there is no alternative offered (yet?).
+                    //noinspection deprecation
                     .setFilter(SemanticAttributes.DB_STATEMENT + ":\"" + sql + "\"")
                     .build());
         int size = Iterables.size(response.iterateAll());
