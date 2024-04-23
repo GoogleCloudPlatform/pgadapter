@@ -590,6 +590,7 @@ public class OptionsMetadata {
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
   private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
+  private static final String OPTION_MULTIPLEXED_SESSIONS = "multiplexed_sessions";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -620,6 +621,7 @@ public class OptionsMetadata {
   private final String serverVersion;
   private final boolean debugMode;
   private final Duration startupTimeout;
+  private final boolean useMultiplexedSessions;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -713,6 +715,7 @@ public class OptionsMetadata {
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
     this.startupTimeout = startupTimeout;
+    this.useMultiplexedSessions = commandLine.hasOption(OPTION_MULTIPLEXED_SESSIONS);
   }
 
   /**
@@ -786,6 +789,7 @@ public class OptionsMetadata {
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
     this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
+    this.useMultiplexedSessions = false;
   }
 
   private Map<String, String> parseProperties(String propertyOptions) {
@@ -1299,6 +1303,11 @@ public class OptionsMetadata {
         false,
         "Enables legacy logging using the default java.util.logging configuration.\n"
             + "This sends all log output to stderr.");
+    options.addOption(
+        OPTION_MULTIPLEXED_SESSIONS,
+        "enable_multiplexed_sessions",
+        false,
+        "Enables multiplexed sessions for read-only operations");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);
@@ -1366,6 +1375,10 @@ public class OptionsMetadata {
 
   public boolean isDebugMode() {
     return this.debugMode;
+  }
+
+  public boolean isUseMultiplexedSessions() {
+    return this.useMultiplexedSessions;
   }
 
   public boolean isUseVirtualThreads() {

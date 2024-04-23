@@ -25,6 +25,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Instance;
 import com.google.cloud.spanner.InstanceAdminClient;
 import com.google.cloud.spanner.InstanceNotFoundException;
+import com.google.cloud.spanner.SessionPoolOptionsHelper;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
@@ -208,6 +209,10 @@ public class ConnectionHandler implements Runnable {
     if (options.getSessionPoolOptions() != null) {
       connectionOptionsBuilder =
           connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
+    } else if (options.isUseMultiplexedSessions()) {
+      connectionOptionsBuilder =
+          connectionOptionsBuilder.setSessionPoolOptions(
+              SessionPoolOptionsHelper.createMultiplexedSessionOptions());
     }
     if (options.isEnableOpenTelemetryMetrics()) {
       SpannerOptions.enableOpenTelemetryMetrics();
