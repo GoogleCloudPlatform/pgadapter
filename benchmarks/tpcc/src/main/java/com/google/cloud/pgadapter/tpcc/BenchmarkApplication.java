@@ -1,5 +1,7 @@
 package com.google.cloud.pgadapter.tpcc;
 
+import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
+import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
@@ -11,6 +13,12 @@ import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
+import io.opentelemetry.sdk.metrics.export.MetricExporter;
+import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -95,6 +103,8 @@ public class BenchmarkApplication implements CommandLineRunner {
       if (tpccConfiguration.isRunPgadapterBenchmark()
           || tpccConfiguration.isRunSpannerJdbcBenchmark()) {
         LOG.info("Starting benchmark");
+        // Enable the OpenTelemetry metrics in the client library.
+        enableOpenTelemetryMetrics();
         Statistics statistics = new Statistics(tpccConfiguration);
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
@@ -123,6 +133,8 @@ public class BenchmarkApplication implements CommandLineRunner {
           throw new TimeoutException("Timed out while waiting for benchmark runners to shut down");
         }
       }
+    } catch (IOException exception) {
+      throw new RuntimeException(exception);
     } finally {
       if (server != null) {
         server.stopServer();
@@ -135,6 +147,27 @@ public class BenchmarkApplication implements CommandLineRunner {
     try (DataLoader loader = new DataLoader(status, connectionUrl, tpccConfiguration)) {
       return loader.loadData();
     }
+  }
+
+  private void enableOpenTelemetryMetrics() throws IOException {
+    // Enable OpenTelemetry metrics before injecting OpenTelemetry object.
+    SpannerOptions.enableOpenTelemetryMetrics();
+
+    AutoConfiguredOpenTelemetrySdkBuilder openTelemetryBuilder =
+        AutoConfiguredOpenTelemetrySdk.builder();
+
+    MetricExporter cloudMonitoringExporter =
+        GoogleCloudMetricExporter.createWithConfiguration(
+            MetricConfiguration.builder()
+                // Configure the cloud project id.
+                .setProjectId(spannerConfiguration.getProject())
+                .build());
+    openTelemetryBuilder.addMeterProviderCustomizer(
+        (sdkMeterProviderBuilder, configProperties) ->
+            sdkMeterProviderBuilder.registerMetricReader(
+                PeriodicMetricReader.builder(cloudMonitoringExporter).build()));
+
+    GlobalOpenTelemetry.set(openTelemetryBuilder.build().getOpenTelemetrySdk());
   }
 
   private ProxyServer startPGAdapter() {
