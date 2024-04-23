@@ -103,6 +103,7 @@ public class OptionsMetadata {
     private String endpoint;
     private boolean usePlainText;
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
+    private boolean useMultiplexedSessions;
 
     Builder() {}
 
@@ -364,7 +365,7 @@ public class OptionsMetadata {
       return this;
     }
 
-    Builder setEndpoint(String endpoint) {
+    public Builder setEndpoint(String endpoint) {
       this.endpoint = endpoint;
       return this;
     }
@@ -376,6 +377,11 @@ public class OptionsMetadata {
 
     Builder setStartupTimeout(Duration timeout) {
       this.startupTimeout = timeout;
+      return this;
+    }
+
+    public Builder setUseMultiplexedSessions(boolean useMultiplexedSessions) {
+      this.useMultiplexedSessions = useMultiplexedSessions;
       return this;
     }
 
@@ -478,6 +484,9 @@ public class OptionsMetadata {
         addOption(args, OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING);
       }
       addOption(args, OPTION_SERVER_PORT, String.valueOf(port));
+      if (useMultiplexedSessions) {
+        addOption(args, OPTION_MULTIPLEXED_SESSIONS);
+      }
       return args.build().toArray(new String[0]);
     }
   }

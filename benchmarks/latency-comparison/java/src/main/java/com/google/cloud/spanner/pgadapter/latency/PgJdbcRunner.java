@@ -26,9 +26,11 @@ import java.util.logging.Logger;
 
 public class PgJdbcRunner extends AbstractJdbcRunner {
   private ProxyServer proxyServer;
+  private final boolean useMultiplexedSessions;
 
-  PgJdbcRunner(DatabaseId databaseId) {
+  PgJdbcRunner(DatabaseId databaseId, boolean useMultiplexedSessions) {
     super(databaseId);
+    this.useMultiplexedSessions = useMultiplexedSessions;
   }
 
   @Override
@@ -47,6 +49,8 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
             .setInstance(databaseId.getInstanceId().getInstance())
             .disableUnixDomainSockets()
             .setPort(0)
+            .setUseMultiplexedSessions(useMultiplexedSessions)
+            .setEndpoint("staging-wrenchworks.sandbox.googleapis.com")
             .useVirtualThreads()
             .useVirtualGrpcTransportThreads()
             .build();

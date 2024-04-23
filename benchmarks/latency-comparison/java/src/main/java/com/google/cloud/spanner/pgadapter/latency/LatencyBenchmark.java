@@ -92,6 +92,7 @@ public class LatencyBenchmark {
         "Create the results table in the test database if it does not exist.");
     options.addOption("s", "store_results", false, "Store results in the test database.");
     options.addOption("name", true, "Name of this test run");
+    options.addOption("m", "multiplexed", false, "Use multiplexed sessions.");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -131,7 +132,7 @@ public class LatencyBenchmark {
     if (runPg) {
       System.out.println();
       System.out.println("Running benchmark for PostgreSQL JDBC driver");
-      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
+      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, commandLine.hasOption('m'));
       pgJdbcResults = pgJdbcRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
