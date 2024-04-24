@@ -14,9 +14,14 @@
 
 package com.google.cloud.spanner;
 
+import org.threeten.bp.Duration;
+
 public class BenchmarkSessionPoolOptionsHelper {
 
   public static SessionPoolOptions getSessionPoolOptions(boolean useMultiplexedSessions) {
-    return SessionPoolOptions.newBuilder().setUseMultiplexedSession(useMultiplexedSessions).build();
+    return SessionPoolOptions.newBuilder()
+        .setWaitForMinSessions(Duration.ofSeconds(5L))
+        .setUseMultiplexedSession(useMultiplexedSessions)
+        .build();
   }
 }
