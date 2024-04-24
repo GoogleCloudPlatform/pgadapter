@@ -95,6 +95,7 @@ public class LatencyBenchmark {
     options.addOption("s", "store_results", false, "Store results in the test database.");
     options.addOption("name", true, "Name of this test run");
     options.addOption("m", "multiplexed", false, "Use multiplexed sessions.");
+    options.addOption("r", "random", false, "Use random channels.");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -160,7 +161,7 @@ public class LatencyBenchmark {
       System.out.println();
       System.out.println("Running benchmark for Java Client Library");
       JavaClientRunner javaClientRunner =
-          new JavaClientRunner(databaseId, commandLine.hasOption('m'));
+          new JavaClientRunner(databaseId, commandLine.hasOption('m'), commandLine.hasOption('r'));
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }

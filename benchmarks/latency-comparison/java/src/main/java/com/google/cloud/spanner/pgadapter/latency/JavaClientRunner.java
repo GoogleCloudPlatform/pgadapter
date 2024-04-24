@@ -34,12 +34,15 @@ import java.util.concurrent.ThreadLocalRandom;
 public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
   private final boolean useMultiplexedSessions;
+  private final boolean useRandomChannels;
   private long numNullValues;
   private long numNonNullValues;
 
-  JavaClientRunner(DatabaseId databaseId, boolean useMultiplexedSessions) {
+  JavaClientRunner(
+      DatabaseId databaseId, boolean useMultiplexedSessions, boolean useRandomChannels) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
+    this.useRandomChannels = useRandomChannels;
   }
 
   @Override
@@ -51,6 +54,7 @@ public class JavaClientRunner extends AbstractRunner {
             .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
             .setSessionPoolOption(
                 BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions))
+            .setUseRandomChannel(useRandomChannels)
             .build();
     try (Spanner spanner = options.getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
