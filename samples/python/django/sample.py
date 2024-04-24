@@ -14,6 +14,8 @@
 
 import os
 import datetime
+import uuid
+
 import django
 import pytz
 import random
@@ -27,8 +29,8 @@ from django.db.models.functions import Cast
 from pgadapter import start_pgadapter
 
 
-def create_sample_singer(singer_id):
-  return Singer(id=singer_id,
+def create_sample_singer():
+  return Singer(id=str(uuid.uuid4()),
                 first_name='singer',
                 last_name=random_string(10),
                 full_name=random_string(20),
@@ -37,8 +39,8 @@ def create_sample_singer(singer_id):
                 updated_at=datetime.datetime.now(pytz.UTC))
 
 
-def create_sample_album(album_id, singer=None):
-  return Album(id=album_id,
+def create_sample_album(singer=None):
+  return Album(id=str(uuid.uuid4()),
                singer=singer,
                title=random_string(10),
                marketing_budget=200000,
@@ -48,8 +50,8 @@ def create_sample_album(album_id, singer=None):
                updated_at=datetime.datetime.now(pytz.UTC))
 
 
-def create_sample_track(track_id, track_number, album = None):
-  return Track(track_id=track_id,
+def create_sample_track(track_number, album=None):
+  return Track(track_id=str(uuid.uuid4()),
                album=album,
                track_number=track_number,
                title=random_string(15),
@@ -70,16 +72,16 @@ def get_sample_venue_description():
   return description
 
 
-def create_sample_venue(venue_id):
-  return Venue(id=venue_id,
+def create_sample_venue():
+  return Venue(id=str(uuid.uuid4()),
                name=random_string(10),
                description=get_sample_venue_description(),
                created_at=datetime.datetime.now(pytz.UTC),
                updated_at=datetime.datetime.now(pytz.UTC))
 
 
-def create_sample_concert(concert_id, venue = None, singer = None):
-  return Concert(id=concert_id,
+def create_sample_concert(venue=None, singer=None):
+  return Concert(id=str(uuid.uuid4()),
                  venue=venue,
                  singer=singer,
                  name=random_string(20),
@@ -103,20 +105,22 @@ def create_tables():
 
 @atomic(savepoint=False)
 def add_data():
-  singer = create_sample_singer('1')
+  singer = create_sample_singer()
   singer.save()
 
-  album = create_sample_album('1', singer)
+  album = create_sample_album(singer)
   album.save()
 
-  track = create_sample_track('1', '2', album)
+  track = create_sample_track('2', album)
   track.save(force_insert=True)
 
-  venue = create_sample_venue('1')
+  venue = create_sample_venue()
   venue.save()
 
-  concert = create_sample_concert('1', venue, singer)
+  concert = create_sample_concert(venue, singer)
   concert.save()
+
+  return singer.id, album.id
 
 
 @atomic(savepoint=False)
@@ -128,18 +132,18 @@ def delete_all_data():
   Singer.objects.all().delete()
 
 
-def foreign_key_operations():
-  singer1 = Singer.objects.filter(id='1')[0]
-  album1 = Album.objects.filter(id='1')[0]
+def foreign_key_operations(singer_id: str, album_id: str):
+  singer1 = Singer.objects.filter(id=singer_id)[0]
+  album1 = Album.objects.filter(id=album_id)[0]
 
   # Originally album1 belongs to singer1
   if album1.singer_id != singer1.id:
     raise Exception("Album1 doesn't belong to singer1")
 
-  singer2 = create_sample_singer('2')
+  singer2 = create_sample_singer()
   singer2.save()
 
-  album2 = singer2.album_set.create(id='2',
+  album2 = singer2.album_set.create(id=str(uuid.uuid4()),
                                     title=random_string(20),
                                     marketing_budget=250000,
                                     cover_picture=b'new world',
@@ -166,7 +170,7 @@ def foreign_key_operations():
 def transaction_rollback():
   transaction.set_autocommit(False)
 
-  singer3 = create_sample_singer('3')
+  singer3 = create_sample_singer()
   singer3.save()
 
   transaction.rollback()
@@ -178,9 +182,9 @@ def transaction_rollback():
 
 
 def jsonb_filter():
-  venue1 = create_sample_venue('10')
-  venue2 = create_sample_venue('100')
-  venue3 = create_sample_venue('1000')
+  venue1 = create_sample_venue()
+  venue2 = create_sample_venue()
+  venue3 = create_sample_venue()
 
   venue1.save()
   venue2.save()
@@ -249,10 +253,10 @@ if __name__ == "__main__":
 
     print('Starting Django Test')
 
-    add_data()
+    singer_id, album_id = add_data()
     print('Adding Data Successful')
 
-    foreign_key_operations()
+    foreign_key_operations(singer_id, album_id)
     print('Testing Foreign Key Successful')
 
     transaction_rollback()
