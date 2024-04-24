@@ -86,6 +86,7 @@ public class LatencyBenchmark {
     options.addOption("skip_pg", false, "Skip PostgreSQL JDBC benchmarks.");
     options.addOption("skip_jdbc", false, "Skip Cloud Spanner JDBC benchmarks.");
     options.addOption("skip_spanner", false, "Skip Cloud Spanner client library benchmarks.");
+    options.addOption("run_gapic", false, "Run Cloud Spanner generated client (Gapic) library benchmarks.");
     options.addOption(
         "create_results_table",
         false,
@@ -118,6 +119,7 @@ public class LatencyBenchmark {
     boolean runPg = !commandLine.hasOption("skip_pg");
     boolean runJdbc = !commandLine.hasOption("skip_jdbc");
     boolean runSpanner = !commandLine.hasOption("skip_spanner");
+    boolean runGapic = commandLine.hasOption("run_gapic");
     String name = commandLine.getOptionValue("name");
 
     System.out.println();
@@ -127,6 +129,14 @@ public class LatencyBenchmark {
     System.out.printf("Operations: %d\n", operations);
     System.out.printf("Transaction type: %s\n", transactionType);
     System.out.printf("Wait between queries: %dms\n", waitMillis);
+
+    List<Duration> gapicResults = null;
+    if (runGapic) {
+      System.out.println();
+      System.out.println("Running benchmark for Gapic client");
+      GapicRunner gapicRunner = new GapicRunner(databaseId, 4, commandLine.hasOption('m'));
+      gapicResults = gapicRunner.execute(transactionType, clients, operations, waitMillis);
+    }
 
     List<Duration> pgJdbcResults = null;
     if (runPg) {
@@ -153,6 +163,7 @@ public class LatencyBenchmark {
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
+    printResults("Gapic client", gapicResults);
     printResults("PostgreSQL JDBC Driver", pgJdbcResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
     printResults("Java Client Library", javaClientResults);
