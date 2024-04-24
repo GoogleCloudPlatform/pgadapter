@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.latency;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
@@ -32,18 +33,23 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
+  private final boolean useMultiplexedSessions;
   private long numNullValues;
   private long numNonNullValues;
 
-  JavaClientRunner(DatabaseId databaseId) {
+  JavaClientRunner(DatabaseId databaseId, boolean useMultiplexedSessions) {
     this.databaseId = databaseId;
+    this.useMultiplexedSessions = useMultiplexedSessions;
   }
 
   @Override
   public List<Duration> execute(
       TransactionType transactionType, int numClients, int numOperations, int waitMillis) {
     SpannerOptions options =
-        SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject()).build();
+        SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject())
+            .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
+            .setSessionPoolOption(BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions))
+            .build();
     try (Spanner spanner = options.getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
 
