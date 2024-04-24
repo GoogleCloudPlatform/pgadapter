@@ -1,59 +1,69 @@
+# Copyright 2024 Google LLC All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
-import sys
 import datetime
 import django
 import pytz
+import random
+import string
+import sys
 from django.db import connection
 from django.db import transaction
 from django.db.transaction import atomic
 from django.db.models import IntegerField, CharField, BooleanField
 from django.db.models.functions import Cast
-import random
 from pgadapter import start_pgadapter
 
 
-x = 0
-
 def create_sample_singer(singer_id):
-  global x
-  x += 1
   return Singer(id=singer_id,
                 first_name='singer',
-                last_name=str(x),
-                full_name= 'singer'+str(x),
+                last_name=random_string(10),
+                full_name=random_string(20),
                 active=True,
                 created_at=datetime.datetime.now(pytz.UTC),
                 updated_at=datetime.datetime.now(pytz.UTC))
 
+
 def create_sample_album(album_id, singer=None):
-  global x
-  x += 1
   return Album(id=album_id,
                singer=singer,
-               title='album'+str(x),
-               marketing_budget = 200000,
-               release_date = datetime.date.today(),
-               cover_picture= b'hello world',
+               title=random_string(10),
+               marketing_budget=200000,
+               release_date=datetime.date.today(),
+               cover_picture=b'hello world',
                created_at=datetime.datetime.now(pytz.UTC),
                updated_at=datetime.datetime.now(pytz.UTC))
 
+
 def create_sample_track(track_id, track_number, album = None):
-  global x
-  x += 1
   return Track(track_id=track_id,
                album=album,
                track_number=track_number,
-               title='track'+str(x),
+               title=random_string(15),
                sample_rate=124.543,
                created_at=datetime.datetime.now(pytz.UTC),
                updated_at=datetime.datetime.now(pytz.UTC))
 
-def get_sample_venue_description(x):
+
+def get_sample_venue_description():
   random.seed(datetime.datetime.now().timestamp())
 
   description = {
-      'address': 'address'+str(x),
-      'capacity': random.randint(100*x, 500*x),
+      'address': random_string(20),
+      'capacity': random.randint(1000, 50000),
       'isPopular': random.choice([True, False])
   }
 
@@ -61,25 +71,27 @@ def get_sample_venue_description(x):
 
 
 def create_sample_venue(venue_id):
-  global x
-  x += 1
   return Venue(id=venue_id,
-               name='venue'+str(x),
-               description=get_sample_venue_description(x),
+               name=random_string(10),
+               description=get_sample_venue_description(),
                created_at=datetime.datetime.now(pytz.UTC),
                updated_at=datetime.datetime.now(pytz.UTC))
 
+
 def create_sample_concert(concert_id, venue = None, singer = None):
-  global x
-  x += 1
   return Concert(id=concert_id,
                  venue=venue,
                  singer=singer,
-                 name='concert'+str(x),
+                 name=random_string(20),
                  start_time=datetime.datetime.now(pytz.UTC),
-                 end_time=datetime.datetime.now(pytz.UTC)+datetime.timedelta(hours=1),
+                 end_time=datetime.datetime.now(pytz.UTC) + datetime.timedelta(hours=1),
                  created_at=datetime.datetime.now(pytz.UTC),
                  updated_at=datetime.datetime.now(pytz.UTC))
+
+
+def random_string(length):
+    return ''.join(random.choice(string.ascii_lowercase) for _ in range(length))
+
 
 def create_tables():
   file = open('create_data_model.sql', 'r')
@@ -87,6 +99,7 @@ def create_tables():
   print(ddl_statements)
   with connection.cursor() as cursor:
     cursor.execute(ddl_statements)
+
 
 @atomic(savepoint=False)
 def add_data():
@@ -105,6 +118,7 @@ def add_data():
   concert = create_sample_concert('1', venue, singer)
   concert.save()
 
+
 @atomic(savepoint=False)
 def delete_all_data():
   Track.objects.all().delete()
@@ -113,40 +127,41 @@ def delete_all_data():
   Venue.objects.all().delete()
   Singer.objects.all().delete()
 
+
 def foreign_key_operations():
   singer1 = Singer.objects.filter(id='1')[0]
   album1 = Album.objects.filter(id='1')[0]
 
-  #originally album1 belongs to singer1
+  # Originally album1 belongs to singer1
   if album1.singer_id != singer1.id:
     raise Exception("Album1 doesn't belong to singer1")
 
   singer2 = create_sample_singer('2')
   singer2.save()
 
-  global x
-  x += 1
   album2 = singer2.album_set.create(id='2',
-                                    title='album'+str(x),
+                                    title=random_string(20),
                                     marketing_budget=250000,
                                     cover_picture=b'new world',
                                     created_at=datetime.datetime.now(pytz.UTC),
                                     updated_at=datetime.datetime.now(pytz.UTC))
 
-  #checking if the newly created album2 is associated with singer 2
+  # Checking if the newly created album2 is associated with singer 2
   if album2.singer_id != singer2.id:
     raise Exception("Album2 is not associated with singer2")
 
-  #checking if the album2 is actually saved to the db
+  # Checking if the album2 is actually saved to the db
   if len(Album.objects.filter(id=album2.id)) == 0:
     raise Exception("Album2 not found in the db")
 
-  #associating album1 to singer2
+  # Associating album1 to singer2
   singer2.album_set.add(album1)
 
-  #checking if album1 belongs to singer2
+  # Checking if album1 belongs to singer2
   if album1.singer_id != singer2.id:
-    raise Exception("Couldn't change the parent of album1 fromm singer1 to singer2")
+    raise Exception("Couldn't change the parent of "
+                    "album1 fromm singer1 to singer2")
+
 
 def transaction_rollback():
   transaction.set_autocommit(False)
@@ -157,9 +172,10 @@ def transaction_rollback():
   transaction.rollback()
   transaction.set_autocommit(True)
 
-  #checking if singer3 is present in the actual table or not
+  # Checking if singer3 is present in the actual table or not
   if len(Singer.objects.filter(id='3')) > 0:
     raise Exception('Transaction Rollback Unsuccessful')
+
 
 def jsonb_filter():
   venue1 = create_sample_venue('10')
@@ -171,26 +187,38 @@ def jsonb_filter():
   venue3.save()
 
   # In order to query inside the fields of a jsonb column,
-  # we first need to use annotate to cast the respective jsonb field to the relevant data type.
+  # we first need to use annotate to cast the respective jsonb
+  # field to the relevant data type.
   # In this example, the 'address' field is cast to CharField
   # and then a filter is applied to this field.
-  # Make sure to enclose the filter value in double quotes("") for string values.
+  # Make sure to enclose the filter value in double quotes("") for string
+  # values.
 
-  fetched_venue1 = Venue.objects.annotate(address=Cast('description__address', output_field=CharField())).filter(address='"'+venue1.description['address']+'"').first()
+  fetched_venue1 = Venue.objects.annotate(
+      address=Cast('description__address',
+                   output_field=CharField())).filter(
+      address='"'+venue1.description['address']+'"').first()
 
   if fetched_venue1.id != venue1.id:
-    raise Exception('No Venue found with address ' + venue1.description['address'])
+    raise Exception('No Venue found with address '
+                    + venue1.description['address'])
 
-  fetched_venue2 = Venue.objects.annotate(capacity=Cast('description__capacity', output_field=IntegerField())).filter(capacity=venue2.description['capacity']).first()
+  fetched_venue2 = Venue.objects.annotate(
+      capacity=Cast('description__capacity',
+                    output_field=IntegerField())).filter(
+      capacity=venue2.description['capacity']).first()
 
   if fetched_venue2.id != venue2.id:
-    raise Exception('No Venue found with capacity ' + venue1.description['capacity'])
+    raise Exception('No Venue found with capacity '
+                    + venue1.description['capacity'])
 
-
-  fetched_venues3 = Venue.objects.annotate(isPopular=Cast('description__isPopular', output_field=BooleanField())).filter(isPopular=venue3.description['isPopular']).only('id')
+  fetched_venues3 = Venue.objects.annotate(
+      isPopular=Cast('description__isPopular',
+                     output_field=BooleanField())).filter(
+      isPopular=venue3.description['isPopular']).only('id')
   if venue3 not in fetched_venues3:
-    raise Exception('No Venue found with popularity ' + venue1.description['isPopular'])
-
+    raise Exception('No Venue found with popularity '
+                    + venue1.description['isPopular'])
 
 
 if __name__ == "__main__":
@@ -199,10 +227,11 @@ if __name__ == "__main__":
                                     "test-instance",
                                     True,
                                     None)
-  os.environ.setdefault('PGPORT', str(port))
+  os.environ.setdefault("PGHOST", "localhost")
+  os.environ.setdefault("PGPORT", str(port))
 
+  tables_created = False
   try:
-    tables_created = False
 
     # Setting up django
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'setting')
