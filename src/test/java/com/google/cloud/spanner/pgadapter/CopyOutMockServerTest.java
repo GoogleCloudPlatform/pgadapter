@@ -214,9 +214,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
 
       assertEquals(
-          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
+          "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
               + "{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t"
-              + "{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
+              + "{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
               + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
               + "{\"2023-02-20\",NULL,\"2000-01-01\"}\t"
               + "{\"string1\",NULL,\"string2\"}\t"
@@ -253,9 +253,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types (col_bigint, col_varchar) TO STDOUT", writer);
 
       assertEquals(
-          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
+          "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
               + "{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t"
-              + "{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
+              + "{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
               + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
               + "{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t"
               + "{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n",
@@ -291,9 +291,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "COPY all_types TO STDOUT (format csv, escape '~', delimiter '-')", writer);
 
       assertEquals(
-          "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-"
+          "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-"
               + "{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-"
-              + "\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-"
+              + "\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-"
               + "\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-"
               + "\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-"
               + "\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n",
@@ -320,10 +320,10 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "COPY all_types TO STDOUT (header, format csv, escape '~', delimiter '-')", writer);
 
       assertEquals(
-          "col_bigint-col_bool-col_bytea-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb-col_array_bigint-col_array_bool-col_array_bytea-col_array_float8-col_array_int-col_array_numeric-col_array_timestamptz-col_array_date-col_array_varchar-col_array_jsonb\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
-              + "-------------------\n",
+          "col_bigint-col_bool-col_bytea-col_float4-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb-col_array_bigint-col_array_bool-col_array_bytea-col_array_float4-col_array_float8-col_array_int-col_array_numeric-col_array_timestamptz-col_array_date-col_array_varchar-col_array_jsonb\n"
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
+              + "---------------------\n",
           writer.toString());
     }
   }
@@ -344,7 +344,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n",
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n",
           writer.toString());
     }
   }
@@ -364,10 +364,10 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           writer);
 
       assertEquals(
-          "col_bigint|col_bool|col_bytea|col_float8|col_int|col_numeric|col_timestamptz|col_date|col_varchar|col_jsonb|col_array_bigint|col_array_bool|col_array_bytea|col_array_float8|col_array_int|col_array_numeric|col_array_timestamptz|col_array_date|col_array_varchar|col_array_jsonb\n"
-              + "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
+          "col_bigint|col_bool|col_bytea|col_float4|col_float8|col_int|col_numeric|col_timestamptz|col_date|col_varchar|col_jsonb|col_array_bigint|col_array_bool|col_array_bytea|col_array_float4|col_array_float8|col_array_int|col_array_numeric|col_array_timestamptz|col_array_date|col_array_varchar|col_array_jsonb\n"
+              + "1|t|\"\\\\x74657374\"|3.14|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "{1,NULL,2}|{t,NULL,f}|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
-              + "{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
+              + "{3.14,NULL,-99.99}|{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
               + "\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\"|"
               + "\"{\\\"string1\\\",NULL,\\\"string2\\\"}\"|"
@@ -389,9 +389,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "COPY all_types TO STDOUT (format csv, escape '\\', delimiter '|', quote '\"')", writer);
 
       assertEquals(
-          "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
+          "1|t|\"\\\\x74657374\"|3.14|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "{1,NULL,2}|{t,NULL,f}|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
-              + "{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
+              + "{3.14,NULL,-99.99}|{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
               + "\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\"|"
               + "\"{\\\"string1\\\",NULL,\\\"string2\\\"}\"|"
@@ -414,10 +414,10 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           writer);
 
       assertEquals(
-          "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"100\"|\"6.626\"|"
+          "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"3.14\"|\"100\"|\"6.626\"|"
               + "\"2022-02-16 13:18:02.123456+00\"|\"2022-03-29\"|\"test\"|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "\"{1,NULL,2}\"|\"{t,NULL,f}\"|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
-              + "\"{3.14,NULL,-99.99}\"|\"{-100,NULL,-200}\"|\"{6.626,NULL,-3.14}\"|"
+              + "\"{3.14,NULL,-99.99}\"|\"{3.14,NULL,-99.99}\"|\"{-100,NULL,-200}\"|\"{6.626,NULL,-3.14}\"|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
               + "\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\"|"
               + "\"{\\\"string1\\\",NULL,\\\"string2\\\"}\"|"
@@ -457,7 +457,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
 
       assertEquals(
-          "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n",
+          "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n",
           writer.toString());
     }
   }
@@ -516,18 +516,20 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
     CopyRecord record = iterator.next();
     assertFalse(iterator.hasNext());
 
-    assertEquals(Value.int64(1L), record.getValue(Type.int64(), 0));
-    assertEquals(Value.bool(true), record.getValue(Type.bool(), 1));
-    assertEquals(Value.bytes(ByteArray.copyFrom("test")), record.getValue(Type.bytes(), 2));
-    assertEquals(Value.float64(3.14), record.getValue(Type.float64(), 3));
-    assertEquals(Value.int64(100L), record.getValue(Type.int64(), 4));
-    assertEquals(Value.pgNumeric("6.626"), record.getValue(Type.pgNumeric(), 5));
+    int index = -1;
+    assertEquals(Value.int64(1L), record.getValue(Type.int64(), ++index));
+    assertEquals(Value.bool(true), record.getValue(Type.bool(), ++index));
+    assertEquals(Value.bytes(ByteArray.copyFrom("test")), record.getValue(Type.bytes(), ++index));
+    assertEquals(Value.float32(3.14f), record.getValue(Type.float32(), ++index));
+    assertEquals(Value.float64(3.14), record.getValue(Type.float64(), ++index));
+    assertEquals(Value.int64(100L), record.getValue(Type.int64(), ++index));
+    assertEquals(Value.pgNumeric("6.626"), record.getValue(Type.pgNumeric(), ++index));
     // Note: The binary format truncates timestamptz value to microsecond precision.
     assertEquals(
         Value.timestamp(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z")),
-        record.getValue(Type.timestamp(), 6));
-    assertEquals(Value.date(Date.parseDate("2022-03-29")), record.getValue(Type.date(), 7));
-    assertEquals(Value.string("test"), record.getValue(Type.string(), 8));
+        record.getValue(Type.timestamp(), ++index));
+    assertEquals(Value.date(Date.parseDate("2022-03-29")), record.getValue(Type.date(), ++index));
+    assertEquals(Value.string("test"), record.getValue(Type.string(), ++index));
   }
 
   @Test

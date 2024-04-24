@@ -90,6 +90,7 @@ public class OptionsMetadata {
     private Credentials credentials;
     private boolean requireAuthentication;
     private boolean enableOpenTelemetry;
+    private boolean enableOpenTelemetryMetrics;
     private Double openTelemetryTraceRatio;
     private boolean skipLocalhostCheck;
     private boolean useVirtualThreads;
@@ -246,6 +247,12 @@ public class OptionsMetadata {
     /** Enables OpenTelemetry tracing for PGAdapter. */
     public Builder setEnableOpenTelemetry() {
       this.enableOpenTelemetry = true;
+      return this;
+    }
+
+    /** Enables OpenTelemetry metrics for PGAdapter. */
+    public Builder setEnableOpenTelemetryMetrics() {
+      this.enableOpenTelemetryMetrics = true;
       return this;
     }
 
@@ -413,6 +420,9 @@ public class OptionsMetadata {
       if (enableOpenTelemetry) {
         addOption(args, OPTION_ENABLE_OPEN_TELEMETRY);
       }
+      if (enableOpenTelemetryMetrics) {
+        addOption(args, OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
+      }
       if (openTelemetryTraceRatio != null) {
         addLongOption(
             args, OPTION_OPEN_TELEMETRY_TRACE_RATIO, String.valueOf(openTelemetryTraceRatio));
@@ -550,6 +560,7 @@ public class OptionsMetadata {
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_ENABLE_OPEN_TELEMETRY = "enable_otel";
+  private static final String OPTION_ENABLE_OPEN_TELEMETRY_METRICS = "enable_otel_metrics";
   private static final String OPTION_OPEN_TELEMETRY_TRACE_RATIO = "otel_trace_ratio";
   private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
@@ -578,6 +589,7 @@ public class OptionsMetadata {
   private static final String OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING =
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
+  private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -593,6 +605,7 @@ public class OptionsMetadata {
   private final boolean binaryFormat;
   private final boolean authenticate;
   private final boolean enableOpenTelemetry;
+  private final boolean enableOpenTelemetryMetrics;
   private final Double openTelemetryTraceRatio;
   private final SslMode sslMode;
   private final boolean disableAutoDetectClient;
@@ -679,6 +692,7 @@ public class OptionsMetadata {
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
     this.enableOpenTelemetry = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY);
+    this.enableOpenTelemetryMetrics = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
     this.openTelemetryTraceRatio =
         parseOpenTelemetryTraceRatio(commandLine.getOptionValue(OPTION_OPEN_TELEMETRY_TRACE_RATIO));
     this.sslMode = parseSslMode(commandLine.getOptionValue(OPTION_SSL));
@@ -757,6 +771,7 @@ public class OptionsMetadata {
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
     this.enableOpenTelemetry = false;
+    this.enableOpenTelemetryMetrics = false;
     this.openTelemetryTraceRatio = null;
     this.sslMode = SslMode.Disable;
     this.disableAutoDetectClient = false;
@@ -1125,6 +1140,8 @@ public class OptionsMetadata {
         "Whether you wish the proxy to perform an authentication step.");
     options.addOption(null, OPTION_ENABLE_OPEN_TELEMETRY, false, "Enable OpenTelemetry tracing.");
     options.addOption(
+        null, OPTION_ENABLE_OPEN_TELEMETRY_METRICS, false, "Enable OpenTelemetry metrics.");
+    options.addOption(
         null,
         OPTION_OPEN_TELEMETRY_TRACE_RATIO,
         true,
@@ -1276,6 +1293,12 @@ public class OptionsMetadata {
             + "You most probably do not want to turn internal debug mode on. It is only intended for\n"
             + "internal test cases in PGAdapter that need to verify that it receives the correct \n"
             + "wire-protocol messages.");
+    options.addOption(
+        OPTION_LEGACY_LOGGING,
+        "enable_legacy_logging",
+        false,
+        "Enables legacy logging using the default java.util.logging configuration.\n"
+            + "This sends all log output to stderr.");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);
@@ -1462,6 +1485,10 @@ public class OptionsMetadata {
 
   public boolean isEnableOpenTelemetry() {
     return this.enableOpenTelemetry;
+  }
+
+  public boolean isEnableOpenTelemetryMetrics() {
+    return this.enableOpenTelemetryMetrics;
   }
 
   public Double getOpenTelemetryTraceRatio() {

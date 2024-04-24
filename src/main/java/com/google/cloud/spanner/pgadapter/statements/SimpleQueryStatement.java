@@ -137,6 +137,8 @@ public class SimpleQueryStatement {
   static ParsedStatement translatePotentialMetadataCommand(
       ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
     Tracer tracer = connectionHandler.getExtendedQueryProtocolHandler().getTracer();
+    // Ignore deprecation for now, as there is no alternative offered (yet?).
+    //noinspection deprecation
     Span span =
         tracer
             .spanBuilder("translatePotentialMetadataCommand")

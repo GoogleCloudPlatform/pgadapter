@@ -18,6 +18,35 @@ import java.time.Duration;
 import java.util.List;
 
 public interface BenchmarkRunner {
+  enum TransactionType {
+    READ_ONLY {
+      @Override
+      String getJdbcSql() {
+        return "select col_varchar from latency_test where col_bigint=?";
+      }
 
-  List<Duration> execute(String sql, int numClients, int numOperations, int waitMillis);
+      @Override
+      String getSql() {
+        return "select col_varchar from latency_test where col_bigint=$1";
+      }
+    },
+    READ_WRITE {
+      @Override
+      String getJdbcSql() {
+        return "update latency_test set col_varchar=? where col_bigint=?";
+      }
+
+      @Override
+      String getSql() {
+        return "update latency_test set col_varchar=$1 where col_bigint=$2";
+      }
+    };
+
+    abstract String getJdbcSql();
+
+    abstract String getSql();
+  }
+
+  List<Duration> execute(
+      TransactionType transactionType, int numClients, int numOperations, int waitMillis);
 }

@@ -40,6 +40,10 @@ public class QueryMessage extends ControlMessage {
   public static final String CLOSE = "CLOSE";
   public static final ImmutableList<String> SHOW_DATABASE_DDL =
       ImmutableList.of("SHOW", "DATABASE", "DDL");
+  public static final ImmutableList<String> SELECT_CURRENT_SETTING =
+      ImmutableList.of("SELECT", "CURRENT_SETTING");
+  public static final ImmutableList<String> SELECT_SET_CONFIG =
+      ImmutableList.of("SELECT", "SET_CONFIG");
   private final Statement originalStatement;
   private final SimpleQueryStatement simpleQueryStatement;
 

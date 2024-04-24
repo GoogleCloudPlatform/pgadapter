@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.32.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.31.1...v0.32.0) (2024-03-26)
+
+
+### Features
+
+* support client lib's OpenTelemetry metrics ([#1561](https://github.com/GoogleCloudPlatform/pgadapter/issues/1561)) ([027417d](https://github.com/GoogleCloudPlatform/pgadapter/commit/027417d6dbdc2a5da21b45ca475413adfd7a13f1))
+* support float4 data type ([#1481](https://github.com/GoogleCloudPlatform/pgadapter/issues/1481)) ([c2554fc](https://github.com/GoogleCloudPlatform/pgadapter/commit/c2554fc380f34e8dfffaea988df43d1c2d9580bb))
+
+
+### Documentation
+
+* document how to get 32-bit integers in node-postgres ([#1512](https://github.com/GoogleCloudPlatform/pgadapter/issues/1512)) ([d49e678](https://github.com/GoogleCloudPlatform/pgadapter/commit/d49e6781fce027436e08d81219c5d00c407b90a2))
+* sleep 2s to ensure PGAdapter has started ([#1533](https://github.com/GoogleCloudPlatform/pgadapter/issues/1533)) ([8b1475c](https://github.com/GoogleCloudPlatform/pgadapter/commit/8b1475c63321fbf3d2cc2f0a89ac207be7bbcdd1))
+* support read/write tx in latency comparison ([#1532](https://github.com/GoogleCloudPlatform/pgadapter/issues/1532)) ([7c14284](https://github.com/GoogleCloudPlatform/pgadapter/commit/7c1428441406a386f6db11a3d0a54260bacae83a))
+
+## [0.31.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.31.0...v0.31.1) (2024-03-07)
+
+
+### Bug Fixes
+
+* boolean parser was case sensitive ([#1490](https://github.com/GoogleCloudPlatform/pgadapter/issues/1490)) ([5e97378](https://github.com/GoogleCloudPlatform/pgadapter/commit/5e97378775e63e5786dd30bdf55aa7f29da91d76))
+
+## [0.31.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.30.0...v0.31.0) (2024-02-21)
+
+
+### Features
+
+* support set_config and current_setting ([#1437](https://github.com/GoogleCloudPlatform/pgadapter/issues/1437)) ([59d3250](https://github.com/GoogleCloudPlatform/pgadapter/commit/59d3250467ec988d546082e3fce9e955019ca5b4))
+
+
+### Bug Fixes
+
+* respect the SPANNER_EMULATOR_HOST env var ([#1432](https://github.com/GoogleCloudPlatform/pgadapter/issues/1432)) ([2f059f7](https://github.com/GoogleCloudPlatform/pgadapter/commit/2f059f7dc034a546bd3244923b159cfd2a0259d7))
+
+
+### Dependencies
+
+* remove junit dependency from compile path ([#1423](https://github.com/GoogleCloudPlatform/pgadapter/issues/1423)) ([9c315d1](https://github.com/GoogleCloudPlatform/pgadapter/commit/9c315d1ed41b97ffef69492d21b7939803bdd512))
+
+
+### Documentation
+
+* Ruby ActiveRecord bit-reversed sequence sample ([#1434](https://github.com/GoogleCloudPlatform/pgadapter/issues/1434)) ([176dd15](https://github.com/GoogleCloudPlatform/pgadapter/commit/176dd150f3e5baf5fbd8a37ef7a63edfa49d1a28))
+* run Ruby ActiveRecord sample on emulator ([#1433](https://github.com/GoogleCloudPlatform/pgadapter/issues/1433)) ([cd6c9dc](https://github.com/GoogleCloudPlatform/pgadapter/commit/cd6c9dc9ae3492b9c561ca892cbbf518645be623))
+
 ## [0.30.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.29.1...v0.30.0) (2024-02-16)
 
 

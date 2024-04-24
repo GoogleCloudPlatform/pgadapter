@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,5 +62,11 @@ abstract class AbstractRunner implements BenchmarkRunner {
     }
     int randomMillis = ThreadLocalRandom.current().nextInt(waitMillis * 2);
     Thread.sleep(randomMillis);
+  }
+
+  protected String generateRandomString() {
+    byte[] bytes = new byte[64];
+    ThreadLocalRandom.current().nextBytes(bytes);
+    return new String(bytes, StandardCharsets.UTF_8);
   }
 }

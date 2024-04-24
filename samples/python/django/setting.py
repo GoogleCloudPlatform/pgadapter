@@ -1,7 +1,7 @@
 import os
 
 INSTALLED_APPS = [
-    'sample_app'
+  'sample_app'
 ]
 DATABASES = {
     'default': {

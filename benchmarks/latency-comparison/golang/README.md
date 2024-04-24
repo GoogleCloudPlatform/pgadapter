@@ -64,6 +64,8 @@ The benchmark application accepts the following command line arguments:
 * -database: The fully qualified database name to use for the benchmark. Defaults to `projects/$GOOGLE_CLOUD_PROJECT/instances/$SPANNER_INSTANCE/databases/$SPANNER_DATABASE`.
 * -clients: The number of parallel clients that execute queries. Defaults to 16.
 * -operations: The number of operations (queries) that each client executes. Defaults to 1,000.
+* -transaction: The type of transaction to execute. Must be either READ_ONLY or READ_WRITE. Defaults to READ_ONLY.
+* -wait: The wait time in milliseconds between each operation. Defaults to 0. 
 * -embedded (true/false): Whether to start PGAdapter as an embedded test container together with the
   benchmark application. Defaults to true. Set to false if you want to start and configure PGAdapter
   manually.
@@ -80,4 +82,20 @@ Run a benchmark with 32 parallel clients each executing 5,000 operations:
 
 ```shell
 ./benchmark -clients=32 -operations=5000
+```
+
+
+Run a benchmark with 32 parallel clients each executing 1 query per second.
+Each client executes 100 queries:
+
+```shell
+./benchmark -clients=32 -operations=100 -wait=1000
+```
+
+
+Run a benchmark with 32 parallel clients executing read/write transactions.
+Each client executes 1,000 transactions:
+
+```shell
+./benchmark -clients=32 -operations=1000 -transaction=read_write
 ```

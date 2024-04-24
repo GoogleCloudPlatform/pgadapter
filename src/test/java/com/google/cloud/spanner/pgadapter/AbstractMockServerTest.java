@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.NoCredentials;
+import com.google.cloud.ServiceOptions;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
@@ -173,7 +174,7 @@ public abstract class AbstractMockServerTest {
       Statement.of(
           "with "
               + PG_TYPE_PREFIX
-              + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = 'jsonb'  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
+              + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = ('jsonb')  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
 
   protected static final ResultSet SELECT_JSONB_TYPE_BY_NAME_RESULT_SET =
       ResultSet.newBuilder()
@@ -375,6 +376,7 @@ public abstract class AbstractMockServerTest {
                             Base64.getEncoder()
                                 .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
                         .build())
+                .addValues(Value.newBuilder().setNumberValue(3.14f).build())
                 .addValues(Value.newBuilder().setNumberValue(3.14d).build())
                 .addValues(Value.newBuilder().setStringValue("100").build())
                 .addValues(Value.newBuilder().setStringValue("6.626").build())
@@ -426,6 +428,15 @@ public abstract class AbstractMockServerTest {
                                                 .encodeToString(
                                                     "bytes2".getBytes(StandardCharsets.UTF_8)))
                                         .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setNumberValue(3.14f).build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setNumberValue(-99.99f).build())
                                 .build()))
                 .addValues(
                     Value.newBuilder()
@@ -667,7 +678,9 @@ public abstract class AbstractMockServerTest {
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 // Arrays
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -725,6 +738,10 @@ public abstract class AbstractMockServerTest {
                     Field.newBuilder()
                         .setName(columnPrefix + "col_bytea")
                         .setType(Type.newBuilder().setCode(TypeCode.BYTES).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_float4")
+                        .setType(Type.newBuilder().setCode(TypeCode.FLOAT32).build()))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_float8")
@@ -785,6 +802,14 @@ public abstract class AbstractMockServerTest {
                                 .setCode(TypeCode.ARRAY)
                                 .setArrayElementType(
                                     Type.newBuilder().setCode(TypeCode.BYTES).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_float4")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.FLOAT32).build())))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_array_float8")
@@ -1157,6 +1182,8 @@ public abstract class AbstractMockServerTest {
                                   "x-goog-api-client", Metadata.ASCII_STRING_MARSHALLER));
                       assertNotNull(userAgent);
                       assertTrue(userAgent.contains("pg-adapter"));
+                      assertTrue(
+                          userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
                     }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
