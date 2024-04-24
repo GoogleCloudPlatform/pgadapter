@@ -57,15 +57,17 @@ public class GapicRunner extends AbstractRunner {
   }
 
   @Override
-  public List<Duration> execute(TransactionType transactionType, int numClients, int numOperations,
-      int waitMillis) {
+  public List<Duration> execute(
+      TransactionType transactionType, int numClients, int numOperations, int waitMillis) {
 
     try {
       this.clients = new ArrayList<>(numChannels);
       for (int i = 0; i < numChannels; i++) {
-        this.clients.add(SpannerClient.create(SpannerSettings.newBuilder()
-            .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
-            .build()));
+        this.clients.add(
+            SpannerClient.create(
+                SpannerSettings.newBuilder()
+                    .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
+                    .build()));
       }
       // Create the required session(s).
       createSessions(clients, numClients);
@@ -78,7 +80,13 @@ public class GapicRunner extends AbstractRunner {
         final int sessionIndex = client % numSessionsPerChannel;
         results.add(
             service.submit(
-                () -> runBenchmark(clients.get(clientIndex), sessionIndex, transactionType, numOperations, waitMillis)));
+                () ->
+                    runBenchmark(
+                        clients.get(clientIndex),
+                        sessionIndex,
+                        transactionType,
+                        numOperations,
+                        waitMillis)));
       }
       return collectResults(service, results, numClients, numOperations);
     } catch (Throwable t) {
@@ -116,25 +124,33 @@ public class GapicRunner extends AbstractRunner {
 
   private void createSessions(List<SpannerClient> clients, int numSessions) {
     if (useMultiplexedSessions) {
-      this.multiplexedSession = clients.get(0).createSession(CreateSessionRequest.newBuilder()
-              .setDatabase(databaseId.getName())
-              .setSession(Session.newBuilder()
-                  .setMultiplexed(true)
-                  .build())
-          .build());
+      this.multiplexedSession =
+          clients
+              .get(0)
+              .createSession(
+                  CreateSessionRequest.newBuilder()
+                      .setDatabase(databaseId.getName())
+                      .setSession(Session.newBuilder().setMultiplexed(true).build())
+                      .build());
     } else {
       this.sessions = new HashMap<>();
       int numSessionsPerChannel = numSessions / clients.size();
       for (SpannerClient client : clients) {
-        this.sessions.put(client, client.batchCreateSessions(BatchCreateSessionsRequest.newBuilder()
-            .setDatabase(databaseId.getName())
-            .setSessionCount(numSessionsPerChannel)
-            .build()).getSessionList());
+        this.sessions.put(
+            client,
+            client
+                .batchCreateSessions(
+                    BatchCreateSessionsRequest.newBuilder()
+                        .setDatabase(databaseId.getName())
+                        .setSessionCount(numSessionsPerChannel)
+                        .build())
+                .getSessionList());
       }
     }
   }
 
-  private Duration executeTransaction(SpannerClient client, int sessionIndex, TransactionType transactionType) {
+  private Duration executeTransaction(
+      SpannerClient client, int sessionIndex, TransactionType transactionType) {
     Stopwatch watch = Stopwatch.createStarted();
     switch (transactionType) {
       case READ_ONLY:
@@ -148,17 +164,26 @@ public class GapicRunner extends AbstractRunner {
   }
 
   private void executeReadOnlyTransaction(SpannerClient client, int sessionIndex, String sql) {
-    Session session = this.useMultiplexedSessions
-        ? this.multiplexedSession
-        : this.sessions.get(client).get(sessionIndex);
-    com.google.spanner.v1.ResultSet resultSet = client.executeSql(ExecuteSqlRequest.newBuilder()
-            .setSession(session.getName())
-            .setSql(sql)
-            .setParams(Struct.newBuilder()
-                .putFields("p1", Value.newBuilder().setStringValue(String.valueOf(ThreadLocalRandom.current().nextInt(100000))).build())
-                .build())
-            .putParamTypes("p1", Type.newBuilder().setCode(TypeCode.INT64).build())
-        .build());
+    Session session =
+        this.useMultiplexedSessions
+            ? this.multiplexedSession
+            : this.sessions.get(client).get(sessionIndex);
+    com.google.spanner.v1.ResultSet resultSet =
+        client.executeSql(
+            ExecuteSqlRequest.newBuilder()
+                .setSession(session.getName())
+                .setSql(sql)
+                .setParams(
+                    Struct.newBuilder()
+                        .putFields(
+                            "p1",
+                            Value.newBuilder()
+                                .setStringValue(
+                                    String.valueOf(ThreadLocalRandom.current().nextInt(100000)))
+                                .build())
+                        .build())
+                .putParamTypes("p1", Type.newBuilder().setCode(TypeCode.INT64).build())
+                .build());
     for (ListValue row : resultSet.getRowsList()) {
       for (int col = 0; col < resultSet.getMetadata().getRowType().getFieldsCount(); col++) {
         if (row.getValues(col).hasNullValue()) {
@@ -173,5 +198,4 @@ public class GapicRunner extends AbstractRunner {
   private void executeReadWriteTransaction(SpannerClient client, String sql) {
     throw SpannerExceptionFactory.newSpannerException(ErrorCode.UNIMPLEMENTED, "Not supported");
   }
-
 }

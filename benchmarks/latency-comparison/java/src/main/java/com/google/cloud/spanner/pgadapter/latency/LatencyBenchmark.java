@@ -86,7 +86,8 @@ public class LatencyBenchmark {
     options.addOption("skip_pg", false, "Skip PostgreSQL JDBC benchmarks.");
     options.addOption("skip_jdbc", false, "Skip Cloud Spanner JDBC benchmarks.");
     options.addOption("skip_spanner", false, "Skip Cloud Spanner client library benchmarks.");
-    options.addOption("run_gapic", false, "Run Cloud Spanner generated client (Gapic) library benchmarks.");
+    options.addOption(
+        "run_gapic", false, "Run Cloud Spanner generated client (Gapic) library benchmarks.");
     options.addOption(
         "create_results_table",
         false,
@@ -158,7 +159,8 @@ public class LatencyBenchmark {
     if (runSpanner) {
       System.out.println();
       System.out.println("Running benchmark for Java Client Library");
-      JavaClientRunner javaClientRunner = new JavaClientRunner(databaseId, commandLine.hasOption('m'));
+      JavaClientRunner javaClientRunner =
+          new JavaClientRunner(databaseId, commandLine.hasOption('m'));
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }

@@ -14,10 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
@@ -46,9 +46,11 @@ public class JavaClientRunner extends AbstractRunner {
   public List<Duration> execute(
       TransactionType transactionType, int numClients, int numOperations, int waitMillis) {
     SpannerOptions options =
-        SpannerOptions.newBuilder().setProjectId(databaseId.getInstanceId().getProject())
+        SpannerOptions.newBuilder()
+            .setProjectId(databaseId.getInstanceId().getProject())
             .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
-            .setSessionPoolOption(BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions))
+            .setSessionPoolOption(
+                BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions))
             .build();
     try (Spanner spanner = options.getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
