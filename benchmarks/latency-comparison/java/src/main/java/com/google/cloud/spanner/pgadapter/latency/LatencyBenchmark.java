@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import static com.google.cloud.spanner.Spanner.CALL_DURATIONS;
+
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -171,6 +173,7 @@ public class LatencyBenchmark {
               commandLine.hasOption('v'));
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
+      System.out.println(CALL_DURATIONS);
     }
 
     printResults("Gapic client", gapicResults);
