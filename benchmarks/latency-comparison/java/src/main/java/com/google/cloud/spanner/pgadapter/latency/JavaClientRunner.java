@@ -35,28 +35,39 @@ public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
   private final boolean useMultiplexedSessions;
   private final boolean useRandomChannels;
+  private final boolean useVirtualThreads;
+  private final boolean useLeaderAwareRouting;
   private long numNullValues;
   private long numNonNullValues;
 
   JavaClientRunner(
-      DatabaseId databaseId, boolean useMultiplexedSessions, boolean useRandomChannels) {
+      DatabaseId databaseId,
+      boolean useMultiplexedSessions,
+      boolean useRandomChannels,
+      boolean useVirtualThreads,
+      boolean useLeaderAwareRouting) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
     this.useRandomChannels = useRandomChannels;
+    this.useVirtualThreads = useVirtualThreads;
+    this.useLeaderAwareRouting = useLeaderAwareRouting;
   }
 
   @Override
   public List<Duration> execute(
       TransactionType transactionType, int numClients, int numOperations, int waitMillis) {
-    SpannerOptions options =
+    SpannerOptions.Builder optionsBuilder =
         SpannerOptions.newBuilder()
             .setProjectId(databaseId.getInstanceId().getProject())
             .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
             .setSessionPoolOption(
                 BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions))
             .setUseRandomChannel(useRandomChannels)
-            .build();
-    try (Spanner spanner = options.getService()) {
+            .disableDirectPath();
+    if (!useLeaderAwareRouting) {
+      optionsBuilder.disableLeaderAwareRouting();
+    }
+    try (Spanner spanner = optionsBuilder.build().getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
 
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
