@@ -14,18 +14,19 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import com.google.api.gax.rpc.ServerStream;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.v1.SpannerClient;
 import com.google.cloud.spanner.v1.SpannerSettings;
 import com.google.common.base.Stopwatch;
-import com.google.protobuf.ListValue;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.BatchCreateSessionsRequest;
 import com.google.spanner.v1.CreateSessionRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.PartialResultSet;
 import com.google.spanner.v1.Session;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
@@ -168,25 +169,25 @@ public class GapicRunner extends AbstractRunner {
         this.useMultiplexedSessions
             ? this.multiplexedSession
             : this.sessions.get(client).get(sessionIndex);
-    com.google.spanner.v1.ResultSet resultSet =
-        client.executeSql(
-            ExecuteSqlRequest.newBuilder()
-                .setSession(session.getName())
-                .setSql(sql)
-                .setParams(
-                    Struct.newBuilder()
-                        .putFields(
-                            "p1",
-                            Value.newBuilder()
-                                .setStringValue(
-                                    String.valueOf(ThreadLocalRandom.current().nextInt(100000)))
-                                .build())
-                        .build())
-                .putParamTypes("p1", Type.newBuilder().setCode(TypeCode.INT64).build())
-                .build());
-    for (ListValue row : resultSet.getRowsList()) {
-      for (int col = 0; col < resultSet.getMetadata().getRowType().getFieldsCount(); col++) {
-        if (row.getValues(col).hasNullValue()) {
+    ExecuteSqlRequest request =
+        ExecuteSqlRequest.newBuilder()
+            .setSession(session.getName())
+            .setSql(sql)
+            .setParams(
+                Struct.newBuilder()
+                    .putFields(
+                        "p1",
+                        Value.newBuilder()
+                            .setStringValue(
+                                String.valueOf(ThreadLocalRandom.current().nextInt(100000)))
+                            .build())
+                    .build())
+            .putParamTypes("p1", Type.newBuilder().setCode(TypeCode.INT64).build())
+            .build();
+    ServerStream<PartialResultSet> stream = client.executeStreamingSqlCallable().call(request);
+    for (PartialResultSet resultSet : stream) {
+      for (Value value : resultSet.getValuesList()) {
+        if (value.hasNullValue()) {
           numNullValues++;
         } else {
           numNonNullValues++;
