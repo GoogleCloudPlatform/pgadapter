@@ -62,7 +62,7 @@ public class JavaClientRunner extends AbstractRunner {
             .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
             // .setMaxInboundMessageSize(MAX_MESSAGE_SIZE)
             // .setMaxInboundMetadataSize(MAX_METADATA_SIZE)
-            .setPoolSize(16);
+            .setPoolSize(Math.min(4, (int) Math.ceil((double) numClients / 10)));
 
     SpannerOptions.Builder optionsBuilder =
         SpannerOptions.newBuilder()
