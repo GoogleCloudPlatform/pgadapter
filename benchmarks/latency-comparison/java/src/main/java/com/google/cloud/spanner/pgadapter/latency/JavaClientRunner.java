@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -56,10 +57,19 @@ public class JavaClientRunner extends AbstractRunner {
   @Override
   public List<Duration> execute(
       TransactionType transactionType, int numClients, int numOperations, int waitMillis) {
+    InstantiatingGrpcChannelProvider.Builder defaultChannelProviderBuilder =
+        InstantiatingGrpcChannelProvider.newBuilder()
+            .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
+            // .setMaxInboundMessageSize(MAX_MESSAGE_SIZE)
+            // .setMaxInboundMetadataSize(MAX_METADATA_SIZE)
+            .setPoolSize(4)
+            .setAllowNonDefaultServiceAccount(true);
+
     SpannerOptions.Builder optionsBuilder =
         SpannerOptions.newBuilder()
             .setProjectId(databaseId.getInstanceId().getProject())
-            .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
+            // .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
+            .setChannelProvider(defaultChannelProviderBuilder.build())
             .setSessionPoolOption(
                 BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions))
             .setUseRandomChannel(useRandomChannels)
