@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -173,13 +174,13 @@ public class LatencyBenchmark {
               commandLine.hasOption('v'));
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
-      System.out.println(CALL_DURATIONS);
     }
 
     printResults("Gapic client", gapicResults);
     printResults("PostgreSQL JDBC Driver", pgJdbcResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
     printResults("Java Client Library", javaClientResults);
+    printResults("Java CALL_DURATIONS", CALL_DURATIONS);
 
     if (commandLine.hasOption('s')) {
       saveResults(
@@ -187,7 +188,7 @@ public class LatencyBenchmark {
     }
   }
 
-  private void printResults(String header, List<Duration> results) {
+  private void printResults(String header, Collection<Duration> results) {
     if (results == null) {
       return;
     }
@@ -252,7 +253,7 @@ public class LatencyBenchmark {
         / 1_000_000.0f;
   }
 
-  private double avg(List<Duration> results) {
+  private double avg(Collection<Duration> results) {
     return results.stream()
         .collect(Collectors.averagingDouble(result -> result.get(ChronoUnit.NANOS) / 1_000_000.0f));
   }
