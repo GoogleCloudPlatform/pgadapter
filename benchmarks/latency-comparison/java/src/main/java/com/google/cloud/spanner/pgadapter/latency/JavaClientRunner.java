@@ -35,6 +35,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
   private final boolean useMultiplexedSessions;
+  private final boolean useMultiplexedClient;
   private final boolean useRandomChannels;
   private final boolean useVirtualThreads;
   private final boolean useLeaderAwareRouting;
@@ -45,12 +46,14 @@ public class JavaClientRunner extends AbstractRunner {
   JavaClientRunner(
       DatabaseId databaseId,
       boolean useMultiplexedSessions,
+      boolean useMultiplexedClient,
       boolean useRandomChannels,
       boolean useVirtualThreads,
       boolean useLeaderAwareRouting,
       int numChannels) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
+    this.useMultiplexedClient = useMultiplexedClient;
     this.useRandomChannels = useRandomChannels;
     this.useVirtualThreads = useVirtualThreads;
     this.useLeaderAwareRouting = useLeaderAwareRouting;
@@ -73,7 +76,8 @@ public class JavaClientRunner extends AbstractRunner {
             // .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
             .setChannelProvider(defaultChannelProviderBuilder.build())
             .setSessionPoolOption(
-                BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions))
+                BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(
+                    useMultiplexedSessions, useMultiplexedClient))
             .setUseRandomChannel(useRandomChannels)
             .disableDirectPath();
     if (!useLeaderAwareRouting) {

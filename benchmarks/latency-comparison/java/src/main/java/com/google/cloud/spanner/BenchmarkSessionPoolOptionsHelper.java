@@ -18,10 +18,12 @@ import org.threeten.bp.Duration;
 
 public class BenchmarkSessionPoolOptionsHelper {
 
-  public static SessionPoolOptions getSessionPoolOptions(boolean useMultiplexedSessions) {
+  public static SessionPoolOptions getSessionPoolOptions(
+      boolean useMultiplexedSessions, boolean useMultiplexedClient) {
     return SessionPoolOptions.newBuilder()
         .setWaitForMinSessions(Duration.ofSeconds(5L))
         .setUseMultiplexedSession(useMultiplexedSessions)
+        .setUseMultiplexedDatabaseClient(useMultiplexedClient)
         .build();
   }
 }

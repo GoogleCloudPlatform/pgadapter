@@ -98,6 +98,7 @@ public class LatencyBenchmark {
     options.addOption("s", "store_results", false, "Store results in the test database.");
     options.addOption("name", true, "Name of this test run");
     options.addOption("m", "multiplexed", false, "Use multiplexed sessions.");
+    options.addOption("mc", "multiplexed-client", false, "Use multiplexed session client.");
     options.addOption("r", "random", false, "Use random channels.");
     options.addOption("l", "leader-aware-routing", false, "Use leader-aware routing.");
     options.addOption("v", "virtual", false, "Use virtual threads.");
@@ -174,6 +175,7 @@ public class LatencyBenchmark {
           new JavaClientRunner(
               databaseId,
               commandLine.hasOption('m'),
+              commandLine.hasOption("mc"),
               commandLine.hasOption('r'),
               commandLine.hasOption('l'),
               commandLine.hasOption('v'),
