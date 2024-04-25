@@ -101,6 +101,7 @@ public class LatencyBenchmark {
     options.addOption("r", "random", false, "Use random channels.");
     options.addOption("l", "leader-aware-routing", false, "Use leader-aware routing.");
     options.addOption("v", "virtual", false, "Use virtual threads.");
+    options.addOption("channels", "num_channels", true, "The number of gRPC channels to use.");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -127,6 +128,10 @@ public class LatencyBenchmark {
     boolean runJdbc = !commandLine.hasOption("skip_jdbc");
     boolean runSpanner = !commandLine.hasOption("skip_spanner");
     boolean runGapic = commandLine.hasOption("run_gapic");
+    int numChannels =
+        commandLine.hasOption("channels")
+            ? Integer.parseInt(commandLine.getOptionValue("channels"))
+            : 4;
     String name = commandLine.getOptionValue("name");
 
     System.out.println();
@@ -171,7 +176,8 @@ public class LatencyBenchmark {
               commandLine.hasOption('m'),
               commandLine.hasOption('r'),
               commandLine.hasOption('l'),
-              commandLine.hasOption('v'));
+              commandLine.hasOption('v'),
+              numChannels);
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }

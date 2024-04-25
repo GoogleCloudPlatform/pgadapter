@@ -38,6 +38,7 @@ public class JavaClientRunner extends AbstractRunner {
   private final boolean useRandomChannels;
   private final boolean useVirtualThreads;
   private final boolean useLeaderAwareRouting;
+  private final int numChannels;
   private long numNullValues;
   private long numNonNullValues;
 
@@ -46,12 +47,14 @@ public class JavaClientRunner extends AbstractRunner {
       boolean useMultiplexedSessions,
       boolean useRandomChannels,
       boolean useVirtualThreads,
-      boolean useLeaderAwareRouting) {
+      boolean useLeaderAwareRouting,
+      int numChannels) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
     this.useRandomChannels = useRandomChannels;
     this.useVirtualThreads = useVirtualThreads;
     this.useLeaderAwareRouting = useLeaderAwareRouting;
+    this.numChannels = numChannels;
   }
 
   @Override
@@ -62,7 +65,7 @@ public class JavaClientRunner extends AbstractRunner {
             .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
             // .setMaxInboundMessageSize(MAX_MESSAGE_SIZE)
             // .setMaxInboundMetadataSize(MAX_METADATA_SIZE)
-            .setPoolSize(Math.min(4, (int) Math.ceil((double) numClients / 10)));
+            .setPoolSize(numChannels);
 
     SpannerOptions.Builder optionsBuilder =
         SpannerOptions.newBuilder()
