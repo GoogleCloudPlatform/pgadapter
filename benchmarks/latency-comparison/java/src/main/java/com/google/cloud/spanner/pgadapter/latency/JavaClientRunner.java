@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
-import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -35,10 +34,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
   private final boolean useMultiplexedSessions;
-  private final boolean useMultiplexedClient;
-  private final boolean useRandomChannels;
   private final boolean useVirtualThreads;
-  private final boolean useLeaderAwareRouting;
   private final int numChannels;
   private long numNullValues;
   private long numNonNullValues;
@@ -46,43 +42,24 @@ public class JavaClientRunner extends AbstractRunner {
   JavaClientRunner(
       DatabaseId databaseId,
       boolean useMultiplexedSessions,
-      boolean useMultiplexedClient,
-      boolean useRandomChannels,
       boolean useVirtualThreads,
-      boolean useLeaderAwareRouting,
       int numChannels) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
-    this.useMultiplexedClient = useMultiplexedClient;
-    this.useRandomChannels = useRandomChannels;
     this.useVirtualThreads = useVirtualThreads;
-    this.useLeaderAwareRouting = useLeaderAwareRouting;
     this.numChannels = numChannels;
   }
 
   @Override
   public List<Duration> execute(
       TransactionType transactionType, int numClients, int numOperations, int waitMillis) {
-    InstantiatingGrpcChannelProvider.Builder defaultChannelProviderBuilder =
-        InstantiatingGrpcChannelProvider.newBuilder()
-            .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
-            // .setMaxInboundMessageSize(MAX_MESSAGE_SIZE)
-            // .setMaxInboundMetadataSize(MAX_METADATA_SIZE)
-            .setPoolSize(numChannels);
-
     SpannerOptions.Builder optionsBuilder =
         SpannerOptions.newBuilder()
             .setProjectId(databaseId.getInstanceId().getProject())
-            // .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
-            .setChannelProvider(defaultChannelProviderBuilder.build())
+            .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
+            .setNumChannels(numChannels)
             .setSessionPoolOption(
-                BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(
-                    useMultiplexedSessions, useMultiplexedClient))
-            .setUseRandomChannel(useRandomChannels)
-            .disableDirectPath();
-    if (!useLeaderAwareRouting) {
-      optionsBuilder.disableLeaderAwareRouting();
-    }
+                BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions));
     try (Spanner spanner = optionsBuilder.build().getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
 

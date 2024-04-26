@@ -14,8 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
-import static com.google.cloud.spanner.Spanner.CALL_DURATIONS;
-
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -98,9 +96,6 @@ public class LatencyBenchmark {
     options.addOption("s", "store_results", false, "Store results in the test database.");
     options.addOption("name", true, "Name of this test run");
     options.addOption("m", "multiplexed", false, "Use multiplexed sessions.");
-    options.addOption("u", "multiplexed_client", false, "Use multiplexed session client.");
-    options.addOption("r", "random", false, "Use random channels.");
-    options.addOption("l", "leader_aware_routing", false, "Use leader-aware routing.");
     options.addOption("v", "virtual", false, "Use virtual threads.");
     options.addOption("channels", "num_channels", true, "The number of gRPC channels to use.");
     CommandLineParser parser = new DefaultParser();
@@ -173,13 +168,7 @@ public class LatencyBenchmark {
       System.out.println("Running benchmark for Java Client Library");
       JavaClientRunner javaClientRunner =
           new JavaClientRunner(
-              databaseId,
-              commandLine.hasOption('m'),
-              commandLine.hasOption('u'),
-              commandLine.hasOption('r'),
-              commandLine.hasOption('l'),
-              commandLine.hasOption('v'),
-              numChannels);
+              databaseId, commandLine.hasOption('m'), commandLine.hasOption('v'), numChannels);
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }
@@ -188,7 +177,6 @@ public class LatencyBenchmark {
     printResults("PostgreSQL JDBC Driver", pgJdbcResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
     printResults("Java Client Library", javaClientResults);
-    printResults("Java CALL_DURATIONS", CALL_DURATIONS);
 
     if (commandLine.hasOption('s')) {
       saveResults(
