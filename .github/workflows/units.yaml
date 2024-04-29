@@ -59,6 +59,8 @@ jobs:
         java: [8, 17]
     steps:
       - uses: actions/checkout@v4
+      - name: install coreutils
+        run: brew install coreutils
       - name: install libpq
         run: brew install libpq
       - uses: actions/setup-java@v4
