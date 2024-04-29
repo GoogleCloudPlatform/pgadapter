@@ -406,18 +406,20 @@ public class ClientAutoDetector {
         return false;
       }
 
+      private final String prefix =
+          "SELECT version();%s"
+              + "%s"
+              + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid%s";
+      private final String unixPrefix = String.format(prefix, "\n", "\n", "\n");
+      private final String windowsPrefix = String.format(prefix, "\r\n", "\r\n", "\r\n");
+
       @Override
       boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // The npgsql client always starts with sending a query that contains multiple statements
         // and that starts with the following prefix.
         return statements.size() == 1
-            && statements
-                .get(0)
-                .getSql()
-                .startsWith(
-                    "SELECT version();\n"
-                        + "\n"
-                        + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n");
+            && (statements.get(0).getSql().startsWith(unixPrefix)
+                || statements.get(0).getSql().startsWith(windowsPrefix));
       }
 
       @Override
