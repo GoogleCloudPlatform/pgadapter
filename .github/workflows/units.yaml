@@ -59,6 +59,8 @@ jobs:
         java: [8, 17]
     steps:
       - uses: actions/checkout@v4
+      - name: install libpq
+        run: brew install libpq
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
@@ -82,6 +84,4 @@ jobs:
         with:
           ruby-version: '3.0'
           bundler-cache: true
-      - name: install libpq
-        run: brew install libpq
       - run: mvn -B test -Ptest-all -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
