@@ -89,6 +89,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+      - name: Switch Docker daemon
+        run: $Env:ProgramFiles\Docker\Docker\DockerCli.exe -SwitchDaemon
       - name: Run npgsql Sample tests
         working-directory: ./samples/dotnet/npgsql-sample
         run: dotnet run Program.cs
