@@ -90,19 +90,19 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   @Test
   public void testShowServerVersion() throws IOException, InterruptedException {
     String result = execute("TestShowServerVersion", createConnectionString());
-    assertEquals("14.1" + lf, result);
+    assertEquals("14.1\n", result);
   }
 
   @Test
   public void testShowApplicationName() throws IOException, InterruptedException {
     String result = execute("TestShowApplicationName", createConnectionString());
-    assertEquals("npgsql" + lf, result);
+    assertEquals("npgsql\n", result);
   }
 
   @Test
   public void testSelect1() throws IOException, InterruptedException {
     String result = execute("TestSelect1", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -152,7 +152,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .build()));
 
     String result = execute("TestSelectArray", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -197,7 +197,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .build()));
 
     String result = execute("TestQueryWithParameter", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -218,7 +218,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
     String result = execute("TestQueryAllDataTypes", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -264,7 +264,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             1L));
 
     String result = execute("TestUpdateAllDataTypes", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -312,7 +312,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             1L));
 
     String result = execute("TestInsertAllDataTypes", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -355,7 +355,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             1L));
 
     String result = execute("TestInsertNullsAllDataTypes", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -424,7 +424,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .build()));
 
     String result = execute("TestInsertAllDataTypesReturning", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -443,7 +443,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     }
 
     String result = execute("TestInsertBatch", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
     ExecuteBatchDmlRequest batchDmlRequest =
@@ -490,7 +490,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     }
 
     String result = execute("TestMixedBatch", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     // Reverse the requests list, so it's a little easier to check what we want to check. There are
@@ -553,7 +553,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     addDdlResponseToSpannerAdmin();
 
     String result = execute("TestDdlBatch", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<UpdateDatabaseDdlRequest> requests =
         mockDatabaseAdmin.getRequests().stream()
@@ -570,7 +570,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     addDdlResponseToSpannerAdmin();
 
     String result = execute("TestDdlScript", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<UpdateDatabaseDdlRequest> requests =
         mockDatabaseAdmin.getRequests().stream()
@@ -597,7 +597,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
         mockSpanner, "public", "all_types", true);
 
     String result = execute(testMethod, createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     CommitRequest request = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
@@ -642,12 +642,9 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
     String result = execute("TestBinaryCopyOut", createConnectionString());
     assertEquals(
-        "1\tTrue\tdGVzdA==\t3.14\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]"
-            + lf
-            + "NULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL"
-            + lf
-            + "Success"
-            + lf,
+        "1\tTrue\tdGVzdA==\t3.14\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]\n"
+            + "NULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
+            + "Success\n",
         result);
   }
 
@@ -666,12 +663,9 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
     String result = execute("TestTextCopyOut", createConnectionString());
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}"
-            + lf
-            + "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N"
-            + lf
-            + "Success"
-            + lf,
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
+            + "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
+            + "Success\n",
         result);
   }
 
@@ -683,7 +677,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             Statement.of(sql), ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
 
     String result = execute("TestSimplePrepare", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ParseMessage> parseMessages =
         pgServer.getDebugMessages().stream()
@@ -761,7 +755,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     }
 
     String result = execute("TestPrepareAndExecute", createConnectionString());
-    assertEquals("Success" + lf, result);
+    assertEquals("Success\n", result);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -848,7 +842,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     }
 
     String result = execute("TestReadWriteTransaction", createConnectionString());
-    assertEquals("Row: 1" + lf + "Success" + lf, result);
+    assertEquals("Row: 1\n" + "Success\n", result);
 
     List<ExecuteSqlRequest> select1Requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -874,7 +868,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   @Test
   public void testReadOnlyTransaction() throws IOException, InterruptedException {
     String result = execute("TestReadOnlyTransaction", createConnectionString());
-    assertEquals("Row: 1" + lf + "Row: 2" + lf + "Success" + lf, result);
+    assertEquals("Row: 1\n" + "Row: 2\n" + "Success\n", result);
 
     // There are two BeginTransaction requests on the server, because the initial metadata queries
     // that are executed by the npgsql driver will also use a read-only transaction.
