@@ -22,7 +22,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <spring-boot.version>2.7.18</spring-boot.version>
-    <junixsocket.version>2.6.2</junixsocket.version>
+    <junixsocket.version>2.9.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
