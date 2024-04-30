@@ -417,6 +417,9 @@ public class ClientAutoDetector {
       boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // The npgsql client always starts with sending a query that contains multiple statements
         // and that starts with the following prefix.
+        if (statements.size() == 1 && statements.get(0).getSql().contains("ns.nspname")) {
+          System.out.println(statements.get(0).getSql());
+        }
         return statements.size() == 1
             && statements.get(0).getSql().contains("SELECT version();")
             && statements.get(0).getSql().contains("SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid");
