@@ -100,8 +100,8 @@ public class BenchmarkApplication implements CommandLineRunner {
         System.out.printf("Finished loading %d rows\n", loadDataFuture.get());
       }
 
-      if (tpccConfiguration.isRunPgadapterBenchmark()
-          || tpccConfiguration.isRunSpannerJdbcBenchmark()) {
+      if (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.PGADAPTER_JDBC_RUNNER)
+          || tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.SPANNER_JDBC_RUNNER)) {
         LOG.info("Starting benchmark");
         // Enable the OpenTelemetry metrics in the client library.
         enableOpenTelemetryMetrics();
@@ -109,12 +109,16 @@ public class BenchmarkApplication implements CommandLineRunner {
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
-          if (tpccConfiguration.isRunPgadapterBenchmark()) {
+          if (tpccConfiguration
+              .getBenchmarkRunner()
+              .equals(TpccConfiguration.PGADAPTER_JDBC_RUNNER)) {
             // Run PGAdapter benchmark
             statistics.setRunnerName("PGAdapter benchmark");
             executor.submit(
                 new JdbcBenchmarkRunner(statistics, pgadapterConnectionUrl, tpccConfiguration));
-          } else if (tpccConfiguration.isRunSpannerJdbcBenchmark()) {
+          } else if (tpccConfiguration
+              .getBenchmarkRunner()
+              .equals(TpccConfiguration.SPANNER_JDBC_RUNNER)) {
             // Run Spanner JDBC benchmark
             statistics.setRunnerName("Spanner JDBC benchmark");
             executor.submit(
@@ -132,6 +136,8 @@ public class BenchmarkApplication implements CommandLineRunner {
         if (!executor.awaitTermination(60L, TimeUnit.SECONDS)) {
           throw new TimeoutException("Timed out while waiting for benchmark runners to shut down");
         }
+      } else {
+        LOG.error("Unknown benchmark runner option: " + tpccConfiguration.getBenchmarkRunner());
       }
     } catch (IOException exception) {
       throw new RuntimeException(exception);

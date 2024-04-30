@@ -7,15 +7,16 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "tpcc")
 public class TpccConfiguration {
+  public static final String PGADAPTER_JDBC_RUNNER = "pgadapter";
+  public static final String SPANNER_JDBC_RUNNER = "spanner_jdbc";
+
   private boolean loadData;
 
   private int loadDataThreads;
 
   private boolean truncateBeforeLoad;
 
-  private boolean runPgadapterBenchmark;
-
-  private boolean runSpannerJdbcBenchmark;
+  private String benchmarkRunner;
 
   private boolean runBenchmark;
 
@@ -60,20 +61,12 @@ public class TpccConfiguration {
     this.truncateBeforeLoad = truncateBeforeLoad;
   }
 
-  public boolean isRunPgadapterBenchmark() {
-    return runPgadapterBenchmark;
+  public String getBenchmarkRunner() {
+    return benchmarkRunner;
   }
 
-  public void setRunPgadapterBenchmark(boolean runPgadapterBenchmark) {
-    this.runPgadapterBenchmark = runPgadapterBenchmark;
-  }
-
-  public boolean isRunSpannerJdbcBenchmark() {
-    return runSpannerJdbcBenchmark;
-  }
-
-  public void setRunSpannerJdbcBenchmark(boolean runSpannerJdbcBenchmark) {
-    this.runSpannerJdbcBenchmark = runSpannerJdbcBenchmark;
+  public void setBenchmarkRunner(String benchmarkRunner) {
+    this.benchmarkRunner = benchmarkRunner;
   }
 
   public boolean isRunBenchmark() {
