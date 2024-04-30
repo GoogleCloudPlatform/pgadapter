@@ -171,7 +171,11 @@ public class LatencyBenchmark {
       System.out.println("Running benchmark for Java Client Library");
       JavaClientRunner javaClientRunner =
           new JavaClientRunner(
-              databaseId, commandLine.hasOption('m'), commandLine.hasOption('v'), numChannels);
+              databaseId,
+              commandLine.hasOption('m'),
+              commandLine.hasOption('r'),
+              commandLine.hasOption('v'),
+              numChannels);
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }
