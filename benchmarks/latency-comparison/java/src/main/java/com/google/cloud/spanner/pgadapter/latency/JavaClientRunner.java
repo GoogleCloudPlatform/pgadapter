@@ -34,6 +34,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
   private final boolean useMultiplexedSessions;
+  private final boolean useRandomChannelHint;
   private final boolean useVirtualThreads;
   private final int numChannels;
   private long numNullValues;
@@ -42,10 +43,12 @@ public class JavaClientRunner extends AbstractRunner {
   JavaClientRunner(
       DatabaseId databaseId,
       boolean useMultiplexedSessions,
+      boolean useRandomChannelHint,
       boolean useVirtualThreads,
       int numChannels) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
+    this.useRandomChannelHint = useRandomChannelHint;
     this.useVirtualThreads = useVirtualThreads;
     this.numChannels = numChannels;
   }
@@ -59,7 +62,8 @@ public class JavaClientRunner extends AbstractRunner {
             .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
             .setNumChannels(numChannels)
             .setSessionPoolOption(
-                BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(useMultiplexedSessions));
+                BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(
+                    useMultiplexedSessions, useRandomChannelHint));
     try (Spanner spanner = optionsBuilder.build().getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
 

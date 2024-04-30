@@ -96,6 +96,7 @@ public class LatencyBenchmark {
     options.addOption("s", "store_results", false, "Store results in the test database.");
     options.addOption("name", true, "Name of this test run");
     options.addOption("m", "multiplexed", false, "Use multiplexed sessions.");
+    options.addOption("r", "random", false, "Use random channel hint.");
     options.addOption("v", "virtual", false, "Use virtual threads.");
     options.addOption("channels", "num_channels", true, "The number of gRPC channels to use.");
     CommandLineParser parser = new DefaultParser();
@@ -137,6 +138,8 @@ public class LatencyBenchmark {
     System.out.printf("Operations: %d\n", operations);
     System.out.printf("Transaction type: %s\n", transactionType);
     System.out.printf("Wait between queries: %dms\n", waitMillis);
+    System.out.printf("Multiplexed sessions: %s\n", commandLine.hasOption('m'));
+    System.out.printf("Random channel hint: %s\n", commandLine.hasOption('r'));
 
     List<Duration> gapicResults = null;
     if (runGapic) {
