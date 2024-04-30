@@ -626,9 +626,10 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     Process process = builder.start();
     System.out.println("Executing " + test);
     System.out.println("Waiting for input");
+    int result = process.waitFor();
+    assertEquals(0, result);
     String output = readAll(process.getInputStream());
     String errors = readAll(process.getErrorStream());
-    int result = process.waitFor();
     assertEquals(errors, 0, result);
 
     return output;
@@ -638,7 +639,9 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     StringBuilder result = new StringBuilder();
     try (Scanner scanner = new Scanner(new InputStreamReader(inputStream))) {
       while (scanner.hasNextLine()) {
-        result.append(scanner.nextLine()).append("" + lf);
+        String line = scanner.nextLine();
+        result.append(line).append(lf);
+        System.out.println(line);
       }
     }
     return result.toString();

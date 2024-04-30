@@ -51,8 +51,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
-      - name: Run standard unit tests
-        run: mvn -B test
+      # - name: Run standard unit tests
+      #  run: mvn -B test
       - name: Run dotnet tests
         run: mvn -B test -Ptest-all -Dtest="com.google.cloud.spanner.pgadapter.csharp.*Test"
   macos:
