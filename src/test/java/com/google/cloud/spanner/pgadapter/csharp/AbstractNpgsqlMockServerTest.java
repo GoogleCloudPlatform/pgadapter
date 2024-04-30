@@ -626,8 +626,8 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     Process process = builder.start();
     System.out.println("Executing " + test);
     System.out.println("Waiting for input");
-    String errors = readAll(process.getErrorStream());
     String output = readAll(process.getInputStream());
+    String errors = readAll(process.getErrorStream());
     int result = process.waitFor();
     assertEquals(errors, 0, result);
 
