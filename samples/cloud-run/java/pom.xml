@@ -22,7 +22,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <spring-boot.version>2.7.18</spring-boot.version>
-    <junixsocket.version>2.6.2</junixsocket.version>
+    <junixsocket.version>2.9.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -97,7 +97,7 @@
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
         <artifactId>jib-maven-plugin</artifactId>
-        <version>3.3.2</version>
+        <version>3.4.2</version>
         <configuration>
           <to>
             <image>gcr.io/PROJECT_ID/pgadapter-sidecar-example</image>

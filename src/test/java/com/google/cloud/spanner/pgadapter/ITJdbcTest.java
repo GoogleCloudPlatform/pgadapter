@@ -23,7 +23,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -1108,10 +1107,6 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testPGSettings() throws SQLException {
-    // TODO: Remove when the bug in the emulator has been fixed.
-    assumeFalse(
-        "The emulator fails queries that scan CTEs", PgAdapterTestEnv.isRunningOnEmulator());
-
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       // First verify the default value.
       // JDBC sets the DateStyle to 'ISO' for every connection in the connection request, except in
