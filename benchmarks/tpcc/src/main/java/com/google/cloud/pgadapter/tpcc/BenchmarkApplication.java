@@ -27,6 +27,9 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
@@ -117,7 +120,8 @@ public class BenchmarkApplication implements CommandLineRunner {
           || tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.SPANNER_JDBC_RUNNER)) {
         LOG.info("Starting benchmark");
         // Enable the OpenTelemetry metrics in the client library.
-        enableOpenTelemetryMetrics();
+        OpenTelemetry openTelemetry = enableOpenTelemetryMetrics();
+        Metrics metrics = new Metrics(openTelemetry, createMetricAttributes(spannerConfiguration));
         Statistics statistics = new Statistics(tpccConfiguration);
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
@@ -128,14 +132,16 @@ public class BenchmarkApplication implements CommandLineRunner {
             // Run PGAdapter benchmark
             statistics.setRunnerName("PGAdapter benchmark");
             executor.submit(
-                new JdbcBenchmarkRunner(statistics, pgadapterConnectionUrl, tpccConfiguration));
+                new JdbcBenchmarkRunner(
+                    statistics, pgadapterConnectionUrl, tpccConfiguration, metrics));
           } else if (tpccConfiguration
               .getBenchmarkRunner()
               .equals(TpccConfiguration.SPANNER_JDBC_RUNNER)) {
             // Run Spanner JDBC benchmark
             statistics.setRunnerName("Spanner JDBC benchmark");
             executor.submit(
-                new JdbcBenchmarkRunner(statistics, spannerConnectionUrl, tpccConfiguration));
+                new JdbcBenchmarkRunner(
+                    statistics, spannerConnectionUrl, tpccConfiguration, metrics));
           }
         }
 
@@ -168,7 +174,7 @@ public class BenchmarkApplication implements CommandLineRunner {
     }
   }
 
-  private void enableOpenTelemetryMetrics() throws IOException {
+  private OpenTelemetry enableOpenTelemetryMetrics() throws IOException {
     // Enable OpenTelemetry metrics before injecting OpenTelemetry object.
     SpannerOptions.enableOpenTelemetryMetrics();
 
@@ -186,7 +192,17 @@ public class BenchmarkApplication implements CommandLineRunner {
             sdkMeterProviderBuilder.registerMetricReader(
                 PeriodicMetricReader.builder(cloudMonitoringExporter).build()));
 
-    GlobalOpenTelemetry.set(openTelemetryBuilder.build().getOpenTelemetrySdk());
+    OpenTelemetry openTelemetry = openTelemetryBuilder.build().getOpenTelemetrySdk();
+    GlobalOpenTelemetry.set(openTelemetry);
+    return openTelemetry;
+  }
+
+  static Attributes createMetricAttributes(SpannerConfiguration spannerConfiguration) {
+    AttributesBuilder attributesBuilder = Attributes.builder();
+    attributesBuilder.put("database", spannerConfiguration.getDatabase());
+    attributesBuilder.put("instance_id", spannerConfiguration.getInstance());
+    attributesBuilder.put("project_id", spannerConfiguration.getProject());
+    return attributesBuilder.build();
   }
 
   private ProxyServer startPGAdapter() {

@@ -24,8 +24,11 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
   private static final Logger LOG = LoggerFactory.getLogger(JdbcBenchmarkRunner.class);
 
   JdbcBenchmarkRunner(
-      Statistics statistics, String connectionUrl, TpccConfiguration tpccConfiguration) {
-    super(statistics, connectionUrl, tpccConfiguration);
+      Statistics statistics,
+      String connectionUrl,
+      TpccConfiguration tpccConfiguration,
+      Metrics metrics) {
+    super(statistics, connectionUrl, tpccConfiguration, metrics);
   }
 
   Object[] queryRow(

@@ -14,6 +14,7 @@
 package com.google.cloud.pgadapter.tpcc;
 
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
+import com.google.common.base.Stopwatch;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -21,6 +22,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Random;
@@ -40,13 +42,19 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
   private final TpccConfiguration tpccConfiguration;
 
+  private final Metrics metrics;
+
   private boolean failed;
 
   AbstractBenchmarkRunner(
-      Statistics statistics, String connectionUrl, TpccConfiguration tpccConfiguration) {
+      Statistics statistics,
+      String connectionUrl,
+      TpccConfiguration tpccConfiguration,
+      Metrics metrics) {
     this.statistics = statistics;
     this.connectionUrl = connectionUrl;
     this.tpccConfiguration = tpccConfiguration;
+    this.metrics = metrics;
   }
 
   @Override
@@ -104,7 +112,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
             LOG.warn("Transaction failed", exception);
             statistics.incFailed();
           }
-          statement.execute("rollback");
+          execute(statement, "rollback");
         }
       }
     }
@@ -152,7 +160,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     Object[] row;
-    statement.execute("begin transaction");
+    execute(statement, "begin transaction");
     row =
         queryRow(
             statement,
@@ -180,16 +188,19 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     long districtNextOrderId = (long) row[0];
     BigDecimal districtTax = (BigDecimal) row[1];
 
-    statement.execute(
+    execute(
+        statement,
         String.format(
             "UPDATE district " + "SET d_next_o_id = %d " + "WHERE d_id = %d AND w_id= %d",
             districtNextOrderId + 1L, districtId, warehouseId));
-    statement.execute(
+    execute(
+        statement,
         String.format(
             "INSERT INTO orders (o_id, d_id, w_id, c_id, o_entry_d, o_ol_cnt, o_all_local) "
                 + "VALUES (%d,%d,%d,%d,NOW(),%d,%d)",
             districtNextOrderId, districtId, warehouseId, customerId, orderLineCount, allLocal));
-    statement.execute(
+    execute(
+        statement,
         String.format(
             "INSERT INTO new_orders (o_id, c_id, d_id, w_id) " + "VALUES (%d,%d,%d,%d)",
             districtNextOrderId, customerId, districtId, warehouseId));
@@ -208,7 +219,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       } catch (RowNotFoundException ignore) {
         // TODO: Record deliberate rollback
         LOG.info("Rolling back new_order transaction");
-        statement.execute("rollback transaction");
+        execute(statement, "rollback transaction");
         return;
       }
       BigDecimal itemPrice = (BigDecimal) row[0];
@@ -240,7 +251,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         stockQuantity = stockQuantity - orderLineQuantity + 91;
       }
 
-      statement.execute(
+      execute(
+          statement,
           String.format(
               "UPDATE stock " + "SET s_quantity = %d " + "WHERE s_i_id = %d AND w_id= %d",
               stockQuantity, orderLineItemId, orderLineSupplyWarehouseId));
@@ -252,7 +264,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
               .multiply(itemPrice)
               .multiply(totalTax)
               .multiply(discountFactor);
-      statement.execute(
+      execute(
+          statement,
           String.format(
               "INSERT INTO order_line (o_id, c_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) "
                   + "VALUES (%d,%d,%d,%d,%d,%d,%d,%d,%s,'%s')",
@@ -269,7 +282,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     LOG.debug("Committing new_order transaction");
-    statement.execute("commit");
+    execute(statement, "commit");
   }
 
   private void payment(Statement statement) throws SQLException {
@@ -300,8 +313,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     }
 
-    statement.execute("begin transaction");
-    statement.execute(
+    execute(statement, "begin transaction");
+    execute(
+        statement,
         String.format(
             "UPDATE warehouse " + "SET w_ytd = w_ytd + %s " + "WHERE w_id = %d",
             amount, warehouseId));
@@ -320,7 +334,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     String warehouseZip = (String) row[4];
     String warehouseName = (String) row[5];
 
-    statement.execute(
+    execute(
+        statement,
         String.format(
             "UPDATE district " + "SET d_ytd = d_ytd + %s " + "WHERE w_id = %d AND d_id= %d",
             amount, warehouseId, districtId));
@@ -355,7 +370,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         nameCount++;
       }
       try (ResultSet resultSet =
-          statement.executeQuery(
+          executeQuery(
+              statement,
               String.format(
                   "SELECT c_id "
                       + "FROM customer "
@@ -421,7 +437,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         newCustomerData = newCustomerData.substring(0, 500);
       }
 
-      statement.execute(
+      execute(
+          statement,
           String.format(
               "UPDATE customer "
                   + "SET c_balance=%s, c_ytd_payment=%s, c_data='%s' "
@@ -433,14 +450,16 @@ abstract class AbstractBenchmarkRunner implements Runnable {
               customerDistrictId,
               customerId));
     } else {
-      statement.execute(
+      execute(
+          statement,
           String.format(
               "UPDATE customer "
                   + "SET c_balance=%s, c_ytd_payment=%s "
                   + "WHERE w_id = %d AND d_id=%d AND c_id=%d",
               balance, ytdPayment, customerWarehouseId, customerDistrictId, customerId));
     }
-    statement.execute(
+    execute(
+        statement,
         String.format(
             "INSERT INTO history (d_id, w_id, c_id, h_d_id,  h_w_id, h_date, h_amount, h_data) "
                 + "VALUES (%d,%d,%d,%d,%d,NOW(),%s,'%s')",
@@ -453,7 +472,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
             String.format("%10s %10s", warehouseName, districtName)));
 
     LOG.debug("Committing payment");
-    statement.execute("commit");
+    execute(statement, "commit");
   }
 
   private void orderStatus(Statement statement) throws SQLException {
@@ -475,9 +494,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     BigDecimal balance;
     String first, middle, last;
 
-    statement.execute("begin transaction");
+    execute(statement, "begin transaction");
     if (tpccConfiguration.isUseReadOnlyTransactions()) {
-      statement.execute("set transaction read only");
+      execute(statement, "set transaction read only");
     }
     if (byName) {
       row =
@@ -494,7 +513,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         nameCount++;
       }
       try (ResultSet resultSet =
-          statement.executeQuery(
+          executeQuery(
+              statement,
               String.format(
                   "SELECT c_balance, c_first, c_middle, c_id "
                       + "FROM customer WHERE w_id = %d AND d_id= %d AND c_last='%s' "
@@ -538,7 +558,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
             customerId);
     long orderId = (long) row[0];
     try (ResultSet resultSet =
-        statement.executeQuery(
+        executeQuery(
+            statement,
             String.format(
                 "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d "
                     + "FROM order_line "
@@ -554,7 +575,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     LOG.debug("Committing order_status");
-    statement.execute("commit");
+    execute(statement, "commit");
   }
 
   private void delivery(Statement statement) throws SQLException {
@@ -564,7 +585,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     long carrierId = Long.reverse(random.nextInt(10));
     Object[] row;
 
-    statement.execute("begin transaction");
+    execute(statement, "begin transaction");
     for (long district = 0L; district < tpccConfiguration.getDistrictsPerWarehouse(); district++) {
       long districtId = Long.reverse(district);
       row =
@@ -584,7 +605,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       if (row != null) {
         long newOrderId = (long) row[0];
         long customerId = (long) row[1];
-        statement.execute(
+        execute(
+            statement,
             String.format(
                 "DELETE "
                     + "FROM new_orders "
@@ -598,13 +620,15 @@ abstract class AbstractBenchmarkRunner implements Runnable {
                 districtId,
                 warehouseId);
         // long customerId = (long) row[0];
-        statement.execute(
+        execute(
+            statement,
             String.format(
                 "UPDATE orders "
                     + "SET o_carrier_id = %d "
                     + "WHERE o_id = %d AND c_id = %d AND d_id = %d AND w_id = %d",
                 carrierId, newOrderId, customerId, districtId, warehouseId));
-        statement.execute(
+        execute(
+            statement,
             String.format(
                 "UPDATE order_line "
                     + "SET ol_delivery_d = NOW() "
@@ -621,7 +645,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
                 districtId,
                 warehouseId);
         BigDecimal sumOrderLineAmount = (BigDecimal) row[0];
-        statement.execute(
+        execute(
+            statement,
             String.format(
                 "UPDATE customer "
                     + "SET c_balance = c_balance + %s, c_delivery_cnt = c_delivery_cnt + 1 "
@@ -631,7 +656,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     LOG.debug("Committing delivery");
-    statement.execute("commit");
+    execute(statement, "commit");
   }
 
   private void stockLevel(Statement statement) throws SQLException {
@@ -641,9 +666,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     long districtId = Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     int level = random.nextInt(10, 21);
 
-    statement.execute("begin transaction");
+    execute(statement, "begin transaction");
     if (tpccConfiguration.isUseReadOnlyTransactions()) {
-      statement.execute("set transaction read only");
+      execute(statement, "set transaction read only");
     }
     String stockLevelQueries = "case1";
     Object[] row;
@@ -657,7 +682,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     long nextOrderId = (long) row[0];
     // Only 'case1' is implemented.
     try (ResultSet resultSet =
-        statement.executeQuery(
+        executeQuery(
+            statement,
             String.format(
                 "SELECT COUNT(DISTINCT (s_i_id)) "
                     + "FROM order_line ol, stock s "
@@ -687,7 +713,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     LOG.debug("Committing stock_level");
-    statement.execute("commit");
+    execute(statement, "commit");
   }
 
   public boolean isFailed() {
@@ -708,33 +734,29 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
   private Object[] queryRow(Statement statement, String query, Object... parameters)
       throws SQLException {
-    return queryRow(QueryRowMode.REQUIRE_ONE, statement, query, parameters);
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    Object[] row = queryRow(QueryRowMode.REQUIRE_ONE, statement, query, parameters);
+    Duration executionDuration = stopwatch.elapsed();
+    metrics.recordLatency(executionDuration.toMillis());
+    return row;
   }
 
   abstract Object[] queryRow(
       QueryRowMode queryRowMode, Statement statement, String query, Object... parameters)
       throws SQLException;
 
-  // private Object[] queryRow(
-  //     QueryRowMode queryRowMode, Statement statement, String query, Object... parameters)
-  //     throws SQLException {
-  //   String sql = String.format(query, parameters);
-  //   try (ResultSet resultSet = statement.executeQuery(sql)) {
-  //     if (!resultSet.next()) {
-  //       if (queryRowMode == QueryRowMode.ALLOW_LESS_THAN_ONE) {
-  //         return null;
-  //       } else {
-  //         throw new RowNotFoundException(String.format("No results found for: %s", sql));
-  //       }
-  //     }
-  //     Object[] result = new Object[resultSet.getMetaData().getColumnCount()];
-  //     for (int i = 0; i < result.length; i++) {
-  //       result[i] = resultSet.getObject(i + 1);
-  //     }
-  //     if (queryRowMode != QueryRowMode.ALLOW_MORE_THAN_ONE && resultSet.next()) {
-  //       throw new SQLException(String.format("More than one result found for: %s", sql));
-  //     }
-  //     return result;
-  //   }
-  // }
+  private void execute(Statement statement, String dml) throws SQLException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    statement.execute(dml);
+    Duration executionDuration = stopwatch.elapsed();
+    metrics.recordLatency(executionDuration.toMillis());
+  }
+
+  private ResultSet executeQuery(Statement statement, String query) throws SQLException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    ResultSet result = statement.executeQuery(query);
+    Duration executionDuration = stopwatch.elapsed();
+    metrics.recordLatency(executionDuration.toMillis());
+    return result;
+  }
 }
