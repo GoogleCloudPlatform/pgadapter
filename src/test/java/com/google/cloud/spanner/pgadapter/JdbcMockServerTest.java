@@ -3288,7 +3288,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   //       type (jsonb is not one of the types that the JDBC driver will load
                   //       automatically).
                   final int jsonbColumnIndex = 6;
-                  final int jsonbArrayColumnIndex = 16;
+                  final int jsonbArrayColumnIndex = 17;
                   if (col == jsonbColumnIndex || col == jsonbArrayColumnIndex) {
                     resultSet.getString(col + 1);
                   } else {
