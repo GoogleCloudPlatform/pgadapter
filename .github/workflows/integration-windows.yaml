@@ -1,0 +1,43 @@
+on:
+  pull_request:
+  workflow_dispatch:
+name: integration-windows
+env:
+  GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
+  GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
+  GOOGLE_CLOUD_DATABASE: "testdb_integration"
+  GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
+  DOTNET_NOLOGO: true
+jobs:
+  check-env:
+    outputs:
+      has-key: ${{ steps.project-id.outputs.defined }}
+    runs-on: windows-latest
+    steps:
+      - id: project-id
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        if: "${{ env.GCP_PROJECT_ID != '' }}"
+        run: echo "defined=true" >> "$GITHUB_OUTPUT"
+  integration-test:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
+    timeout-minutes: 60
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+      - run: java -version
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - name: Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
+      - name: Run integration tests
+        run: mvn -Dit.test=ITNpgsqlTest verify -B -Dclirr.skip=true -DskipITs=false -DskipUnits=true -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
