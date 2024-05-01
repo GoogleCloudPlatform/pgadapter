@@ -100,6 +100,7 @@ public class JavaClientRunner extends AbstractRunner {
                     // do nothing, just keep the stream alive
                     System.out.println("Received heartbeat record");
                   }
+                  System.out.println("Finished reading change stream");
                 }
               });
         }
