@@ -40,4 +40,4 @@ jobs:
         with:
           credentials_json: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
       - name: Run integration tests
-        run: mvn -Dit.test=ITNpgsqlTest verify -B -Dclirr.skip=true -DskipITs=false -DskipUnits=true -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
+        run: mvn verify -B -Dclirr.skip=true -Dit.test=ITNpgsqlTest -DskipITs=false -DskipUnits=true -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
