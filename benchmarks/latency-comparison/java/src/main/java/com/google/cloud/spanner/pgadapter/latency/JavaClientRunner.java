@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
@@ -70,6 +71,7 @@ public class JavaClientRunner extends AbstractRunner {
                 BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(
                     useMultiplexedSessions, useRandomChannelHint));
     ExecutorService changeStreamExecutor = null;
+    CountDownLatch benchmarkFinished = new CountDownLatch(1);
     try (Spanner spanner = optionsBuilder.build().getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
       CountDownLatch start;
@@ -91,7 +93,7 @@ public class JavaClientRunner extends AbstractRunner {
                   System.out.println("Received first row");
                   start.countDown();
                   try {
-                    Thread.sleep(Long.MAX_VALUE);
+                    benchmarkFinished.await();
                   } catch (InterruptedException ignore) {
                   }
                 } finally {
@@ -115,8 +117,13 @@ public class JavaClientRunner extends AbstractRunner {
     } catch (Throwable t) {
       throw SpannerExceptionFactory.asSpannerException(t);
     } finally {
+      benchmarkFinished.countDown();
       if (changeStreamExecutor != null) {
-        changeStreamExecutor.shutdownNow();
+        changeStreamExecutor.shutdown();
+        try {
+          changeStreamExecutor.awaitTermination(60L, TimeUnit.SECONDS);
+        } catch (InterruptedException ignore) {
+        }
       }
     }
   }
