@@ -167,6 +167,7 @@ public class Converter implements AutoCloseable {
       case FLOAT64:
         return DoubleParser.convertToPG(result, position, format);
       case INT64:
+      case PG_OID:
         return LongParser.convertToPG(result, position, format);
       case PG_NUMERIC:
         return NumericParser.convertToPG(result, position, format);
