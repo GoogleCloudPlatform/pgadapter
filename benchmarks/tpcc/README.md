@@ -20,8 +20,7 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
    "
 ```
 
-
-Load data:
+### Load data
 
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
@@ -41,8 +40,11 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   "
 ```
 
+### Run benchmark
 
-Run benchmark:
+Currently, we support two options of benchmark runners: `pgadapter` and `spanner_jdbc`.
+
+Run with the default benchmark runner (PGAdapter with PG JDBC):
 
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
@@ -52,13 +54,33 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.load-data=false
   --tpcc.truncate-before-load=false
   --tpcc.run-benchmark=true
+  --tpcc.benchmark-runner=pgadapter
   --tpcc.use-read-only-transactions=true
   --tpcc.lock-scanned-ranges=false
   --spanner.project=appdev-soda-spanner-staging
   --spanner.instance=knut-test-ycsb
   --spanner.database=tpcc2
-  --pgadapter.enable-open-telemetry=true
-  --pgadatper.open-telemetry-sample-ratio=1.0
+  --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
+  --pgadapter.disable-internal-retries=true
+  "
+```
+
+Run with the benchmark runner (Spanner JDBC):
+
+```shell
+mvn spring-boot:run -Dspring-boot.run.arguments="
+  --tpcc.benchmark-duration=PT600s
+  --tpcc.warehouses=10
+  --tpcc.benchmark-threads=1
+  --tpcc.load-data=false
+  --tpcc.truncate-before-load=false
+  --tpcc.run-benchmark=true
+  --tpcc.benchmark-runner=spanner_jdbc
+  --tpcc.use-read-only-transactions=true
+  --tpcc.lock-scanned-ranges=false
+  --spanner.project=appdev-soda-spanner-staging
+  --spanner.instance=knut-test-ycsb
+  --spanner.database=tpcc2
   --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
   --pgadapter.disable-internal-retries=true
   "
