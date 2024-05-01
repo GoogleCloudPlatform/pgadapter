@@ -271,12 +271,6 @@ public class OptionsMetadata {
       return this;
     }
 
-    /** Enables OpenTelemetry metrics for PGAdapter. */
-    public Builder setEnableOpenTelemetryMetrics() {
-      this.enableOpenTelemetryMetrics = true;
-      return this;
-    }
-
     /**
      * PGAdapter by default only allows connections from localhost. Call this method to disable this
      * check. You should only allow connections from private networks, unless you are also using SSL
