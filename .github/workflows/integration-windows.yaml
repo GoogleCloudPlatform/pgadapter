@@ -8,20 +8,10 @@ env:
   GOOGLE_CLOUD_DATABASE: "testdb_integration"
   GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
   DOTNET_NOLOGO: true
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
 jobs:
-  check-env:
-    outputs:
-      has-key: ${{ steps.project-id.outputs.defined }}
-    runs-on: windows-latest
-    steps:
-      - id: project-id
-        env:
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-        if: "${{ env.GCP_PROJECT_ID != '' }}"
-        run: echo "defined=true" >> "$GITHUB_OUTPUT"
   integration-test:
-    needs: [check-env]
-    if: needs.check-env.outputs.has-key == 'true'
+    if: "${{ env.GCP_PROJECT_ID != '' }}"
     timeout-minutes: 60
     runs-on: windows-latest
     steps:
