@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -23,6 +24,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Stopwatch;
+import io.opentelemetry.sdk.internal.DaemonThreadFactory;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +39,7 @@ public class JavaClientRunner extends AbstractRunner {
   private final boolean useRandomChannelHint;
   private final boolean useVirtualThreads;
   private final int numChannels;
+  private final boolean readChangeStream;
   private long numNullValues;
   private long numNonNullValues;
 
@@ -45,12 +48,14 @@ public class JavaClientRunner extends AbstractRunner {
       boolean useMultiplexedSessions,
       boolean useRandomChannelHint,
       boolean useVirtualThreads,
-      int numChannels) {
+      int numChannels,
+      boolean readChangeStream) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
     this.useRandomChannelHint = useRandomChannelHint;
     this.useVirtualThreads = useVirtualThreads;
     this.numChannels = numChannels;
+    this.readChangeStream = readChangeStream;
   }
 
   @Override
@@ -64,8 +69,41 @@ public class JavaClientRunner extends AbstractRunner {
             .setSessionPoolOption(
                 BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(
                     useMultiplexedSessions, useRandomChannelHint));
+    ExecutorService changeStreamExecutor = null;
     try (Spanner spanner = optionsBuilder.build().getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
+      if (readChangeStream) {
+        changeStreamExecutor =
+            Executors.newFixedThreadPool(
+                numChannels, new DaemonThreadFactory("change-stream-reader"));
+        for (int i = 0; i < numChannels; i++) {
+          changeStreamExecutor.execute(
+              () -> {
+                try (ResultSet resultSet =
+                    databaseClient
+                        .singleUse()
+                        .executeQuery(
+                            Statement.newBuilder(
+                                    "select * from \"spanner\".\"read_json_latency_test_stream\"($1, $2, $3, $4, null)")
+                                .bind("p1")
+                                .to(Timestamp.now())
+                                .bind("p2")
+                                .to(
+                                    Timestamp.ofTimeSecondsAndNanos(
+                                        Timestamp.now().getSeconds() + 60 * 60 * 24, 0))
+                                .bind("p3")
+                                .to((String) null)
+                                .bind("p4")
+                                .to(10_000L)
+                                .build())) {
+                  while (resultSet.next()) {
+                    // do nothing, just keep the stream alive
+                    System.out.println("Received heartbeat record");
+                  }
+                }
+              });
+        }
+      }
 
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
       ExecutorService service = Executors.newFixedThreadPool(numClients);
@@ -77,6 +115,10 @@ public class JavaClientRunner extends AbstractRunner {
       return collectResults(service, results, numClients, numOperations);
     } catch (Throwable t) {
       throw SpannerExceptionFactory.asSpannerException(t);
+    } finally {
+      if (changeStreamExecutor != null) {
+        changeStreamExecutor.shutdownNow();
+      }
     }
   }
 
