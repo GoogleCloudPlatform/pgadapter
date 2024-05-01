@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
-import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -28,6 +27,7 @@ import io.opentelemetry.sdk.internal.DaemonThreadFactory;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -72,10 +72,11 @@ public class JavaClientRunner extends AbstractRunner {
     ExecutorService changeStreamExecutor = null;
     try (Spanner spanner = optionsBuilder.build().getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
+      CountDownLatch start;
       if (readChangeStream) {
+        start = new CountDownLatch(numChannels);
         changeStreamExecutor =
-            Executors.newFixedThreadPool(
-                numChannels, new DaemonThreadFactory("change-stream-reader"));
+            Executors.newFixedThreadPool(numChannels, new DaemonThreadFactory("stream-reader"));
         for (int i = 0; i < numChannels; i++) {
           changeStreamExecutor.execute(
               () -> {
@@ -83,29 +84,26 @@ public class JavaClientRunner extends AbstractRunner {
                     databaseClient
                         .singleUse()
                         .executeQuery(
-                            Statement.newBuilder(
-                                    "select * from \"spanner\".\"read_json_latency_test_stream\"($1, $2, $3, $4, null)")
-                                .bind("p1")
-                                .to(Timestamp.now())
-                                .bind("p2")
-                                .to(
-                                    Timestamp.ofTimeSecondsAndNanos(
-                                        Timestamp.now().getSeconds() + 60 * 60 * 24, 0))
-                                .bind("p3")
-                                .to((String) null)
-                                .bind("p4")
-                                .to(10_000L)
-                                .build())) {
-                  while (resultSet.next()) {
-                    // do nothing, just keep the stream alive
-                    System.out.println("Received heartbeat record");
+                            Statement.of(
+                                "select * from latency_test union all select * from latency_test union all select * from latency_test union all select * from latency_test union all select * from latency_test union all select * from latency_test"))) {
+                  resultSet.next();
+                  // do nothing, just keep the stream alive
+                  System.out.println("Received first row");
+                  start.countDown();
+                  try {
+                    Thread.sleep(Long.MAX_VALUE);
+                  } catch (InterruptedException ignore) {
                   }
-                  System.out.println("Finished reading change stream");
+                } finally {
+                  System.out.println("Finished reading stream");
                 }
               });
         }
+      } else {
+        start = new CountDownLatch(0);
       }
 
+      start.await();
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
       ExecutorService service = Executors.newFixedThreadPool(numClients);
       for (int client = 0; client < numClients; client++) {
