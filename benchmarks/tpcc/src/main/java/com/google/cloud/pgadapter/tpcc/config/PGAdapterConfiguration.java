@@ -39,6 +39,10 @@ public class PGAdapterConfiguration {
 
   private String connectionUrl;
 
+  private int minSessions = 100;
+
+  private int maxSessions = 400;
+
   public boolean isInProcess() {
     return inProcess;
   }
@@ -117,5 +121,21 @@ public class PGAdapterConfiguration {
 
   public void setConnectionUrl(String connectionUrl) {
     this.connectionUrl = connectionUrl;
+  }
+
+  public int getMinSessions() {
+    return minSessions;
+  }
+
+  public void setMinSessions(int minSessions) {
+    this.minSessions = minSessions;
+  }
+
+  public int getMaxSessions() {
+    return maxSessions;
+  }
+
+  public void setMaxSessions(int maxSessions) {
+    this.maxSessions = maxSessions;
   }
 }

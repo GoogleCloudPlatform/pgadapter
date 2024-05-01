@@ -34,4 +34,3 @@ samples/cloud-run/nodejs/**/.DS_Store
 src/test/ruby/**/Gemfile.lock
 samples/**/ruby/**/Gemfile.lock
 
-tpcc-log.log*.gz

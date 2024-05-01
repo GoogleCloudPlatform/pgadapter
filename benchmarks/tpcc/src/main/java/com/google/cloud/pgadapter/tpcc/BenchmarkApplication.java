@@ -116,8 +116,11 @@ public class BenchmarkApplication implements CommandLineRunner {
         System.out.printf("Finished loading %d rows\n", loadDataFuture.get());
       }
 
-      if (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.PGADAPTER_JDBC_RUNNER)
-          || tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.SPANNER_JDBC_RUNNER)) {
+      if (tpccConfiguration.isRunBenchmark()
+          && (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.PGADAPTER_JDBC_RUNNER)
+              || tpccConfiguration
+                  .getBenchmarkRunner()
+                  .equals(TpccConfiguration.SPANNER_JDBC_RUNNER))) {
         LOG.info("Starting benchmark");
         // Enable the OpenTelemetry metrics in the client library.
         OpenTelemetry openTelemetry = enableOpenTelemetryMetrics();
@@ -211,28 +214,13 @@ public class BenchmarkApplication implements CommandLineRunner {
             .setProject(spannerConfiguration.getProject())
             .setInstance(spannerConfiguration.getInstance())
             .setDatabase(spannerConfiguration.getDatabase())
-            // .setNumChannels(pgAdapterConfiguration.getNumChannels())
+            .setNumChannels(pgAdapterConfiguration.getNumChannels())
             .setSessionPoolOptions(
                 SessionPoolOptions.newBuilder()
                     .setTrackStackTraceOfSessionCheckout(false)
-                    // .setMinSessions(
-                    //     benchmarkConfiguration.getParallelism().stream()
-                    //         .max(Integer::compare)
-                    //         .orElse(100))
-                    .setMinSessions(100)
-                    // .setMaxSessions(
-                    //     benchmarkConfiguration.getParallelism().stream()
-                    //         .max(Integer::compare)
-                    //         .orElse(400))
-                    .setMaxSessions(800)
-                    // .setOptimizeSessionPoolFuture(
-                    //     spannerConfiguration.isOptimizeSessionPoolFuture())
-                    // .setOptimizeUnbalancedCheck(spannerConfiguration.isOptimizeUnbalancedCheck())
-                    // .setRandomizePositionTransactionsPerSecondThreshold(
-                    //
-                    // spannerConfiguration.getRandomizePositionTransactionsPerSecondThreshold())
+                    .setMinSessions(pgAdapterConfiguration.getMinSessions())
+                    .setMaxSessions(pgAdapterConfiguration.getMaxSessions())
                     .build())
-            // .setDisableVirtualThreads(!spannerConfiguration.isUseVirtualThreads())
             .disableUnixDomainSockets();
     if (pgAdapterConfiguration.isEnableOpenTelemetry()) {
       builder
