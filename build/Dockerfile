@@ -24,7 +24,7 @@ RUN mvn package -Passembly -DskipTests
 #                                   RELEASE                                    #
 ################################################################################
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:22-jre
 
 COPY --from=build target/pgadapter /home/pgadapter
 COPY --from=build LICENSE /home/pgadapter/
