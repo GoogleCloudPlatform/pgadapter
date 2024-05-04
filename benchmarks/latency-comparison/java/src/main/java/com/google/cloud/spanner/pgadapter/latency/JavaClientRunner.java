@@ -109,7 +109,7 @@ public class JavaClientRunner extends AbstractRunner {
             .setProjectId(project)
             .setCredentials(
                 GoogleCredentials.fromStream(
-                    Files.newInputStream(Paths.get("~/appdev-soda-spanner-staging.json"))))
+                    Files.newInputStream(Paths.get("/home/loite_google_com/appdev-soda-spanner-staging.json"))))
             .build();
     SpanExporter traceExporter = TraceExporter.createWithConfiguration(traceConfiguration);
 
