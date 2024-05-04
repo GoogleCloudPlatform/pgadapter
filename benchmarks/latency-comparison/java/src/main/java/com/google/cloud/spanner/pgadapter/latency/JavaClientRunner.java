@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
 import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
@@ -33,6 +34,8 @@ import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -101,7 +104,13 @@ public class JavaClientRunner extends AbstractRunner {
     SpannerOptions.enableOpenTelemetryTraces();
 
     TraceConfiguration.Builder traceConfigurationBuilder = TraceConfiguration.builder();
-    TraceConfiguration traceConfiguration = traceConfigurationBuilder.setProjectId(project).build();
+    TraceConfiguration traceConfiguration =
+        traceConfigurationBuilder
+            .setProjectId(project)
+            .setCredentials(
+                GoogleCredentials.fromStream(
+                    Files.newInputStream(Paths.get("~/appdev-soda-spanner-staging.json"))))
+            .build();
     SpanExporter traceExporter = TraceExporter.createWithConfiguration(traceConfiguration);
 
     return OpenTelemetrySdk.builder()
