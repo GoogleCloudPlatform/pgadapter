@@ -99,7 +99,6 @@ public class LatencyBenchmark {
     options.addOption("r", "random", false, "Use random channel hint.");
     options.addOption("v", "virtual", false, "Use virtual threads.");
     options.addOption("channels", "num_channels", true, "The number of gRPC channels to use.");
-    options.addOption("k", "keep-stream", false, "Keep a stream open for each channel.");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -176,8 +175,7 @@ public class LatencyBenchmark {
               commandLine.hasOption('m'),
               commandLine.hasOption('r'),
               commandLine.hasOption('v'),
-              numChannels,
-              commandLine.hasOption('k'));
+              numChannels);
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }

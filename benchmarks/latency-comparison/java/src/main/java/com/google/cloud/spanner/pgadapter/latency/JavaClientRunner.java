@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import com.google.cloud.opentelemetry.trace.TraceConfiguration;
+import com.google.cloud.opentelemetry.trace.TraceExporter;
 import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -23,16 +25,21 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Stopwatch;
-import io.opentelemetry.sdk.internal.DaemonThreadFactory;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 
 public class JavaClientRunner extends AbstractRunner {
   private final DatabaseId databaseId;
@@ -40,7 +47,7 @@ public class JavaClientRunner extends AbstractRunner {
   private final boolean useRandomChannelHint;
   private final boolean useVirtualThreads;
   private final int numChannels;
-  private final boolean readChangeStream;
+  private final OpenTelemetry openTelemetry;
   private long numNullValues;
   private long numNonNullValues;
 
@@ -49,14 +56,17 @@ public class JavaClientRunner extends AbstractRunner {
       boolean useMultiplexedSessions,
       boolean useRandomChannelHint,
       boolean useVirtualThreads,
-      int numChannels,
-      boolean readChangeStream) {
+      int numChannels) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
     this.useRandomChannelHint = useRandomChannelHint;
     this.useVirtualThreads = useVirtualThreads;
     this.numChannels = numChannels;
-    this.readChangeStream = readChangeStream;
+    try {
+      this.openTelemetry = getOpenTelemetry("appdev-soda-spanner-staging");
+    } catch (IOException ioException) {
+      throw SpannerExceptionFactory.asSpannerException(ioException);
+    }
   }
 
   @Override
@@ -67,45 +77,12 @@ public class JavaClientRunner extends AbstractRunner {
             .setProjectId(databaseId.getInstanceId().getProject())
             .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
             .setNumChannels(numChannels)
+            .setOpenTelemetry(this.openTelemetry)
             .setSessionPoolOption(
                 BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(
                     useMultiplexedSessions, useRandomChannelHint));
-    ExecutorService changeStreamExecutor = null;
-    CountDownLatch benchmarkFinished = new CountDownLatch(1);
     try (Spanner spanner = optionsBuilder.build().getService()) {
       DatabaseClient databaseClient = spanner.getDatabaseClient(databaseId);
-      CountDownLatch start;
-      if (readChangeStream) {
-        start = new CountDownLatch(numChannels);
-        changeStreamExecutor =
-            Executors.newFixedThreadPool(numChannels, new DaemonThreadFactory("stream-reader"));
-        for (int i = 0; i < numChannels; i++) {
-          changeStreamExecutor.execute(
-              () -> {
-                try (ResultSet resultSet =
-                    databaseClient
-                        .singleUse()
-                        .executeQuery(
-                            Statement.of(
-                                "select * from latency_test union all select * from latency_test union all select * from latency_test union all select * from latency_test union all select * from latency_test union all select * from latency_test"))) {
-                  resultSet.next();
-                  // do nothing, just keep the stream alive
-                  System.out.println("Received first row");
-                  start.countDown();
-                  try {
-                    benchmarkFinished.await();
-                  } catch (InterruptedException ignore) {
-                  }
-                } finally {
-                  System.out.println("Finished reading stream");
-                }
-              });
-        }
-      } else {
-        start = new CountDownLatch(0);
-      }
-
-      start.await();
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
       ExecutorService service = Executors.newFixedThreadPool(numClients);
       for (int client = 0; client < numClients; client++) {
@@ -116,16 +93,31 @@ public class JavaClientRunner extends AbstractRunner {
       return collectResults(service, results, numClients, numOperations);
     } catch (Throwable t) {
       throw SpannerExceptionFactory.asSpannerException(t);
-    } finally {
-      benchmarkFinished.countDown();
-      if (changeStreamExecutor != null) {
-        changeStreamExecutor.shutdown();
-        try {
-          changeStreamExecutor.awaitTermination(60L, TimeUnit.SECONDS);
-        } catch (InterruptedException ignore) {
-        }
-      }
     }
+  }
+
+  private OpenTelemetry getOpenTelemetry(String project) throws IOException {
+    // Enable OpenTelemetry tracing in Spanner.
+    SpannerOptions.enableOpenTelemetryTraces();
+
+    TraceConfiguration.Builder traceConfigurationBuilder = TraceConfiguration.builder();
+    TraceConfiguration traceConfiguration = traceConfigurationBuilder.setProjectId(project).build();
+    SpanExporter traceExporter = TraceExporter.createWithConfiguration(traceConfiguration);
+
+    return OpenTelemetrySdk.builder()
+        .setTracerProvider(
+            SdkTracerProvider.builder()
+                .setSampler(Sampler.traceIdRatioBased(0.05))
+                .setResource(
+                    Resource.builder()
+                        .put(
+                            "service.name",
+                            "spanner-client-latency-benchmark-"
+                                + ThreadLocalRandom.current().nextInt())
+                        .build())
+                .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build())
+                .build())
+        .buildAndRegisterGlobal();
   }
 
   private List<Duration> runBenchmark(
