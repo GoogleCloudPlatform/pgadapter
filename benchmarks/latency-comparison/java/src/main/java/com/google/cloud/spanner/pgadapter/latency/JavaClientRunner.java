@@ -26,6 +26,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Stopwatch;
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
@@ -105,6 +106,7 @@ public class JavaClientRunner extends AbstractRunner {
   private OpenTelemetry getOpenTelemetry(String project) throws IOException {
     // Enable OpenTelemetry tracing in Spanner.
     SpannerOptions.enableOpenTelemetryTraces();
+    GlobalOpenTelemetry.resetForTest();
 
     TraceConfiguration.Builder traceConfigurationBuilder = TraceConfiguration.builder();
     TraceConfiguration traceConfiguration =
@@ -113,7 +115,7 @@ public class JavaClientRunner extends AbstractRunner {
             .setCredentials(
                 GoogleCredentials.fromStream(
                     Files.newInputStream(
-                        Paths.get("/home/loite_google_com/appdev-soda-spanner-staging.json"))))
+                        Paths.get("/home/loite/appdev-soda-spanner-staging.json"))))
             .build();
     SpanExporter traceExporter = TraceExporter.createWithConfiguration(traceConfiguration);
 
