@@ -99,6 +99,7 @@ public class LatencyBenchmark {
     options.addOption("r", "random", false, "Use random channel hint.");
     options.addOption("v", "virtual", false, "Use virtual threads.");
     options.addOption("channels", "num_channels", true, "The number of gRPC channels to use.");
+    options.addOption("w", "warmup", true, "Run warmup iterations.");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -129,6 +130,7 @@ public class LatencyBenchmark {
         commandLine.hasOption("channels")
             ? Integer.parseInt(commandLine.getOptionValue("channels"))
             : 4;
+    int warmup = commandLine.hasOption('w') ? Integer.parseInt(commandLine.getOptionValue('w')) : 0;
     String name = commandLine.getOptionValue("name");
 
     System.out.println();
@@ -139,7 +141,9 @@ public class LatencyBenchmark {
     System.out.printf("Transaction type: %s\n", transactionType);
     System.out.printf("Wait between queries: %dms\n", waitMillis);
     System.out.printf("Multiplexed sessions: %s\n", commandLine.hasOption('m'));
-    System.out.printf("Random channel hint: %s\n", commandLine.hasOption('r'));
+    System.out.printf("Warmup iterations: %d\n", warmup);
+
+    GrpcWarmup.runWarmup(warmup);
 
     List<Duration> gapicResults = null;
     if (runGapic) {

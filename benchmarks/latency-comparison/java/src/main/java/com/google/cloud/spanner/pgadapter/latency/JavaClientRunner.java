@@ -100,6 +100,8 @@ public class JavaClientRunner extends AbstractRunner {
     }
   }
 
+  private static void warmup() {}
+
   private OpenTelemetry getOpenTelemetry(String project) throws IOException {
     // Enable OpenTelemetry tracing in Spanner.
     SpannerOptions.enableOpenTelemetryTraces();
