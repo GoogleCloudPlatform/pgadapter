@@ -14,12 +14,19 @@
 
 package com.google.cloud.spanner.pgadapter.latency;
 
+import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.BenchmarkSessionPoolOptionsHelper;
+import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.AbstractMockServerTest;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
-import com.google.common.base.Stopwatch;
 import com.google.common.io.ByteStreams;
 import com.google.spanner.v1.ResultSet;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.MethodDescriptor.Marshaller;
 import io.grpc.protobuf.ProtoUtils;
 import java.io.ByteArrayInputStream;
@@ -27,17 +34,23 @@ import java.io.InputStream;
 
 public class GrpcWarmup extends AbstractMockServerTest {
 
-  public static void runWarmup(int numIterations) {
+  public static void main(String[] args) {
+    runWarmup(50000, true);
+  }
+
+  public static void runWarmup(int numIterations, boolean useMultiplexedSessions) {
     try {
       startStaticServer();
-      runWarmupFunction(numIterations);
+      GrpcWarmup grpcWarmup = new GrpcWarmup();
+      // grpcWarmup.runWarmupFunction(numIterations);
+      grpcWarmup.runWarmupQueries(numIterations, useMultiplexedSessions);
       stopServer();
     } catch (Exception exception) {
       throw SpannerExceptionFactory.asSpannerException(exception);
     }
   }
 
-  private static void runWarmupFunction(int numIterations) throws Exception {
+  private void runWarmupFunction(int numIterations) throws Exception {
     RandomResultSetGenerator generator = new RandomResultSetGenerator(1);
     for (int i = 0; i < numIterations; i++) {
       com.google.spanner.v1.ResultSet resultSet = generator.generate();
@@ -46,11 +59,35 @@ public class GrpcWarmup extends AbstractMockServerTest {
       try (InputStream inputStream = marshaller.stream(resultSet)) {
         byte[] bytes = ByteStreams.toByteArray(inputStream);
 
-        Stopwatch watch = Stopwatch.createStarted();
         com.google.spanner.v1.ResultSet resultSet1 =
             marshaller.parse(new ByteArrayInputStream(bytes));
         if (!resultSet.equals(resultSet1)) {
           throw new IllegalStateException();
+        }
+      }
+    }
+  }
+
+  private void runWarmupQueries(int numIterations, boolean useMultiplexedSessions) {
+    RandomResultSetGenerator generator = new RandomResultSetGenerator(1);
+    try (Spanner spanner =
+        SpannerOptions.newBuilder()
+            .setHost("http://localhost:" + getPort())
+            .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+            .setCredentials(NoCredentials.getInstance())
+            .setSessionPoolOption(
+                BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(
+                    useMultiplexedSessions, false))
+            .build()
+            .getService()) {
+      DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));
+
+      for (int i = 0; i < numIterations; i++) {
+        mockSpanner.putStatementResult(
+            StatementResult.query(SELECT_RANDOM_STATEMENT, generator.generate()));
+        try (com.google.cloud.spanner.ResultSet resultSet =
+            client.singleUse().executeQuery(SELECT1_STATEMENT)) {
+          while (resultSet.next()) {}
         }
       }
     }

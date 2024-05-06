@@ -146,7 +146,7 @@ public class LatencyBenchmark {
     System.out.printf("Multiplexed sessions: %s\n", commandLine.hasOption('m'));
     System.out.printf("Warmup iterations: %d\n", warmup);
 
-    GrpcWarmup.runWarmup(warmup);
+    GrpcWarmup.runWarmup(warmup, commandLine.hasOption('m'));
 
     List<Duration> gapicResults = null;
     if (runGapic) {
