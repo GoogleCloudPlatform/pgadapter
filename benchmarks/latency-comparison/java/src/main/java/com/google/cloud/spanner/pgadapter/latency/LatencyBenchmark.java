@@ -99,7 +99,7 @@ public class LatencyBenchmark {
     options.addOption("r", "random", false, "Use random channel hint.");
     options.addOption("v", "virtual", false, "Use virtual threads.");
     options.addOption("channels", "num_channels", true, "The number of gRPC channels to use.");
-    options.addOption("w", "warmup", true, "Run warmup iterations.");
+    options.addOption("warmup", "warmup_iterations", true, "Run warmup iterations.");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -130,7 +130,10 @@ public class LatencyBenchmark {
         commandLine.hasOption("channels")
             ? Integer.parseInt(commandLine.getOptionValue("channels"))
             : 4;
-    int warmup = commandLine.hasOption('w') ? Integer.parseInt(commandLine.getOptionValue('w')) : 0;
+    int warmup =
+        commandLine.hasOption("warmup")
+            ? Integer.parseInt(commandLine.getOptionValue("warmup"))
+            : 0;
     String name = commandLine.getOptionValue("name");
 
     System.out.println();
