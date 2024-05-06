@@ -81,6 +81,7 @@ public class JavaClientRunner extends AbstractRunner {
             .setHost("https://staging-wrenchworks.sandbox.googleapis.com")
             .setNumChannels(numChannels)
             .setOpenTelemetry(this.openTelemetry)
+            .setEnableApiTracing(true)
             .setSessionPoolOption(
                 BenchmarkSessionPoolOptionsHelper.getSessionPoolOptions(
                     useMultiplexedSessions, useRandomChannelHint));
