@@ -21,14 +21,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.34.0</version>
+        <version>26.38.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.35.0</version>
+        <version>1.37.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -49,13 +49,13 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-jdbc</artifactId>
-      <version>2.15.0</version>
+      <version>2.17.0</version>
     </dependency>
     <!-- Add PGAdapter as a dependency, so we can start it in-process -->
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.31.2-SNAPSHOT</version>
+      <version>0.33.1-SNAPSHOT</version>
     </dependency>
     <dependency>
           <groupId>io.opentelemetry</groupId>
