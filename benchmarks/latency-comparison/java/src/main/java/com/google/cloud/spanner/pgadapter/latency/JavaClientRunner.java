@@ -118,7 +118,8 @@ public class JavaClientRunner extends AbstractRunner {
     return OpenTelemetrySdk.builder()
         .setTracerProvider(
             SdkTracerProvider.builder()
-                .setSampler(Sampler.traceIdRatioBased(0.05))
+                // .setSampler(Sampler.traceIdRatioBased(0.05))
+                .setSampler(Sampler.alwaysOn())
                 .setResource(
                     Resource.builder()
                         .put(
