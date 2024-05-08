@@ -60,14 +60,15 @@ public class JavaClientRunner extends AbstractRunner {
       boolean useMultiplexedSessions,
       boolean useRandomChannelHint,
       boolean useVirtualThreads,
-      int numChannels) {
+      int numChannels,
+      double traceRatio) {
     this.databaseId = databaseId;
     this.useMultiplexedSessions = useMultiplexedSessions;
     this.useRandomChannelHint = useRandomChannelHint;
     this.useVirtualThreads = useVirtualThreads;
     this.numChannels = numChannels;
     try {
-      this.openTelemetry = getOpenTelemetry("appdev-soda-spanner-staging");
+      this.openTelemetry = getOpenTelemetry("appdev-soda-spanner-staging", traceRatio);
     } catch (IOException ioException) {
       throw SpannerExceptionFactory.asSpannerException(ioException);
     }
@@ -103,7 +104,7 @@ public class JavaClientRunner extends AbstractRunner {
 
   private static void warmup() {}
 
-  private OpenTelemetry getOpenTelemetry(String project) throws IOException {
+  private OpenTelemetry getOpenTelemetry(String project, double traceRatio) throws IOException {
     // Enable OpenTelemetry tracing in Spanner.
     SpannerOptions.enableOpenTelemetryTraces();
     GlobalOpenTelemetry.resetForTest();
@@ -122,8 +123,7 @@ public class JavaClientRunner extends AbstractRunner {
     return OpenTelemetrySdk.builder()
         .setTracerProvider(
             SdkTracerProvider.builder()
-                // .setSampler(Sampler.traceIdRatioBased(0.05))
-                .setSampler(Sampler.alwaysOn())
+                .setSampler(Sampler.traceIdRatioBased(traceRatio))
                 .setResource(
                     Resource.builder()
                         .put(

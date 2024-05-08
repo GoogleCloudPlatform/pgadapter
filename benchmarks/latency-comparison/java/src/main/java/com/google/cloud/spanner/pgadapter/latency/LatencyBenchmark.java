@@ -100,6 +100,7 @@ public class LatencyBenchmark {
     options.addOption("v", "virtual", false, "Use virtual threads.");
     options.addOption("channels", "num_channels", true, "The number of gRPC channels to use.");
     options.addOption("warmup", "warmup_iterations", true, "Run warmup iterations.");
+    options.addOption("trace", "trace_ratio", true, "Trace ratio for OpenTelemetry");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -134,6 +135,10 @@ public class LatencyBenchmark {
         commandLine.hasOption("warmup")
             ? Integer.parseInt(commandLine.getOptionValue("warmup"))
             : 0;
+    double traceRatio =
+        commandLine.hasOption("trace")
+            ? Double.parseDouble(commandLine.getOptionValue("trace"))
+            : 0.05;
     String name = commandLine.getOptionValue("name");
 
     System.out.println();
@@ -184,7 +189,8 @@ public class LatencyBenchmark {
               commandLine.hasOption('m'),
               commandLine.hasOption('r'),
               commandLine.hasOption('v'),
-              numChannels);
+              numChannels,
+              traceRatio);
       javaClientResults =
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }
