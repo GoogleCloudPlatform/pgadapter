@@ -118,6 +118,7 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
         // Then send a random message with no meaning and drop the connection.
         outputStream.writeInt(20);
         outputStream.writeChar(' ');
+        outputStream.writeBytes("lkjbanslkwejr092jgasnlkfdbnvo4witwnaognasvbo");
         outputStream.flush();
 
         // Read until the end of the stream. The stream should be closed by the backend.
@@ -230,10 +231,17 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
         // an implicit read/write transaction, as we do not know what type of statement might follow
         // after the flush.
         assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-        ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
-        assertTrue(request.getTransaction().hasSingleUse());
-        assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+        if (pgServer instanceof NonBlockingProxyServer) {
+          assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+          ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+          assertTrue(request.getTransaction().hasBegin());
+          assertTrue(request.getTransaction().getBegin().hasReadWrite());
+        } else {
+          assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+          ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+          assertTrue(request.getTransaction().hasSingleUse());
+          assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+        }
       }
     }
   }

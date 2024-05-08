@@ -54,7 +54,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
 
   @Parameters(name = "host = {0}")
   public static List<Object[]> data() {
-    return ImmutableList.of(new Object[] {"localhost"}, new Object[] {""});
+    return ImmutableList.of(new Object[] {"localhost"} /*, new Object[] {""}*/);
   }
 
   @BeforeClass

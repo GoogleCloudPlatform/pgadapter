@@ -262,6 +262,8 @@ public class SessionState {
 
   private void clearCachedValues() {
     cachedZoneId = null;
+    cachedIsReplacePgCatalogTables = null;
+    cachedLogSlowStatementThreshold = null;
   }
 
   /** Returns the current value of the specified setting. */
@@ -433,8 +435,17 @@ public class SessionState {
     return getBoolSetting("spanner", "replace_for_update", true);
   }
 
+  private Boolean cachedIsReplacePgCatalogTables;
+
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
   public boolean isReplacePgCatalogTables() {
+    if (cachedIsReplacePgCatalogTables == null) {
+      return cachedIsReplacePgCatalogTables = internalIsReplacePgCatalogTables();
+    }
+    return cachedIsReplacePgCatalogTables;
+  }
+
+  private boolean internalIsReplacePgCatalogTables() {
     PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);
     if (setting == null) {
       return true;
@@ -475,8 +486,17 @@ public class SessionState {
         () -> DdlTransactionMode.valueOf(setting.getBootVal()));
   }
 
+  private Duration cachedLogSlowStatementThreshold;
+
   /** Returns the threshold for when a query should be considered slow and should be logged. */
   public Duration getLogSlowStatementThreshold() {
+    if (cachedLogSlowStatementThreshold == null) {
+      cachedLogSlowStatementThreshold = internalGetLogSlowStatementThreshold();
+    }
+    return cachedLogSlowStatementThreshold;
+  }
+
+  private Duration internalGetLogSlowStatementThreshold() {
     PGSetting setting = internalGet(toKey("spanner", "log_slow_statement_threshold"), false);
     if (setting == null) {
       return Duration.ofSeconds(120L);

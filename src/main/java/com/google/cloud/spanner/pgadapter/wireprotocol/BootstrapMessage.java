@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -47,9 +48,9 @@ public abstract class BootstrapMessage extends WireMessage {
    *
    * @param connection The connection handler object setup with the ability to send/receive.
    * @return The constructed wire message given the input message.
-   * @throws Exception If construction or reading fails.
+   * @throws IOException If construction or reading fails.
    */
-  public static BootstrapMessage create(ConnectionHandler connection) throws Exception {
+  public static BootstrapMessage create(ConnectionHandler connection) throws IOException {
     int length = connection.getConnectionMetadata().getInputStream().readInt();
     int protocol = connection.getConnectionMetadata().getInputStream().readInt();
     switch (protocol) {

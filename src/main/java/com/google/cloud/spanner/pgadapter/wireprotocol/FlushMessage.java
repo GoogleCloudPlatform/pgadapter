@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -27,7 +28,7 @@ public class FlushMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'H';
 
-  public FlushMessage(ConnectionHandler connection) throws Exception {
+  public FlushMessage(ConnectionHandler connection) throws IOException {
     super(connection);
   }
 

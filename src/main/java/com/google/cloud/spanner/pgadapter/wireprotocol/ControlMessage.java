@@ -113,13 +113,13 @@ public abstract class ControlMessage extends WireMessage {
    *
    * @param connection The connection handler object setup with the ability to send/receive.
    * @return The constructed wire message given the input message.
-   * @throws Exception If construction or reading fails.
+   * @throws IOException If construction or reading fails.
    */
-  public static ControlMessage create(ConnectionHandler connection) throws Exception {
+  public static ControlMessage create(ConnectionHandler connection) throws IOException {
     boolean validMessage = true;
     char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
     try {
-      if (connection.getStatus() == ConnectionStatus.COPY_IN) {
+      /*if (connection.getStatus() == ConnectionStatus.COPY_IN) {
         switch (nextMsg) {
           case CopyDoneMessage.IDENTIFIER:
             return new CopyDoneMessage(connection);
@@ -141,6 +141,13 @@ public abstract class ControlMessage extends WireMessage {
                 String.format(
                     "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: '%c'",
                     nextMsg));
+        }
+      } else*/ if (connection.getStatus() == ConnectionStatus.AUTHENTICATING) {
+        switch (nextMsg) {
+          case PasswordMessage.IDENTIFIER:
+            return new PasswordMessage(connection, connection.getConnectionParameters());
+          default:
+            throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
         }
       } else {
         switch (nextMsg) {
@@ -165,15 +172,25 @@ public abstract class ControlMessage extends WireMessage {
           case SyncMessage.IDENTIFIER:
             return new SyncMessage(connection);
           case CopyDoneMessage.IDENTIFIER:
+            return new CopyDoneMessage(connection);
           case CopyDataMessage.IDENTIFIER:
+            return new CopyDataMessage(connection);
           case CopyFailMessage.IDENTIFIER:
-            // Silently skip COPY messages in non-COPY mode. This is consistent with the PG wire
-            // protocol. If we continue to receive COPY messages while in non-COPY mode, we'll
-            // terminate the connection to prevent the server from being flooded with invalid
-            // messages.
-            validMessage = false;
-            // Note: The stream itself is still valid as we received a message that we recognized.
-            return SkipMessage.createForValidStream(connection);
+            return new CopyFailMessage(connection);
+            //          case CopyDoneMessage.IDENTIFIER:
+            //          case CopyDataMessage.IDENTIFIER:
+            //          case CopyFailMessage.IDENTIFIER:
+            //            // Silently skip COPY messages in non-COPY mode. This is consistent with
+            // the PG wire
+            //            // protocol. If we continue to receive COPY messages while in non-COPY
+            // mode, we'll
+            //            // terminate the connection to prevent the server from being flooded with
+            // invalid
+            //            // messages.
+            //            validMessage = false;
+            //            // Note: The stream itself is still valid as we received a message that we
+            // recognized.
+            //            return SkipMessage.createForValidStream(connection);
           default:
             throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
         }
@@ -205,9 +222,9 @@ public abstract class ControlMessage extends WireMessage {
    *
    * @param input The data stream containing the user request.
    * @return A list of format codes.
-   * @throws Exception If reading fails in any way.
+   * @throws IOException If reading fails in any way.
    */
-  protected static List<Short> getFormatCodes(DataInputStream input) throws Exception {
+  protected static List<Short> getFormatCodes(DataInputStream input) throws IOException {
     List<Short> formatCodes = new ArrayList<>();
     short numberOfFormatCodes = input.readShort();
     for (int i = 0; i < numberOfFormatCodes; i++) {
@@ -552,6 +569,8 @@ public abstract class ControlMessage extends WireMessage {
           }
         }
         return rows;
+      } catch (InterruptedException interruptedException) {
+        throw PGExceptionFactory.newQueryCancelledException();
       } finally {
         if (converter != null) {
           converter.close();

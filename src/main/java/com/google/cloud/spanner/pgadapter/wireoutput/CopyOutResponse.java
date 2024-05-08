@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse.calcu
 
 import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
@@ -38,7 +39,7 @@ public class CopyOutResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  protected void sendPayload() throws IOException {
     this.outputStream.writeByte(this.formatCode);
     this.outputStream.writeShort(this.numColumns);
     for (int i = 0; i < columnFormat.length; i++) {

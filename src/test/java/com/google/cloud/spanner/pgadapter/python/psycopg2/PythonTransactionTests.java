@@ -22,7 +22,6 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ByteString;
@@ -542,10 +541,6 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
         ((ExecuteSqlRequest) (requests.get(6))).getTransaction().getId();
 
     assertEquals(transactionIdForRequest6, transactionIdForRequest5);
-
-    for (WireMessage wm : getWireMessagesOfType(QueryMessage.class)) {
-      System.out.println(wm);
-    }
   }
 
   @Test

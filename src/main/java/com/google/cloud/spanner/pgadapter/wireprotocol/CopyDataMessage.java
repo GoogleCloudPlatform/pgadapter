@@ -19,6 +19,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -33,9 +34,9 @@ public class CopyDataMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'd';
 
   private final byte[] payload;
-  private final CopyStatement statement;
+  private CopyStatement statement;
 
-  public CopyDataMessage(ConnectionHandler connection) throws Exception {
+  public CopyDataMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     // Payload byte array excluding 4 bytes containing the length of message itself
     int dataLength = this.length - 4;
@@ -47,10 +48,14 @@ public class CopyDataMessage extends ControlMessage {
   @Override
   protected void sendPayload() throws Exception {
     if (statement == null) {
-      // Do not handle this message if there is no CopyStatement available anymore. This means that
-      // the copy operation failed and stopped while the client was still sending data to the
-      // server.
-      return;
+      this.statement = connection.getActiveCopyStatement();
+      if (this.statement == null) {
+        // Do not handle this message if there is no CopyStatement available anymore. This means
+        // that
+        // the copy operation failed and stopped while the client was still sending data to the
+        // server.
+        return;
+      }
     }
     // If backend error occurred during copy-in mode, drop any subsequent CopyData messages.
     MutationWriter mutationWriter = this.statement.getMutationWriter();

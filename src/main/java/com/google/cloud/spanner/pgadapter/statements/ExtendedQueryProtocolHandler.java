@@ -160,7 +160,7 @@ public class ExtendedQueryProtocolHandler {
   public void flush() throws Exception {
     addEvent("Received Flush");
     logger.log(Level.FINER, Logging.format("Flush", Action.Starting));
-    if (isExtendedProtocol()) {
+    if (connectionHandler.supportsPeekNextByte() && isExtendedProtocol()) {
       // Wait at most 2 milliseconds for the next message to arrive. The method will just return 0
       // if no message could be found in the buffer within this timeframe.
       char nextMessage = connectionHandler.getConnectionMetadata().peekNextByte(2L);

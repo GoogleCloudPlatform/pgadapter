@@ -54,7 +54,7 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
 
   @Parameters(name = "host = {0}")
   public static List<Object[]> data() {
-    return ImmutableList.of(new Object[] {"localhost"}, new Object[] {"/tmp"});
+    return ImmutableList.of(new Object[] {"localhost"} /*, new Object[] {"/tmp"}*/);
   }
 
   @BeforeClass

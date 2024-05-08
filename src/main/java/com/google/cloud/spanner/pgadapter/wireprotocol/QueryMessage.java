@@ -19,6 +19,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.SimpleQueryStatement;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Executes a simple statement. */
@@ -47,7 +48,7 @@ public class QueryMessage extends ControlMessage {
   private final Statement originalStatement;
   private final SimpleQueryStatement simpleQueryStatement;
 
-  public QueryMessage(ConnectionHandler connection) throws Exception {
+  public QueryMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     connection.getExtendedQueryProtocolHandler().maybeStartSpan(true);
     this.originalStatement = Statement.of(this.readAll());

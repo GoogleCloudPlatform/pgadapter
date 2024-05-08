@@ -31,6 +31,8 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.admin.database.v1.MockDatabaseAdminImpl;
 import com.google.cloud.spanner.admin.instance.v1.MockInstanceAdminImpl;
 import com.google.cloud.spanner.connection.SpannerPool;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.metadata.TestOptionsMetadataBuilder;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
@@ -1203,7 +1205,11 @@ public abstract class AbstractMockServerTest {
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
         .setCredentials(NoCredentials.getInstance());
     optionsConfigurator.accept(builder);
-    pgServer = new ProxyServer(builder.build(), openTelemetry);
+    OptionsMetadata options = builder.build();
+    pgServer =
+        options.getSslMode() == SslMode.Disable
+            ? new NonBlockingProxyServer(options, openTelemetry)
+            : new ProxyServer(options, openTelemetry);
     pgServer.startServer();
   }
 

@@ -366,7 +366,11 @@ public class OptionsMetadataTest {
             .build()
             .getSessionPoolOptions());
     assertEquals(
-        SessionPoolOptions.newBuilder().setMinSessions(500).setMaxSessions(1000).build(),
+        SessionPoolOptions.newBuilder()
+            .setMinSessions(500)
+            .setMaxSessions(1000)
+            .setTrackStackTraceOfSessionCheckout(false)
+            .build(),
         OptionsMetadata.newBuilder()
             .setSessionPoolOptions(
                 SessionPoolOptions.newBuilder().setMinSessions(500).setMaxSessions(1000).build())

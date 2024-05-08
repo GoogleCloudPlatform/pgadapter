@@ -77,7 +77,7 @@ public class ProxyServer extends AbstractApiService {
    */
   private final List<ServerSocket> serverSockets = Collections.synchronizedList(new LinkedList<>());
 
-  private int localPort;
+  protected int localPort;
 
   /** The server will keep track of all messages it receives if it started in DEBUG mode. */
   private static final int MAX_DEBUG_MESSAGES = 100_000;
@@ -86,7 +86,7 @@ public class ProxyServer extends AbstractApiService {
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
-  private final ThreadFactory threadFactory;
+  protected final ThreadFactory threadFactory;
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -358,7 +358,7 @@ public class ProxyServer extends AbstractApiService {
    *
    * @param handler The handler currently in use.
    */
-  private void register(ConnectionHandler handler) {
+  public void register(ConnectionHandler handler) {
     this.handlers.add(handler);
   }
 
@@ -377,6 +377,10 @@ public class ProxyServer extends AbstractApiService {
 
   public OpenTelemetry getOpenTelemetry() {
     return this.openTelemetry;
+  }
+
+  public ThreadFactory getThreadFactory() {
+    return this.threadFactory;
   }
 
   public Tracer getTracer(String name, String version) {

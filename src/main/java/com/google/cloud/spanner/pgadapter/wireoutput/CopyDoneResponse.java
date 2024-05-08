@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
+import java.io.IOException;
 
 @InternalApi
 public class CopyDoneResponse extends WireOutput {
@@ -25,7 +26,7 @@ public class CopyDoneResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {}
+  protected void sendPayload() throws IOException {}
 
   @Override
   public byte getIdentifier() {

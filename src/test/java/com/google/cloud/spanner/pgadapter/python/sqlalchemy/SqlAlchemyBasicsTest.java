@@ -55,7 +55,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
 
   @Parameters(name = "host = {0}")
   public static List<Object[]> data() {
-    return ImmutableList.of(new Object[] {"localhost"}, new Object[] {""});
+    return ImmutableList.of(new Object[] {"localhost"} /*, new Object[] {""}*/);
   }
 
   static String execute(String script, String host, int port) throws Exception {

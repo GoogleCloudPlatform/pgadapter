@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -29,15 +30,18 @@ import java.text.MessageFormat;
 @InternalApi
 public class CopyDoneMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'c';
-  private final CopyStatement statement;
+  private CopyStatement statement;
 
-  public CopyDoneMessage(ConnectionHandler connection) throws Exception {
+  public CopyDoneMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.statement = connection.getActiveCopyStatement();
   }
 
   @Override
   protected void sendPayload() throws Exception {
+    if (this.statement == null) {
+      this.statement = this.connection.getActiveCopyStatement();
+    }
     // If backend error occurred during copy-in mode, drop any subsequent CopyDone messages.
     if (this.statement != null && !this.statement.hasException()) {
       statement.getMutationWriter().commit();
