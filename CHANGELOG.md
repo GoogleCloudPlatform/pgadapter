@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.33.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.33.0...v0.33.1) (2024-05-10)
+
+
+### Dependencies
+
+* update dependency testcontainers to v4 ([#1700](https://github.com/GoogleCloudPlatform/pgadapter/issues/1700)) ([e6f305a](https://github.com/GoogleCloudPlatform/pgadapter/commit/e6f305a57c5b57e8190b5f653168f8449f8a6f65))
+* update eclipse-temurin docker tag to v22 ([#1701](https://github.com/GoogleCloudPlatform/pgadapter/issues/1701)) ([bfa3ed3](https://github.com/GoogleCloudPlatform/pgadapter/commit/bfa3ed3fd8b99cb07bc6c4370cdcd44bbb7e55cd))
+* update gcr.io/google.com/cloudsdktool/google-cloud-cli docker tag to v474 ([#1702](https://github.com/GoogleCloudPlatform/pgadapter/issues/1702)) ([1351a6c](https://github.com/GoogleCloudPlatform/pgadapter/commit/1351a6cb7517a55c1802da444f24e242d71d0517))
+* update module github.com/docker/docker to v26 ([#1703](https://github.com/GoogleCloudPlatform/pgadapter/issues/1703)) ([2839f6f](https://github.com/GoogleCloudPlatform/pgadapter/commit/2839f6feb133cafc799e3118aa51192ddcc7b480))
+
 ## [0.33.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.32.0...v0.33.0) (2024-05-01)
 
 
