@@ -31,6 +31,8 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.ImagePullPolicy;
+import org.testcontainers.images.PullPolicy;
 import org.testcontainers.utility.DockerImageName;
 
 /**
@@ -233,6 +235,7 @@ public class SampleApplication {
             DockerImageName.parse("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator"));
     container.addExposedPort(5432);
     container.setWaitStrategy(Wait.forListeningPorts(5432));
+    container.withImagePullPolicy(PullPolicy.alwaysPull());
     container.start();
 
     return new PGAdapterWithEmulator(container);
