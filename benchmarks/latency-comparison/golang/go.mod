@@ -7,7 +7,7 @@ toolchain go1.22.2
 require (
 	cloud.google.com/go/spanner v1.61.0
 	github.com/docker/docker v26.1.1+incompatible
-	github.com/jackc/pgx/v4 v4.12.1-0.20210724153913-640aa07df17c
+	github.com/jackc/pgx/v5 v5.5.5
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/montanaflynn/stats v0.7.0
 	github.com/testcontainers/testcontainers-go v0.30.0
