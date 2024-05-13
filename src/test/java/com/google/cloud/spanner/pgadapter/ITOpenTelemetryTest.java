@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.ITJdbcMetadataTest.getDdlStatem
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.api.gax.rpc.ResourceExhaustedException;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -25,6 +26,7 @@ import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.trace.v1.TraceServiceClient;
 import com.google.cloud.trace.v1.TraceServiceClient.ListTracesPagedResponse;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.devtools.cloudtrace.v1.ListTracesRequest;
@@ -54,6 +56,9 @@ public class ITOpenTelemetryTest implements IntegrationTest {
   @BeforeClass
   public static void setup() throws IOException {
     IntegrationTest.skipOnEmulator("This test requires credentials");
+    assumeTrue(
+        Strings.isNullOrEmpty(testEnv.getSpannerUrl())
+            || testEnv.getSpannerUrl().contains("spanner.googleapis.com"));
 
     OptionsMetadata.Builder openTelemetryOptionsBuilder =
         OptionsMetadata.newBuilder()
