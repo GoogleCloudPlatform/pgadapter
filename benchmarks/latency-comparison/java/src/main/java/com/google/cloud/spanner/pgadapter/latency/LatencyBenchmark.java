@@ -83,6 +83,8 @@ public class LatencyBenchmark {
         "transaction",
         true,
         "The type of transaction to execute. Must be either READ_ONLY or READ_WRITE. Defaults to READ_ONLY.");
+    options.addOption("host", true, "PGAdapter host");
+    options.addOption("port", true, "PGAdapter port");
     options.addOption("skip_pg", false, "Skip PostgreSQL JDBC benchmarks.");
     options.addOption("skip_jdbc", false, "Skip Cloud Spanner JDBC benchmarks.");
     options.addOption("skip_spanner", false, "Skip Cloud Spanner client library benchmarks.");
@@ -114,6 +116,9 @@ public class LatencyBenchmark {
         commandLine.hasOption('t')
             ? TransactionType.valueOf(commandLine.getOptionValue('t').toUpperCase(Locale.ENGLISH))
             : TransactionType.READ_ONLY;
+    String host = commandLine.hasOption("host") ? commandLine.getOptionValue("host") : null;
+    Integer port =
+        commandLine.hasOption("port") ? Integer.parseInt(commandLine.getOptionValue("port")) : null;
     boolean runPg = !commandLine.hasOption("skip_pg");
     boolean runJdbc = !commandLine.hasOption("skip_jdbc");
     boolean runSpanner = !commandLine.hasOption("skip_spanner");
@@ -131,7 +136,7 @@ public class LatencyBenchmark {
     if (runPg) {
       System.out.println();
       System.out.println("Running benchmark for PostgreSQL JDBC driver");
-      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
+      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, host, port);
       pgJdbcResults = pgJdbcRunner.execute(transactionType, clients, operations, waitMillis);
     }
 

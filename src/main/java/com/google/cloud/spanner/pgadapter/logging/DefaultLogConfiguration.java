@@ -23,6 +23,8 @@ public class DefaultLogConfiguration {
 
   public static void configureLogging(String[] args) throws IOException {
     if (shouldUseDefaultLogging(args)) {
+      StdoutHandler stdoutHandler = new StdoutHandler();
+      StderrHandler stderrHandler = new StderrHandler();
       LogManager.getLogManager()
           .readConfiguration(
               DefaultLogConfiguration.class
