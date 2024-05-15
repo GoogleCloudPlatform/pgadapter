@@ -1,7 +1,4 @@
 on:
-  push:
-    branches:
-      - postgresql-dialect
   pull_request:
   schedule:
     # Run at 04:52UTC every day. This run will use preprod-spanner.sandbox.googleapis.com
