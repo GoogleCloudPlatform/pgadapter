@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.google.api.gax.rpc.PermissionDeniedException;
 import com.google.api.gax.rpc.ResourceExhaustedException;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.Database;
@@ -118,6 +119,8 @@ public class ITOpenTelemetryTest implements IntegrationTest {
         }
       }
       assertTrue(foundTrace);
+    } catch (PermissionDeniedException permissionDeniedException) {
+      // ignore, as the permissions to query Cloud Tracing is being removed automatically.
     } catch (ResourceExhaustedException resourceExhaustedException) {
       if (resourceExhaustedException
           .getMessage()
