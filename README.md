@@ -41,6 +41,8 @@ PGAdapter can be used with the following frameworks and tools:
    carefully for how to set up ActiveRecord to work with PGAdapter.
 1. `Knex.js` query builder can be used with PGAdapter. See [Knex.js sample application](samples/nodejs/knex)
    for a sample application.
+1. `Sequelize.js` ORM can be used with PGAdapter. See [Sequelize.js sample application](samples/nodejs/sequelize)
+   for a sample application.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.

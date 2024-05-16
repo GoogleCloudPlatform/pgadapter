@@ -30,6 +30,7 @@ samples/nodejs/**/.DS_Store
 samples/cloud-run/nodejs/**/node_modules
 samples/cloud-run/nodejs/**/package-lock.json
 samples/cloud-run/nodejs/**/.DS_Store
+samples/nodejs/sequelize/**/*.js
 
 src/test/ruby/**/Gemfile.lock
 samples/**/ruby/**/Gemfile.lock
