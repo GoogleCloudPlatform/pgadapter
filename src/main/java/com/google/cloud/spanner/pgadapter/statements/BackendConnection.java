@@ -977,8 +977,7 @@ public class BackendConnection {
 
   public ListenableFuture<StatementResult> analyze(
       String command, ParsedStatement parsedStatement, Statement statement) {
-    Execute execute =
-        new Execute(command, parsedStatement, statement, Function.identity(), true);
+    Execute execute = new Execute(command, parsedStatement, statement, Function.identity(), true);
     bufferedStatements.add(execute);
     return execute.result;
   }
