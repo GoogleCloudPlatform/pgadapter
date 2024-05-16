@@ -261,9 +261,8 @@ public class BackendConnection {
         String command,
         ParsedStatement parsedStatement,
         Statement statement,
-        Function<Statement, Statement> statementBinder,
-        DatabaseId databaseId) {
-      this(command, parsedStatement, statement, statementBinder, databaseId, false);
+        Function<Statement, Statement> statementBinder) {
+      this(command, parsedStatement, statement, statementBinder, false);
     }
 
     Execute(
@@ -271,7 +270,6 @@ public class BackendConnection {
         ParsedStatement parsedStatement,
         Statement statement,
         Function<Statement, Statement> statementBinder,
-        DatabaseId databaseId,
         boolean analyze) {
       super(parsedStatement, statement);
       this.command = command;
@@ -972,7 +970,7 @@ public class BackendConnection {
       ParsedStatement parsedStatement,
       Statement statement,
       Function<Statement, Statement> statementBinder) {
-    Execute execute = new Execute(command, parsedStatement, statement, statementBinder, databaseId);
+    Execute execute = new Execute(command, parsedStatement, statement, statementBinder);
     bufferedStatements.add(execute);
     return execute.result;
   }
@@ -980,7 +978,7 @@ public class BackendConnection {
   public ListenableFuture<StatementResult> analyze(
       String command, ParsedStatement parsedStatement, Statement statement) {
     Execute execute =
-        new Execute(command, parsedStatement, statement, Function.identity(), databaseId, true);
+        new Execute(command, parsedStatement, statement, Function.identity(), true);
     bufferedStatements.add(execute);
     return execute.result;
   }

@@ -76,12 +76,11 @@ public class BenchmarkApplication implements CommandLineRunner {
   @Override
   public void run(String... args) throws Exception {
     ProxyServer server = pgAdapterConfiguration.isInProcess() ? startPGAdapter() : null;
-    String pgadapterConnectionUrl =
-        server == null
-            ? pgAdapterConfiguration.getConnectionUrl()
-            : String.format(
-                "jdbc:postgresql://localhost:%d/tpcc?preferQueryMode=simple",
-                server.getLocalPort());
+    String pgadapterConnectionUrl = server == null
+        ? pgAdapterConfiguration.getConnectionUrl()
+        : String.format(
+            "jdbc:postgresql://localhost:%d/tpcc",
+            server.getLocalPort());
     String spannerConnectionUrl =
         String.format(
             "jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s?numChannels=%d;minSessions=%d;maxSessions=%d"

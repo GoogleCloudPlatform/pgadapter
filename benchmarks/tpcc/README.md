@@ -32,10 +32,10 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.run-benchmark=false
   --tpcc.use-read-only-transactions=false
   --tpcc.lock-scanned-ranges=false
-  --spanner.project=appdev-soda-spanner-staging
-  --spanner.instance=knut-test-ycsb
-  --spanner.database=tpcc2
-  --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
+  --spanner.project=my-project
+  --spanner.instance=my-instance
+  --spanner.database=my-database
+  --pgadapter.credentials=/path/to/credentials.json
   --pgadapter.disable-internal-retries=false
   "
 ```
@@ -57,10 +57,10 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.benchmark-runner=pgadapter
   --tpcc.use-read-only-transactions=true
   --tpcc.lock-scanned-ranges=false
-  --spanner.project=appdev-soda-spanner-staging
-  --spanner.instance=knut-test-ycsb
-  --spanner.database=tpcc2
-  --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
+  --spanner.project=my-project
+  --spanner.instance=my-instance
+  --spanner.database=my-database
+  --pgadapter.credentials=/path/to/credentials.json
   --pgadapter.disable-internal-retries=true
   "
 ```
@@ -78,10 +78,10 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.benchmark-runner=spanner_jdbc
   --tpcc.use-read-only-transactions=true
   --tpcc.lock-scanned-ranges=false
-  --spanner.project=appdev-soda-spanner-staging
-  --spanner.instance=knut-test-ycsb
-  --spanner.database=tpcc2
-  --pgadapter.credentials=/home/loite/appdev-soda-spanner-staging.json
+  --spanner.project=my-project
+  --spanner.instance=my-instance
+  --spanner.database=my-database
+  --pgadapter.credentials=/path/to/credentials.json
   --pgadapter.disable-internal-retries=true
   "
 ```

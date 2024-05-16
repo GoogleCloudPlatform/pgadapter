@@ -88,7 +88,6 @@ public class OptionsMetadata {
     private DdlTransactionMode ddlTransactionMode;
     private String credentialsFile;
     private Credentials credentials;
-    private boolean disableInternalRetries;
     private boolean requireAuthentication;
     private boolean enableOpenTelemetry;
     private boolean enableOpenTelemetryMetrics;
@@ -228,12 +227,6 @@ public class OptionsMetadata {
       Preconditions.checkState(
           this.credentialsFile == null, "Cannot set both credentials and credentialsFile");
       this.credentials = Preconditions.checkNotNull(credentials);
-      return this;
-    }
-
-    /** Disables internal retries of aborted read/write transactions. */
-    public Builder setDisableInternalRetries() {
-      this.disableInternalRetries = true;
       return this;
     }
 
@@ -454,8 +447,7 @@ public class OptionsMetadata {
           || databaseRole != null
           || autoConfigEmulator
           || useVirtualThreads
-          || useVirtualGrpcTransportThreads
-          || disableInternalRetries) {
+          || useVirtualGrpcTransportThreads) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -478,9 +470,6 @@ public class OptionsMetadata {
           jdbcOptionBuilder
               .append(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME)
               .append("=true;");
-        }
-        if (disableInternalRetries) {
-          jdbcOptionBuilder.append("retryAbortsInternally=false;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
