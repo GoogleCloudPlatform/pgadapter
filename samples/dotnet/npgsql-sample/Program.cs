@@ -14,6 +14,7 @@
 
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using DotNet.Testcontainers.Images;
 using Npgsql;
 
 namespace npgsql_sample;
@@ -44,6 +45,7 @@ internal static class Sample
     private static async Task<IContainer> StartPGAdapterAndEmulator()
     {
         var container = new ContainerBuilder()
+            .WithImagePullPolicy(imagePullPolicy: PullPolicy.Always)
             // Use the PGAdapter image that also contains automatically starts the Spanner emulator.
             .WithImage("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
             // Bind port 5432 of the container to a random port on the host.
