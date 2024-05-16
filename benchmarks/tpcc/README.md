@@ -36,7 +36,6 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --spanner.instance=my-instance
   --spanner.database=my-database
   --pgadapter.credentials=/path/to/credentials.json
-  --pgadapter.disable-internal-retries=false
   "
 ```
 
@@ -61,7 +60,6 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --spanner.instance=my-instance
   --spanner.database=my-database
   --pgadapter.credentials=/path/to/credentials.json
-  --pgadapter.disable-internal-retries=true
   "
 ```
 
@@ -82,6 +80,5 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --spanner.instance=my-instance
   --spanner.database=my-database
   --pgadapter.credentials=/path/to/credentials.json
-  --pgadapter.disable-internal-retries=true
   "
 ```

@@ -31,8 +31,6 @@ public class PGAdapterConfiguration {
 
   private double openTelemetrySampleRate;
 
-  private boolean disableInternalRetries;
-
   private String host;
 
   private int port;
@@ -81,14 +79,6 @@ public class PGAdapterConfiguration {
 
   public void setOpenTelemetrySampleRate(double openTelemetrySampleRate) {
     this.openTelemetrySampleRate = openTelemetrySampleRate;
-  }
-
-  public boolean isDisableInternalRetries() {
-    return disableInternalRetries;
-  }
-
-  public void setDisableInternalRetries(boolean disableInternalRetries) {
-    this.disableInternalRetries = disableInternalRetries;
   }
 
   public String getCredentials() {
