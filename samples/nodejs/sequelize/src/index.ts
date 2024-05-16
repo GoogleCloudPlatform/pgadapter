@@ -14,7 +14,7 @@
 
 import {createDataModel, startPGAdapter} from './init'
 import {Album, Concert, initModels, Singer, TicketSale, Track, Venue} from '../models/models';
-import {Sequelize} from "sequelize";
+import {QueryTypes, Sequelize} from "sequelize";
 import {randomInt} from "crypto";
 import {randomAlbumTitle, randomFirstName, randomLastName, randomTrackTitle} from "./random";
 
@@ -24,6 +24,7 @@ async function main() {
   // The emulator runs in the same Docker container as PGAdapter.
   const pgAdapter = await startPGAdapter();
 
+  console.log('Initializing Sequelize');
   // Connect Sequelize to PGAdapter using the standard PostgreSQL Sequelize provider.
   const sequelize = new Sequelize('sample-database', null, null, {
     dialect: "postgres",
@@ -32,6 +33,7 @@ async function main() {
     // in the test container.
     host: 'localhost',
     port: pgAdapter.getMappedPort(5432),
+    ssl: false,
 
     // Setting the timezone is required, as Sequelize otherwise tries to use an INTERVAL to set
     // the timezone. That is not supported on PGAdapter, and you will get the following error:
@@ -59,7 +61,12 @@ async function main() {
   await createRandomSingersAndAlbums(sequelize, 20);
   await printSingersAlbums();
 
+  // Create Venues and Concerts rows.
+  // The "venues" table contains a JSONB column.
+  // The "ticket_sales" table contains a text array column.
   await createVenuesAndConcerts(sequelize);
+  
+  await staleRead(sequelize);
 
   // Close the sequelize connection pool and shut down PGAdapter.
   await sequelize.close();
@@ -123,6 +130,7 @@ async function createRandomSingersAndAlbums(sequelize: Sequelize, numSingers: nu
   console.log("Finished creating singers and albums");
 }
 
+// Selects all Singers and Albums in the database.
 async function printSingersAlbums() {
   const singers = await Singer.findAll();
   for (const singer of singers) {
@@ -131,6 +139,63 @@ async function printSingersAlbums() {
     for (const album of albums) {
       console.log(`\t${album.title}`);
     }
+  }
+}
+
+// Shows how to execute a stale read on Spanner.
+async function staleRead(sequelize: Sequelize) {
+  console.log("");
+  console.log("Executing a stale read");
+  
+  // First get the current timestamp on the server, so we know at which time we had the original
+  // number of concerts.
+  const currentTimestamp = (await sequelize.query("SELECT current_timestamp", {
+    plain: true,
+    raw: true,
+    type: QueryTypes.SELECT
+  }))["current_timestamp"];
+  
+  // Insert a new concert.
+  await Concert.create({
+    name: 'New Concert',
+    SingerId:  (await Singer.findOne({limit: 1})).id,
+    VenueId:   (await Venue.findOne({limit: 1})).id,
+    startTime: new Date('2023-02-01T20:00:00-05:00'),
+    endTime:   new Date('2023-02-02T02:00:00-05:00'),
+  });
+  
+  // Execute a query at a timestamp before we inserted a new concert.
+  // To do this, we need to get a connection from the pool, as we need to set the read timestamp
+  // that we want to use for the query on the connection.
+  const connection = await sequelize.connectionManager.getConnection({type: "read"});
+  try {
+    // Set the read timestamp to use.
+    await sequelize.query(`set spanner.read_only_staleness='read_timestamp ${currentTimestamp.toISOString()}'`,
+        {raw: true, type: QueryTypes.RAW});
+    
+    // Fetch all concerts at the timestamp before the insert.
+    const allConcertsBeforeInsert = await Concert.findAll();
+    // Verify that the list of concerts does not contain the new concert.
+    console.log(`Found ${allConcertsBeforeInsert.length} concerts before the insert at timestamp ${currentTimestamp.toISOString()}`);
+    
+    // Reset the read timestamp to using strong reads and verify that we now see the new concert.
+    await sequelize.query(`set spanner.read_only_staleness='strong'`,
+        {raw: true, type: QueryTypes.RAW});
+    // Fetch all concerts as of now.
+    const allConcertsAfterInsert = await Concert.findAll();
+    // We can get the timestamp that was used for the last read from the connection by executing
+    // 'show spanner.read_timestamp'.
+    const readTimestamp = (await sequelize.query("show spanner.read_timestamp", {
+      plain: true,
+      raw: true,
+      type: QueryTypes.SELECT
+    }))["SPANNER.READ_TIMESTAMP"];
+    
+    // Verify that the list of concerts now contains the new concert.
+    console.log(`Found ${allConcertsAfterInsert.length} concerts after the insert at timestamp ${readTimestamp.toISOString()}`);
+  } finally {
+    // Return the connection to the pool.
+    sequelize.connectionManager.releaseConnection(connection);
   }
 }
 
@@ -156,6 +221,7 @@ async function createVenuesAndConcerts(sequelize: Sequelize) {
       endTime:   new Date('2023-02-02T02:00:00-05:00'),
     }, {transaction: tx});
 
+    // The "ticket_sales" table contains an array column "seats".
     await TicketSale.create({
       ConcertId:    concert.id,
       customerName: `${randomFirstName()} ${randomLastName()}`,

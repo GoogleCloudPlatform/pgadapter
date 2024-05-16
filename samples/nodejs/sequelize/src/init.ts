@@ -35,7 +35,8 @@ export async function createDataModel(sequelize: Sequelize) {
   }
   console.log("Creating tables");
   // Create the data model.
-  await sequelize.query(`
+  await sequelize.query(
+      `
             create sequence if not exists singers_seq bit_reversed_positive;
             create table "Singers" (
               id          bigint not null primary key default nextval('singers_seq'),
@@ -106,8 +107,7 @@ export async function createDataModel(sequelize: Sequelize) {
               "createdAt"    timestamptz,
               "updatedAt"    timestamptz,
               constraint fk_ticket_sales_concerts foreign key ("ConcertId") references "Concerts" (id)
-            );
-           `,
+            );`,
       {type: QueryTypes.RAW})
 }
 
