@@ -1,30 +1,32 @@
-''' Copyright 2022 Google LLC
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-'''
+# Copyright 2022 Google LLC All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from django.db import models
 from django.db.models import Q, F
-from django.contrib.postgres.fields import JSONField
+
 
 class BaseModel(models.Model):
-  class Meta():
+  objects = models.Manager()
+
+  class Meta:
     abstract = True
   created_at = models.DateTimeField()
   updated_at = models.DateTimeField()
 
+
 class Singer(BaseModel):
-  class Meta():
+  class Meta:
     db_table = 'singers'
 
   id = models.CharField(primary_key=True, null=False)
@@ -33,8 +35,9 @@ class Singer(BaseModel):
   full_name = models.CharField(null=False)
   active = models.BooleanField()
 
+
 class Album(BaseModel):
-  class Meta():
+  class Meta:
     db_table = 'albums'
 
   id = models.CharField(primary_key=True, null=False)
@@ -44,8 +47,9 @@ class Album(BaseModel):
   cover_picture = models.BinaryField()
   singer = models.ForeignKey(Singer, on_delete=models.DO_NOTHING)
 
+
 class Track(BaseModel):
-  class Meta():
+  class Meta:
     db_table = 'tracks'
 
   # Here, track_id is a column that is supposed to be primary key by Django.
@@ -63,7 +67,7 @@ class Track(BaseModel):
 
 
 class Venue(BaseModel):
-  class Meta():
+  class Meta:
     db_table = 'venues'
   id = models.CharField(primary_key=True, null=False)
   name = models.CharField(null=False)
@@ -71,13 +75,14 @@ class Venue(BaseModel):
 
 
 class Concert(BaseModel):
-  class Meta():
+  class Meta:
     db_table = 'concerts'
-    constraints = [models.CheckConstraint(check = Q(end_time__gte=F('start_time')), name='chk_end_time_after_start_time' )]
+    constraints = [models.CheckConstraint(
+      check=Q(end_time__gte=F('start_time')),
+      name='chk_end_time_after_start_time')]
   id = models.CharField(primary_key=True, null=False)
   venue = models.ForeignKey(Venue, on_delete=models.DO_NOTHING)
   singer = models.ForeignKey(Singer, on_delete=models.DO_NOTHING)
   name = models.CharField(null=False)
   start_time = models.DateTimeField(null=False)
   end_time = models.DateTimeField(null=False)
-

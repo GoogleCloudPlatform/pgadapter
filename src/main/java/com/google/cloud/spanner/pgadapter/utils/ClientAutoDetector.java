@@ -411,13 +411,12 @@ public class ClientAutoDetector {
         // The npgsql client always starts with sending a query that contains multiple statements
         // and that starts with the following prefix.
         return statements.size() == 1
+            && statements.get(0).getSql().contains("SELECT version();")
             && statements
                 .get(0)
                 .getSql()
-                .startsWith(
-                    "SELECT version();\n"
-                        + "\n"
-                        + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n");
+                .contains(
+                    "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid");
       }
 
       @Override

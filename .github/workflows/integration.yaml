@@ -1,7 +1,4 @@
 on:
-  push:
-    branches:
-      - postgresql-dialect
   pull_request:
   schedule:
     # Run at 04:52UTC every day. This run will use preprod-spanner.sandbox.googleapis.com
@@ -114,8 +111,18 @@ jobs:
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
         run: mvn test -B -Ptest-all -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
       - name: Run unit tests with virtual threads
         run: mvn test -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -B -Ptest-all
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
       - name: Auth
         uses: google-github-actions/auth@v2
         with:
@@ -132,7 +139,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           directory: ./target/site/jacoco-merged-test-coverage-report
           fail_ci_if_error: false

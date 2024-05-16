@@ -110,6 +110,7 @@ public class ArrayParser extends Parser<List<?>> {
       case BYTES:
         return value.getBytesArray();
       case INT64:
+      case PG_OID:
         return value.getInt64Array();
       case STRING:
       case PG_NUMERIC:
@@ -376,6 +377,9 @@ public class ArrayParser extends Parser<List<?>> {
         break;
       case Oid.INT8:
         statementBuilder.bind(name).toInt64Array((List<Long>) this.item);
+        break;
+      case Oid.OID:
+        statementBuilder.bind(name).toPgOidArray((List<Long>) this.item);
         break;
       case Oid.NUMERIC:
         statementBuilder.bind(name).toPgNumericArray((List<String>) this.item);

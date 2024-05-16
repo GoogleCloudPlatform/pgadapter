@@ -399,7 +399,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
             "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar, col_jsonb "
                 + "from all_types "
                 + "where col_bigint=('1'::int8) "
-                + "and col_bool=('TRUE') "
+                + "and col_bool=('TRUE'::boolean) "
                 + "and col_float8=('3.14'::double precision) "
                 + "and col_numeric=('6.626'::numeric) "
                 + "and col_timestamptz=('%s') "

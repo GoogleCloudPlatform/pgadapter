@@ -713,6 +713,76 @@ func TestBatchExecutionError(connString string) *C.char {
 	return nil
 }
 
+//export TestDdlBatch
+func TestDdlBatch(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	batch := &pgx.Batch{}
+	batch.Queue("CREATE SEQUENCE IF NOT EXISTS seq_merchants bit_reversed_positive")
+	batch.Queue("CREATE TABLE IF NOT EXISTS merchants (" +
+		"  merchant_id   varchar(36) DEFAULT spanner.generate_uuid() NOT NULL," +
+		"  seq_id bigint DEFAULT nextval('seq_merchants')," +
+		"  name  varchar(255) NOT NULL," +
+		"  created   timestamptz DEFAULT CURRENT_TIMESTAMP," +
+		"  created_by varchar(36)," +
+		"  modified  timestamptz DEFAULT CURRENT_TIMESTAMP," +
+		"  modified_by varchar(36)," +
+		"  PRIMARY KEY(merchant_id)" +
+		")")
+	batch.Queue("CREATE UNIQUE INDEX idx_uq_email ON users(email);")
+	br := conn.SendBatch(context.Background(), batch)
+	if _, err := br.Exec(); err != nil {
+		return C.CString(fmt.Sprintf("executing DDL batch returned error: %v", err.Error()))
+	}
+
+	return nil
+}
+
+//export TestDdlBatchInTransaction
+func TestDdlBatchInTransaction(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	// Start a transaction and then try to execute a DDL batch.
+	tx, err := conn.Begin(ctx)
+
+	batch := &pgx.Batch{}
+	batch.Queue("CREATE SEQUENCE IF NOT EXISTS seq_merchants bit_reversed_positive")
+	batch.Queue("CREATE TABLE IF NOT EXISTS merchants (" +
+		"  merchant_id   varchar(36) DEFAULT spanner.generate_uuid() NOT NULL," +
+		"  seq_id bigint DEFAULT nextval('seq_merchants')," +
+		"  name  varchar(255) NOT NULL," +
+		"  created   timestamptz DEFAULT CURRENT_TIMESTAMP," +
+		"  created_by varchar(36)," +
+		"  modified  timestamptz DEFAULT CURRENT_TIMESTAMP," +
+		"  modified_by varchar(36)," +
+		"  PRIMARY KEY(merchant_id)" +
+		")")
+	batch.Queue("CREATE UNIQUE INDEX idx_uq_email ON users(email);")
+	br := conn.SendBatch(context.Background(), batch)
+	_, err = br.Exec()
+	if err == nil {
+		return C.CString("missing expected error for DDL batch in transaction")
+	}
+	// The batch execution should return an error indicating that DDL batches are not supported in transactions.
+	if g, w := err.Error(), "ERROR: DDL statements are not allowed in mixed batches or transactions. (SQLSTATE 25000)"; g != w {
+		return C.CString(fmt.Sprintf("error mismatch\n Got: %v\nWant: %v", g, w))
+	}
+
+	_ = tx.Rollback(ctx)
+
+	return nil
+}
+
 func insertBatch(batch *pgx.Batch, connString string, batchSize int) error {
 	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
 	numeric := pgtype.Numeric{}

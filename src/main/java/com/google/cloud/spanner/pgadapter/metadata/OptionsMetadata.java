@@ -90,6 +90,7 @@ public class OptionsMetadata {
     private Credentials credentials;
     private boolean requireAuthentication;
     private boolean enableOpenTelemetry;
+    private boolean enableOpenTelemetryMetrics;
     private Double openTelemetryTraceRatio;
     private boolean skipLocalhostCheck;
     private boolean useVirtualThreads;
@@ -246,6 +247,12 @@ public class OptionsMetadata {
     /** Enables OpenTelemetry tracing for PGAdapter. */
     public Builder setEnableOpenTelemetry() {
       this.enableOpenTelemetry = true;
+      return this;
+    }
+
+    /** Enables OpenTelemetry metrics for PGAdapter. */
+    public Builder setEnableOpenTelemetryMetrics() {
+      this.enableOpenTelemetryMetrics = true;
       return this;
     }
 
@@ -413,6 +420,9 @@ public class OptionsMetadata {
       if (enableOpenTelemetry) {
         addOption(args, OPTION_ENABLE_OPEN_TELEMETRY);
       }
+      if (enableOpenTelemetryMetrics) {
+        addOption(args, OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
+      }
       if (openTelemetryTraceRatio != null) {
         addLongOption(
             args, OPTION_OPEN_TELEMETRY_TRACE_RATIO, String.valueOf(openTelemetryTraceRatio));
@@ -579,6 +589,7 @@ public class OptionsMetadata {
   private static final String OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING =
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
+  private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -1282,6 +1293,12 @@ public class OptionsMetadata {
             + "You most probably do not want to turn internal debug mode on. It is only intended for\n"
             + "internal test cases in PGAdapter that need to verify that it receives the correct \n"
             + "wire-protocol messages.");
+    options.addOption(
+        OPTION_LEGACY_LOGGING,
+        "enable_legacy_logging",
+        false,
+        "Enables legacy logging using the default java.util.logging configuration.\n"
+            + "This sends all log output to stderr.");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);

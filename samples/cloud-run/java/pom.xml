@@ -21,8 +21,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <spring-boot.version>2.7.16</spring-boot.version>
-    <junixsocket.version>2.6.2</junixsocket.version>
+    <spring-boot.version>3.2.5</spring-boot.version>
+    <junixsocket.version>2.9.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -51,7 +51,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.2</version>
+      <version>42.7.3</version>
       <scope>compile</scope>
     </dependency>
     <!-- This dependency allows us to use Unix Domain Sockets to connect to PGAdapter/PostgreSQL. -->
@@ -97,7 +97,7 @@
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
         <artifactId>jib-maven-plugin</artifactId>
-        <version>3.3.2</version>
+        <version>3.4.2</version>
         <configuration>
           <to>
             <image>gcr.io/PROJECT_ID/pgadapter-sidecar-example</image>

@@ -126,7 +126,21 @@ public class PgCatalog {
               Suppliers.ofInstance(" IN ('pg_catalog', 'public')")),
           RegexQueryPartReplacer.replace(
               Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*false\\s*\\)\\)"),
-              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")));
+              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)\\s*AS\\s+"),
+              "''::varchar AS "),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
+              "''::varchar AS obj_description"),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)\\s*AS\\s+"),
+              "''::varchar AS "),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
+              "''::varchar AS obj_description"));
 
   private final ImmutableSet<String> checkPrefixes;
 
@@ -797,7 +811,7 @@ public class PgCatalog {
             + "                 group by c.constraint_catalog, c.constraint_schema,\n"
             + "                          c.constraint_name) fck on tc.constraint_catalog=fck.constraint_catalog and tc.constraint_schema=fck.constraint_schema and tc.constraint_name=fck.constraint_name\n"
             + "left outer join information_schema.check_constraints cc on cc.constraint_catalog=tc.constraint_catalog and cc.constraint_schema=tc.constraint_schema and cc.constraint_name=tc.constraint_name\n"
-            + "where tc.constraint_schema='public' and not substr(tc.constraint_name, 1, length('CK_IS_NOT_NULL_')) = 'CK_IS_NOT_NULL_'\n"
+            + "where tc.constraint_schema not in (select schema_name from information_schema.schemata where schema_owner='spanner_system') and not substr(tc.constraint_name, 1, length('CK_IS_NOT_NULL_')) = 'CK_IS_NOT_NULL_'\n"
             + ")";
 
     public static final String EMPTY_PG_CONSTRAINT_CTE =

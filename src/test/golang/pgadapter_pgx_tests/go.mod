@@ -4,8 +4,8 @@ go 1.17
 
 require (
 	github.com/jackc/pgconn v1.14.3
-	github.com/jackc/pgtype v1.14.2
-	github.com/jackc/pgx/v4 v4.18.2
+	github.com/jackc/pgtype v1.14.3
+	github.com/jackc/pgx/v4 v4.18.3
 )
 
 require (

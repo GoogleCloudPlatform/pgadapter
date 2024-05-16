@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:24.04
 
 ARG UBER_JAR_PATH
 RUN apt-get update && apt-get -qq -y install default-jre

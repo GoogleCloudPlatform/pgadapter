@@ -15,14 +15,18 @@ package runners
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/spanner"
 )
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 var rnd *rand.Rand
 var m *sync.Mutex
@@ -32,7 +36,7 @@ func init() {
 	m = &sync.Mutex{}
 }
 
-func RunClientLib(db, sql string, numOperations, numClients int) ([]float64, error) {
+func RunClientLib(db, sql string, readWrite bool, numOperations, numClients, wait int) ([]float64, error) {
 	ctx := context.Background()
 	client, err := spanner.NewClient(ctx, db)
 	if err != nil {
@@ -41,11 +45,20 @@ func RunClientLib(db, sql string, numOperations, numClients int) ([]float64, err
 	defer client.Close()
 
 	// Run one query to warm up.
-	if _, err := executeClientLibQuery(ctx, client, sql); err != nil {
-		return nil, err
+	if readWrite {
+		if _, err := executeClientLibUpdate(ctx, client, sql); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := executeClientLibQuery(ctx, client, sql); err != nil {
+			return nil, err
+		}
 	}
 
-	runTimes := make([]float64, numOperations*numClients)
+	var ops atomic.Int64
+	var finished atomic.Bool
+	totalOps := numOperations * numClients
+	runTimes := make([]float64, totalOps)
 	wg := sync.WaitGroup{}
 	wg.Add(numClients)
 	for c := 0; c < numClients; c++ {
@@ -53,15 +66,24 @@ func RunClientLib(db, sql string, numOperations, numClients int) ([]float64, err
 		go func() error {
 			defer wg.Done()
 			for n := 0; n < numOperations; n++ {
-				runTimes[clientIndex*numOperations+n], err = executeClientLibQuery(ctx, client, sql)
+				randWait(wait)
+				if readWrite {
+					runTimes[clientIndex*numOperations+n], err = executeClientLibUpdate(ctx, client, sql)
+				} else {
+					runTimes[clientIndex*numOperations+n], err = executeClientLibQuery(ctx, client, sql)
+				}
 				if err != nil {
 					return err
 				}
+				ops.Add(1)
 			}
 			return nil
 		}()
 	}
+	printProgress(&finished, &ops, totalOps)
 	wg.Wait()
+	finished.Store(true)
+	fmt.Printf("\r%d/%d\n\n", ops.Load(), totalOps)
 	return runTimes, nil
 }
 
@@ -97,8 +119,56 @@ func executeClientLibQuery(ctx context.Context, client *spanner.Client, sql stri
 	return end, nil
 }
 
+func executeClientLibUpdate(ctx context.Context, client *spanner.Client, sql string) (float64, error) {
+	start := time.Now()
+	stmt := spanner.Statement{
+		SQL: sql,
+		Params: map[string]interface{}{
+			"p1": randString(),
+			"p2": randId(100000),
+		},
+	}
+	if _, err := client.ReadWriteTransaction(ctx, func(ctx context.Context, transaction *spanner.ReadWriteTransaction) error {
+		_, err := transaction.Update(ctx, stmt)
+		return err
+	}); err != nil {
+		return 0, err
+	}
+	end := float64(time.Since(start).Microseconds()) / 1e3
+	return end, nil
+}
+
+func printProgress(finished *atomic.Bool, ops *atomic.Int64, totalOps int) {
+	go func() {
+		for !finished.Load() {
+			time.Sleep(time.Second)
+			fmt.Printf("\r%d/%d        ", ops.Load(), totalOps)
+		}
+	}()
+}
+
+func randWait(wait int) {
+	if wait <= 0 {
+		return
+	}
+	m.Lock()
+	sleep := rand.Intn(2 * wait)
+	m.Unlock()
+	time.Sleep(time.Duration(sleep) * time.Millisecond)
+}
+
 func randId(n int64) int64 {
 	m.Lock()
 	defer m.Unlock()
 	return rnd.Int63n(n)
+}
+
+func randString() string {
+	b := make([]byte, 64)
+	m.Lock()
+	defer m.Unlock()
+	for i := range b {
+		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
+	}
+	return string(b)
 }

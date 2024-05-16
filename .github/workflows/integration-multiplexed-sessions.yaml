@@ -1,0 +1,115 @@
+on:
+  pull_request:
+  workflow_dispatch:
+name: integration-multiplexed-sessions
+env:
+  GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
+  GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
+  GOOGLE_CLOUD_DATABASE: "testdb_integration"
+  GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
+  GOOGLE_CLOUD_SPANNER_ENABLE_MULTIPLEXED_SESSIONS: true
+jobs:
+  check-env:
+    outputs:
+      has-key: ${{ steps.project-id.outputs.defined }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: project-id
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        if: "${{ env.GCP_PROJECT_ID != '' }}"
+        run: echo "defined=true" >> "$GITHUB_OUTPUT"
+  integration-test:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    # Add a PostgreSQL Docker container
+    services:
+      # Container label
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        ports:
+          - 5432:5432
+        volumes:
+          - /pg:/var/run/postgresql
+          - /tmp:/tmp
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      # TODO: Remove
+      - id: set-test-type-for-float32
+        run: |
+          if [[ $GOOGLE_CLOUD_ENDPOINT == 'staging-wrenchworks.sandbox.googleapis.com' ]]; then
+            echo "FLOAT32_TEST_TYPE=float4" >> $GITHUB_ENV
+          else
+            echo "FLOAT32_TEST_TYPE=float8" >> $GITHUB_ENV
+          fi
+      - id: set-excluded-integration-tests
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "EXCLUDED_INTEGRATION_TESTS=SlowTest" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 21
+      - run: java -version
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '^1.17.7'
+      - run: go version
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 16
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      - name: Setup psql
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client-14
+      - name: Create PostgreSQL test database
+        run: |
+          psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
+      - name: Run unit tests
+        run: mvn test -B -Ptest-all -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
+      - name: Run unit tests with virtual threads
+        run: mvn test -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -B -Ptest-all
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
+      - name: Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
+      - name: Setup GCloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+      - name: Run integration tests
+        run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DskipUnits=true -Dpgadapter.test_float4_type="$FLOAT32_TEST_TYPE" -DexcludedIntegrationTests="$EXCLUDED_INTEGRATION_TESTS" -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
