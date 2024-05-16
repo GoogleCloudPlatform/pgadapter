@@ -12,7 +12,7 @@ require (
 	github.com/montanaflynn/stats v0.7.0
 	github.com/testcontainers/testcontainers-go v0.31.0
 	golang.org/x/oauth2 v0.20.0
-	google.golang.org/api v0.180.0
+	google.golang.org/api v0.181.0
 )
 
 require (
