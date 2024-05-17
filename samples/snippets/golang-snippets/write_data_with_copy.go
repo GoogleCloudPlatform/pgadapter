@@ -33,6 +33,10 @@ func writeDataWithCopy(host string, port int, database string) error {
 	}
 	defer conn.Close(ctx)
 
+	// Enable 'partitioned_non_atomic' mode. This ensures that the COPY operation
+	// will succeed even if it exceeds Spanner's mutation limit per transaction.
+	conn.Exec(ctx, "set spanner.autocommit_dml_mode='partitioned_non_atomic'")
+
 	file, err := os.Open("singers_data.txt")
 	if err != nil {
 		return err

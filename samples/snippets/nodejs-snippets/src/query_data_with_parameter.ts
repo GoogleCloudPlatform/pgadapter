@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START spanner_dml_getting_started_insert]
+// [START spanner_query_with_parameter]
 import { Client } from 'pg';
 
-async function writeDataWithDml(host: string, port: number, database: string): Promise<void> {
+async function queryWithParameter(host: string, port: number, database: string): Promise<void> {
+  // Connect to Spanner through PGAdapter.
   const connection = new Client({
     host: host,
     port: port,
@@ -23,18 +24,17 @@ async function writeDataWithDml(host: string, port: number, database: string): P
   });
   await connection.connect();
 
-  const result = await connection.query("INSERT INTO singers (singer_id, first_name, last_name) " +
-      "VALUES ($1, $2, $3), ($4, $5, $6), " +
-      "       ($7, $8, $9), ($10, $11, $12)",
-       [12, "Melissa", "Garcia",
-        13, "Russel", "Morales",
-        14, "Jacqueline", "Long",
-        15, "Dylan", "Shaw"])
-  console.log(`${result.rowCount} records inserted`);
+  const result = await connection.query(
+      "SELECT singer_id, first_name, last_name " +
+      "FROM singers " +
+      "WHERE last_name = $1", ["Garcia"]);
+  for (const row of result.rows) {
+    console.log(`${row["singer_id"]} ${row["first_name"]} ${row["last_name"]}`);
+  }
 
   // Close the connection.
   await connection.end();
 }
-// [END spanner_dml_getting_started_insert]
+// [END spanner_query_with_parameter]
 
-export = writeDataWithDml;
+export = queryWithParameter;

@@ -27,6 +27,9 @@ async function writeDataWithCopy(host: string, port: number, database: string): 
   });
   await connection.connect();
 
+  // Enable 'partitioned_non_atomic' mode. This ensures that the COPY operation
+  // will succeed even if it exceeds Spanner's mutation limit per transaction.
+  await connection.query("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
   // Copy data from a csv file to Spanner using the COPY command.
   // Note that even though the command says 'from stdin', the actual input comes from a file.
   const copySingersStream = copyFrom('copy singers (singer_id, first_name, last_name) from stdin');
