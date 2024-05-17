@@ -14,6 +14,7 @@
 package com.google.cloud.pgadapter.tpcc;
 
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
+import com.google.cloud.spanner.jdbc.JdbcSqlExceptionFactory.JdbcAbortedException;
 import com.google.common.base.Stopwatch;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -107,7 +108,10 @@ abstract class AbstractBenchmarkRunner implements Runnable {
                   PSQLState.SERIALIZATION_FAILURE.getState())
               && Objects.requireNonNull(psqlException.getServerErrorMessage().getMessage())
                   .contains("concurrent modification")) {
-            LOG.debug("Transaction aborted by Cloud Spanner");
+            LOG.debug("Transaction aborted by Cloud Spanner via PG JDBC");
+            statistics.incAborted();
+          } else if (exception instanceof JdbcAbortedException) {
+            LOG.debug("Transaction aborted by Cloud Spanner via Spanner JDBC");
             statistics.incAborted();
           } else {
             LOG.warn("Transaction failed", exception);
