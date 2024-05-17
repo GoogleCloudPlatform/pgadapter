@@ -29,6 +29,7 @@ import addColumn from "../src/add_column";
 import ddlBatch from "../src/ddl_batch";
 import updateDataWithCopy from "../src/update_data_with_copy";
 import queryDataWithNewColumn from "../src/query_data_with_new_column";
+import writeWithTransactionUsingDml from "../src/update_data_with_transaction";
 
 const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withExposedPorts(5432)
@@ -102,5 +103,9 @@ describe('running samples', () => {
         expect(console.log).toHaveBeenCalledWith("2 1 null");
         expect(console.log).toHaveBeenCalledWith("2 2 500000");
         expect(console.log).toHaveBeenCalledWith("2 3 null");
+    }, 30000);
+    test('update data with transaction', async () => {
+        await writeWithTransactionUsingDml(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("Transferred marketing budget from Album 2 to Album 1");
     }, 30000);
 });

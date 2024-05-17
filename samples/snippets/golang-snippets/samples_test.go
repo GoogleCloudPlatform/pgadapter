@@ -72,4 +72,10 @@ func TestSamples(t *testing.T) {
 	if err := updateDataWithCopy(host, port, db); err != nil {
 		t.Fatalf("update data with copy failed: %v", err)
 	}
+	if err := queryDataWithNewColumn(host, port, db); err != nil {
+		t.Fatalf("query data with with new column failed: %v", err)
+	}
+	if err := writeWithTransactionUsingDml(host, port, db); err != nil {
+		t.Fatalf("update data using a transaction failed: %v", err)
+	}
 }

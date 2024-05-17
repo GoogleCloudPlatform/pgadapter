@@ -16,6 +16,7 @@ package golang_snippets
 // [START spanner_query_data_with_new_column]
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -41,12 +42,18 @@ func queryDataWithNewColumn(host string, port int, database string) error {
 	}
 	for rows.Next() {
 		var singerId, albumId int64
-		var marketingBudget string
+		var marketingBudget sql.NullString
 		err = rows.Scan(&singerId, &albumId, &marketingBudget)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%v %v %v\n", singerId, albumId, marketingBudget)
+		var budget string
+		if marketingBudget.Valid {
+			budget = marketingBudget.String
+		} else {
+			budget = "NULL"
+		}
+		fmt.Printf("%v %v %v\n", singerId, albumId, budget)
 	}
 
 	return rows.Err()
