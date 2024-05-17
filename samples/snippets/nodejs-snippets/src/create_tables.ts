@@ -25,23 +25,22 @@ async function createTables(host: string, port: number, database: string): Promi
   await connection.connect();
 
   // Create two tables in one batch.
-  await connection.query("START BATCH DDL");
-  await connection.query("CREATE TABLE Singers ("
-      + "  SingerId   bigint NOT NULL,"
-      + "  FirstName  character varying(1024),"
-      + "  LastName   character varying(1024),"
-      + "  SingerInfo bytea,"
-      + "  FullName character varying(2048) GENERATED "
-      + "  ALWAYS AS (FirstName || ' ' || LastName) STORED,"
-      + "  PRIMARY KEY (SingerId)"
-      + ")");
-  await connection.query("CREATE TABLE Albums ("
-      + "  SingerId     bigint NOT NULL,"
-      + "  AlbumId      bigint NOT NULL,"
-      + "  AlbumTitle   character varying(1024),"
-      + "  PRIMARY KEY (SingerId, AlbumId)"
-      + ") INTERLEAVE IN PARENT Singers ON DELETE CASCADE");
-  await connection.query("RUN BATCH");
+  await connection.query("start batch ddl");
+  await connection.query("create table singers (" +
+      "  singer_id   bigint primary key not null," +
+      "  first_name  character varying(1024)," +
+      "  last_name   character varying(1024)," +
+      "  singer_info bytea," +
+      "  full_name   character varying(2048) generated " +
+      "  always as (first_name || ' ' || last_name) stored" +
+      ")");
+  await connection.query("create table albums (" +
+      "  singer_id     bigint not null," +
+      "  album_id      bigint not null," +
+      "  album_title   character varying(1024)," +
+      "  primary key (singer_id, album_id)" +
+      ") interleave in parent singers on delete cascade");
+  await connection.query("run batch");
   console.log(`Created Singers & Albums tables in database: [${database}]`);
 
   // Close the connection.

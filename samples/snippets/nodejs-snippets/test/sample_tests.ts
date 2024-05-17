@@ -20,6 +20,8 @@ import {
 } from "testcontainers";
 import createTables from "../src/create_tables";
 import createConnection from "../src/create_connection"
+import writeDataWithDml from "../src/write_data_with_dml"
+import writeDataWithDmlBatch from "../src/write_data_with_dml_batch"
 
 const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withExposedPorts(5432)
@@ -48,5 +50,13 @@ describe('running samples', () => {
     test('create connection', async () => {
         await createConnection(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
         expect(console.log).toHaveBeenCalledWith("Greeting from Cloud Spanner PostgreSQL: Hello world!");
+    }, 30000);
+    test('write data with DML', async () => {
+        await writeDataWithDml(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("4 records inserted");
+    }, 30000);
+    test('execute DML batch', async () => {
+        await writeDataWithDmlBatch(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("3 records inserted");
     }, 30000);
 });
