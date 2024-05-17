@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.22.3
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240516111254-4142f0a3ddee
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240516190932-f7dd6ab01c75
 	github.com/jackc/pgx/v5 v5.5.5
 )
 
@@ -22,7 +22,7 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.1 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v26.1.2+incompatible // indirect
+	github.com/docker/docker v26.1.3+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
