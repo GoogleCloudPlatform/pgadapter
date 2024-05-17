@@ -78,4 +78,7 @@ func TestSamples(t *testing.T) {
 	if err := writeWithTransactionUsingDml(host, port, db); err != nil {
 		t.Fatalf("update data using a transaction failed: %v", err)
 	}
+	if err := tags(host, port, db); err != nil {
+		t.Fatalf("transaction and statement tag test failed: %v", err)
+	}
 }

@@ -30,6 +30,7 @@ import ddlBatch from "../src/ddl_batch";
 import updateDataWithCopy from "../src/update_data_with_copy";
 import queryDataWithNewColumn from "../src/query_data_with_new_column";
 import writeWithTransactionUsingDml from "../src/update_data_with_transaction";
+import tags from "../src/tags";
 
 const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withExposedPorts(5432)
@@ -107,5 +108,9 @@ describe('running samples', () => {
     test('update data with transaction', async () => {
         await writeWithTransactionUsingDml(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
         expect(console.log).toHaveBeenCalledWith("Transferred marketing budget from Album 2 to Album 1");
+    }, 30000);
+    test('transaction and statement tags', async () => {
+        await tags(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("Reduced marketing budget");
     }, 30000);
 });
