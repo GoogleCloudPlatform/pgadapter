@@ -69,4 +69,7 @@ func TestSamples(t *testing.T) {
 	if err := ddlBatch(host, port, db); err != nil {
 		t.Fatalf("ddl batch failed: %v", err)
 	}
+	if err := updateDataWithCopy(host, port, db); err != nil {
+		t.Fatalf("update data with copy failed: %v", err)
+	}
 }

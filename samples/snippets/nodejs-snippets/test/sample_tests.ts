@@ -25,6 +25,10 @@ import writeDataWithDmlBatch from "../src/write_data_with_dml_batch"
 import writeDataWithCopy from "../src/write_data_with_copy"
 import queryData from "../src/query_data"
 import queryWithParameter from "../src/query_data_with_parameter"
+import addColumn from "../src/add_column";
+import ddlBatch from "../src/ddl_batch";
+import updateDataWithCopy from "../src/update_data_with_copy";
+import queryDataWithNewColumn from "../src/query_data_with_new_column";
 
 const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withExposedPorts(5432)
@@ -78,5 +82,25 @@ describe('running samples', () => {
     test('query with parameter', async () => {
         await queryWithParameter(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
         expect(console.log).toHaveBeenCalledWith("12 Melissa Garcia");
+    }, 30000);
+    test('add column', async () => {
+        await addColumn(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("Added marketing_budget column");
+    }, 30000);
+    test('ddl batch', async () => {
+        await ddlBatch(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("Added venues and concerts tables");
+    }, 30000);
+    test('update data', async () => {
+        await updateDataWithCopy(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("Updated 2 albums");
+    }, 30000);
+    test('query data with new column', async () => {
+        await queryDataWithNewColumn(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("1 1 100000");
+        expect(console.log).toHaveBeenCalledWith("1 2 null");
+        expect(console.log).toHaveBeenCalledWith("2 1 null");
+        expect(console.log).toHaveBeenCalledWith("2 2 500000");
+        expect(console.log).toHaveBeenCalledWith("2 3 null");
     }, 30000);
 });

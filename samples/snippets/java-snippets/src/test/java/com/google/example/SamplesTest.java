@@ -83,6 +83,13 @@ public class SamplesTest {
         "Updated 2 albums\n",
         runSample(UpdateDataWithCopy::updateDataWithCopy));
     assertEquals(
+        "1 1 100000\n"
+            + "1 2 null\n"
+            + "2 1 null\n"
+            + "2 2 500000\n"
+            + "2 3 null\n",
+        runSample(QueryDataWithNewColumn::queryDataWithNewColumn));
+    assertEquals(
         "Transferred marketing budget from Album 2 to Album 1\n",
         runSample(UpdateDataWithTransaction::writeWithTransactionUsingDml));
     assertEquals(
