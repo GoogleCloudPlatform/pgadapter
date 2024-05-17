@@ -24,8 +24,8 @@ async function createConnection(host: string, port: number, database: string): P
   });
   await connection.connect();
 
-  const rows = await connection.query("select 'Hello world!' as hello");
-  console.log(`Greeting from Cloud Spanner PostgreSQL: [${rows}]`);
+  const result = await connection.query("select 'Hello world!' as hello");
+  console.log(`Greeting from Cloud Spanner PostgreSQL: ${result.rows[0]['hello']}`);
 
   // Close the connection.
   await connection.end();

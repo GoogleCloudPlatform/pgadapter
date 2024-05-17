@@ -19,6 +19,7 @@ import {
     PullPolicy
 } from "testcontainers";
 import createTables from "../src/create_tables";
+import createConnection from "../src/create_connection"
 
 const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withExposedPorts(5432)
@@ -43,5 +44,9 @@ describe('running samples', () => {
     test('create tables', async () => {
         await createTables(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
         expect(console.log).toHaveBeenCalledWith("Created Singers & Albums tables in database: [example-db]");
+    }, 30000);
+    test('create connection', async () => {
+        await createConnection(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("Greeting from Cloud Spanner PostgreSQL: Hello world!");
     }, 30000);
 });
