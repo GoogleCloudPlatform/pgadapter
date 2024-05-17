@@ -302,7 +302,8 @@ public class ClientAutoDetector {
             && parameters.get("options").contains("spanner.well_known_client")) {
           return false;
         }
-        return parameters.get("DateStyle").equals("ISO");
+        return parameters.get("DateStyle").equals("ISO, MDY")
+            || parameters.get("DateStyle").equals("ISO");
       }
 
       @Override
@@ -412,13 +413,12 @@ public class ClientAutoDetector {
         // The npgsql client always starts with sending a query that contains multiple statements
         // and that starts with the following prefix.
         return statements.size() == 1
+            && statements.get(0).getSql().contains("SELECT version();")
             && statements
                 .get(0)
                 .getSql()
-                .startsWith(
-                    "SELECT version();\n"
-                        + "\n"
-                        + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n");
+                .contains(
+                    "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid");
       }
 
       @Override
@@ -434,7 +434,9 @@ public class ClientAutoDetector {
                   Suppliers.ofInstance("'' as regtype")),
               RegexQueryPartReplacer.replace(
                   Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
-                  Suppliers.ofInstance("WHERE t.typname = \\$1")));
+                  Suppliers.ofInstance("WHERE t.typname = \\$1")),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("COLLATE \"C\""), Suppliers.ofInstance("")));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -571,13 +573,9 @@ public class ClientAutoDetector {
                 Pattern.compile(
                     "format_type\\(att\\.atttypid, att\\.atttypmod\\) as formatted_type"),
                 "att.spanner_type as formatted_type"),
-            //            RegexQueryPartReplacer.replace(Pattern.compile("format_type\\(.*,.*\\)"),
-            // () -> "''"),
             RegexQueryPartReplacer.replace(
                 Pattern.compile("pg_get_expr\\(attdef\\.adbin, attdef\\.adrelid\\) AS "),
                 Suppliers.ofInstance("attdef.adbin AS ")),
-            //            RegexQueryPartReplacer.replace(Pattern.compile("pg_get_expr\\(.*,.*\\)"),
-            // () -> "''"),
             RegexQueryPartReplacer.replace(
                 Pattern.compile("SELECT\\s+" + "tbl\\.relname\\s+AS\\s+table_name"),
                 "SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name"),

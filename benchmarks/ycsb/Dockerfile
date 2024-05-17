@@ -1,5 +1,5 @@
 # BUILD
-FROM maven:3.8.4-eclipse-temurin-17-alpine AS build
+FROM maven:3-eclipse-temurin-21 AS build
 # Copy over build files to docker image.
 COPY LICENSE ./
 COPY CONTRIBUTING.md ./
@@ -18,12 +18,17 @@ RUN mvn package -Passembly -DskipTests
 
 
 # Docker image for the YCSB runner.
-FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+# We pin the version to 455.0.0, because YCSB requires Python 2.x, and this is the last
+# version of the gcloud-cli Docker image that supports Python 2.x.
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:455.0.0-slim
 
 RUN apt update && apt -y install postgresql-client
-RUN apt -y install default-jre
 RUN apt -y install wget
 RUN apt -y install python
+
+# Install Java 21 in the Docker image.
+ADD https://download.java.net/java/GA/jdk21.0.2/f2283984656d49d69e91c558476027ac/13/GPL/openjdk-21.0.2_linux-x64_bin.tar.gz /openjdk.tar.gz
+RUN tar xvfz /openjdk.tar.gz
 
 COPY --from=build target/pgadapter /
 

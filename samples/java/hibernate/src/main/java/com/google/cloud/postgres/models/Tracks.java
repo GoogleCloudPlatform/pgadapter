@@ -26,8 +26,7 @@ import org.hibernate.annotations.GeneratorType;
 public class Tracks {
 
   // For composite primary keys, @EmbeddedId will have to be used.
-  @EmbeddedId
-  private TracksId id;
+  @EmbeddedId private TracksId id;
 
   @Column(name = "title", nullable = false)
   private String title;

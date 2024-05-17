@@ -17,9 +17,11 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -36,6 +38,7 @@ import java.sql.Array;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -44,6 +47,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.PGStatement;
+import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
 public class ArraysMockServerTest extends AbstractMockServerTest {
@@ -130,6 +135,39 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
         Array array = resultSet.getArray("BIGINT_ARRAY");
         assertArrayEquals(new Long[] {1L, null, 2L}, (Long[]) array.getArray());
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testBigintArrayBinary() throws SQLException {
+    // https://github.com/pgjdbc/pgjdbc/issues/3014
+    assumeFalse(OptionsMetadata.isJava8());
+
+    String sql = "SELECT BIGINT_ARRAY FROM FOO WHERE BAR=?";
+    String spannerSql = sql.replace("?", "$1");
+    com.google.spanner.v1.ResultSet spannerResultSet =
+        createResultSet(
+            "BIGINT_ARRAY",
+            TypeCode.INT64,
+            ImmutableList.of(Values.of("1"), Values.ofNull(), Values.of("2")));
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(spannerSql), spannerResultSet));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(spannerSql).bind("p1").to(1L).build(), spannerResultSet));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?binaryTransferEnable=" + Oid.INT8_ARRAY)) {
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        statement.unwrap(PGStatement.class).setPrepareThreshold(-1);
+        statement.setLong(1, 1L);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          assertTrue(resultSet.next());
+          Array array = resultSet.getArray("BIGINT_ARRAY");
+          assertArrayEquals(new Long[] {1L, null, 2L}, (Long[]) array.getArray());
+          assertFalse(resultSet.next());
+        }
       }
     }
   }

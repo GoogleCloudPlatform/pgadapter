@@ -33,6 +33,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Spanner;
@@ -139,6 +140,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   static void setupJsonbResults() {
+    setupJsonbResults(mockSpanner);
+  }
+
+  static void setupJsonbResults(MockSpannerServiceImpl mockSpanner) {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
@@ -328,6 +333,52 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("3807").build())
                         .build())
                 .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT typinput='pg_catalog.array_in'::regproc as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .addValues(Value.newBuilder().setStringValue("3807").build())
+                        .build())
+                .build()));
   }
 
   /**
@@ -368,6 +419,121 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals(sql, request.getSql());
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    }
+  }
+
+  @Test
+  public void testSelectHelloWorld() throws SQLException {
+    String randomString =
+        "╍➗⡢ⵄ⯣⺫␐Ⓔ⠊⓭∲Ⳋ⤄▹⡨⿄⦺⒢⠱\u2E5E⾀⭯⛧⫶⏵⽐⓮⻋⥍\u242A⫌⏎⎽⚚⒊ↄ⦛⹐⌣⸤ⳅ⼑╪␦⻛➯⃝⡥⨬⸺⇊⹐┪⍦╳◄⪷ⴺ⽾⣌⛛⬗⍘⧤⃰⩧⬔⇌⣸⮽❨⫘ⱶ⣗⤶⢽⚶⒪⁙♤✾✟⏩⟞\u20C5℈⺙ⵠ⋛✧⧬⯨➛⌁⻚ⰷ∑⼫⊅ⷛ";
+    String sql = String.format("SELECT '%s'", randomString);
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(randomString).build())
+                        .build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (int bufferSize : new int[] {0, 32}) {
+        connection
+            .createStatement()
+            .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals(randomString, resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testJsonbBinary() throws SQLException {
+    String randomString =
+        "{\"key\": \"╍➗⡢ⵄ⯣⺫␐Ⓔ⠊⓭∲Ⳋ⤄▹⡨⿄⦺⒢⠱\u2E5E⾀⭯⛧⫶⏵⽐⓮⻋⥍\u242A⫌⏎⎽⚚⒊ↄ⦛⹐⌣⸤ⳅ⼑╪␦⻛➯⃝⡥⨬⸺⇊⹐┪⍦╳◄⪷ⴺ⽾⣌⛛⬗⍘⧤⃰⩧⬔⇌⣸⮽❨⫘ⱶ⣗⤶⢽⚶⒪⁙♤✾✟⏩⟞\u20C5℈⺙ⵠ⋛✧⧬⯨➛⌁⻚ⰷ∑⼫⊅ⷛ\"}";
+    String sql = String.format("SELECT '%s'::jsonb", randomString);
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.JSON)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(randomString).build())
+                        .build())
+                .build()));
+
+    String binaryTransfer = "&binaryTransferEnable=" + Oid.JSONB;
+    try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransfer)) {
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      for (int bufferSize : new int[] {0, 32}) {
+        connection
+            .createStatement()
+            .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertNotNull(resultSet.getObject(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testGetCatalogs() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with pg_database as (\n"
+                    + "  select 0::bigint as oid,\n"
+                    + "         catalog_name as datname,\n"
+                    + "         0::bigint as datdba,\n"
+                    + "         6::bigint as encoding,\n"
+                    + "         'c' as datlocprovider,\n"
+                    + "         'C' as datcollate,\n"
+                    + "         'C' as datctype,\n"
+                    + "         false as datistemplate,\n"
+                    + "         true as datallowconn,\n"
+                    + "         -1::bigint as datconnlimit,\n"
+                    + "         0::bigint as datlastsysoid,\n"
+                    + "         0::bigint as datfrozenxid,\n"
+                    + "         0::bigint as datminmxid,\n"
+                    + "         0::bigint as dattablespace,\n"
+                    + "         null as daticulocale,\n"
+                    + "         null as daticurules,\n"
+                    + "         null as datcollversion,\n"
+                    + "         null as datacl  from information_schema.information_schema_catalog_name\n"
+                    + ")\n"
+                    + "SELECT datname AS TABLE_CAT FROM pg_database WHERE datallowconn = true ORDER BY datname"),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("TABLE_CAT")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("test-database").build())
+                        .build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet catalogs = connection.getMetaData().getCatalogs()) {
+        assertTrue(catalogs.next());
+        assertEquals("test-database", catalogs.getString("TABLE_CAT"));
+        assertFalse(catalogs.next());
+      }
     }
   }
 
@@ -714,6 +880,20 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowWellKnownClient() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort()))) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.well_known_client")) {
+        assertTrue(resultSet.next());
+        assertEquals("JDBC", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testSetWellKnownClient() throws SQLException {
     for (String client : new String[] {"pgx", "npgsql", "sqlalchemy2"}) {
       try (Connection connection =
@@ -1012,12 +1192,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
             + "and col_bytea=? "
             + "and col_int=? "
+            + "and col_float4=? "
             + "and col_float8=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
@@ -1025,18 +1206,19 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_varchar=? "
             + "and col_jsonb=?";
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=$1 "
             + "and col_bool=$2 "
             + "and col_bytea=$3 "
             + "and col_int=$4 "
-            + "and col_float8=$5 "
-            + "and col_numeric=$6 "
-            + "and col_timestamptz=$7 "
-            + "and col_date=$8 "
-            + "and col_varchar=$9 "
-            + "and col_jsonb=$10";
+            + "and col_float4=$5 "
+            + "and col_float8=$6 "
+            + "and col_numeric=$7 "
+            + "and col_timestamptz=$8 "
+            + "and col_date=$9 "
+            + "and col_varchar=$10 "
+            + "and col_jsonb=$11";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1050,16 +1232,18 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p4")
                 .to(100)
                 .bind("p5")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(3.14d)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p9")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p10")
+                .to("test")
+                .bind("p11")
                 .to("{\"key\": \"value\"}")
                 .build(),
             ALL_TYPES_RESULTSET));
@@ -1082,6 +1266,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           preparedStatement.setBoolean(++index, true);
           preparedStatement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
           preparedStatement.setInt(++index, 100);
+          preparedStatement.setFloat(++index, 3.14f);
           preparedStatement.setDouble(++index, 3.14d);
           preparedStatement.setBigDecimal(++index, new BigDecimal("6.626"));
           preparedStatement.setObject(++index, offsetDateTime);
@@ -1094,6 +1279,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             assertEquals(1L, resultSet.getLong(++index));
             assertTrue(resultSet.getBoolean(++index));
             assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+            assertEquals(3.14f, resultSet.getFloat(++index), 0.0f);
             assertEquals(3.14d, resultSet.getDouble(++index), 0.0d);
             assertEquals(100, resultSet.getInt(++index));
             assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
@@ -1138,18 +1324,20 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           params.get("p3").getStringValue());
       assertEquals(TypeCode.INT64, types.get("p4").getCode());
       assertEquals("100", params.get("p4").getStringValue());
-      assertEquals(TypeCode.FLOAT64, types.get("p5").getCode());
-      assertEquals(3.14d, params.get("p5").getNumberValue(), 0.0d);
-      assertEquals(TypeCode.NUMERIC, types.get("p6").getCode());
-      assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p6").getTypeAnnotation());
-      assertEquals("6.626", params.get("p6").getStringValue());
-      assertEquals(TypeCode.TIMESTAMP, types.get("p7").getCode());
-      assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p7").getStringValue());
-      assertEquals(TypeCode.DATE, types.get("p8").getCode());
-      assertEquals("2022-03-29", params.get("p8").getStringValue());
-      assertEquals(TypeCode.STRING, types.get("p9").getCode());
-      assertEquals("test", params.get("p9").getStringValue());
-      assertEquals("{\"key\": \"value\"}", params.get("p10").getStringValue());
+      assertEquals(TypeCode.FLOAT32, types.get("p5").getCode());
+      assertEquals(3.14f, params.get("p5").getNumberValue(), 0.0f);
+      assertEquals(TypeCode.FLOAT64, types.get("p6").getCode());
+      assertEquals(3.14d, params.get("p6").getNumberValue(), 0.0d);
+      assertEquals(TypeCode.NUMERIC, types.get("p7").getCode());
+      assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p7").getTypeAnnotation());
+      assertEquals("6.626", params.get("p7").getStringValue());
+      assertEquals(TypeCode.TIMESTAMP, types.get("p8").getCode());
+      assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p8").getStringValue());
+      assertEquals(TypeCode.DATE, types.get("p9").getCode());
+      assertEquals("2022-03-29", params.get("p9").getStringValue());
+      assertEquals(TypeCode.STRING, types.get("p10").getCode());
+      assertEquals("test", params.get("p10").getStringValue());
+      assertEquals("{\"key\": \"value\"}", params.get("p11").getStringValue());
 
       mockSpanner.clearRequests();
     }
@@ -1537,9 +1725,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testNullValues() throws SQLException {
     String pgSql =
         "insert into all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
-            + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)";
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+            + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)";
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(pgSql)
@@ -1550,19 +1738,19 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to((ByteArray) null)
                 .bind("p4")
-                .to((Double) null)
+                .to((Float) null)
                 .bind("p5")
-                .to((Long) null)
+                .to((Double) null)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric(null))
+                .to((Long) null)
                 .bind("p7")
-                .to((com.google.cloud.spanner.Value) null)
+                .to(com.google.cloud.spanner.Value.pgNumeric(null))
                 .bind("p8")
-                .to((Date) null)
-                .bind("p9")
-                .to((String) null)
-                .bind("p10")
                 .to((com.google.cloud.spanner.Value) null)
+                .bind("p9")
+                .to((Date) null)
+                .bind("p10")
+                .to((String) null)
                 .bind("p11")
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p12")
@@ -1583,6 +1771,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p20")
                 .to((com.google.cloud.spanner.Value) null)
+                .bind("p21")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p22")
+                .to((com.google.cloud.spanner.Value) null)
                 .build(),
             1L));
     mockSpanner.putStatementResult(
@@ -1594,13 +1786,14 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
-                  + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+                  + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
         statement.setNull(++index, Types.BINARY);
+        statement.setNull(++index, Types.REAL);
         statement.setNull(++index, Types.DOUBLE);
         statement.setNull(++index, Types.INTEGER);
         statement.setNull(++index, Types.NUMERIC);
@@ -1608,6 +1801,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         statement.setNull(++index, Types.DATE);
         statement.setNull(++index, Types.VARCHAR);
         statement.setNull(++index, Types.OTHER);
+        statement.setNull(++index, Types.ARRAY);
         statement.setNull(++index, Types.ARRAY);
         statement.setNull(++index, Types.ARRAY);
         statement.setNull(++index, Types.ARRAY);
@@ -1636,6 +1830,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertFalse(resultSet.getBoolean(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getBytes(++index));
+        assertTrue(resultSet.wasNull());
+        assertEquals(0f, resultSet.getFloat(++index), 0.0f);
         assertTrue(resultSet.wasNull());
         assertEquals(0d, resultSet.getDouble(++index), 0.0d);
         assertTrue(resultSet.wasNull());
@@ -2747,13 +2943,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testPreparedStatementReturning() throws SQLException {
     String pgSql =
         "insert into all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
             + "returning *";
     String sql =
         "insert into all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             + "returning *";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -2768,6 +2964,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.BOOL,
                                         TypeCode.BYTES,
+                                        TypeCode.FLOAT32,
                                         TypeCode.FLOAT64,
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
@@ -2789,18 +2986,20 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test"))
                 .bind("p4")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p5")
-                .to(100L)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(100L)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p9")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p10")
+                .to("test")
+                .bind("p11")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             com.google.spanner.v1.ResultSet.newBuilder()
@@ -2814,24 +3013,27 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         ParameterMetaData parameterMetaData = statement.getParameterMetaData();
-        assertEquals(10, parameterMetaData.getParameterCount());
-        assertEquals(Types.BIGINT, parameterMetaData.getParameterType(1));
-        assertEquals(Types.BIT, parameterMetaData.getParameterType(2));
-        assertEquals(Types.BINARY, parameterMetaData.getParameterType(3));
-        assertEquals(Types.DOUBLE, parameterMetaData.getParameterType(4));
-        assertEquals(Types.BIGINT, parameterMetaData.getParameterType(5));
-        assertEquals(Types.NUMERIC, parameterMetaData.getParameterType(6));
-        assertEquals(Types.TIMESTAMP, parameterMetaData.getParameterType(7));
-        assertEquals(Types.DATE, parameterMetaData.getParameterType(8));
-        assertEquals(Types.VARCHAR, parameterMetaData.getParameterType(9));
-        assertEquals(Types.OTHER, parameterMetaData.getParameterType(10));
+        int index = 0;
+        assertEquals(11, parameterMetaData.getParameterCount());
+        assertEquals(Types.BIGINT, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.BIT, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.BINARY, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.REAL, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.DOUBLE, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.BIGINT, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.NUMERIC, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.TIMESTAMP, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.DATE, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.VARCHAR, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.OTHER, parameterMetaData.getParameterType(++index));
 
         ResultSetMetaData metadata = statement.getMetaData();
-        assertEquals(20, metadata.getColumnCount());
-        int index = 0;
+        assertEquals(22, metadata.getColumnCount());
+        index = 0;
         assertEquals(Types.BIGINT, metadata.getColumnType(++index));
         assertEquals(Types.BIT, metadata.getColumnType(++index));
         assertEquals(Types.BINARY, metadata.getColumnType(++index));
+        assertEquals(Types.REAL, metadata.getColumnType(++index));
         assertEquals(Types.DOUBLE, metadata.getColumnType(++index));
         assertEquals(Types.BIGINT, metadata.getColumnType(++index));
         assertEquals(Types.NUMERIC, metadata.getColumnType(++index));
@@ -2850,11 +3052,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
 
         index = 0;
         statement.setLong(++index, 1L);
         statement.setBoolean(++index, true);
         statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
+        statement.setFloat(++index, 3.14f);
         statement.setDouble(++index, 3.14d);
         statement.setInt(++index, 100);
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
@@ -3027,119 +3231,137 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testRandomResults() throws SQLException {
-    for (boolean binary : new boolean[] {false, true}) {
-      // Also get the random results using the normal Spanner client to compare the results with
-      // what is returned by PGAdapter.
-      Spanner spanner =
-          SpannerOptions.newBuilder()
-              .setProjectId("p")
-              .setHost(String.format("http://localhost:%d", spannerServer.getPort()))
-              .setCredentials(NoCredentials.getInstance())
-              .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
-              .setClientLibToken("pg-adapter")
-              .build()
-              .getService();
-      DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));
-      com.google.cloud.spanner.ResultSet spannerResult =
-          client.singleUse().executeQuery(SELECT_RANDOM);
+    for (int bufferSize : new int[] {0, 32}) {
+      for (boolean binary : new boolean[] {false, true}) {
+        // Also get the random results using the normal Spanner client to compare the results with
+        // what is returned by PGAdapter.
+        Spanner spanner =
+            SpannerOptions.newBuilder()
+                .setProjectId("p")
+                .setHost(String.format("http://localhost:%d", spannerServer.getPort()))
+                .setCredentials(NoCredentials.getInstance())
+                .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+                .setClientLibToken("pg-adapter")
+                .build()
+                .getService();
+        DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));
+        com.google.cloud.spanner.ResultSet spannerResult =
+            client.singleUse().executeQuery(SELECT_RANDOM);
 
-      String binaryTransferEnable =
-          "&binaryTransferEnable="
-              + ImmutableList.of(
-                      Oid.BOOL,
-                      Oid.BYTEA,
-                      Oid.VARCHAR,
-                      Oid.NUMERIC,
-                      Oid.FLOAT8,
-                      Oid.INT8,
-                      Oid.DATE,
-                      Oid.TIMESTAMPTZ)
-                  .stream()
-                  .map(String::valueOf)
-                  .collect(Collectors.joining(","));
+        String binaryTransferEnable =
+            "&binaryTransferEnable="
+                + ImmutableList.of(
+                        Oid.BOOL,
+                        Oid.BYTEA,
+                        Oid.VARCHAR,
+                        Oid.NUMERIC,
+                        Oid.FLOAT4,
+                        Oid.FLOAT8,
+                        Oid.INT8,
+                        Oid.DATE,
+                        Oid.TIMESTAMPTZ)
+                    .stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
 
-      final int fetchSize = 3;
-      try (Connection connection =
-          DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
-        connection.setAutoCommit(false);
-        connection.unwrap(PGConnection.class).setPrepareThreshold(binary ? -1 : 5);
-        try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
-          statement.setFetchSize(fetchSize);
-          try (ResultSet resultSet = statement.executeQuery()) {
-            int rowCount = 0;
-            while (resultSet.next()) {
-              assertTrue(spannerResult.next());
-              for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
-                // TODO: Remove once we have a replacement for pg_type, as the JDBC driver will try
-                // to read type information from the backend when it hits an 'unknown' type (jsonb
-                // is not one of the types that the JDBC driver will load automatically).
-                if (col == 5 || col == 14) {
-                  resultSet.getString(col + 1);
-                } else {
-                  resultSet.getObject(col + 1);
+        final int fetchSize = 3;
+        try (Connection connection =
+            DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
+          connection.setAutoCommit(false);
+          connection.unwrap(PGConnection.class).setPrepareThreshold(binary ? -1 : 5);
+          connection
+              .createStatement()
+              .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+          connection
+              .createStatement()
+              .execute(String.format("set spanner.binary_conversion_buffer_size=%d", bufferSize));
+
+          try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
+            statement.setFetchSize(fetchSize);
+            try (ResultSet resultSet = statement.executeQuery()) {
+              int rowCount = 0;
+              while (resultSet.next()) {
+                assertTrue(spannerResult.next());
+                for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
+                  // TODO: Remove once we have a replacement for pg_type, as the JDBC driver will
+                  //       try to read type information from the backend when it hits an 'unknown'
+                  //       type (jsonb is not one of the types that the JDBC driver will load
+                  //       automatically).
+                  final int jsonbColumnIndex = 6;
+                  final int jsonbArrayColumnIndex = 17;
+                  if (col == jsonbColumnIndex || col == jsonbArrayColumnIndex) {
+                    resultSet.getString(col + 1);
+                  } else {
+                    resultSet.getObject(col + 1);
+                  }
                 }
+                assertEqual(spannerResult, resultSet);
+                rowCount++;
               }
-              assertEqual(spannerResult, resultSet);
-              rowCount++;
+              assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
             }
-            assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
           }
+          connection.commit();
         }
-        connection.commit();
-      }
 
-      // Close the resources used by the normal Spanner client.
-      spannerResult.close();
-      spanner.close();
+        // Close the resources used by the normal Spanner client.
+        spannerResult.close();
+        spanner.close();
 
-      // The ExecuteSql request should only be sent once to Cloud Spanner by PGAdapter.
-      // The normal Spanner client will also send it once to Spanner.
-      assertEquals(binary ? 3 : 2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-      ExecuteSqlRequest executeRequest =
-          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(binary ? 2 : 1);
-      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-      assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
+        // The ExecuteSql request should only be sent once to Cloud Spanner by PGAdapter.
+        // The normal Spanner client will also send it once to Spanner.
+        assertEquals(binary ? 3 : 2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        ExecuteSqlRequest executeRequest =
+            mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(binary ? 2 : 1);
+        assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+        assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
 
-      // PGAdapter should receive 5 Execute messages:
-      // 1. BEGIN
-      // 2. Execute - fetch rows 1, 2
-      // 3. Execute - fetch rows 3, 4
-      // 4. Execute - fetch rows 5
-      // 5. COMMIT
-      if (pgServer != null) {
-        List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
-        assertEquals(1, describeMessages.size());
-        DescribeMessage describeMessage = describeMessages.get(0);
-        assertEquals(
-            binary ? PreparedType.Statement : PreparedType.Portal, describeMessage.getType());
+        // PGAdapter should receive 5 Execute messages:
+        // 1. BEGIN
+        // 2. Execute - fetch rows 1, 2
+        // 3. Execute - fetch rows 3, 4
+        // 4. Execute - fetch rows 5
+        // 5. COMMIT
+        if (pgServer != null) {
+          List<DescribeMessage> describeMessages =
+              getWireMessagesOfType(DescribeMessage.class).stream()
+                  .filter(message -> message.getSql().equals(SELECT_RANDOM.getSql()))
+                  .collect(Collectors.toList());
+          assertEquals(1, describeMessages.size());
+          DescribeMessage describeMessage = describeMessages.get(0);
+          assertEquals(
+              binary ? PreparedType.Statement : PreparedType.Portal, describeMessage.getType());
 
-        List<ExecuteMessage> executeMessages =
-            getWireMessagesOfType(ExecuteMessage.class).stream()
-                .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-                .collect(Collectors.toList());
-        int expectedExecuteMessageCount =
-            RANDOM_RESULTS_ROW_COUNT / fetchSize
-                + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
-                + 2;
-        assertEquals(expectedExecuteMessageCount, executeMessages.size());
-        assertEquals("", executeMessages.get(0).getName());
-        for (ExecuteMessage executeMessage :
-            executeMessages.subList(1, executeMessages.size() - 1)) {
-          assertEquals(fetchSize, executeMessage.getMaxRows());
+          List<ExecuteMessage> executeMessages =
+              getWireMessagesOfType(ExecuteMessage.class).stream()
+                  .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+                  .filter(message -> !message.getSql().startsWith("set spanner."))
+                  .collect(Collectors.toList());
+          int expectedExecuteMessageCount =
+              RANDOM_RESULTS_ROW_COUNT / fetchSize
+                  + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
+                  + 2;
+          assertEquals(expectedExecuteMessageCount, executeMessages.size());
+          assertEquals("", executeMessages.get(0).getName());
+          for (ExecuteMessage executeMessage :
+              executeMessages.subList(1, executeMessages.size() - 1)) {
+            assertEquals(fetchSize, executeMessage.getMaxRows());
+          }
+          assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
+
+          List<ParseMessage> parseMessages =
+              getWireMessagesOfType(ParseMessage.class).stream()
+                  .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+                  .filter(message -> !message.getSql().startsWith("set spanner."))
+                  .collect(Collectors.toList());
+          assertEquals(3, parseMessages.size());
+          assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
+          assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
+          assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
         }
-        assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
-
-        List<ParseMessage> parseMessages =
-            getWireMessagesOfType(ParseMessage.class).stream()
-                .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-                .collect(Collectors.toList());
-        assertEquals(3, parseMessages.size());
-        assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-        assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
-        assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+        mockSpanner.clearRequests();
+        pgServer.clearDebugMessages();
       }
-      mockSpanner.clearRequests();
-      pgServer.clearDebugMessages();
     }
   }
 
@@ -3547,10 +3769,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testShowSettingWithStartupValue() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      // DATESTYLE is set to 'ISO' by the JDBC driver at startup.
+      // DATESTYLE is set to 'ISO' by the JDBC driver at startup, except in version 42.7.0, which
+      // sets 'ISO, MDY'.
       try (ResultSet resultSet = connection.createStatement().executeQuery("show DATESTYLE")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        String dateStyle = resultSet.getString(1);
+        assertTrue(dateStyle, "ISO".equals(dateStyle) || "ISO, MDY".equals(dateStyle));
         assertFalse(resultSet.next());
       }
     }
@@ -3635,9 +3859,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testResetSettingWithStartupValue() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      String originalDateStyle;
       try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        originalDateStyle = resultSet.getString(1);
+        assertTrue(
+            originalDateStyle,
+            "ISO".equals(originalDateStyle) || "ISO, MDY".equals(originalDateStyle));
         assertFalse(resultSet.next());
       }
 
@@ -3653,7 +3881,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO", resultSet.getString(1));
+        assertEquals(originalDateStyle, resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -4034,6 +4262,106 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       verifySettingValue(connection, "time zone", "UTC");
       connection.rollback();
       verifySettingValue(connection, "time zone", originalTimeZone);
+    }
+  }
+
+  @Test
+  public void testSelectSetConfigTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select set_config('timezone', 'ist', false)")) {
+        assertTrue(resultSet.next());
+        assertEquals("ist", resultSet.getString("set_config"));
+        assertFalse(resultSet.next());
+      }
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
+    }
+  }
+
+  @Test
+  public void testSelectSetConfigInvalidTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery(
+                          "select set_config('timezone', 'non-existent-timezone', false)"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          exception.getServerErrorMessage().getSQLState(), SQLState.RaiseException.toString());
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_setting('timezone')")) {
+        assertTrue(resultSet.next());
+        assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingInvalidName() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery("select current_setting('invalid-setting-name')"));
+      assertEquals(SQLState.SyntaxError.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingMissingNotOk() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .executeQuery("select current_setting('non_existing_setting')"));
+      assertEquals(SQLState.RaiseException.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingMissingOk_settingIsMissing() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select current_setting('non_existing_setting', true)")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingMissingOk_settingIsPresent() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_setting('timezone', true)")) {
+        assertTrue(resultSet.next());
+        assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+        assertFalse(resultSet.next());
+      }
     }
   }
 

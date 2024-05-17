@@ -32,6 +32,7 @@ from testcontainers.core.waiting_utils import wait_for_logs
 
 def start_pgadapter(project: str,
                     instance: str,
+                    emulator: bool = False,
                     credentials: str = None) -> (DockerContainer, str):
   """Starts PGAdapter in an embedded Docker container
 
@@ -45,6 +46,9 @@ def start_pgadapter(project: str,
       The Google Cloud project that PGAdapter should connect to.
   instance : str
       The Cloud Spanner instance that PGAdapter should connect to.
+  emulator: bool
+      Whether PGAdapter should connect to the Cloud Spanner emulator or real
+      Cloud Spanner.
   credentials : str or None
       The credentials file that PGAdapter should use. If None, then this
       function will try to load the default credentials from the environment.
@@ -57,19 +61,27 @@ def start_pgadapter(project: str,
       with a standard PostgreSQL driver to connect to Cloud Spanner.
   """
 
-  # Start PGAdapter in a Docker container
-  container = DockerContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter") \
-    .with_exposed_ports(5432) \
-    .with_command("   -p " + project
-                  + " -i " + instance
-                  + " -x -c /credentials.json")
-  container.start()
-  # Determine the credentials that should be used by PGAdapter and write these
-  # to a file in the container.
-  credentials_info = _determine_credentials(credentials)
-  container.exec("sh -c 'cat <<EOT >> /credentials.json\n"
-                 + json.dumps(credentials_info, indent=0)
-                 + "\nEOT'")
+  if emulator:
+    # Start PGAdapter with the Cloud Spanner emulator in a Docker container
+    container =(
+      DockerContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
+      .with_exposed_ports(5432)
+      .with_command("-p " + project + " -i " + instance))
+    container.start()
+  else:
+    # Start PGAdapter in a Docker container
+    container = DockerContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter") \
+      .with_exposed_ports(5432) \
+      .with_command("   -p " + project
+                    + " -i " + instance
+                    + " -x -c /credentials.json")
+    container.start()
+    # Determine the credentials that should be used by PGAdapter and write these
+    # to a file in the container.
+    credentials_info = _determine_credentials(credentials)
+    container.exec("sh -c 'cat <<EOT >> /credentials.json\n"
+                   + json.dumps(credentials_info, indent=0)
+                   + "\nEOT'")
   # Wait until PGAdapter has started and is listening on the exposed port.
   wait_for_logs(container, "PostgreSQL version:")
   port = container.get_exposed_port("5432")

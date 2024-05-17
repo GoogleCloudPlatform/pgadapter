@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.python.django;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
@@ -44,6 +45,10 @@ public class ITDjangoTest extends DjangoTestSetup {
 
   @BeforeClass
   public static void setup() throws Exception {
+    assumeTrue(
+        "This test is not supported on the emulator",
+        System.getenv("SPANNER_EMULATOR_HOST") == null);
+
     if (!isPythonAvailable()
         && !System.getProperty("allowSkipUnsupportedEcosystemTest", "false")
             .equalsIgnoreCase("true")) {

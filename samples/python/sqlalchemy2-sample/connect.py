@@ -12,20 +12,23 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-import argparse
 
+from pgadapter import in_process_pgadapter_host, in_process_pgadapter_port
+from args import parse_arguments
 from sqlalchemy import create_engine
 
 
 # Creates a database engine that can be used with the sample.py script in this
-# directory. This function assumes that the host, port and database name was
-# given as command line arguments.
+# directory. This function checks whether an in-process PGAdapter instance has
+# been started, and if so, uses that instance. Otherwise, it connects to the
+# host and port number given in the command line arguments.
 def create_test_engine(autocommit: bool = False, options: str = ""):
-  parser = argparse.ArgumentParser(description='Run SQLAlchemy sample.')
-  parser.add_argument('host', type=str, help='host to connect to')
-  parser.add_argument('port', type=int, help='port number to connect to')
-  parser.add_argument('database', type=str, help='database to connect to', default='d')
-  args = parser.parse_args()
+  args = parse_arguments()
+  # Check if PGAdapter has been started in-process. If so, we'll connect to that
+  # instance.
+  if in_process_pgadapter_host is not None and in_process_pgadapter_port is not None:
+    args.host = in_process_pgadapter_host
+    args.port = in_process_pgadapter_port
 
   conn_string = "postgresql+psycopg://user:password@{host}:{port}/" \
                 "{database}{options}".format(host=args.host,

@@ -63,6 +63,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.PGProperty;
+import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
@@ -98,11 +99,16 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
    * recognize the connection as a psql connection.
    */
   private String createUrl(String database) {
+    return createUrl(database, "psql");
+  }
+
+  private String createUrl(String database, String applicationName) {
     return String.format(
-        "jdbc:postgresql://localhost:%d/%s?preferQueryMode=simple&%s=psql&%s=090000",
+        "jdbc:postgresql://localhost:%d/%s?preferQueryMode=simple&%s=%s&%s=090000",
         pgServer.getLocalPort(),
         database,
         PGProperty.APPLICATION_NAME.getName(),
+        applicationName,
         PGProperty.ASSUME_MIN_SERVER_VERSION.getName());
   }
 
@@ -209,37 +215,61 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testConnectToNonExistingInstance() {
+    for (String appName : new String[] {"psql", "other-app"}) {
+      try {
+        mockSpanner.setExecuteStreamingSqlExecutionTime(
+            SimulatedExecutionTime.ofStickyException(
+                newStatusResourceNotFoundException(
+                    "i",
+                    "type.googleapis.com/google.spanner.admin.instance.v1.Instance",
+                    "projects/p/instances/i")));
+        // The Connection API calls listInstanceConfigs(..) once first when the connection is a
+        // localhost connection. It does so to verify that the connection is valid and to quickly
+        // return an error if someone is for example trying to connect to the emulator while the
+        // emulator is not running. This does not happen when you connect to a remote host. We
+        // therefore need to add a response for the listInstanceConfigs as well.
+        mockInstanceAdmin.addResponse(ListInstanceConfigsResponse.getDefaultInstance());
+        mockInstanceAdmin.addResponse(
+            ListInstancesResponse.newBuilder()
+                .addInstances(
+                    Instance.newBuilder()
+                        .setConfig("projects/p/instanceConfigs/ic")
+                        .setName("projects/p/instances/i")
+                        .build())
+                .build());
+
+        SQLException exception =
+            assertThrows(
+                SQLException.class,
+                () -> DriverManager.getConnection(createUrl("non-existing-db", appName)));
+        assertTrue(exception.getMessage(), exception.getMessage().contains("NOT_FOUND"));
+
+        boolean isPsql = "psql".equals(appName);
+        assertEquals(
+            exception.getMessage(),
+            isPsql,
+            exception.getMessage().contains("These instances are available in project p:"));
+        assertEquals(
+            exception.getMessage(),
+            isPsql,
+            exception.getMessage().contains("\tprojects/p/instances/i\n"));
+      } finally {
+        closeSpannerPool(true);
+      }
+    }
+  }
+
+  @Test
+  public void testConnectFailed() {
     try {
       mockSpanner.setExecuteStreamingSqlExecutionTime(
           SimulatedExecutionTime.ofStickyException(
-              newStatusResourceNotFoundException(
-                  "i",
-                  "type.googleapis.com/google.spanner.admin.instance.v1.Instance",
-                  "projects/p/instances/i")));
-      // The Connection API calls listInstanceConfigs(..) once first when the connection is a
-      // localhost connection. It does so to verify that the connection is valid and to quickly
-      // return an error if someone is for example trying to connect to the emulator while the
-      // emulator is not running. This does not happen when you connect to a remote host. We
-      // therefore need to add a response for the listInstanceConfigs as well.
-      mockInstanceAdmin.addResponse(ListInstanceConfigsResponse.getDefaultInstance());
-      mockInstanceAdmin.addResponse(
-          ListInstancesResponse.newBuilder()
-              .addInstances(
-                  Instance.newBuilder()
-                      .setConfig("projects/p/instanceConfigs/ic")
-                      .setName("projects/p/instances/i")
-                      .build())
-              .build());
-
+              Status.INVALID_ARGUMENT.withDescription("test error").asRuntimeException()));
       SQLException exception =
           assertThrows(
               SQLException.class, () -> DriverManager.getConnection(createUrl("non-existing-db")));
-      assertTrue(exception.getMessage(), exception.getMessage().contains("NOT_FOUND"));
-      assertTrue(
-          exception.getMessage(),
-          exception.getMessage().contains("These instances are available in project p:"));
-      assertTrue(
-          exception.getMessage(), exception.getMessage().contains("\tprojects/p/instances/i\n"));
+      assertTrue(exception.getMessage(), exception.getMessage().contains("test error"));
+
     } finally {
       closeSpannerPool(true);
     }
@@ -324,6 +354,41 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
       assertEquals(
           "ERROR: prepared statement my_prepared_statement does not exist",
           sqlException.getMessage());
+    }
+  }
+
+  @Test
+  public void testPrepareInvalidStatement() throws SQLException {
+    // Register an error for an invalid statement.
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of("SELECT"),
+            Status.INVALID_ARGUMENT
+                .withDescription("Statement must produce at least one output column")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      // Try to create a prepared statement using the invalid SELECT statement.
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  connection.createStatement().execute("prepare my_prepared_statement as SELECT"));
+      assertTrue(
+          exception.getMessage().contains("Statement must produce at least one output column"));
+
+      // Verify that we can create a prepared statement with the same name without having to drop it
+      // first.
+      connection.createStatement().execute("prepare my_prepared_statement as SELECT 1");
+      // Verify that we can now use the prepared statement.
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertTrue(statement.execute("execute my_prepared_statement"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
     }
   }
 

@@ -31,6 +31,7 @@ import com.google.protobuf.Value;
 import com.google.spanner.v1.BatchCreateSessionsRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.CreateSessionRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
@@ -1137,7 +1138,10 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
     List<AbstractMessage> requests = mockSpanner.getRequests();
     requests =
         requests.stream()
-            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .filter(
+                request ->
+                    !(request.getClass().equals(BatchCreateSessionsRequest.class)
+                        || request.getClass().equals(CreateSessionRequest.class)))
             .collect(Collectors.toList());
 
     assertEquals(6, requests.size());

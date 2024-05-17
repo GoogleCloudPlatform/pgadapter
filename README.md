@@ -41,6 +41,10 @@ PGAdapter can be used with the following frameworks and tools:
 1. `Ruby ActiveRecord`: Version 7.x has _experimental support_ and with limitations. Please read the
    instructions in [PGAdapter - Ruby ActiveRecord Connection Options](docs/ruby-activerecord.md)
    carefully for how to set up ActiveRecord to work with PGAdapter.
+1. `Knex.js` query builder can be used with PGAdapter. See [Knex.js sample application](samples/nodejs/knex)
+   for a sample application.
+1. `Sequelize.js` ORM can be used with PGAdapter. See [Sequelize.js sample application](samples/nodejs/sequelize)
+   for a sample application.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
@@ -48,6 +52,10 @@ See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked qu
 ## Performance
 See [Latency Comparisons](benchmarks/latency-comparison/README.md) for benchmark comparisons between
 using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers and client libraries.
+
+## Insights
+See [OpenTelemetry in PGAdapter](docs/open_telemetry.md) for how to use `OpenTelemetry` to collect
+and export traces to Google Cloud Trace.
 
 ## Usage
 PGAdapter can be started both as a Docker container, a standalone process as well as an
@@ -107,9 +115,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.25.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.33.1` with the version you want to download):
 ```shell
-VERSION=v0.25.0
+VERSION=v0.33.1
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -144,7 +152,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.25.0</version>
+  <version>0.33.1</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -155,19 +163,16 @@ This option is only available for Java/JVM-based applications.
 
 ```java
 class PGProxyRunner {
-    public static void main() {
-      String[] arguments =
-              new String[] {
-                      "-p",
-                      "my-project",
-                      "-i",
-                      "my-instance",
-                      "-d",
-                      "my-database",
-                      "-c",
-                      "/path/to/credentials.json"
-              };
-      ProxyServer server = new ProxyServer(new OptionsMetadata(arguments));
+  public static void main(String[] args) {
+      OptionsMetadata.Builder builder =
+          OptionsMetadata.newBuilder()
+              .setProject("my-project")
+              .setInstance("my-instance")
+              .setDatabase("my-database")
+              .setCredentialsFile("/path/to/credentials.json")
+              // Start PGAdapter on any available port.
+              .setPort(0);
+      ProxyServer server = new ProxyServer(builder.build());
       server.startServer();
       server.awaitRunning();
     }
@@ -176,6 +181,32 @@ class PGProxyRunner {
 
 See [samples/java/jdbc](samples/java/jdbc) for a small sample application that adds
 PGAdapter as a compile-time dependency and runs it together with the main application.
+
+## Emulator
+A pre-built Docker image that contains both PGAdapter and the Spanner Emulator can be started with
+these commands:
+
+```shell
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+docker run \
+  -d -p 5432:5432 \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+sleep 2
+psql -h localhost -p 5432 -d test-database
+```
+
+This Docker container configures PGAdapter to connect to a Cloud Spanner Emulator running inside
+the same container. You do not need to first create a Spanner instance or database on the Emulator
+before connecting to them. Instead, the instance and database are automatically created on the
+Emulator when you connect to PGAdapter.
+
+### Additional Information
+See [this document](docs/emulator.md) for more information on how to connect PGAdapter to the Cloud
+Spanner Emulator.
+
+Connecting to the Cloud Spanner Emulator is supported with:
+1. PGAdapter version 0.26.0 and higher.
+2. Cloud Spanner Emulator 1.5.12 and higher.
 
 ### Options
 
@@ -328,8 +359,30 @@ PGAdapter has the following known limitations at this moment:
 
 ## Logging
 
-PGAdapter uses `java.util.logging` for logging. Create a `logging.properties` file to configure
-logging messages. See the following example for an example to get fine-grained logging.
+PGAdapter uses `java.util.logging` for logging.
+
+### Default Logging
+
+PGAdapter by default configures `java.util.logging` to do the following:
+1. Log messages of level WARNING and higher are logged to `stderr`.
+2. Log messages of level INFO are logged to `stdout`.
+3. Log messages of higher levels than INFO are not logged.
+
+You can supply your own logging configuration with the `-Djava.util.logging.config.file`
+System property. See the next section for an example.
+
+The default log configuration described in this section was introduced in version 0.33.0 of
+PGAdapter. Prior to that, PGAdapter used the default `java.util.logging` configuration, which
+logs everything to `stderr`.
+
+You can disable the default PGAdapter log configuration and go back to the standard
+`java.util.logging` configuration by starting PGAdapter with the command line argument
+`-legacy_logging`.
+
+### Custom Logging Configuration
+
+Create a `logging.properties` file to configure logging messages.
+See the following example for an example to get fine-grained logging.
 
 ```
 handlers=java.util.logging.ConsoleHandler,java.util.logging.FileHandler
@@ -340,12 +393,12 @@ java.util.logging.FileHandler.pattern=%h/log/pgadapter-%u.log
 java.util.logging.FileHandler.append=false
 io.grpc.internal.level = WARNING
 
-java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS] [%4$s] (%2$s): %5$s%6$s%n
+java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL] [%4$s] (%2$s): %5$s%6$s%n
 java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
 ```
 
-Start PGAdapter with `-Djava.util.logging.config.file=logging.properties` when running PGAdapter as
-a jar.
+Start PGAdapter with `-Djava.util.logging.config.file=logging.properties` when running PGAdapter
+as a jar.
 
 ### Logging in Docker
 
@@ -361,7 +414,7 @@ java.util.logging.FileHandler.pattern=/home/pgadapter/log/pgadapter.log
 java.util.logging.FileHandler.append=true
 io.grpc.internal.level = WARNING
 
-java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS] [%4$s] (%2$s): %5$s%6$s%n
+java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL] [%4$s] (%2$s): %5$s%6$s%n
 java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
 ```
 

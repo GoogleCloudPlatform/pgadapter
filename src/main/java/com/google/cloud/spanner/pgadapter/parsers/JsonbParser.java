@@ -22,6 +22,8 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
+import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
@@ -29,6 +31,7 @@ import javax.annotation.Nonnull;
 /** Translate from wire protocol to jsonb. */
 @InternalApi
 public class JsonbParser extends Parser<String> {
+  private static final byte[] BINARY_HEADER = new byte[] {1};
 
   JsonbParser(ResultSet item, int position) {
     this.item = item.getPgJsonb(position);
@@ -91,13 +94,21 @@ public class JsonbParser extends Parser<String> {
     return result;
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+  public static byte[] convertToPG(
+      SessionState sessionState,
+      DataOutputStream dataOutputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format) {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        return resultSet.getPgJsonb(position).getBytes(StandardCharsets.UTF_8);
+        StringParser.writeToPG(sessionState, dataOutputStream, resultSet.getPgJsonb(position));
+        return null;
       case POSTGRESQL_BINARY:
-        return convertToPG(resultSet.getPgJsonb(position));
+        StringParser.writeToPG(
+            sessionState, dataOutputStream, resultSet.getPgJsonb(position), BINARY_HEADER);
+        return null;
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }

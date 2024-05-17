@@ -31,6 +31,8 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import java.io.DataOutputStream;
+import java.util.UUID;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -42,9 +44,13 @@ import org.mockito.junit.MockitoRule;
 @RunWith(JUnit4.class)
 public class ExtendedQueryProtocolHandlerTest {
   @Rule public MockitoRule rule = MockitoJUnit.rule();
-
   @Mock private ConnectionHandler connectionHandler;
   @Mock private BackendConnection backendConnection;
+
+  @Before
+  public void setupMocks() {
+    when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
+  }
 
   @Test
   public void testBuffer() {

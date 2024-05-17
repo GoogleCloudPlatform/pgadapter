@@ -1,43 +1,37 @@
 # PGAdapter and Hibernate
 
-PGAdapter can be used in combination with Hibernate, but with a number of limitations. This sample
-shows the command line arguments and configuration that is needed in order to use Hibernate with
+PGAdapter can be used in combination with Hibernate, but with some limitations. This sample shows to use Hibernate with
 PGAdapter.
 
-> __Note__: This sample uses Hibernate directly. There is also a sample for using [Spring Data JPA
-with PGAdapter here](../spring-data-jpa).
+> __Note__: This sample uses Hibernate directly. There is also a sample for using
+> [Spring Data JPA and Spring Boot with PGAdapter here](../spring-data-jpa).
 
-## Start PGAdapter
-You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
-pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
-to run PGAdapter.
+You can run the sample on the Cloud Spanner emulator with this command:
 
 ```shell
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
-docker run \
-  -d -p 5432:5432 \
-  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS \
-  -v /tmp:/tmp \
-  gcr.io/cloud-spanner-pg-adapter/pgadapter \
-  -p my-project -i my-instance \
-  -x
+mvn exec:java
 ```
 
-## Creating the Sample Data Model
-Run the following command in this directory. Replace the host, port and database name with the actual host, port and
-database name for your PGAdapter and database setup.
+You can also run the sample on a real Cloud Spanner database with this command:
 
 ```shell
-psql -h localhost -p 5432 -d my-database -f sample-schema.sql
+mvn exec:java \
+  -Dexec.args=" \
+    -p my-project \
+    -i my-instance \
+    -d my-database"
 ```
 
-You can also drop an existing data model using the `drop_data_model.sql` script:
+## PGAdapter
+PGAdapter is automatically started by the sample application as an in-process dependency. Depending on the command line
+arguments, one of the following will be started:
+1. No command line arguments: A Docker container with both PGAdapter and the Cloud Spanner emulator is started
+   automatically. The sample creates a database on the emulator and uses that for the sample application.
+2. With command line arguments: Use `-p <project> -i <instance> -d <database>` to point to an existing Cloud Spanner
+   PostgreSQL database that should be used for the sample. The database may be empty. The sample application will
+   automatically create the tables that are needed for the sample.
 
-```shell
-psql -h localhost -p 5432 -d my-database -f drop-data-model.sql
-```
+
 
 ## Data Types
 Cloud Spanner supports the following data types in combination with `Hibernate`.
@@ -61,7 +55,6 @@ The following limitations are currently known:
 | Limitation             | Workaround                                                                                                                                                                                                                                                                   |
 |------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Schema updates         | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated schema updates using `hibernate` are therefore not supported. It is recommended to set the option `hibernate.hbm2ddl.auto=none` (or `spring.jpa.hibernate.ddl-auto=none` if you are using Spring). |
-| Generated primary keys | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Remove auto increment annotation for primary key columns. The recommended type of primary key is a client side generated `UUID` stored as a string.                                 |
 | Pessimistic Locking    | Cloud Spanner does not support `LockMode.UPGRADE` and `LockMode.UPGRADE_NOWAIT` lock modes.                                                                                                                                                                                  |
 
 
@@ -75,11 +68,10 @@ your schema in production. This gives you more control over the changes that are
 you to store schema changes in a code repository. See [Spring Data JPA with PGAdapter here](../spring-data-jpa)
 for an example of how to integrate Liquibase with your application.
 
-### Generated Primary Keys
-`Sequences` are not supported. Hence, auto increment primary key is not supported and should be replaced with primary key definitions that
-are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
-for more information on choosing a good primary key. This sample uses UUIDs that are generated by the client for primary
-keys.
+### Generated Primary Keys - UUIDs
+See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots for more
+information on choosing a good primary key. Most entities in this sample use UUIDs that are
+generated by the client for primary keys.
 
 ```java
 public class User {
@@ -90,3 +82,64 @@ public class User {
     private UUID id;
 }
 ```
+
+### Generated Primary Keys - Bit-reversed Sequence
+
+Using a traditional auto-increment primary key with Cloud Spanner is not recommended, because a
+monotonically increasing or decreasing primary key value can create a write-hotspot. This will cause
+all writes to be sent to one server. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
+for more background information.
+
+Cloud Spanner therefore supports bit-reversed sequences. These internally work as traditional
+sequences, but the value that is returned is bit-reversed before being returned to the user. These
+sequences can be used to generate primary keys with JPA / Hibernate.
+
+Note that Hibernate requires sequences to support pooling in order to support efficient batching of
+multiple inserts. Pooling normally requires the sequence to support an increment size larger than 1.
+Bit-reversed sequences can also support pooling, but require a custom ID generator to be used.
+Follow these steps to define an entity that uses a bit-reversed sequence for generating a primary
+key that also supports batching:
+
+1. Add the following dependency to your project:
+
+```xml
+<!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
+<dependency>
+   <groupId>com.google.cloud</groupId>
+   <artifactId>google-cloud-spanner-hibernate-tools</artifactId>
+   <version>3.1.0</version>
+</dependency>
+```
+
+2. Add the following annotations to your entity:
+
+```java
+  @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ticketSaleId")
+  @GenericGenerator(
+      // This is the name of the generator, not the name of the sequence. This name must correspond
+      // with the name given in the @GeneratedValue above.
+      name = "ticketSaleId",
+      // Use this custom strategy to ensure the use of a bit-reversed sequence that is compatible
+      // with batching multiple inserts. See also
+      // https://docs.jboss.org/hibernate/orm/5.4/userguide/html_single/Hibernate_User_Guide.html#batch.
+      type = PooledBitReversedSequenceStyleGenerator.class,
+      parameters = {
+        // Use a separate sequence name for each entity.
+        // See resources/db.changelog-v1.1.sql file for the sequence definition in the database.
+        @Parameter(name = SequenceStyleGenerator.SEQUENCE_PARAM, value = "ticket_sale_seq"),
+        // The increment_size is not actually set on the sequence that is created, but is used to
+        // generate a SELECT query that fetches this number of identifiers at once.
+        @Parameter(name = SequenceStyleGenerator.INCREMENT_PARAM, value = "50"),
+        @Parameter(name = SequenceStyleGenerator.INITIAL_PARAM, value = "50000"),
+        // Add any range that should be excluded by the generator if your table already
+        // contains existing values that have been generated by other generators.
+        @Parameter(
+            name = PooledBitReversedSequenceStyleGenerator.EXCLUDE_RANGE_PARAM,
+            value = "[1,1000]"),
+      })
+  public Long id;
+```
+
+See [TicketSale.java](src/main/java/com/google/cloud/postgres/models/TicketSale.java)
+for a working example.

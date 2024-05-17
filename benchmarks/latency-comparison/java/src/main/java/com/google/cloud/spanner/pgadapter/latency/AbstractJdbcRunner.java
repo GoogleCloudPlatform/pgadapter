@@ -40,12 +40,15 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
   }
 
   @Override
-  public List<Duration> execute(String sql, int numClients, int numOperations) {
+  public List<Duration> execute(
+      TransactionType transactionType, int numClients, int numOperations, int waitMillis) {
     try {
       List<Future<List<Duration>>> results = new ArrayList<>(numClients);
       ExecutorService service = Executors.newFixedThreadPool(numClients);
       for (int client = 0; client < numClients; client++) {
-        results.add(service.submit(() -> runBenchmark(createUrl(), sql, numOperations)));
+        results.add(
+            service.submit(
+                () -> runBenchmark(createUrl(), transactionType, numOperations, waitMillis)));
       }
       return collectResults(service, results, numClients, numOperations);
     } catch (Throwable t) {
@@ -55,23 +58,41 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
 
   protected abstract String createUrl();
 
-  private List<Duration> runBenchmark(String url, String sql, int numOperations) {
+  private List<Duration> runBenchmark(
+      String url, TransactionType transactionType, int numOperations, int waitMillis) {
     List<Duration> results = new ArrayList<>(numOperations);
     try (Connection connection = DriverManager.getConnection(url)) {
       // Execute one query to make sure everything has been warmed up.
-      executeQuery(connection, sql);
+      executeTransaction(connection, transactionType);
 
       for (int i = 0; i < numOperations; i++) {
-        results.add(executeQuery(connection, sql));
+        randomWait(waitMillis);
+        results.add(executeTransaction(connection, transactionType));
+        incOperations();
       }
     } catch (SQLException exception) {
       throw SpannerExceptionFactory.newSpannerException(exception);
+    } catch (InterruptedException interruptedException) {
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     }
     return results;
   }
 
-  protected Duration executeQuery(Connection connection, String sql) throws SQLException {
+  protected Duration executeTransaction(Connection connection, TransactionType transactionType)
+      throws SQLException {
     Stopwatch watch = Stopwatch.createStarted();
+    switch (transactionType) {
+      case READ_ONLY:
+        executeReadOnlyTransaction(connection, transactionType.getJdbcSql());
+        break;
+      case READ_WRITE:
+        executeReadWriteTransaction(connection, transactionType.getJdbcSql());
+        break;
+    }
+    return watch.elapsed();
+  }
+
+  protected void executeReadOnlyTransaction(Connection connection, String sql) throws SQLException {
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
       statement.setInt(1, ThreadLocalRandom.current().nextInt(100000));
       try (ResultSet resultSet = statement.executeQuery()) {
@@ -86,6 +107,16 @@ public abstract class AbstractJdbcRunner extends AbstractRunner {
         }
       }
     }
-    return watch.elapsed();
+  }
+
+  protected void executeReadWriteTransaction(Connection connection, String sql)
+      throws SQLException {
+    connection.createStatement().execute("begin transaction");
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, generateRandomString());
+      statement.setInt(2, ThreadLocalRandom.current().nextInt(100000));
+      statement.executeUpdate();
+    }
+    connection.createStatement().execute("commit");
   }
 }

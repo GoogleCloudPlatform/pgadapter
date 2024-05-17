@@ -88,7 +88,8 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     // don't need to do that once more.
     if (futureStatementResult == null && getStatementResult() == null) {
       this.executed = true;
-      setFutureStatementResult(backendConnection.execute(parsedStatement, statement, this::bind));
+      setFutureStatementResult(
+          backendConnection.execute(command, parsedStatement, statement, this::bind));
     }
   }
 
@@ -136,7 +137,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     // DescribePortal and Execute.
     if (futureStatementResult == null && getStatementResult() == null) {
       Future<StatementResult> statementResultFuture =
-          backendConnection.execute(this.parsedStatement, this.statement, this::bind);
+          backendConnection.execute(this.command, this.parsedStatement, this.statement, this::bind);
       setFutureStatementResult(statementResultFuture);
       this.executed = true;
       return statementResultFuture;

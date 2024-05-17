@@ -16,8 +16,10 @@ package main
 
 import "C"
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jackc/pgtype"
 	"github.com/shopspring/decimal"
 	"reflect"
 	"time"
@@ -72,6 +74,20 @@ type AllTypes struct {
 	ColTimestamptz *time.Time
 	ColDate        *datatypes.Date
 	ColVarchar     *string `gorm:"primaryKey"`
+}
+
+type AllArrayTypes struct {
+	ID                  *string `gorm:"primaryKey"`
+	ColArrayBigint      pgtype.Int8Array `gorm:"type:bigint[]"`
+	ColArrayBool        pgtype.BoolArray `gorm:"type:bool[]"`
+	ColArrayBytea       pgtype.ByteaArray `gorm:"type:bytea[]"`
+	ColArrayFloat8      pgtype.Float8Array `gorm:"type:float8[]"`
+	ColArrayInt         pgtype.Int4Array `gorm:"type:integer[]"`
+	ColArrayNumeric     pgtype.NumericArray `gorm:"type:numeric[]"`
+	ColArrayTimestamptz pgtype.TimestamptzArray `gorm:"type:timestamptz[]"`
+	ColArrayDate        pgtype.DateArray `gorm:"type:date[]"`
+	ColArrayVarchar     pgtype.TextArray `gorm:"type:varchar[]"`
+	ColArrayJsonb       pgtype.JSONBArray `gorm:"type:jsonb[]"`
 }
 
 //export TestCreateBlogAndUser
@@ -392,6 +408,362 @@ func TestUpdateAllDataTypes(connString string) *C.char {
 	return nil
 }
 
+//export TestQueryAllArrayDataTypes
+func TestQueryAllArrayDataTypes(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+	_, _  = conn.ExecContext(context.Background(), "set time zone UTC")
+	row := AllArrayTypes{}
+	if err := db.First(&row).Error; err != nil {
+		return C.CString(fmt.Sprintf("failed to get AllArrayTypes: %v", err))
+	}
+
+	// First verify that nothing is null.
+	if row.ID == nil {
+		return C.CString("ID is null")
+	}
+	if row.ColArrayBigint.Status == pgtype.Null {
+		return C.CString("ColArrayBigint is null")
+	}
+	if row.ColArrayBool.Status == pgtype.Null {
+		return C.CString("ColArrayBool is null")
+	}
+	if row.ColArrayBytea.Status == pgtype.Null {
+		return C.CString("ColArrayBytea is null")
+	}
+	if row.ColArrayFloat8.Status == pgtype.Null {
+		return C.CString("ColArrayFloat8 is null")
+	}
+	if row.ColArrayInt.Status == pgtype.Null {
+		return C.CString("ColArrayInt is null")
+	}
+	if row.ColArrayNumeric.Status == pgtype.Null {
+		return C.CString("ColArrayNumeric is null")
+	}
+	if row.ColArrayTimestamptz.Status == pgtype.Null {
+		return C.CString("ColArrayTimestamptz is null")
+	}
+	if row.ColArrayDate.Status == pgtype.Null {
+		return C.CString("ColArrayDate is null")
+	}
+	if row.ColArrayVarchar.Status == pgtype.Null {
+		return C.CString("ColArrayVarchar is null")
+	}
+
+	wantInt8Array := pgtype.Int8Array{
+		Elements: []pgtype.Int8{
+			{Int: int64(1), Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Int: int64(2), Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayBigint, wantInt8Array; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayBigint mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	wantBoolArray := pgtype.BoolArray{
+		Elements: []pgtype.Bool{
+			{Bool: true, Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Bool: false, Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayBool, wantBoolArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayBool mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	wantFloat8Array := pgtype.Float8Array{
+		Elements: []pgtype.Float8{
+			{Float: 3.14, Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Float: -99.99, Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayFloat8, wantFloat8Array; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayFloat8 mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	wantByteaArray := pgtype.ByteaArray{
+		Elements: []pgtype.Bytea{
+			{Bytes: []byte("bytes1"), Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Bytes: []byte("bytes2"), Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayBytea, wantByteaArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayBytea mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	wantInt4Array := pgtype.Int4Array{
+		Elements: []pgtype.Int4{
+			{Int: -100, Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Int: -200, Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayInt, wantInt4Array; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayInt mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	num1 := pgtype.Numeric{}
+	_ = num1.Scan("6.626")
+	num2 := pgtype.Numeric{}
+	_ = num2.Scan("-3.14")
+	wantNumericArray := pgtype.NumericArray{
+		Elements: []pgtype.Numeric{
+			{Int: num1.Int, Exp: num1.Exp, Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Int: num2.Int, Exp: num2.Exp, Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayNumeric, wantNumericArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayNumeric mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	wantTimestamptzArray := pgtype.TimestamptzArray{
+		Elements: []pgtype.Timestamptz{
+			{Time: parseTimestamp("2022-02-16T16:18:02.123456+00:00"), Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Time: parseTimestamp("2000-01-01T00:00:00+00:00"), Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayTimestamptz, wantTimestamptzArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayTimestamptz mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	wantDateArray := pgtype.DateArray{
+		Elements: []pgtype.Date{
+			{Time: time.Time(parseDate("2023-02-20")), Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Time: time.Time(parseDate("2000-01-01")), Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayDate, wantDateArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayDate mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	wantVarcharArray := pgtype.TextArray{
+		Elements: []pgtype.Text{
+			{String: "string1", Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{String: "string2", Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayVarchar, wantVarcharArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayVarchar mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	wantJsonbArray := pgtype.JSONBArray{
+		Elements: []pgtype.JSONB{
+			{Bytes: []byte("{\"key\": \"value1\"}"), Status: pgtype.Present},
+			{Status: pgtype.Null},
+			{Bytes: []byte("{\"key\": \"value2\"}"), Status: pgtype.Present},
+		},
+		Dimensions: []pgtype.ArrayDimension{{3, 1}},
+		Status: pgtype.Present,
+	}
+	if g, w := row.ColArrayJsonb, wantJsonbArray; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColArrayJsonb mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestQueryNullsAllArrayDataTypes
+func TestQueryNullsAllArrayDataTypes(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+	row := AllArrayTypes{}
+	db.First(&row)
+
+	// Verify that all columns are null.
+	if row.ColArrayBigint.Status == pgtype.Present {
+		return C.CString("ColArrayBigint is not null")
+	}
+	if row.ColArrayBool.Status == pgtype.Present {
+		return C.CString("ColArrayBool is not null")
+	}
+	if row.ColArrayBytea.Status == pgtype.Present {
+		return C.CString("ColArrayBytea is not null")
+	}
+	if row.ColArrayFloat8.Status == pgtype.Present {
+		return C.CString("ColArrayFloat8 is not null")
+	}
+	if row.ColArrayInt.Status == pgtype.Present {
+		return C.CString("ColArrayInt is not null")
+	}
+	if row.ColArrayNumeric.Status == pgtype.Present {
+		return C.CString("ColArrayNumeric is not null")
+	}
+	if row.ColArrayTimestamptz.Status == pgtype.Present {
+		return C.CString("ColArrayTimestamptz is not null")
+	}
+	if row.ColArrayDate.Status == pgtype.Present {
+		return C.CString("ColArrayDate is not null")
+	}
+	if row.ColArrayVarchar.Status == pgtype.Present {
+		return C.CString("ColArrayVarchar is not null")
+	}
+	if row.ColArrayJsonb.Status == pgtype.Present {
+		return C.CString("ColArrayJsonb is not null")
+	}
+
+	return nil
+}
+
+//export TestInsertAllArrayDataTypes
+func TestInsertAllArrayDataTypes(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	num1 := pgtype.Numeric{}
+	_ = num1.Scan("6.626")
+	num2 := pgtype.Numeric{}
+	_ = num2.Scan("-3.14")
+
+	row := AllArrayTypes{
+		ID: stringRef("1"),
+		ColArrayBigint: pgtype.Int8Array{
+			Elements: []pgtype.Int8{
+				{Int: int64(1), Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Int: int64(2), Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayBool: pgtype.BoolArray{
+			Elements: []pgtype.Bool{
+				{Bool: true, Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Bool: false, Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayFloat8: pgtype.Float8Array{
+			Elements: []pgtype.Float8{
+				{Float: 3.14, Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Float: -99.99, Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayBytea: pgtype.ByteaArray{
+			Elements: []pgtype.Bytea{
+				{Bytes: []byte("bytes1"), Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Bytes: []byte("bytes2"), Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayInt: pgtype.Int4Array{
+			Elements: []pgtype.Int4{
+				{Int: -100, Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Int: -200, Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayNumeric: pgtype.NumericArray{
+			Elements: []pgtype.Numeric{
+				{Int: num1.Int, Exp: num1.Exp, Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Int: num2.Int, Exp: num2.Exp, Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayTimestamptz: pgtype.TimestamptzArray{
+			Elements: []pgtype.Timestamptz{
+				{Time: parseTimestamp("2022-02-16T16:18:02.123456Z").Local(), Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Time: parseTimestamp("2000-01-01T00:00:00Z").Local(), Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayDate: pgtype.DateArray{
+			Elements: []pgtype.Date{
+				{Time: time.Time(parseDate("2023-02-20")), Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Time: time.Time(parseDate("2000-01-01")), Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayVarchar: pgtype.TextArray{
+			Elements: []pgtype.Text{
+				{String: "string1", Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{String: "string2", Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+		ColArrayJsonb: pgtype.JSONBArray{
+			Elements: []pgtype.JSONB{
+				{Bytes: []byte("{\"key\": \"value1\"}"), Status: pgtype.Present},
+				{Status: pgtype.Null},
+				{Bytes: []byte("{\"key\": \"value2\"}"), Status: pgtype.Present},
+			},
+			Dimensions: []pgtype.ArrayDimension{{3, 1}},
+			Status: pgtype.Present,
+		},
+	}
+	res := db.Create(&row)
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", res.Error))
+	}
+	if g, w := res.RowsAffected, int64(1); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
 //export TestDelete
 func TestDelete(connString string) *C.char {
 	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
@@ -428,15 +800,16 @@ func TestCreateInBatches(connString string) *C.char {
 	}
 	defer conn.Close()
 
-	res := db.CreateInBatches([]*AllTypes{
-		{ColVarchar: stringRef("1")},
-		{ColVarchar: stringRef("2")},
-		{ColVarchar: stringRef("3")},
-	}, 10)
+	numRows := 100
+	rows := make([]*AllTypes, numRows)
+	for i := 0; i < numRows; i++ {
+		rows[i] = &AllTypes{ColVarchar: stringRef(fmt.Sprintf("%d", i))}
+	}
+	res := db.CreateInBatches(rows, 10)
 	if res.Error != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert batch: %v", res.Error))
 	}
-	if g, w := res.RowsAffected, int64(3); g != w {
+	if g, w := res.RowsAffected, int64(numRows); g != w {
 		return C.CString(fmt.Sprintf("rows affected mismatch\nGot:  %v\nWant: %v", g, w))
 	}
 
@@ -624,7 +997,7 @@ func stringRef(val string) *string {
 
 func parseTimestamp(ts string) time.Time {
 	t, _ := time.Parse(time.RFC3339Nano, ts)
-	return t.UTC()
+	return t
 }
 
 // parseDate returns the given date string as a Date. The Date contains a Time instance at the given

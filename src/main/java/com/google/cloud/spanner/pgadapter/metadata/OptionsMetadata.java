@@ -23,6 +23,7 @@ import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
+import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.Server;
 import com.google.common.annotations.VisibleForTesting;
@@ -32,6 +33,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.DatabaseName;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -47,6 +51,16 @@ import org.json.simple.JSONObject;
 
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
+  /** These system properties can be used to turn on the use of virtual threads. */
+  public static String USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME = "pgadapter.use_virtual_threads";
+
+  public static String USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME =
+      "pgadapter.use_virtual_grpc_transport_threads";
+
+  /** The environment variable used by Spanner to specify the emulator host:port. */
+  private static final String SPANNER_EMULATOR_HOST_ENV_VAR = "SPANNER_EMULATOR_HOST";
+
+  static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
 
   /**
    * Builder class for creating an instance of {@link OptionsMetadata}.
@@ -64,6 +78,7 @@ public class OptionsMetadata {
    * </ol>
    */
   public static class Builder {
+    private Map<String, String> environment = System.getenv();
     private String project;
     private String instance;
     private String database;
@@ -74,7 +89,12 @@ public class OptionsMetadata {
     private String credentialsFile;
     private Credentials credentials;
     private boolean requireAuthentication;
+    private boolean enableOpenTelemetry;
+    private boolean enableOpenTelemetryMetrics;
+    private Double openTelemetryTraceRatio;
     private boolean skipLocalhostCheck;
+    private boolean useVirtualThreads;
+    private boolean useVirtualGrpcTransportThreads;
     private SslMode sslMode;
     private int port;
     private String unixDomainSocketDirectory;
@@ -82,8 +102,14 @@ public class OptionsMetadata {
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
+    private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
 
     Builder() {}
+
+    Builder setEnvironment(Map<String, String> environment) {
+      this.environment = Preconditions.checkNotNull(environment);
+      return this;
+    }
 
     /**
      * (Optional) The Google Cloud project ID that PGAdapter should connect to.
@@ -218,6 +244,26 @@ public class OptionsMetadata {
       return this;
     }
 
+    /** Enables OpenTelemetry tracing for PGAdapter. */
+    public Builder setEnableOpenTelemetry() {
+      this.enableOpenTelemetry = true;
+      return this;
+    }
+
+    /** Enables OpenTelemetry metrics for PGAdapter. */
+    public Builder setEnableOpenTelemetryMetrics() {
+      this.enableOpenTelemetryMetrics = true;
+      return this;
+    }
+
+    /** Sets the trace sampling ratio for OpenTelemetry. */
+    public Builder setOpenTelemetryTraceRatio(double ratio) {
+      Preconditions.checkArgument(
+          ratio >= 0.0d && ratio <= 1.0d, "ration must be in the range [0.0, 1.0]");
+      this.openTelemetryTraceRatio = ratio;
+      return this;
+    }
+
     /**
      * PGAdapter by default only allows connections from localhost. Call this method to disable this
      * check. You should only allow connections from private networks, unless you are also using SSL
@@ -225,6 +271,35 @@ public class OptionsMetadata {
      */
     public Builder setDisableLocalhostCheck() {
       this.skipLocalhostCheck = true;
+      return this;
+    }
+
+    /**
+     * Creates a virtual thread for each connection instead of a platform thread. Enabling this
+     * option only has effect if PGAdapter is running on Java 21 or higher. Enabling virtual threads
+     * can reduce memory consumption for PGAdapter instances that have a large number of incoming
+     * connections, and reduces the total number of platform threads that are created.
+     *
+     * <p>See <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual
+     * threads</a> for more information on virtual threads.
+     */
+    public Builder useVirtualThreads() {
+      this.useVirtualThreads = true;
+      return this;
+    }
+
+    /**
+     * Uses virtual threads instead of platform threads for the gRPC executor pool. Enabling this
+     * option only has effect if PGAdapter is running on Java 21 or higher. Enabling virtual threads
+     * for gRPC can reduce memory consumption for PGAdapter instances that execute a large number of
+     * parallel queries or transactions, and reduces the total number of platform threads that are
+     * created.
+     *
+     * <p>See <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual
+     * threads</a> for more information on virtual threads.
+     */
+    public Builder useVirtualGrpcTransportThreads() {
+      this.useVirtualGrpcTransportThreads = true;
       return this;
     }
 
@@ -299,6 +374,11 @@ public class OptionsMetadata {
       return this;
     }
 
+    Builder setStartupTimeout(Duration timeout) {
+      this.startupTimeout = timeout;
+      return this;
+    }
+
     public OptionsMetadata build() {
       if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
         throw SpannerExceptionFactory.newSpannerException(
@@ -337,6 +417,16 @@ public class OptionsMetadata {
       if (requireAuthentication) {
         addOption(args, OPTION_AUTHENTICATE);
       }
+      if (enableOpenTelemetry) {
+        addOption(args, OPTION_ENABLE_OPEN_TELEMETRY);
+      }
+      if (enableOpenTelemetryMetrics) {
+        addOption(args, OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
+      }
+      if (openTelemetryTraceRatio != null) {
+        addLongOption(
+            args, OPTION_OPEN_TELEMETRY_TRACE_RATIO, String.valueOf(openTelemetryTraceRatio));
+      }
       if (skipLocalhostCheck) {
         addOption(args, OPTION_DISABLE_LOCALHOST_CHECK);
       }
@@ -352,7 +442,12 @@ public class OptionsMetadata {
       if (endpoint != null) {
         addOption(args, OPTION_SPANNER_ENDPOINT, endpoint);
       }
-      if (usePlainText || numChannels != null || databaseRole != null || autoConfigEmulator) {
+      if (usePlainText
+          || numChannels != null
+          || databaseRole != null
+          || autoConfigEmulator
+          || useVirtualThreads
+          || useVirtualGrpcTransportThreads) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -365,6 +460,16 @@ public class OptionsMetadata {
         }
         if (autoConfigEmulator) {
           jdbcOptionBuilder.append("autoConfigEmulator=true;");
+        }
+        if (useVirtualThreads) {
+          jdbcOptionBuilder
+              .append(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME)
+              .append("=true;");
+        }
+        if (useVirtualGrpcTransportThreads) {
+          jdbcOptionBuilder
+              .append(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME)
+              .append("=true;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
@@ -454,6 +559,9 @@ public class OptionsMetadata {
   private static final String OPTION_CREDENTIALS_FILE = "c";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
+  private static final String OPTION_ENABLE_OPEN_TELEMETRY = "enable_otel";
+  private static final String OPTION_ENABLE_OPEN_TELEMETRY_METRICS = "enable_otel_metrics";
+  private static final String OPTION_OPEN_TELEMETRY_TRACE_RATIO = "otel_trace_ratio";
   private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
@@ -481,7 +589,9 @@ public class OptionsMetadata {
   private static final String OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING =
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
+  private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
 
+  private final Map<String, String> environment;
   private final String osName;
   private final CommandLine commandLine;
   private final Credentials credentials;
@@ -494,6 +604,9 @@ public class OptionsMetadata {
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
+  private final boolean enableOpenTelemetry;
+  private final boolean enableOpenTelemetryMetrics;
+  private final Double openTelemetryTraceRatio;
   private final SslMode sslMode;
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
@@ -506,6 +619,7 @@ public class OptionsMetadata {
   private final Map<String, String> propertyMap;
   private final String serverVersion;
   private final boolean debugMode;
+  private final Duration startupTimeout;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -514,26 +628,32 @@ public class OptionsMetadata {
    * of calling this method directly.
    */
   public OptionsMetadata(String[] args) {
-    this(System.getProperty("os.name", ""), args);
+    this(System.getenv(), System.getProperty("os.name", ""), DEFAULT_STARTUP_TIMEOUT, args);
   }
 
   private OptionsMetadata(Builder builder) {
     this(
+        builder.environment,
         System.getProperty("os.name", ""),
         builder.toCommandLineArguments(),
         builder.credentials,
-        builder.sessionPoolOptions);
-  }
-
-  OptionsMetadata(String osName, String[] args) {
-    this(osName, args, null, null);
+        builder.sessionPoolOptions,
+        builder.startupTimeout);
   }
 
   OptionsMetadata(
+      Map<String, String> environment, String osName, Duration startupTimeout, String[] args) {
+    this(environment, osName, args, null, null, startupTimeout);
+  }
+
+  OptionsMetadata(
+      Map<String, String> environment,
       String osName,
       String[] args,
       @Nullable Credentials credentials,
-      @Nullable SessionPoolOptions sessionPoolOptions) {
+      @Nullable SessionPoolOptions sessionPoolOptions,
+      Duration startupTimeout) {
+    this.environment = Preconditions.checkNotNull(environment);
     this.osName = osName;
     this.commandLine = buildOptions(args);
     this.credentials = credentials;
@@ -571,6 +691,10 @@ public class OptionsMetadata {
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
+    this.enableOpenTelemetry = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY);
+    this.enableOpenTelemetryMetrics = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
+    this.openTelemetryTraceRatio =
+        parseOpenTelemetryTraceRatio(commandLine.getOptionValue(OPTION_OPEN_TELEMETRY_TRACE_RATIO));
     this.sslMode = parseSslMode(commandLine.getOptionValue(OPTION_SSL));
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.disableDefaultLocalStatements =
@@ -588,6 +712,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
+    this.startupTimeout = startupTimeout;
   }
 
   /**
@@ -605,6 +730,7 @@ public class OptionsMetadata {
       boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
     this(
+        System.getenv(),
         System.getProperty("os.name", ""),
         defaultConnectionUrl,
         proxyPort,
@@ -618,6 +744,7 @@ public class OptionsMetadata {
 
   @VisibleForTesting
   OptionsMetadata(
+      Map<String, String> environment,
       String osName,
       String defaultConnectionUrl,
       int proxyPort,
@@ -627,6 +754,7 @@ public class OptionsMetadata {
       boolean requiresMatcher,
       boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
+    this.environment = Preconditions.checkNotNull(environment);
     this.osName = osName;
     this.commandLine = null;
     this.credentials = null;
@@ -642,6 +770,9 @@ public class OptionsMetadata {
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
+    this.enableOpenTelemetry = false;
+    this.enableOpenTelemetryMetrics = false;
+    this.openTelemetryTraceRatio = null;
     this.sslMode = SslMode.Disable;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
@@ -654,6 +785,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
+    this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
   private Map<String, String> parseProperties(String propertyOptions) {
@@ -668,6 +800,18 @@ public class OptionsMetadata {
           throw new IllegalArgumentException("Invalid JDBC property specified: " + propertyOptions);
         }
       }
+    }
+    // Set virtual thread properties from system properties if:
+    // 1. The virtual thread property has not been set in the command line arguments.
+    // 2. The corresponding system property has been set.
+    if (properties.get(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME) == null
+        && Boolean.parseBoolean(System.getProperty(USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME))) {
+      properties.put(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME, "true");
+    }
+    if (properties.get(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME) == null
+        && Boolean.parseBoolean(
+            System.getProperty(USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME))) {
+      properties.put(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME, "true");
     }
     return properties;
   }
@@ -695,6 +839,26 @@ public class OptionsMetadata {
       // Catch and rethrow to give a better error message.
       throw new IllegalArgumentException(
           String.format("Invalid ddl-batching mode value specified: %s", value));
+    }
+  }
+
+  private Double parseOpenTelemetryTraceRatio(String value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      double ratio = Double.parseDouble(value);
+      if (ratio < 0.0d || ratio > 1.0d) {
+        throw new IllegalArgumentException(
+            String.format(
+                "OpenTelemetry trace ratio must be in the range [0.0, 1.0]. "
+                    + "Specified value is invalid: %s",
+                value));
+      }
+      return ratio;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid OpenTelemetry trace ratio: %s", value));
     }
   }
 
@@ -795,27 +959,38 @@ public class OptionsMetadata {
     // Check if it is a full database name, or only a database ID.
     DatabaseName databaseName = getDatabaseName(database);
     String host = commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT, "");
+    boolean usePlainText = false;
+    if (Strings.isNullOrEmpty(host)
+        && !Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))) {
+      host = environment.get(SPANNER_EMULATOR_HOST_ENV_VAR);
+      usePlainText = true;
+    }
     String endpoint;
     if (host.isEmpty()) {
       endpoint = "cloudspanner:/";
     } else {
       endpoint = "cloudspanner://" + host + "/";
+      String finalHost = host;
       logger.log(
           Level.INFO,
           () ->
               String.format(
                   "PG Adapter will connect to the following Cloud Spanner service endpoint: %s",
-                  host));
+                  finalHost));
     }
 
     // Note that Credentials here is the credentials file, not the actual credentials
     String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
-    if (!shouldAuthenticate()) {
+    if (!shouldAuthenticate()
+        && Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))) {
       String credentials = buildCredentialsFile();
       if (!Strings.isNullOrEmpty(credentials)) {
         url = String.format("%s;credentials=%s", url, credentials);
       }
+    }
+    if (usePlainText) {
+      url += ";usePlainText=true";
     }
 
     return url;
@@ -963,6 +1138,14 @@ public class OptionsMetadata {
         "authenticate",
         false,
         "Whether you wish the proxy to perform an authentication step.");
+    options.addOption(null, OPTION_ENABLE_OPEN_TELEMETRY, false, "Enable OpenTelemetry tracing.");
+    options.addOption(
+        null, OPTION_ENABLE_OPEN_TELEMETRY_METRICS, false, "Enable OpenTelemetry metrics.");
+    options.addOption(
+        null,
+        OPTION_OPEN_TELEMETRY_TRACE_RATIO,
+        true,
+        "OpenTelemetry trace sampling ration. Value must be in the range [0.0, 1.0].");
     options.addOption(
         OPTION_SSL,
         "sslmode",
@@ -1110,6 +1293,12 @@ public class OptionsMetadata {
             + "You most probably do not want to turn internal debug mode on. It is only intended for\n"
             + "internal test cases in PGAdapter that need to verify that it receives the correct \n"
             + "wire-protocol messages.");
+    options.addOption(
+        OPTION_LEGACY_LOGGING,
+        "enable_legacy_logging",
+        false,
+        "Enables legacy logging using the default java.util.logging configuration.\n"
+            + "This sends all log output to stderr.");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);
@@ -1179,6 +1368,20 @@ public class OptionsMetadata {
     return this.debugMode;
   }
 
+  public boolean isUseVirtualThreads() {
+    return Boolean.parseBoolean(
+        getPropertyMap().get(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME));
+  }
+
+  public boolean isUseGrpcTransportVirtualThreads() {
+    return Boolean.parseBoolean(
+        getPropertyMap().get(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME));
+  }
+
+  public Duration getStartupTimeout() {
+    return this.startupTimeout;
+  }
+
   public JSONObject getCommandMetadataJSON() {
     return this.commandMetadataJSON;
   }
@@ -1236,6 +1439,26 @@ public class OptionsMetadata {
     return defaultConnectionUrl;
   }
 
+  public String getTelemetryProjectId() {
+    // TODO: Add separate command line argument for telemetry project id.
+    if (commandLine.hasOption(OPTION_PROJECT_ID)) {
+      return commandLine.getOptionValue(OPTION_PROJECT_ID);
+    }
+    return null;
+  }
+
+  public Credentials getTelemetryCredentials() throws IOException {
+    // TODO: Add separate command line argument for telemetry credentials.
+    if (credentials != null) {
+      return credentials;
+    }
+    if (commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
+      return GoogleCredentials.fromStream(
+          Files.newInputStream(Paths.get(commandLine.getOptionValue(OPTION_CREDENTIALS_FILE))));
+    }
+    return null;
+  }
+
   public int getProxyPort() {
     return this.proxyPort;
   }
@@ -1258,6 +1481,18 @@ public class OptionsMetadata {
 
   public boolean shouldAuthenticate() {
     return this.authenticate;
+  }
+
+  public boolean isEnableOpenTelemetry() {
+    return this.enableOpenTelemetry;
+  }
+
+  public boolean isEnableOpenTelemetryMetrics() {
+    return this.enableOpenTelemetryMetrics;
+  }
+
+  public Double getOpenTelemetryTraceRatio() {
+    return this.openTelemetryTraceRatio;
   }
 
   public SslMode getSslMode() {

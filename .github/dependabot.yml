@@ -30,6 +30,10 @@ updates:
     schedule:
       interval: "daily"
   - package-ecosystem: "npm"
+    directory: "/src/test/nodejs/sequelize-tests"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "npm"
     directory: "/src/test/nodejs/typeorm/data-test"
     schedule:
       interval: "daily"
@@ -74,7 +78,13 @@ updates:
     directory: "/samples/java/spring-data-jpa"
     schedule:
       interval: "daily"
-  
+
+  # Node.js samples
+  - package-ecosystem: "npm"
+    directory: "/samples/nodejs/sequelize"
+    schedule:
+      interval: "daily"
+
   # Python Samples
   # Python psycopg3 Sample
   - package-ecosystem: "pip"

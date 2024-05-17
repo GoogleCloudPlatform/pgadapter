@@ -137,7 +137,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   }
 
   @Override
-  protected String getIdentifier() {
+  public String getIdentifier() {
     return String.valueOf(IDENTIFIER);
   }
 
@@ -151,7 +151,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   public String getSql() {
-    return this.statement.getSql();
+    return this.statement == null ? "" : this.statement.getSql();
   }
 
   public byte[][] getParameters() {

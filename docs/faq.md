@@ -17,6 +17,9 @@ You can run [these latency comparison benchmarks](../benchmarks/latency-comparis
 the difference between using PostgreSQL drivers with PGAdapter and using native Cloud Spanner drivers
 and client libraries.
 
+### How can I get insights into execution times in PGAdapter?
+PGAdapter supports [using OpenTelemetry](open_telemetry.md) to collect and export traces to Google Cloud Trace.
+
 ## Connection Options
 
 ### How can I specify the credentials that should be used for a connection?

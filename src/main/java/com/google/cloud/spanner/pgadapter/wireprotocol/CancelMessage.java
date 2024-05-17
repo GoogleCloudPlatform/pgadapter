@@ -56,7 +56,7 @@ public class CancelMessage extends BootstrapMessage {
   }
 
   @Override
-  protected String getIdentifier() {
+  public String getIdentifier() {
     return Integer.toString(IDENTIFIER);
   }
 

@@ -50,7 +50,11 @@ public class PgCatalog {
               new TableOrIndexName(null, "pg_namespace"),
               new TableOrIndexName(null, "pg_namespace"))
           .put(
-              new TableOrIndexName("pg_catalog", "pg_collation"),
+              new TableOrIndexName("pg_catalog", "pg_database"),
+              new TableOrIndexName(null, "pg_database"))
+          .put(new TableOrIndexName(null, "pg_database"), new TableOrIndexName(null, "pg_database"))
+          .put(
+              new TableOrIndexName("pg_collation", "pg_collation"),
               new TableOrIndexName(null, "pg_collation"))
           .put(
               new TableOrIndexName(null, "pg_collation"),
@@ -112,9 +116,6 @@ public class PgCatalog {
           .put(
               new TableOrIndexName("information_schema", "sequences"),
               new TableOrIndexName(null, "pg_information_schema_sequences"))
-          //          .put(
-          //              new TableOrIndexName("information_schema", "columns"),
-          //              new TableOrIndexName("information_schema", "columns"))
           .put(
               new TableOrIndexName("pg_catalog", "pg_extension"),
               new TableOrIndexName(null, "pg_extension"))
@@ -139,7 +140,21 @@ public class PgCatalog {
               Suppliers.ofInstance(" IN ('pg_catalog', 'public')")),
           RegexQueryPartReplacer.replace(
               Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*false\\s*\\)\\)"),
-              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")));
+              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)\\s*AS\\s+"),
+              "''::varchar AS "),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
+              "''::varchar AS obj_description"),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)\\s*AS\\s+"),
+              "''::varchar AS "),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
+              "''::varchar AS obj_description"));
 
   private final ImmutableSet<String> checkPrefixes;
 
@@ -151,6 +166,7 @@ public class PgCatalog {
   private static final Map<TableOrIndexName, PgCatalogTable> DEFAULT_PG_CATALOG_TABLES =
       ImmutableMap.<TableOrIndexName, PgCatalogTable>builder()
           .put(new TableOrIndexName(null, "pg_namespace"), new PgNamespace())
+          .put(new TableOrIndexName(null, "pg_database"), new PgDatabase())
           .put(new TableOrIndexName(null, "pg_collation"), new PgCollation())
           .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
           .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
@@ -187,7 +203,6 @@ public class PgCatalog {
             .put(new TableOrIndexName(null, "pg_index"), new PgIndex())
             .put(new TableOrIndexName(null, "pg_type"), new PgType())
             .put(new TableOrIndexName(null, "pg_settings"), new PgSettings());
-    //            .put(new TableOrIndexName("information_schema", "columns"), new PgType());
     wellKnownClient
         .getPgCatalogTables()
         .forEach((k, v) -> pgCatalogTablesBuilder.put(TableOrIndexName.parse(k), v));
@@ -331,6 +346,38 @@ public class PgCatalog {
   }
 
   @InternalApi
+  public static class PgDatabase implements PgCatalogTable {
+    // https://www.postgresql.org/docs/current/catalog-pg-database.html
+    public static final String PG_DATABASE_CTE =
+        "pg_database as (\n"
+            + "  select 0::bigint as oid,\n"
+            + "         catalog_name as datname,\n"
+            + "         0::bigint as datdba,\n"
+            + "         6::bigint as encoding,\n"
+            + "         'c' as datlocprovider,\n"
+            + "         'C' as datcollate,\n"
+            + "         'C' as datctype,\n"
+            + "         false as datistemplate,\n"
+            + "         true as datallowconn,\n"
+            + "         -1::bigint as datconnlimit,\n"
+            + "         0::bigint as datlastsysoid,\n"
+            + "         0::bigint as datfrozenxid,\n"
+            + "         0::bigint as datminmxid,\n"
+            + "         0::bigint as dattablespace,\n"
+            + "         null as daticulocale,\n"
+            + "         null as daticurules,\n"
+            + "         null as datcollversion,\n"
+            + "         null as datacl"
+            + "  from information_schema.information_schema_catalog_name\n"
+            + ")";
+
+    @Override
+    public String getTableExpression() {
+      return PG_DATABASE_CTE;
+    }
+  }
+
+  @InternalApi
   public static class PgCollation implements PgCatalogTable {
     public static final String PG_COLLATION_CTE =
         "pg_collation as (\n"
@@ -399,7 +446,6 @@ public class PgCatalog {
             + "  || (case typname\n"
             + "        when 'int2' then 'false'\n"
             + "        when 'int4' then 'false'\n"
-            + "        when 'float4' then 'false'\n"
             + "        when 'timestamp' then 'false'\n"
             + "        else 'true'\n"
             + "      end) || ' as typisdefined, '\n"
@@ -437,7 +483,7 @@ public class PgCatalog {
             + "  select 21 as oid, 'int2' as typname, 11 as typnamespace, null as typowner, 2 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1005 as typarray, 'int2in' as typinput, 'int2out' as typoutput, 'int2recv' as typreceive, 'int2send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 's' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
             + "  select 23 as oid, 'int4' as typname, 11 as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1007 as typarray, 'int4in' as typinput, 'int4out' as typoutput, 'int4recv' as typreceive, 'int4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
             + "  select 25 as oid, 'text' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1009 as typarray, 'textin' as typinput, 'textout' as typoutput, 'textrecv' as typreceive, 'textsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
-            + "  select 700 as oid, 'float4' as typname, 11 as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1021 as typarray, 'float4in' as typinput, 'float4out' as typoutput, 'float4recv' as typreceive, 'float4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
+            + "  select 700 as oid, 'float4' as typname, 11 as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1021 as typarray, 'float4in' as typinput, 'float4out' as typoutput, 'float4recv' as typreceive, 'float4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'real' as spanner_type union all\n"
             + "  select 701 as oid, 'float8' as typname, 11 as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1022 as typarray, 'float8in' as typinput, 'float8out' as typoutput, 'float8recv' as typreceive, 'float8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'double precision' as spanner_type union all\n"
             + "  select 1043 as oid, 'varchar' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1015 as typarray, 'varcharin' as typinput, 'varcharout' as typoutput, 'varcharrecv' as typreceive, 'varcharsend' as typsend, 'varchartypmodin' as typmodin, 'varchartypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'character varying' as spanner_type union all\n"
             + "  select 1082 as oid, 'date' as typname, 11 as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1182 as typarray, 'date_in' as typinput, 'date_out' as typoutput, 'date_recv' as typreceive, 'date_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'date' as spanner_type union all\n"
@@ -451,14 +497,15 @@ public class PgCatalog {
             + "  select 1005 as oid, '_int2' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 21 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
             + "  select 1007 as oid, '_int4' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 23 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
             + "  select 1009 as oid, '_text' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 25 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
-            + "  select 1021 as oid, '_float4' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 700 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
+            + "  select 1021 as oid, '_float4' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 700 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'real[]' as spanner_type union all\n"
             + "  select 1022 as oid, '_float8' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 701 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'double precision[]' as spanner_type union all\n"
             + "  select 1015 as oid, '_varchar' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 1043 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'character varying[]' as spanner_type union all\n"
             + "  select 1182 as oid, '_date' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 1082 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'date[]' as spanner_type union all\n"
             + "  select 1115 as oid, '_timestamp' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 1114 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type union all\n"
             + "  select 1185 as oid, '_timestamptz' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 1184 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'timestamp with time zone[]' as spanner_type union all\n"
             + "  select 1231 as oid, '_numeric' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 1700 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'numeric[]' as spanner_type union all\n"
-            + "  select 3807 as oid, '_jsonb' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 3802 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'jsonb[]' as spanner_type\n"
+            + "  select 3807 as oid, '_jsonb' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 3802 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'jsonb[]' as spanner_type union all\n"
+            + "  select 705 as oid, 'unknown' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'p' as typtype, 'X' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 0 as typarray, 'unknownin' as typinput, 'unknownout' as typoutput, 'unknownrecv' as typreceive, 'unknownsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, null as spanner_type\n"
             + ")";
 
     @Override
@@ -629,6 +676,7 @@ public class PgCatalog {
             + "            when 'boolean' then 16\n"
             + "            when 'bytea' then 17\n"
             + "            when 'bigint' then 20\n"
+            + "            when 'real' then 700\n"
             + "            when 'double precision' then 701\n"
             + "            when 'character varying' then 1043\n"
             + "            when 'date' then 1082\n"
@@ -638,6 +686,7 @@ public class PgCatalog {
             + "            when 'boolean[]' then 1000\n"
             + "            when 'bytea[]' then 1001\n"
             + "            when 'bigint[]' then 1016\n"
+            + "            when 'real[]' then 1021\n"
             + "            when 'double precision[]' then 1022\n"
             + "            when 'character varying[]' then 1015\n"
             + "            when 'date[]' then 1182\n"
@@ -667,6 +716,7 @@ public class PgCatalog {
             + "            when 'boolean' then 16\n"
             + "            when 'bytea' then 17\n"
             + "            when 'bigint' then 20\n"
+            + "            when 'real' then 700\n"
             + "            when 'double precision' then 701\n"
             + "            when 'character varying' then 1043\n"
             + "            when 'date' then 1082\n"
@@ -676,6 +726,7 @@ public class PgCatalog {
             + "            when 'boolean[]' then 1000\n"
             + "            when 'bytea[]' then 1001\n"
             + "            when 'bigint[]' then 1016\n"
+            + "            when 'real[]' then 1021\n"
             + "            when 'double precision[]' then 1022\n"
             + "            when 'character varying[]' then 1015\n"
             + "            when 'date[]' then 1182\n"
@@ -808,7 +859,7 @@ public class PgCatalog {
             + "                 group by c.constraint_catalog, c.constraint_schema,\n"
             + "                          c.constraint_name) fck on tc.constraint_catalog=fck.constraint_catalog and tc.constraint_schema=fck.constraint_schema and tc.constraint_name=fck.constraint_name\n"
             + "left outer join information_schema.check_constraints cc on cc.constraint_catalog=tc.constraint_catalog and cc.constraint_schema=tc.constraint_schema and cc.constraint_name=tc.constraint_name\n"
-            + "where tc.constraint_schema='public' and not substr(tc.constraint_name, 1, length('CK_IS_NOT_NULL_')) = 'CK_IS_NOT_NULL_'\n"
+            + "where tc.constraint_schema not in (select schema_name from information_schema.schemata where schema_owner='spanner_system') and not substr(tc.constraint_name, 1, length('CK_IS_NOT_NULL_')) = 'CK_IS_NOT_NULL_'\n"
             + ")";
 
     public static final String EMPTY_PG_CONSTRAINT_CTE =

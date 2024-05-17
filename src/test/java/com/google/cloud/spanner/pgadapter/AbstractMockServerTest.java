@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.NoCredentials;
+import com.google.cloud.ServiceOptions;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
@@ -68,6 +69,7 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.OpenTelemetry;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -172,7 +174,7 @@ public abstract class AbstractMockServerTest {
       Statement.of(
           "with "
               + PG_TYPE_PREFIX
-              + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = 'jsonb'  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
+              + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = ('jsonb')  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
 
   protected static final ResultSet SELECT_JSONB_TYPE_BY_NAME_RESULT_SET =
       ResultSet.newBuilder()
@@ -344,6 +346,10 @@ public abstract class AbstractMockServerTest {
       createAllTypesResultSet("");
   protected static final com.google.spanner.v1.ResultSet ALL_TYPES_NULLS_RESULTSET =
       createAllTypesNullResultSet("");
+  protected static final com.google.spanner.v1.ResultSet ALL_ARRAY_TYPES_RESULTSET =
+      createAllArrayTypesResultSet("1", "", true);
+  protected static final com.google.spanner.v1.ResultSet ALL_ARRAY_TYPES_NULLS_RESULTSET =
+      createAllArrayTypesNullResultSet("");
 
   protected static final StatusRuntimeException EXCEPTION =
       Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException();
@@ -375,6 +381,7 @@ public abstract class AbstractMockServerTest {
                             Base64.getEncoder()
                                 .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
                         .build())
+                .addValues(Value.newBuilder().setNumberValue(3.14f).build())
                 .addValues(Value.newBuilder().setNumberValue(3.14d).build())
                 .addValues(Value.newBuilder().setStringValue("100").build())
                 .addValues(Value.newBuilder().setStringValue("6.626").build())
@@ -443,6 +450,15 @@ public abstract class AbstractMockServerTest {
                                                 .encodeToString(
                                                     "bytes2".getBytes(StandardCharsets.UTF_8)))
                                         .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setNumberValue(3.14f).build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setNumberValue(-99.99f).build())
                                 .build()))
                 .addValues(
                     Value.newBuilder()
@@ -564,30 +580,127 @@ public abstract class AbstractMockServerTest {
   protected static ResultSet createAllArrayTypesResultSet(
       String id, String columnPrefix, boolean microsTimestamp) {
     return com.google.spanner.v1.ResultSet.newBuilder()
-        .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
+        .setMetadata(createAllArrayTypesResultSetMetadata(columnPrefix))
         .addRows(
             ListValue.newBuilder()
                 .addValues(Value.newBuilder().setStringValue(id).build())
-                .addValues(Value.newBuilder().setBoolValue(true).build())
                 .addValues(
                     Value.newBuilder()
-                        .setStringValue(
-                            Base64.getEncoder()
-                                .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
-                        .build())
-                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
-                .addValues(Value.newBuilder().setStringValue("100").build())
-                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("1").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("2").build())
+                                .build()))
                 .addValues(
                     Value.newBuilder()
-                        .setStringValue(
-                            microsTimestamp
-                                ? "2022-02-16T13:18:02.123456Z"
-                                : "2022-02-16T13:18:02.123456789Z")
-                        .build())
-                .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
-                .addValues(Value.newBuilder().setStringValue("test").build())
-                .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setBoolValue(true).build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setBoolValue(false).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            Base64.getEncoder()
+                                                .encodeToString(
+                                                    "bytes1".getBytes(StandardCharsets.UTF_8)))
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            Base64.getEncoder()
+                                                .encodeToString(
+                                                    "bytes2".getBytes(StandardCharsets.UTF_8)))
+                                        .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setNumberValue(-99.99).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("-100").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("-200").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("-3.14").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            microsTimestamp
+                                                ? "2022-02-16T16:18:02.123456Z"
+                                                : "2022-02-16T16:18:02.123456789Z")
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("2000-01-01T00:00:00Z")
+                                        .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("2023-02-20").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("2000-01-01").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("string1").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("string2").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("{\"key\": \"value1\"}")
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("{\"key\": \"value2\"}")
+                                        .build())
+                                .build()))
                 .build())
         .build();
   }
@@ -622,7 +735,36 @@ public abstract class AbstractMockServerTest {
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 // Arrays
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .build())
+        .build();
+  }
+
+  protected static ResultSet createAllArrayTypesNullResultSet(String columnPrefix) {
+    return createAllArrayTypesNullResultSet(columnPrefix, null);
+  }
+
+  protected static ResultSet createAllArrayTypesNullResultSet(String columnPrefix, String id) {
+    return com.google.spanner.v1.ResultSet.newBuilder()
+        .setMetadata(createAllArrayTypesResultSetMetadata(columnPrefix))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(
+                    id == null
+                        ? Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
+                        : Value.newBuilder().setStringValue(id).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -653,6 +795,10 @@ public abstract class AbstractMockServerTest {
                     Field.newBuilder()
                         .setName(columnPrefix + "col_bytea")
                         .setType(Type.newBuilder().setCode(TypeCode.BYTES).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_float4")
+                        .setType(Type.newBuilder().setCode(TypeCode.FLOAT32).build()))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_float8")
@@ -713,6 +859,14 @@ public abstract class AbstractMockServerTest {
                                 .setCode(TypeCode.ARRAY)
                                 .setArrayElementType(
                                     Type.newBuilder().setCode(TypeCode.BYTES).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_float4")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.FLOAT32).build())))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_array_float8")
@@ -783,6 +937,10 @@ public abstract class AbstractMockServerTest {
     return ResultSetMetadata.newBuilder()
         .setRowType(
             StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "id")
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_array_bigint")
@@ -1029,14 +1187,20 @@ public abstract class AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        createMockSpannerThatReturnsOneQueryPartition(), "d", configurator -> {});
+        createMockSpannerThatReturnsOneQueryPartition(),
+        "d",
+        configurator -> {},
+        OpenTelemetry.noop());
   }
 
   protected static void doStartMockSpannerAndPgAdapterServers(
       String defaultDatabase, Consumer<TestOptionsMetadataBuilder> optionsConfigurator)
       throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        createMockSpannerThatReturnsOneQueryPartition(), defaultDatabase, optionsConfigurator);
+        createMockSpannerThatReturnsOneQueryPartition(),
+        defaultDatabase,
+        optionsConfigurator,
+        OpenTelemetry.noop());
   }
 
   public static PGobject createJdbcPgJsonbObject(String value) throws SQLException {
@@ -1049,7 +1213,8 @@ public abstract class AbstractMockServerTest {
   protected static void doStartMockSpannerAndPgAdapterServers(
       MockSpannerServiceImpl mockSpannerService,
       String defaultDatabase,
-      Consumer<TestOptionsMetadataBuilder> optionsConfigurator)
+      Consumer<TestOptionsMetadataBuilder> optionsConfigurator,
+      OpenTelemetry openTelemetry)
       throws Exception {
     mockSpanner = mockSpannerService;
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
@@ -1109,6 +1274,8 @@ public abstract class AbstractMockServerTest {
                                   "x-goog-api-client", Metadata.ASCII_STRING_MARSHALLER));
                       assertNotNull(userAgent);
                       assertTrue(userAgent.contains("pg-adapter"));
+                      assertTrue(
+                          userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
                     }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
@@ -1128,7 +1295,7 @@ public abstract class AbstractMockServerTest {
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
         .setCredentials(NoCredentials.getInstance());
     optionsConfigurator.accept(builder);
-    pgServer = new ProxyServer(builder.build());
+    pgServer = new ProxyServer(builder.build(), openTelemetry);
     pgServer.startServer();
   }
 

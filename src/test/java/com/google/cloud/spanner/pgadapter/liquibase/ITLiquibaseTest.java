@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
@@ -60,6 +61,10 @@ public class ITLiquibaseTest {
 
   @BeforeClass
   public static void setup() throws ClassNotFoundException, IOException, SQLException {
+    assumeTrue(
+        "This test is not supported on the emulator due to a failure to add a column of type numeric with a default value to a non-empty table",
+        System.getenv("SPANNER_EMULATOR_HOST") == null);
+
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
 
@@ -90,8 +95,10 @@ public class ITLiquibaseTest {
 
   @AfterClass
   public static void teardown() throws IOException {
-    try (FileWriter writer = new FileWriter(LIQUIBASE_PROPERTIES_FILE)) {
-      writer.write(originalLiquibaseProperties);
+    if (originalLiquibaseProperties != null) {
+      try (FileWriter writer = new FileWriter(LIQUIBASE_PROPERTIES_FILE)) {
+        writer.write(originalLiquibaseProperties);
+      }
     }
     testEnv.stopPGAdapterServer();
     testEnv.cleanUp();

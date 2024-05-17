@@ -1,7 +1,4 @@
 on:
-  push:
-    branches:
-      - postgresql-dialect
   pull_request:
   schedule:
     # Run at 04:52UTC every day. This run will use preprod-spanner.sandbox.googleapis.com
@@ -34,7 +31,7 @@ jobs:
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         if: "${{ env.GCP_PROJECT_ID != '' }}"
-        run: echo "::set-output name=defined::true"
+        run: echo "defined=true" >> "$GITHUB_OUTPUT"
   integration-test:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
@@ -71,23 +68,31 @@ jobs:
         if: github.event.schedule=='14 3 * * *'
         run: |
           echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
+      # TODO: Remove
+      - id: set-test-type-for-float32
+        run: |
+          if [[ $GOOGLE_CLOUD_ENDPOINT == 'staging-wrenchworks.sandbox.googleapis.com' ]]; then
+            echo "FLOAT32_TEST_TYPE=float4" >> $GITHUB_ENV
+          else
+            echo "FLOAT32_TEST_TYPE=float8" >> $GITHUB_ENV
+          fi
       - id: set-excluded-integration-tests
         if: github.event_name == 'pull_request'
         run: |
           echo "EXCLUDED_INTEGRATION_TESTS=SlowTest" >> $GITHUB_ENV
       - uses: actions/checkout@v4
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: 17
+          java-version: 21
       - run: java -version
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '^1.17.7'
       - run: go version
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.9'
       - uses: actions/setup-node@v4
@@ -105,25 +110,39 @@ jobs:
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
-        run: mvn test -B -Ptest-all
+        run: mvn test -B -Ptest-all -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
+      - name: Run unit tests with virtual threads
+        run: mvn test -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -B -Ptest-all
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
+      - name: Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
       - name: Setup GCloud
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
-          export_default_credentials: true
       - name: Run integration tests
-        run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DexcludedIntegrationTests="$EXCLUDED_INTEGRATION_TESTS" -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
+        run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DskipUnits=true -Dpgadapter.test_float4_type="$FLOAT32_TEST_TYPE" -DexcludedIntegrationTests="$EXCLUDED_INTEGRATION_TESTS" -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
         env:
           POSTGRES_HOST: /pg
           POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           directory: ./target/site/jacoco-merged-test-coverage-report
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           flags: all_tests
           name: codecov-umbrella
           path_to_write_report: ./coverage/codecov_report.txt

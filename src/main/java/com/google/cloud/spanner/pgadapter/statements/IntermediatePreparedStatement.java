@@ -100,7 +100,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   @Override
   public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
     ListenableFuture<StatementResult> statementResultFuture =
-        backendConnection.analyze(this.parsedStatement, this.statement);
+        backendConnection.analyze(this.command, this.parsedStatement, this.statement);
     setFutureStatementResult(statementResultFuture);
     this.describeResult =
         Futures.transform(

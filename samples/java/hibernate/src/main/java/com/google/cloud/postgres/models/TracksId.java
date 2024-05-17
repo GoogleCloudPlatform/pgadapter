@@ -16,15 +16,9 @@ package com.google.cloud.postgres.models;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import java.io.Serializable;
-import java.util.UUID;
 
-/**
- * {@link Embeddable} is to be used for composite primary key.
- */
+/** {@link Embeddable} is to be used for composite primary key. */
 @Embeddable
 public class TracksId implements Serializable {
 

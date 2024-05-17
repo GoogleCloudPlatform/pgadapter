@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -36,6 +37,7 @@ import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
@@ -235,7 +237,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryAllDataTypes() {
     String sql =
-        "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1";
+        "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
     // Request the data of each column once in both text and binary format to ensure that we support
@@ -246,6 +248,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
           Oid.INT8,
           Oid.BOOL,
           Oid.BYTEA,
+          Oid.FLOAT4,
           Oid.FLOAT8,
           Oid.INT4,
           Oid.NUMERIC,
@@ -279,7 +282,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
   @Test
   public void testUpdateAllDataTypes() {
     String sql =
-        "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float8\"=$4,\"col_int\"=$5,\"col_numeric\"=$6,\"col_timestamptz\"=$7,\"col_date\"=$8,\"col_varchar\"=$9,\"col_jsonb\"=$10 WHERE \"col_varchar\" = $11";
+        "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float4\"=$4,\"col_float8\"=$5,\"col_int\"=$6,\"col_numeric\"=$7,\"col_timestamptz\"=$8,\"col_date\"=$9,\"col_varchar\"=$10,\"col_jsonb\"=$11 WHERE \"col_varchar\" = $12";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -290,6 +293,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -310,20 +314,22 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test_bytes"))
                 .bind("p4")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p5")
-                .to(1L)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
+                .to(1L)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
                 .bind("p8")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p10")
-                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
+                .to("test_string")
                 .bind("p11")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
+                .bind("p12")
                 .to("test")
                 .build(),
             1L));
@@ -424,7 +430,9 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .build(),
             1L));
 
-    String res = pgxTest.TestInsertAllDataTypes(createConnString());
+    String res =
+        pgxTest.TestInsertAllDataTypes(
+            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8);
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
@@ -445,8 +453,8 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
   public void testInsertAllDataTypesReturning() {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *";
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -460,6 +468,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.BOOL,
                                         TypeCode.BYTES,
+                                        TypeCode.FLOAT32,
                                         TypeCode.FLOAT64,
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
@@ -480,18 +489,20 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test_bytes"))
                 .bind("p4")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p5")
-                .to(1L)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
+                .to(1L)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
                 .bind("p8")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p10")
+                .to("test_string")
+                .bind("p11")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             ResultSet.newBuilder()
@@ -504,6 +515,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.BOOL,
                                         TypeCode.BYTES,
+                                        TypeCode.FLOAT32,
                                         TypeCode.FLOAT64,
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
@@ -999,6 +1011,31 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testDdlBatch() {
+    addDdlResponseToSpannerAdmin();
+
+    String res = pgxTest.TestDdlBatch(createConnString());
+
+    assertNull(res);
+    assertEquals(1, mockDatabaseAdmin.getRequests().size());
+    UpdateDatabaseDdlRequest request =
+        (UpdateDatabaseDdlRequest) mockDatabaseAdmin.getRequests().get(0);
+    assertEquals(3, request.getStatementsCount());
+  }
+
+  @Test
+  public void testDdlBatchInTransaction() {
+    addDdlResponseToSpannerAdmin();
+
+    String res = pgxTest.TestDdlBatchInTransaction(createConnString());
+
+    assertNull(res);
+    // No DDL statements should be sent to Spanner, as the DDL batch was being sent in a
+    // transaction.
+    assertEquals(0, mockDatabaseAdmin.getRequests().size());
+  }
+
+  @Test
   public void testInsertNullsAllDataTypes() {
     String sql =
         "INSERT INTO all_types "
@@ -1093,7 +1130,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
         mockSpanner, "public", "all_types", true);
 
     String sql =
-        "select \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\" "
+        "select \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float4\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\" "
             + "from \"all_types\"";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1105,6 +1142,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -1123,20 +1161,23 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     Mutation mutation = request.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(2, mutation.getInsert().getValuesCount());
-    assertEquals(10, mutation.getInsert().getColumnsCount());
+    assertEquals(11, mutation.getInsert().getColumnsCount());
     ListValue insert = mutation.getInsert().getValues(0);
-    assertEquals("1", insert.getValues(0).getStringValue());
-    assertTrue(insert.getValues(1).getBoolValue());
+
+    int index = -1;
+    assertEquals("1", insert.getValues(++index).getStringValue());
+    assertTrue(insert.getValues(++index).getBoolValue());
     assertEquals(
         Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
-        insert.getValues(2).getStringValue());
-    assertEquals(3.14, insert.getValues(3).getNumberValue(), 0.0);
-    assertEquals("10", insert.getValues(4).getStringValue());
-    assertEquals("6.626", insert.getValues(5).getStringValue());
-    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(6).getStringValue());
-    assertEquals("2022-07-01", insert.getValues(7).getStringValue());
-    assertEquals("test", insert.getValues(8).getStringValue());
-    assertEquals("{\"key\": \"value\"}", insert.getValues(9).getStringValue());
+        insert.getValues(++index).getStringValue());
+    assertEquals(3.14f, (float) insert.getValues(++index).getNumberValue(), 0.0f);
+    assertEquals(3.14, insert.getValues(++index).getNumberValue(), 0.0);
+    assertEquals("10", insert.getValues(++index).getStringValue());
+    assertEquals("6.626", insert.getValues(++index).getStringValue());
+    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(++index).getStringValue());
+    assertEquals("2022-07-01", insert.getValues(++index).getStringValue());
+    assertEquals("test", insert.getValues(++index).getStringValue());
+    assertEquals("{\"key\": \"value\"}", insert.getValues(++index).getStringValue());
 
     insert = mutation.getInsert().getValues(1);
     assertEquals("2", insert.getValues(0).getStringValue());

@@ -178,7 +178,7 @@ public class PrepareStatement extends IntermediatePortalStatement {
       byte[][] parameters,
       List<Short> parameterFormatCodes,
       List<Short> resultFormatCodes) {
-    // COPY does not support binding any parameters, so we just return the same statement.
+    // PREPARE does not support binding any parameters, so we just return the same statement.
     return this;
   }
 

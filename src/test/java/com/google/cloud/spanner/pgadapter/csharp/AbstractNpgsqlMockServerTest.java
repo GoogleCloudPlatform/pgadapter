@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.csharp;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
@@ -101,7 +102,7 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + "WHERE\n"
               + "    typtype IN ('b', 'r', 'm', 'e', 'd') OR -- Base, range, multirange, enum, domain\n"
               + "    (typtype = 'c' AND relkind='c') OR -- User-defined free-standing composites (not table composites) by default\n"
-              + "    (typtype = 'p' AND typname IN ('record', 'void')) OR -- Some special supported pseudo-types\n"
+              + "    (typtype = 'p' AND typname IN ('record', 'void', 'unknown')) OR -- Some special supported pseudo-types\n"
               + "    (typtype = 'a' AND (  -- Array of...\n"
               + "        elemtyptype IN ('b', 'r', 'm', 'e', 'd') OR -- Array of base, range, multirange, enum, domain\n"
               + "        (elemtyptype = 'p' AND elemtypname IN ('record', 'void')) OR -- Arrays of special supported pseudo-types\n"
@@ -109,9 +110,9 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + "    ))\n"
               + "ORDER BY CASE\n"
               + "       WHEN typtype IN ('b', 'e', 'p') THEN 0           -- First base types, enums, pseudo-types\n"
-              + "       WHEN typtype = 'r' THEN 1                        -- Ranges after\n"
-              + "       WHEN typtype = 'm' THEN 2                        -- Multiranges after\n"
-              + "       WHEN typtype = 'c' THEN 3                        -- Composites after\n"
+              + "       WHEN typtype = 'c' THEN 1                        -- Composites after (fields loaded later in 2nd pass)\n"
+              + "       WHEN typtype = 'r' THEN 2                        -- Ranges after\n"
+              + "       WHEN typtype = 'm' THEN 3                        -- Multiranges after\n"
               + "       WHEN typtype = 'd' AND elemtyptype <> 'a' THEN 4 -- Domains over non-arrays after\n"
               + "       WHEN typtype = 'a' THEN 5                        -- Arrays after\n"
               + "       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 6  -- Domains over arrays last\n"
@@ -192,6 +193,15 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
                   .addValues(Value.newBuilder().setStringValue("int8").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
+                  .addValues(Value.newBuilder().setStringValue("float4").build())
                   .addValues(Value.newBuilder().setStringValue("b").build())
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -322,6 +332,16 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
                   .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_float4").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
                       Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT8_ARRAY)).build())
                   .addValues(Value.newBuilder().setStringValue("_float8").build())
                   .addValues(Value.newBuilder().setStringValue("a").build())
@@ -424,6 +444,15 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BYTEA)).build())
                   .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue("705").build())
+                  .addValues(Value.newBuilder().setStringValue("unknown").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue("705").build())
+                  .build())
           .setMetadata(SELECT_TYPES_METADATA)
           .build();
   private static final Statement SELECT_ATTRIBUTES =
@@ -517,6 +546,9 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     String[] runCommand = new String[] {"dotnet", "run", test, connectionString};
     builder.command(runCommand);
     builder.directory(new File("./src/test/csharp/pgadapter_npgsql_tests/npgsql_tests"));
+    builder
+        .environment()
+        .put("PGADAPTER_FLOAT4_OID", String.valueOf(useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
     Process process = builder.start();
     String output = readAll(process.getInputStream());
     String errors = readAll(process.getErrorStream());

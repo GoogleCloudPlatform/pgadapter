@@ -20,7 +20,7 @@ import java.util.Map;
 
 public class CopySettings {
   private static final int DEFAULT_PIPE_BUFFER_SIZE = 1 << 16;
-  private static final int DEFAULT_MAX_MUTATION_LIMIT = 20_000; // 20k mutations limit
+  private static final int DEFAULT_MAX_MUTATION_LIMIT = 80_000; // 80k mutations limit
 
   private final SessionState sessionState;
 
@@ -113,7 +113,8 @@ public class CopySettings {
 
   /** Returns the maximum number of mutations in a single commit request. */
   public int getMaxAtomicMutationsLimit() {
-    return sessionState.getIntegerSetting("spanner", "copy_max_atomic_mutations", 20_000);
+    return sessionState.getIntegerSetting(
+        "spanner", "copy_max_atomic_mutations", DEFAULT_MAX_MUTATION_LIMIT);
   }
 
   /** Returns the maximum number of bytes in a single commit request. */

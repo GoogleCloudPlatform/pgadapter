@@ -19,13 +19,18 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.ThreadFactoryUtil;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -39,6 +44,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -54,6 +60,8 @@ public class ProxyServer extends AbstractApiService {
 
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
+  private final OpenTelemetry openTelemetry;
+  private final Metrics metrics;
   private final Properties properties;
   private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
 
@@ -78,32 +86,50 @@ public class ProxyServer extends AbstractApiService {
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
+  private final ThreadFactory threadFactory;
+
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
    *
    * @param optionsMetadata Resulting metadata from CLI.
    */
   public ProxyServer(OptionsMetadata optionsMetadata) {
-    this.options = optionsMetadata;
-    this.localPort = optionsMetadata.getProxyPort();
-    this.properties = new Properties();
-    this.debugMode = optionsMetadata.isDebugMode();
-    addConnectionProperties();
+    this(optionsMetadata, Server.setupOpenTelemetry(optionsMetadata));
+  }
+
+  /**
+   * Instantiates the ProxyServer from CLI-gathered metadata.
+   *
+   * @param optionsMetadata Resulting metadata from CLI.
+   * @param openTelemetry The {@link OpenTelemetry} to use to collect metrics
+   */
+  public ProxyServer(OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry) {
+    this(optionsMetadata, openTelemetry, new Properties());
   }
 
   /**
    * Instantiates the ProxyServer from metadata and properties. For use with in-process invocations.
    *
    * @param optionsMetadata Resulting metadata from CLI.
-   * @param properties Properties for specificying additional information to JDBC like an external
+   * @param openTelemetry The {@link OpenTelemetry} to use to collect metrics
+   * @param properties Properties for specifying additional information to JDBC like an external
    *     channel provider (see ConnectionOptions in Java Spanner client library for more details on
    *     supported properties).
    */
-  public ProxyServer(OptionsMetadata optionsMetadata, Properties properties) {
+  public ProxyServer(
+      OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties) {
     this.options = optionsMetadata;
+    this.openTelemetry = openTelemetry;
+    this.metrics =
+        optionsMetadata.isEnableOpenTelemetryMetrics()
+            ? new Metrics(openTelemetry)
+            : new Metrics(OpenTelemetry.noop());
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
+    this.threadFactory =
+        ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory(
+            "ConnectionHandler", optionsMetadata.isUseVirtualThreads());
     addConnectionProperties();
   }
 
@@ -171,7 +197,7 @@ public class ProxyServer extends AbstractApiService {
         listenerThread.start();
       }
       try {
-        if (startupLatch.await(30L, TimeUnit.SECONDS)) {
+        if (startupLatch.await(options.getStartupTimeout().toMillis(), TimeUnit.MILLISECONDS)) {
           notifyStarted();
         } else {
           throw SpannerExceptionFactory.newSpannerException(
@@ -296,6 +322,9 @@ public class ProxyServer extends AbstractApiService {
                   serverSocket, e));
     } finally {
       logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocket));
+      if (openTelemetry instanceof Closeable) {
+        ((Closeable) openTelemetry).close();
+      }
       stoppedLatch.countDown();
     }
   }
@@ -314,6 +343,8 @@ public class ProxyServer extends AbstractApiService {
     socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
+    Thread thread = threadFactory.newThread(handler);
+    handler.setThread(thread);
     handler.start();
   }
 
@@ -342,6 +373,20 @@ public class ProxyServer extends AbstractApiService {
 
   public OptionsMetadata getOptions() {
     return this.options;
+  }
+
+  public OpenTelemetry getOpenTelemetry() {
+    return this.openTelemetry;
+  }
+
+  public Tracer getTracer(String name, String version) {
+    return getOptions().isEnableOpenTelemetry()
+        ? getOpenTelemetry().getTracer(name, version)
+        : OpenTelemetry.noop().getTracer(name, version);
+  }
+
+  public Metrics getMetrics() {
+    return this.metrics;
   }
 
   /** @return the JDBC connection properties that are used by this server */

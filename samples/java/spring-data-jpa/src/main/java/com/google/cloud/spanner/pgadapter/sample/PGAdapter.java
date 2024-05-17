@@ -18,6 +18,7 @@ import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 
+/** Util class for managing the in-process PGAdapter instance used by thie sample. */
 class PGAdapter {
   private final ProxyServer server;
 
@@ -31,11 +32,16 @@ class PGAdapter {
    * server when your application shuts down.
    */
   static ProxyServer startPGAdapter() {
-    // Start PGAdapter using the default credentials of the runtime environment on port 9432.
-    OptionsMetadata options = OptionsMetadata.newBuilder().setPort(9432).build();
+    // Start PGAdapter using the default credentials of the runtime environment on port a random
+    // port.
+    OptionsMetadata options = OptionsMetadata.newBuilder().setPort(0).build();
     ProxyServer server = new ProxyServer(options);
     server.startServer();
     server.awaitRunning();
+
+    // Override the port that is set in the application.properties file with the one that was
+    // automatically assigned.
+    System.setProperty("pgadapter.port", String.valueOf(server.getLocalPort()));
 
     return server;
   }

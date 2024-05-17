@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.python.psycopg3;
 
 import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.getOnlyAllTypesDdl;
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.DIRECTORY_NAME;
 import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.execute;
 import static org.junit.Assert.assertArrayEquals;
@@ -56,7 +57,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
-public class ITPsycopg3Test {
+public class ITPsycopg3Test implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
 
@@ -106,6 +107,8 @@ public class ITPsycopg3Test {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -127,6 +130,8 @@ public class ITPsycopg3Test {
                 .set("col_array_bytea")
                 .toBytesArray(
                     Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float4")
+                .toFloat32Array(Arrays.asList(3.14f, null, -99.99f))
                 .set("col_array_float8")
                 .toFloat64Array(Arrays.asList(3.14d, null, -99.99))
                 .set("col_array_int")
@@ -189,6 +194,7 @@ public class ITPsycopg3Test {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + String.format("col_float4: %s\n", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -199,6 +205,10 @@ public class ITPsycopg3Test {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                useFloat4InTests() ? "3.14" : "3.140000104904175",
+                useFloat4InTests() ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -216,6 +226,7 @@ public class ITPsycopg3Test {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + String.format("col_float4: %s\n", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -226,6 +237,10 @@ public class ITPsycopg3Test {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                useFloat4InTests() ? "3.14" : "3.140000104904175",
+                useFloat4InTests() ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -254,6 +269,15 @@ public class ITPsycopg3Test {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            // psycopg3 uses Python floats for both float4 and float8.
+            // That means that when using the binary protocol, the actual 64-bit float value
+            // is sent to the server, which again causes rounding issues when the value is
+            // converted to a 32-bit float.
+            + String.format(
+                "col_float4: %s\n",
+                format == DataFormat.POSTGRESQL_TEXT && useFloat4InTests()
+                    ? "3.14"
+                    : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -264,6 +288,14 @@ public class ITPsycopg3Test {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                format == DataFormat.POSTGRESQL_TEXT && useFloat4InTests()
+                    ? "3.14"
+                    : "3.140000104904175",
+                format == DataFormat.POSTGRESQL_TEXT && useFloat4InTests()
+                    ? "-99.99"
+                    : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -335,6 +367,7 @@ public class ITPsycopg3Test {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -345,6 +378,7 @@ public class ITPsycopg3Test {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -448,7 +482,14 @@ public class ITPsycopg3Test {
 
     String result = execute("batch_execution_error");
     assertTrue(result, result.contains("Executing batch failed with error"));
-    assertTrue(result, result.contains("Row [101] in table all_types already exists"));
+    if (IntegrationTest.isRunningOnEmulator()) {
+      assertTrue(
+          result,
+          result.contains(
+              "Failed to insert row with primary key ({pk#col_bigint:101}) due to previously existing row"));
+    } else {
+      assertTrue(result, result.contains("Row [101] in table all_types already exists"));
+    }
   }
 
   // TODO: Enable once the below PR has been merged
@@ -512,11 +553,15 @@ public class ITPsycopg3Test {
     // Add an extra NULL-row to the table.
     addNullRow();
 
-    String result = execute("binary_copy_out");
-    assertEquals(
+    String row1 =
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            // psycopg3 uses Python floats for both float4 and float8.
+            // That means that when using the binary protocol, the actual 64-bit float value
+            // is sent to the server, which again causes rounding issues when the value is
+            // converted to a 32-bit float.
+            + "col_float4: 3.140000104904175\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -527,16 +572,19 @@ public class ITPsycopg3Test {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.140000104904175, None, -99.98999786376953]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
-            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
-            + "col_bigint: 2\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n";
+    String row2 =
+        "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -547,14 +595,21 @@ public class ITPsycopg3Test {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
-            + "col_array_jsonb: None\n",
-        result);
+            + "col_array_jsonb: None\n";
+
+    String result = execute("binary_copy_out");
+    if (IntegrationTest.isRunningOnEmulator()) {
+      assertEquals(row2 + row1, result);
+    } else {
+      assertEquals(row1 + row2, result);
+    }
   }
 
   @Test
@@ -562,11 +617,11 @@ public class ITPsycopg3Test {
     // Add an extra NULL-row to the table.
     addNullRow();
 
-    String result = execute("text_copy_out");
-    assertEquals(
+    String row1 =
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + String.format("col_float4: %s\n", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -577,16 +632,22 @@ public class ITPsycopg3Test {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                useFloat4InTests() ? "3.14" : "3.140000104904175",
+                useFloat4InTests() ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
-            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
-            + "col_bigint: 2\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n";
+    String row2 =
+        "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -597,14 +658,21 @@ public class ITPsycopg3Test {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
-            + "col_array_jsonb: None\n",
-        result);
+            + "col_array_jsonb: None\n";
+
+    String result = execute("text_copy_out");
+    if (IntegrationTest.isRunningOnEmulator()) {
+      assertEquals(row2 + row1, result);
+    } else {
+      assertEquals(row1 + row2, result);
+    }
   }
 
   @Test
@@ -617,6 +685,7 @@ public class ITPsycopg3Test {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + String.format("col_float4: %s\n", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -627,6 +696,10 @@ public class ITPsycopg3Test {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                useFloat4InTests() ? "3.14" : "3.140000104904175",
+                useFloat4InTests() ? "-99.99" : "-99.98999786376953")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -637,6 +710,7 @@ public class ITPsycopg3Test {
             + "col_bigint: 2\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -647,6 +721,7 @@ public class ITPsycopg3Test {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -689,6 +764,8 @@ public class ITPsycopg3Test {
                 .to((Boolean) null)
                 .set("col_bytea")
                 .to((ByteArray) null)
+                .set("col_float4")
+                .to((Float) null)
                 .set("col_float8")
                 .to((Double) null)
                 .set("col_int")
@@ -709,6 +786,8 @@ public class ITPsycopg3Test {
                 .toBoolArray((boolean[]) null)
                 .set("col_array_bytea")
                 .toBytesArray(null)
+                .set("col_array_float4")
+                .toFloat32Array((float[]) null)
                 .set("col_array_float8")
                 .toFloat64Array((double[]) null)
                 .set("col_array_int")

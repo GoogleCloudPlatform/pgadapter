@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
 import com.google.common.base.Preconditions;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -76,7 +77,7 @@ public abstract class WireMessage {
    * @throws Exception If the sending fails.
    */
   public void send() throws Exception {
-    logger.log(Level.FINE, this::toString);
+    logger.log(Level.FINEST, Logging.format("Send", this::toString));
     sendPayload();
   }
 
@@ -107,7 +108,7 @@ public abstract class WireMessage {
    *
    * @return Message Identifier (int for Bootstrap, char otherwise).
    */
-  protected abstract String getIdentifier();
+  public abstract String getIdentifier();
 
   @Override
   public String toString() {

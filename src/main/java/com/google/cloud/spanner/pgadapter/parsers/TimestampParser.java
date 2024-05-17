@@ -67,6 +67,7 @@ public class TimestampParser extends Parser<Timestamp> {
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
           .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+          .appendPattern("[ ]")
           // Java 8 does not support seconds in timezone offset.
           .appendOffset(OptionsMetadata.isJava8() ? "+HH:mm" : "+HH:mm:ss", "+00:00:00")
           .toFormatter();
@@ -74,7 +75,7 @@ public class TimestampParser extends Parser<Timestamp> {
       new DateTimeFormatterBuilder()
           .parseLenient()
           .parseCaseInsensitive()
-          .appendPattern("yyyy-MM-dd[[ ]['T']HH:mm[:ss][XXX]]")
+          .appendPattern("yyyy-MM-dd[[ ]['T']HH:mm[:ss][ ][XXX]]")
           .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
           .toFormatter();
 

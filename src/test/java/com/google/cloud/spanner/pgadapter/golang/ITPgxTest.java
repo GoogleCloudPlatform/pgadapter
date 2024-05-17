@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -35,6 +36,7 @@ import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.AfterClass;
@@ -46,6 +48,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.core.Oid;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -133,6 +136,8 @@ public class ITPgxTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -147,6 +152,35 @@ public class ITPgxTest implements IntegrationTest {
                 .to("test")
                 .set("col_jsonb")
                 .to("{\"key\": \"value\"}")
+                .set("col_array_bigint")
+                .toInt64Array(Arrays.asList(1L, null, 2L))
+                .set("col_array_bool")
+                .toBoolArray(Arrays.asList(true, null, false))
+                .set("col_array_bytea")
+                .toBytesArray(
+                    Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float4")
+                .toFloat32Array(Arrays.asList(3.14f, null, -99.99f))
+                .set("col_array_float8")
+                .toFloat64Array(Arrays.asList(3.14d, null, -99.99d))
+                .set("col_array_int")
+                .toInt64Array(Arrays.asList(-100L, null, -200L))
+                .set("col_array_numeric")
+                .toPgNumericArray(Arrays.asList("6.626", null, "-3.14"))
+                .set("col_array_timestamptz")
+                .toTimestampArray(
+                    Arrays.asList(
+                        Timestamp.parseTimestamp("2022-02-16T16:18:02.123456Z"),
+                        null,
+                        Timestamp.parseTimestamp("2000-01-01T00:00:00Z")))
+                .set("col_array_date")
+                .toDateArray(
+                    Arrays.asList(Date.parseDate("2023-02-20"), null, Date.parseDate("2000-01-01")))
+                .set("col_array_varchar")
+                .toStringArray(Arrays.asList("string1", null, "string2"))
+                .set("col_array_jsonb")
+                .toPgJsonbArray(
+                    Arrays.asList("{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"))
                 .build()));
   }
 
@@ -167,12 +201,16 @@ public class ITPgxTest implements IntegrationTest {
     testEnv.write(
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
-    assertNull(pgxTest.TestInsertAllDataTypes(createConnString()));
+    assertNull(
+        pgxTest.TestInsertAllDataTypes(
+            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
   }
 
   @Test
   public void testPrepareStatement() {
-    assertNull(pgxTest.TestPrepareStatement(createConnString()));
+    assertNull(
+        pgxTest.TestPrepareStatement(
+            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
   }
 
   @Test

@@ -60,6 +60,7 @@ type ExecutionEnvironment interface {
 }
 
 const dockerImage = "gcr.io/cloud-spanner-pg-adapter/pgadapter"
+const dockerImageWithEmulator = "gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator"
 
 // Docker contains the specific configuration for running PGAdapter in a test Docker container.
 // This Docker execution environment can be used for tests and development. You should however
@@ -145,6 +146,12 @@ func (java *Java) Command(config Config) (string, error) {
 }
 
 type Config struct {
+	// ConnectToEmulator specifies whether PGAdapter should connect to the Cloud Spanner emulator,
+	// or whether it should connect to real Cloud Spanner.
+	// Setting this option to true will force the use of Docker as the ExecutionEnvironment, and all
+	// other configuration options will be ignored.
+	ConnectToEmulator bool
+
 	// ExecutionEnvironment determines the execution environment that is used to start
 	// PGAdapter.
 	//
@@ -314,6 +321,13 @@ type PGAdapter struct {
 // incoming connections.
 func Start(ctx context.Context, config Config) (pgadapter *PGAdapter, err error) {
 	autoDetect := config.ExecutionEnvironment == nil
+	if config.ConnectToEmulator {
+		if isDockerAvailable() {
+			config.ExecutionEnvironment = &Docker{}
+		} else {
+			return nil, fmt.Errorf("PGAdapter with the Emulator requires Docker to be installed on the local system")
+		}
+	}
 	if config.ExecutionEnvironment == nil {
 		if isJavaAvailable() {
 			config.ExecutionEnvironment = &Java{}
@@ -582,7 +596,7 @@ func startDocker(ctx context.Context, config Config) (pgadapter *PGAdapter, err 
 		return nil, fmt.Errorf("only dynamic port assignment (Config.Port=0) is supported for Docker")
 	}
 	var credentialsFile string
-	if config.CredentialsFile == "" {
+	if !config.ConnectToEmulator && config.CredentialsFile == "" {
 		credentials, err := google.FindDefaultCredentials(ctx)
 		if credentials == nil {
 			return nil, fmt.Errorf("credentials cannot be nil")
@@ -611,28 +625,33 @@ func startDocker(ctx context.Context, config Config) (pgadapter *PGAdapter, err 
 	}
 	cmd = append(cmd, "-x")
 	image := dockerImage
+	if config.ConnectToEmulator {
+		image = dockerImageWithEmulator
+	}
 	if config.Version != "" {
 		image += ":" + config.Version
 	}
 	req := testcontainers.ContainerRequest{
 		AlwaysPullImage: config.ExecutionEnvironment.(*Docker).AlwaysPullImage,
 		Image:           image,
-		Cmd:             cmd,
-		Files: []testcontainers.ContainerFile{
-			{
-				HostFilePath:      credentialsFile,
-				ContainerFilePath: "/credentials.json",
-				FileMode:          700,
-			},
-		},
-		Env:          map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "/credentials.json"},
-		ExposedPorts: []string{"5432/tcp"},
-		WaitingFor:   wait.ForExposedPort(),
+		ExposedPorts:    []string{"5432/tcp"},
+		WaitingFor:      wait.ForListeningPort("5432/tcp"),
 		HostConfigModifier: func(hostConfig *container.HostConfig) {
 			if !config.ExecutionEnvironment.(*Docker).KeepContainer {
 				hostConfig.AutoRemove = true
 			}
 		},
+	}
+	if !config.ConnectToEmulator {
+		req.Cmd = cmd
+		req.Files = []testcontainers.ContainerFile{
+			{
+				HostFilePath:      credentialsFile,
+				ContainerFilePath: "/credentials.json",
+				FileMode:          700,
+			},
+		}
+		req.Env = map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "/credentials.json"}
 	}
 	pgadapter = &PGAdapter{}
 	pgadapter.container, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

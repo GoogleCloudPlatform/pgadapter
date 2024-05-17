@@ -20,8 +20,7 @@ public class VenueDescription implements Serializable {
   private String name;
   private String val;
 
-  public VenueDescription() {
-  }
+  public VenueDescription() {}
 
   public VenueDescription(String name, String val) {
     this.name = name;

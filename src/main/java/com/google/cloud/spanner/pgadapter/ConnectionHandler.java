@@ -29,6 +29,7 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
@@ -50,6 +51,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStateme
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.Logging;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
@@ -58,6 +60,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -80,10 +83,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -95,13 +98,13 @@ import javax.net.ssl.SSLSocketFactory;
  * representation {@link IntermediateStatement} that servers as a middle layer between Postgres and
  * Spanner.
  *
- * <p>Each {@link ConnectionHandler} is also a {@link Thread}. Although a TCP connection does not
- * necessarily need to have its own thread, this makes the implementation more straightforward.
+ * <p>Each {@link ConnectionHandler} is also a {@link Runnable} so it can be handed to a single
+ * handler thread. Although a TCP connection does not necessarily need to have its own thread, this
+ * makes the implementation more straightforward. The handler thread may be a virtual thread.
  */
 @InternalApi
-public class ConnectionHandler extends Thread {
+public class ConnectionHandler implements Runnable {
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
-  private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
   private final ProxyServer server;
@@ -117,11 +120,16 @@ public class ConnectionHandler extends Thread {
   private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
       new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
+  private Thread thread;
   private final int connectionId;
   private final int secret;
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
   //  32 bytes, and shouldn't be incremented on failed startups.
   private static final AtomicInteger incrementingConnectionId = new AtomicInteger(0);
+
+  /** Randomly generated UUID that is included in tracing to identify a connection. */
+  private final UUID traceConnectionId = UUID.randomUUID();
+
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private int invalidMessagesCount;
@@ -146,20 +154,37 @@ public class ConnectionHandler extends Thread {
   /** Constructor only for testing. */
   @VisibleForTesting
   ConnectionHandler(ProxyServer server, Socket socket, Connection spannerConnection) {
-    super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
     this.connectionId = incrementingConnectionId.incrementAndGet();
     CONNECTION_HANDLERS.put(this.connectionId, this);
-    setDaemon(true);
+    this.spannerConnection = spannerConnection;
+  }
+
+  void start() {
+    Preconditions.checkState(thread != null, "Cannot start a ConnectionHandler without a thread");
+    thread.start();
+  }
+
+  String getName() {
+    Preconditions.checkState(
+        thread != null, "Cannot get the name of a ConnectionHandler without a thread");
+    return thread.getName();
+  }
+
+  Thread getThread() {
+    return this.thread;
+  }
+
+  void setThread(Thread thread) {
+    this.thread = thread;
     logger.log(
         Level.INFO,
         () ->
             String.format(
                 "Connection handler with ID %s created for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
-    this.spannerConnection = spannerConnection;
   }
 
   void createSSLSocket() throws IOException {
@@ -183,6 +208,11 @@ public class ConnectionHandler extends Thread {
     if (options.getSessionPoolOptions() != null) {
       connectionOptionsBuilder =
           connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
+    }
+    if (options.isEnableOpenTelemetryMetrics()) {
+      SpannerOptions.enableOpenTelemetryMetrics();
+      connectionOptionsBuilder =
+          connectionOptionsBuilder.setOpenTelemetry(server.getOpenTelemetry());
     }
     ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
     Connection spannerConnection = connectionOptions.getConnection();
@@ -267,13 +297,14 @@ public class ConnectionHandler extends Thread {
     return uri;
   }
 
-  private static String appendPropertiesToUrl(String url, Properties info) {
+  @VisibleForTesting
+  static String appendPropertiesToUrl(String url, Properties info) {
     if (info == null || info.isEmpty()) {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
     for (Entry<Object, Object> entry : info.entrySet()) {
-      if (entry.getValue() != null && !"".equals(entry.getValue())) {
+      if (!Strings.isNullOrEmpty((String) entry.getValue())) {
         result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
       }
     }
@@ -289,16 +320,20 @@ public class ConnectionHandler extends Thread {
   public void run() {
     logger.log(
         Level.INFO,
-        () ->
-            String.format(
-                "Connection handler with ID %s starting for client %s",
-                getName(), socket.getInetAddress().getHostAddress()));
+        Logging.format(
+            "Run",
+            () ->
+                String.format(
+                    "Connection handler with ID %s starting for client %s with thread %s",
+                    getName(), socket.getInetAddress().getHostAddress(), thread.toString())));
     if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
       logger.log(
           Level.INFO,
-          () ->
-              String.format(
-                  "Connection handler with ID %s is restarted so it can use SSL", getName()));
+          Logging.format(
+              "Run",
+              () ->
+                  String.format(
+                      "Connection handler with ID %s is restarted so it can use SSL", getName())));
       restartConnectionWithSsl();
     }
   }
@@ -392,7 +427,10 @@ public class ConnectionHandler extends Thread {
     } finally {
       if (result != RunConnectionState.RESTART_WITH_SSL) {
         logger.log(
-            Level.INFO, () -> String.format("Closing connection handler with ID %s", getName()));
+            Level.INFO,
+            Logging.format(
+                "RunConnection",
+                () -> String.format("Closing connection handler with ID %s", getName())));
         try {
           if (this.spannerConnection != null) {
             this.spannerConnection.close();
@@ -402,13 +440,18 @@ public class ConnectionHandler extends Thread {
           logger.log(
               Level.WARNING,
               e,
-              () ->
-                  String.format(
-                      "Exception while closing connection handler with ID %s", getName()));
+              Logging.format(
+                  "RunConnection",
+                  () ->
+                      String.format(
+                          "Exception while closing connection handler with ID %s", getName())));
         }
         this.server.deregister(this);
         logger.log(
-            Level.INFO, () -> String.format("Connection handler with ID %s closed", getName()));
+            Level.INFO,
+            Logging.format(
+                "RunConnection",
+                () -> String.format("Connection handler with ID %s closed", getName())));
       }
     }
     return result;
@@ -587,19 +630,24 @@ public class ConnectionHandler extends Thread {
     if (connectionToCancel == null) {
       logger.log(
           Level.WARNING,
-          () ->
-              MessageFormat.format(
-                  "User attempted to cancel an unknown connection. Connection: {0}", connectionId));
+          Logging.format(
+              "CancelActiveStatement",
+              () ->
+                  MessageFormat.format(
+                      "User attempted to cancel an unknown connection. Connection: {0}",
+                      connectionId)));
       return false;
     }
     if (secret != connectionToCancel.secret) {
       logger.log(
           Level.WARNING,
-          () ->
-              MessageFormat.format(
-                  "User attempted to cancel a connection with the incorrect secret."
-                      + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
-                  connectionId, secret, connectionToCancel.secret));
+          Logging.format(
+              "CancelActiveStatement",
+              () ->
+                  MessageFormat.format(
+                      "User attempted to cancel a connection with the incorrect secret."
+                          + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
+                      connectionId, secret, connectionToCancel.secret)));
       // Since the user does not accept a response, there is no need to except here: simply return.
       return false;
     }
@@ -607,7 +655,7 @@ public class ConnectionHandler extends Thread {
     // otherwise)
     try {
       connectionToCancel.getSpannerConnection().cancel();
-      connectionToCancel.interrupt();
+      connectionToCancel.getThread().interrupt();
       return true;
     } catch (Throwable ignore) {
     }
@@ -690,6 +738,10 @@ public class ConnectionHandler extends Thread {
     return this.secret;
   }
 
+  public UUID getTraceConnectionId() {
+    return traceConnectionId;
+  }
+
   public void setMessageState(WireMessage message) {
     this.message = this.server.recordMessage(message);
   }
@@ -744,10 +796,12 @@ public class ConnectionHandler extends Thread {
     if (this.wellKnownClient != WellKnownClient.UNSPECIFIED) {
       logger.log(
           Level.INFO,
-          () ->
-              String.format(
-                  "Well-known client %s detected for connection %d.",
-                  this.wellKnownClient, getConnectionId()));
+          Logging.format(
+              "SetWellKnownClient",
+              () ->
+                  String.format(
+                      "Well-known client %s detected for connection %d.",
+                      this.wellKnownClient, getConnectionId())));
     }
   }
 
@@ -787,8 +841,8 @@ public class ConnectionHandler extends Thread {
       // chosen as a reasonable number of statements that should be enough. It can safely be
       // increased if we encounter clients that send more than 10 client-side statements before
       // sending anything that we can use to automatically recognize them.
-      if (parseMessage.getStatement().getStatementType() == StatementType.CLIENT_SIDE
-          && skippedAutoDetectParseMessages.size() < 10) {
+      if (/*parseMessage.getStatement().getStatementType() == StatementType.CLIENT_SIDE
+          &&*/ skippedAutoDetectParseMessages.size() < 10) {
         skippedAutoDetectParseMessages.add(parseMessage);
       } else {
         if (this.wellKnownClient == WellKnownClient.UNSPECIFIED

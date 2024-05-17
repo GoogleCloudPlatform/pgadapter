@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.nodejs;
 
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -62,6 +63,8 @@ public class ITNodePostgresTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
+    NodeJSTest.installDependencies("node-postgres");
+
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
@@ -80,6 +83,7 @@ public class ITNodePostgresTest implements IntegrationTest {
             + "col_bigint bigint not null primary key, "
             + "col_bool bool, "
             + "col_bytea bytea, "
+            + String.format("col_float4 %s, ", useFloat4InTests() ? "float4" : "float8")
             + "col_float8 float8, "
             + "col_int int, "
             + "col_numeric numeric, "
@@ -110,6 +114,8 @@ public class ITNodePostgresTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -139,6 +145,8 @@ public class ITNodePostgresTest implements IntegrationTest {
                 .to((Boolean) null)
                 .set("col_bytea")
                 .to((ByteArray) null)
+                .set("col_float4")
+                .to((Float) null)
                 .set("col_float8")
                 .to((Double) null)
                 .set("col_int")
@@ -227,6 +235,12 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(
           ByteArray.copyFrom("some random string".getBytes(StandardCharsets.UTF_8)),
           resultSet.getBytes("col_bytea"));
+      assertEquals(
+          3.14f,
+          useFloat4InTests()
+              ? resultSet.getFloat("col_float4")
+              : (float) resultSet.getDouble("col_float4"),
+          0.0f);
       assertEquals(3.14d, resultSet.getDouble("col_float8"), 0.0d);
       assertEquals(100, resultSet.getLong("col_int"));
       assertEquals("234.54235", resultSet.getString("col_numeric"));
@@ -253,6 +267,7 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(1L, resultSet.getLong("col_bigint"));
       assertTrue(resultSet.isNull("col_bool"));
       assertTrue(resultSet.isNull("col_bytea"));
+      assertTrue(resultSet.isNull("col_float4"));
       assertTrue(resultSet.isNull("col_float8"));
       assertTrue(resultSet.isNull("col_int"));
       assertTrue(resultSet.isNull("col_numeric"));
@@ -273,13 +288,21 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
-        client.singleUse().executeQuery(Statement.of("SELECT * FROM alltypes"))) {
+        client
+            .singleUse()
+            .executeQuery(Statement.of("SELECT * FROM alltypes ORDER BY col_bigint"))) {
       assertTrue(resultSet.next());
       assertEquals(1, resultSet.getLong("col_bigint"));
       assertTrue(resultSet.getBoolean("col_bool"));
       assertEquals(
           ByteArray.copyFrom("some random string".getBytes(StandardCharsets.UTF_8)),
           resultSet.getBytes("col_bytea"));
+      assertEquals(
+          3.14f,
+          useFloat4InTests()
+              ? resultSet.getFloat("col_float4")
+              : (float) resultSet.getDouble("col_float4"),
+          0.0f);
       assertEquals(3.14d, resultSet.getDouble("col_float8"), 0.0d);
       assertEquals(100, resultSet.getLong("col_int"));
       assertEquals("234.54235", resultSet.getString("col_numeric"));
@@ -294,6 +317,7 @@ public class ITNodePostgresTest implements IntegrationTest {
       assertEquals(2L, resultSet.getLong("col_bigint"));
       assertTrue(resultSet.isNull("col_bool"));
       assertTrue(resultSet.isNull("col_bytea"));
+      assertTrue(resultSet.isNull("col_float4"));
       assertTrue(resultSet.isNull("col_float8"));
       assertTrue(resultSet.isNull("col_int"));
       assertTrue(resultSet.isNull("col_numeric"));
@@ -316,6 +340,7 @@ public class ITNodePostgresTest implements IntegrationTest {
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":true,"
             + "\"col_bytea\":{\"type\":\"Buffer\",\"data\":[116,101,115,116]},"
+            + String.format("\"col_float4\":%s,", useFloat4InTests() ? "3.14" : "3.140000104904175")
             + "\"col_float8\":3.14,"
             + "\"col_int\":\"100\","
             + "\"col_numeric\":\"6.626\","
@@ -337,6 +362,7 @@ public class ITNodePostgresTest implements IntegrationTest {
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":null,"
             + "\"col_bytea\":null,"
+            + "\"col_float4\":null,"
             + "\"col_float8\":null,"
             + "\"col_int\":null,"
             + "\"col_numeric\":null,"
@@ -358,11 +384,19 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     String output =
         runTest("testErrorInReadWriteTransaction", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals(
-        "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row [foo] in table users already exists\n"
-            + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
-            + "SELECT 1 returned: 1\n",
-        output);
+    if (IntegrationTest.isRunningOnEmulator()) {
+      assertEquals(
+          "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Failed to insert row with primary key ({pk#name:\"foo\"}) due to previously existing row\n"
+              + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
+              + "SELECT 1 returned: 1\n",
+          output);
+    } else {
+      assertEquals(
+          "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row [foo] in table users already exists\n"
+              + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
+              + "SELECT 1 returned: 1\n",
+          output);
+    }
   }
 
   @Test
@@ -389,7 +423,9 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     String output = runTest("testCopyTo", getHost(), testEnv.getServer().getLocalPort());
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        String.format(
+            "1\tt\t\\\\x74657374\t%s\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+            useFloat4InTests() ? "3.14" : "3.140000104904175"),
         output);
   }
 

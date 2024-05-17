@@ -14,6 +14,7 @@
 
 using System.Data;
 using Npgsql;
+using Npgsql.Internal.Postgres;
 using NpgsqlTypes;
 using System.Globalization;
 using System.Reflection;
@@ -34,6 +35,8 @@ public class NpgsqlTest
         var test = new NpgsqlTest(args[0], args[1]);
         test.Execute();
     }
+
+    private static bool UseFloat4 => "700".Equals(Environment.GetEnvironmentVariable("PGADAPTER_FLOAT4_OID"));
 
     private string Test { get; }
     
@@ -198,6 +201,14 @@ public class NpgsqlTest
                     Console.WriteLine($"Value mismatch: Got '{stringValue}', Want: 'test'");
                     return;
                 }
+                var f = UseFloat4
+                    ? reader.GetFloat(++index)
+                    : (float) reader.GetDouble(++index);
+                if (Math.Abs(f - 3.14f) > 0.0f)
+                {
+                    Console.WriteLine($"Value mismatch: Got '{f}', Want: 3.14");
+                    return;
+                }
                 if (Math.Abs(reader.GetDouble(++index) - 3.14d) > 0.0d)
                 {
                     Console.WriteLine($"Value mismatch: Got '{reader.GetDouble(index)}', Want: 3.14");
@@ -248,14 +259,15 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float8=$3, col_int=$4, col_numeric=$5, " +
-            "col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_varchar = $10";
+            "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float4=$3, col_float8=$4, col_int=$5, col_numeric=$6, " +
+            "col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 WHERE col_varchar = $11";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
             {
                 new () {Value = true},
                 new () {Value = Encoding.UTF8.GetBytes("test_bytes")},
+                new () {Value = UseFloat4 ? 3.14f : (double) 3.14f},
                 new () {Value = 3.14d},
                 new () {Value = 1},
                 new () {Value = 6.626m},
@@ -281,8 +293,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
@@ -290,6 +302,7 @@ public class NpgsqlTest
                 new () {Value = 100L},
                 new () {Value = true},
                 new () {Value = Encoding.UTF8.GetBytes("test_bytes")},
+                new () {Value = UseFloat4 ? 3.14f : (double) 3.14f},
                 new () {Value = 3.14d},
                 new () {Value = 100},
                 new () {Value = 6.626m},
@@ -315,13 +328,14 @@ public class NpgsqlTest
 
         var sql =
             "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
             {
                 new () {Value = 100L},
+                new () {Value = DBNull.Value},
                 new () {Value = DBNull.Value},
                 new () {Value = DBNull.Value},
                 new () {Value = DBNull.Value},
@@ -348,8 +362,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
@@ -357,6 +371,7 @@ public class NpgsqlTest
                 new () {Value = 1L},
                 new () {Value = true},
                 new () {Value = Encoding.UTF8.GetBytes("test")},
+                new () {Value = UseFloat4 ? 3.14f : (double) 3.14f},
                 new () {Value = 3.14d},
                 new () {Value = 100},
                 new () {Value = 6.626m},
@@ -389,6 +404,14 @@ public class NpgsqlTest
                 if (stringValue != "test")
                 {
                     Console.WriteLine($"Value mismatch: Got '{stringValue}', Want: 'test'");
+                    return;
+                }
+                var f = UseFloat4
+                    ? reader.GetFloat(++index)
+                    : (float) reader.GetDouble(++index);
+                if (Math.Abs(f - 3.14f) > 0.0f)
+                {
+                    Console.WriteLine($"Value mismatch: Got '{f}', Want: 3.14");
                     return;
                 }
                 if (Math.Abs(reader.GetDouble(++index) - 3.14d) > 0.0d)
@@ -440,8 +463,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
 
         var batchSize = 10;
         using var batch = new NpgsqlBatch(connection);
@@ -454,6 +477,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
+                    new () {Value = UseFloat4 ? (object?) (3.14f + i) : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -479,8 +503,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
 
         var batchSize = 5;
         using var batch = new NpgsqlBatch(connection);
@@ -493,6 +517,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
+                    new () {Value = UseFloat4 ? (object?) (3.14f + i) : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -564,8 +589,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
 
         var batchSize = 3;
         using var batch = new NpgsqlBatch(connection);
@@ -578,6 +603,7 @@ public class NpgsqlTest
                     new () {Value = 100L + i},
                     new () {Value = i%2 == 0},
                     new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
+                    new () {Value = UseFloat4 ? (object?) (3.14f + i) : (double) 3.14f + i},
                     new () {Value = 3.14d + i},
                     new () {Value = i},
                     new () {Value = i + 0.123m},
@@ -749,13 +775,21 @@ public class NpgsqlTest
         
         using (var writer =
                connection.BeginBinaryImport("COPY all_types " +
-                                            "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
+                                            "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
                                             "FROM STDIN (FORMAT BINARY)"))
         {
             writer.StartRow();
             writer.Write(1L);
             writer.Write(true);
             writer.Write(new byte[] {1,2,3});
+            if (UseFloat4)
+            {
+                writer.Write(3.14f);
+            }
+            else
+            {
+                writer.Write((double) 3.14f);
+            }
             writer.Write(3.14d);
             writer.Write(10);
             writer.Write(6.626m);
@@ -766,6 +800,7 @@ public class NpgsqlTest
 
             writer.StartRow();
             writer.Write(2L);
+            writer.WriteNull();
             writer.WriteNull();
             writer.WriteNull();
             writer.WriteNull();
@@ -789,12 +824,13 @@ public class NpgsqlTest
         
         using (var writer =
                connection.BeginTextImport("COPY all_types " +
-                                            "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
+                                            "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
                                             "FROM STDIN"))
         {
             writer.Write("1\t");
             writer.Write("t\t");
             writer.Write("\\x010203\t");
+            writer.Write("3.14\t");
             writer.Write("3.14\t");
             writer.Write("10\t");
             writer.Write("6.626\t");
@@ -805,6 +841,7 @@ public class NpgsqlTest
             writer.Write("\n");
 
             writer.Write("2\t");
+            writer.Write("\\N\t");
             writer.Write("\\N\t");
             writer.Write("\\N\t");
             writer.Write("\\N\t");
@@ -829,7 +866,7 @@ public class NpgsqlTest
         connection.Open();
         
         using (var reader =
-               connection.BeginBinaryExport("COPY all_types " +
+               connection.BeginBinaryExport("COPY (select * from all_types order by col_bigint) " +
                                             "TO STDOUT (FORMAT BINARY)"))
         {
             while (reader.StartRow() > -1)
@@ -862,6 +899,19 @@ public class NpgsqlTest
                 else
                 {
                     Console.Write(Convert.ToBase64String(reader.Read<byte[]>(NpgsqlDbType.Bytea)));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var f = UseFloat4
+                        ? reader.Read<float>(NpgsqlDbType.Real)
+                        : (float) reader.Read<double>(NpgsqlDbType.Double);
+                    Console.Write(f.ToString(nfi));
                 }
                 Console.Write("\t");
                 if (reader.IsNull)
@@ -972,6 +1022,20 @@ public class NpgsqlTest
                 }
                 else
                 {
+                    var floats = UseFloat4 
+                        ? reader.Read<List<float?>>(NpgsqlDbType.Array | NpgsqlDbType.Real) 
+                        : reader.Read<List<double?>>(NpgsqlDbType.Array | NpgsqlDbType.Double)
+                            .Select(d => (float?) d).ToList();
+                    Console.Write("[" + string.Join(", ", floats.Select(f => f?.ToString(nfi))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
                     var doubles = reader.Read<List<Double?>>(NpgsqlDbType.Array | NpgsqlDbType.Double);
                     Console.Write("[" + string.Join(", ", doubles.Select(d => d?.ToString(nfi))) + "]");
                 }
@@ -1051,7 +1115,7 @@ public class NpgsqlTest
         connection.Open();
         
         using (var reader =
-               connection.BeginTextExport("COPY all_types " +
+               connection.BeginTextExport("COPY (select * from all_types order by col_bigint) " +
                                             "TO STDOUT"))
         {
             while (true)
@@ -1088,13 +1152,14 @@ public class NpgsqlTest
         for (var i = 0; i < 2; i++)
         {
             var sql =
-                "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-                + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+                "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+                + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
             var cmd = new NpgsqlCommand(sql, connection);
 #pragma warning disable CS8625
             cmd.Parameters.Add(null, NpgsqlDbType.Bigint);
             cmd.Parameters.Add(null, NpgsqlDbType.Boolean);
             cmd.Parameters.Add(null, NpgsqlDbType.Bytea);
+            cmd.Parameters.Add(null, UseFloat4 ? NpgsqlDbType.Real : NpgsqlDbType.Double);
             cmd.Parameters.Add(null, NpgsqlDbType.Double);
             cmd.Parameters.Add(null, NpgsqlDbType.Integer);
             cmd.Parameters.Add(null, NpgsqlDbType.Numeric);
@@ -1109,6 +1174,7 @@ public class NpgsqlTest
             cmd.Parameters[index++].Value = 100L + i;
             cmd.Parameters[index++].Value = true;
             cmd.Parameters[index++].Value = Encoding.UTF8.GetBytes("test_bytes");
+            cmd.Parameters[index++].Value = UseFloat4 ? (object?) 3.14f : (double) 3.14f;
             cmd.Parameters[index++].Value = 3.14d;
             cmd.Parameters[index++].Value = 100;
             cmd.Parameters[index++].Value = 6.626m;
@@ -1144,8 +1210,8 @@ public class NpgsqlTest
             }
         }
         var insertSql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
         foreach (var id in new [] {10, 20})
         {
             using var insertCommand = new NpgsqlCommand(insertSql, connection)
@@ -1155,6 +1221,7 @@ public class NpgsqlTest
                     new() { Value = id },
                     new() { Value = true },
                     new() { Value = Encoding.UTF8.GetBytes("test_bytes") },
+                    new() { Value = UseFloat4 ? 3.14f : (double) 3.14f },
                     new() { Value = 3.14d },
                     new() { Value = 100 },
                     new() { Value = 6.626m },

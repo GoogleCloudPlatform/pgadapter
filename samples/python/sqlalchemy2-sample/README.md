@@ -11,10 +11,34 @@ to use `SQLAlchemy` in general.
 
 See [Limitations](#limitations) for a full list of known limitations when working with `SQLAlchemy 2.x`.
 
-## Start PGAdapter
-You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
-pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
-to run PGAdapter.
+## Running the Sample
+
+You can run the sample directly on the Spanner emulator with the following command. It will
+automatically start both PGAdapter and the Spanner emulator. This requires Docker on the local
+machine to work:
+
+```shell
+python run_sample.py
+```
+
+You can also connect to a real Spanner instance instead of the emulator by running the sample like
+this. The database must exist. The sample will automatically create the tables that are needed for
+the sample:
+
+```shell
+python run_sample.py \
+  --project my-project \
+  --instance my-instance \
+  --database my-database \
+  --credentials /path/to/credentials.json
+```
+
+
+### Start PGAdapter Manually
+You can also start PGAdapter before you run the sample and connect to that PGAdapter instance. The
+following command shows how to start PGAdapter using the pre-built Docker image and then run the
+sample against that instance.
+See [Running PGAdapter](../../../README.md#usage) for more information on other options for how to run PGAdapter.
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
@@ -27,9 +51,15 @@ docker run \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance \
   -x
+python run_sample.py \
+  --host localhost \
+  --port 5432 \
+  --database my-database
 ```
 
 ## Creating the Sample Data Model
+The sample data model is created automatically by the sample script.
+
 The sample data model contains example tables that cover all supported data types the Cloud Spanner
 PostgreSQL dialect. It also includes an example for how [interleaved tables](https://cloud.google.com/spanner/docs/reference/postgresql/data-definition-language#extensions_to)
 can be used with SQLAlchemy. Interleaved tables is a Cloud Spanner extension of the standard
@@ -37,8 +67,9 @@ PostgreSQL dialect.
 
 The corresponding SQLAlchemy model is defined in [model.py](model.py).
 
-Run the following command in this directory. Replace the host, port and database name with the actual
-host, port and database name for your PGAdapter and database setup.
+You can also create the sample data model manually using for example `psql`.
+Run the following command in this directory. Replace the host, port and database name with the
+actual host, port and database name for your PGAdapter and database setup.
 
 ```shell
 psql -h localhost -p 5432 -d my-database -f create_data_model.sql
@@ -65,7 +96,7 @@ Cloud Spanner supports the following data types in combination with `SQLAlchemy 
 | date                                   | Date                    |
 | bytea                                  | LargeBinary             |
 | jsonb                                  | JSONB                   |
-
+| Arrays                                 | Column()                |
 
 ## Limitations
 The following limitations are currently known:
@@ -75,7 +106,6 @@ The following limitations are currently known:
 | Creating and Dropping Tables   | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated creation of tables using `SQLAlchemy` is therefore not supported.                                                                                                                         |
 | metadata.reflect()             | Cloud Spanner does not support all PostgreSQL `pg_catalog` tables. Using `metadata.reflect()` to get the current objects in the database is therefore not supported.                                                                                                |
 | DDL Transactions               | Cloud Spanner does not support DDL statements in a transaction. Add `?options=-c spanner.ddl_transaction_mode=AutocommitExplicitTransaction` to your connection string to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). |
-| Generated primary keys         | Manually assign a value to the primary key column in your code. The recommended primary key type is a random UUID. Sequences / SERIAL / IDENTITY columns are currently not supported.                                                                               |
 | INSERT ... ON CONFLICT         | `INSERT ... ON CONFLICT` is not supported.                                                                                                                                                                                                                          |
 | SAVEPOINT                      | Rolling back to a `SAVEPOINT` can fail if the transaction contained at least one query that called a volatile function.                                                                                                                                             |
 | SELECT ... FOR UPDATE          | `SELECT ... FOR UPDATE` is not supported.                                                                                                                                                                                                                           |
@@ -86,21 +116,38 @@ The following limitations are currently known:
 | Other drivers than psycopg 3.x | PGAdapter does not support using SQLAlchemy 2.x with any other drivers than `psycopg 3.x`.                                                                                                                                                                          |
 
 ### Generated Primary Keys
-Generated primary keys are not supported and should be replaced with primary key definitions that
-are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
-for more information on choosing a good primary key. This sample uses random UUIDs that are generated
-by the client and stored as strings for primary keys.
+Generated primary keys can be used in combination with a bit-reversed sequence.
+
+The `TicketSale` model in this sample application uses an auto-generated primary key that is
+generated from a bit-reversed sequence:
+1. See [model.py](model.py) for the model definition.
+2. See [create_data_model.sql](create_data_model.sql) for the sequence and table definition.
+
+See https://cloud.google.com/spanner/docs/primary-key-default-value#bit-reversed-sequence for more
+information on bit-reversed sequences in Cloud Spanner.
+
+#### Example Mapping for Generated Primary Key using a Bit-Reversed Sequence
+
+Python model definition:
 
 ```python
-from uuid import uuid4
-
 class Singer(Base):
-  id = Column(String, primary_key=True)
+  id = Column(Integer, primary_key=True)
   name = Column(String(100))
 
-singer = Singer(
-  id="{}".format(uuid4()),
-  name="Alice")
+singer = Singer(name="Alice")
+session.add(singer)
+session.commit()
+```
+
+Sequence and table definition:
+
+```sql
+create sequence if not exists singers_seq bit_reversed_positive;
+create table if not exists singers (
+  id   bigint not null primary key default nextval('singers_seq'),
+  name varchar not null
+);
 ```
 
 ### ON CONFLICT Clauses
