@@ -22,6 +22,7 @@ import createTables from "../src/create_tables";
 import createConnection from "../src/create_connection"
 import writeDataWithDml from "../src/write_data_with_dml"
 import writeDataWithDmlBatch from "../src/write_data_with_dml_batch"
+import writeDataWithCopy from "../src/write_data_with_copy"
 
 const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withExposedPorts(5432)
@@ -58,5 +59,10 @@ describe('running samples', () => {
     test('execute DML batch', async () => {
         await writeDataWithDmlBatch(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
         expect(console.log).toHaveBeenCalledWith("3 records inserted");
+    }, 30000);
+    test('copy from stdin', async () => {
+        await writeDataWithCopy(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("Copied 5 singers");
+        expect(console.log).toHaveBeenCalledWith("Copied 5 albums");
     }, 30000);
 });

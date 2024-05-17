@@ -14,7 +14,9 @@
     "typescript": "^5.4.4"
   },
   "dependencies": {
-    "pg": "^8.11.5"
+    "@types/pg-copy-streams": "^1.2.5",
+    "pg": "^8.11.5",
+    "pg-copy-streams": "^6.0.6"
   },
   "scripts": {
     "start": "ts-node src/index.ts",
