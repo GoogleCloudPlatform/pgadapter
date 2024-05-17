@@ -193,22 +193,38 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     long districtNextOrderId = (long) row[0];
     BigDecimal districtTax = (BigDecimal) row[1];
 
-    execute(
-        statement,
-        String.format(
-            "UPDATE district " + "SET d_next_o_id = %d " + "WHERE d_id = %d AND w_id= %d",
-            districtNextOrderId + 1L, districtId, warehouseId));
-    execute(
-        statement,
-        String.format(
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            "UPDATE district " + "SET d_next_o_id = ? " + "WHERE d_id = ? AND w_id= ?")) {
+      int index = 0;
+      stmt.setLong(++index, districtNextOrderId + 1L);
+      stmt.setLong(++index, districtId);
+      stmt.setLong(++index, warehouseId);
+      executeParamStatement(stmt);
+    }
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
             "INSERT INTO orders (o_id, d_id, w_id, c_id, o_entry_d, o_ol_cnt, o_all_local) "
-                + "VALUES (%d,%d,%d,%d,NOW(),%d,%d)",
-            districtNextOrderId, districtId, warehouseId, customerId, orderLineCount, allLocal));
-    execute(
-        statement,
-        String.format(
-            "INSERT INTO new_orders (o_id, c_id, d_id, w_id) " + "VALUES (%d,%d,%d,%d)",
-            districtNextOrderId, customerId, districtId, warehouseId));
+                + "VALUES (?,?,?,?,NOW(),?,?)")) {
+      int index = 0;
+      stmt.setLong(++index, districtNextOrderId);
+      stmt.setLong(++index, districtId);
+      stmt.setLong(++index, warehouseId);
+      stmt.setLong(++index, customerId);
+      stmt.setLong(++index, orderLineCount);
+      stmt.setLong(++index, allLocal);
+      executeParamStatement(stmt);
+    }
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            "INSERT INTO new_orders (o_id, c_id, d_id, w_id) " + "VALUES (?,?,?,?)")) {
+      int index = 0;
+      stmt.setLong(++index, districtNextOrderId);
+      stmt.setLong(++index, customerId);
+      stmt.setLong(++index, districtId);
+      stmt.setLong(++index, warehouseId);
+      executeParamStatement(stmt);
+    }
 
     for (int line = 0; line < orderLineCount; line++) {
       long orderLineSupplyWarehouseId = supplyWarehouses[line];
@@ -260,11 +276,15 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         stockQuantity = stockQuantity - orderLineQuantity + 91;
       }
 
-      execute(
-          statement,
-          String.format(
-              "UPDATE stock " + "SET s_quantity = %d " + "WHERE s_i_id = %d AND w_id= %d",
-              stockQuantity, orderLineItemId, orderLineSupplyWarehouseId));
+      try (PreparedStatement stmt =
+          connection.prepareStatement(
+              "UPDATE stock " + "SET s_quantity = ? " + "WHERE s_i_id = ? AND w_id= ?")) {
+        int index = 0;
+        stmt.setLong(++index, stockQuantity);
+        stmt.setLong(++index, orderLineItemId);
+        stmt.setLong(++index, orderLineSupplyWarehouseId);
+        executeParamStatement(stmt);
+      }
 
       BigDecimal totalTax = BigDecimal.ONE.add(warehouseTax).add(districtTax);
       BigDecimal discountFactor = BigDecimal.ONE.subtract(discount);
@@ -273,21 +293,23 @@ abstract class AbstractBenchmarkRunner implements Runnable {
               .multiply(itemPrice)
               .multiply(totalTax)
               .multiply(discountFactor);
-      execute(
-          statement,
-          String.format(
+      try (PreparedStatement stmt =
+          connection.prepareStatement(
               "INSERT INTO order_line (o_id, c_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) "
-                  + "VALUES (%d,%d,%d,%d,%d,%d,%d,%d,%s,'%s')",
-              districtNextOrderId,
-              customerId,
-              districtId,
-              warehouseId,
-              line,
-              orderLineItemId,
-              orderLineSupplyWarehouseId,
-              orderLineQuantity,
-              orderLineAmount,
-              orderLineDistrictInfo));
+                  + "VALUES (?,?,?,?,?,?,?,?,?,?)")) {
+        int index = 0;
+        stmt.setLong(++index, districtNextOrderId);
+        stmt.setLong(++index, customerId);
+        stmt.setLong(++index, districtId);
+        stmt.setLong(++index, warehouseId);
+        stmt.setLong(++index, line);
+        stmt.setLong(++index, orderLineItemId);
+        stmt.setLong(++index, orderLineSupplyWarehouseId);
+        stmt.setLong(++index, orderLineQuantity);
+        stmt.setBigDecimal(++index, orderLineAmount);
+        stmt.setString(++index, orderLineDistrictInfo);
+        executeParamStatement(stmt);
+      }
     }
 
     LOG.debug("Committing new_order transaction");
@@ -323,11 +345,14 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     execute(statement, "begin transaction");
-    execute(
-        statement,
-        String.format(
-            "UPDATE warehouse " + "SET w_ytd = w_ytd + %s " + "WHERE w_id = %d",
-            amount, warehouseId));
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            "UPDATE warehouse " + "SET w_ytd = w_ytd + ? " + "WHERE w_id = ?")) {
+      int index = 0;
+      stmt.setBigDecimal(++index, amount);
+      stmt.setLong(++index, warehouseId);
+      executeParamStatement(stmt);
+    }
 
     try (PreparedStatement stmt =
         connection.prepareStatement(
@@ -345,11 +370,15 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     String warehouseZip = (String) row[4];
     String warehouseName = (String) row[5];
 
-    execute(
-        statement,
-        String.format(
-            "UPDATE district " + "SET d_ytd = d_ytd + %s " + "WHERE w_id = %d AND d_id= %d",
-            amount, warehouseId, districtId));
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            "UPDATE district " + "SET d_ytd = d_ytd + ? " + "WHERE w_id = ? AND d_id= ?")) {
+      int index = 0;
+      stmt.setBigDecimal(++index, amount);
+      stmt.setLong(++index, warehouseId);
+      stmt.setLong(++index, districtId);
+      executeParamStatement(stmt);
+    }
 
     try (PreparedStatement stmt =
         connection.prepareStatement(
@@ -459,39 +488,49 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         newCustomerData = newCustomerData.substring(0, 500);
       }
 
-      execute(
-          statement,
-          String.format(
+      try (PreparedStatement stmt =
+          connection.prepareStatement(
               "UPDATE customer "
-                  + "SET c_balance=%s, c_ytd_payment=%s, c_data='%s' "
-                  + "WHERE w_id = %d AND d_id=%d AND c_id=%d",
-              balance,
-              ytdPayment,
-              newCustomerData,
-              customerWarehouseId,
-              customerDistrictId,
-              customerId));
+                  + "SET c_balance=?, c_ytd_payment=?, c_data=? "
+                  + "WHERE w_id = ? AND d_id=? AND c_id=?")) {
+        int index = 0;
+        stmt.setBigDecimal(++index, balance);
+        stmt.setBigDecimal(++index, ytdPayment);
+        stmt.setString(++index, newCustomerData);
+        stmt.setLong(++index, customerWarehouseId);
+        stmt.setLong(++index, customerDistrictId);
+        stmt.setLong(++index, customerId);
+        executeParamStatement(stmt);
+      }
     } else {
-      execute(
-          statement,
-          String.format(
+      try (PreparedStatement stmt =
+          connection.prepareStatement(
               "UPDATE customer "
-                  + "SET c_balance=%s, c_ytd_payment=%s "
-                  + "WHERE w_id = %d AND d_id=%d AND c_id=%d",
-              balance, ytdPayment, customerWarehouseId, customerDistrictId, customerId));
+                  + "SET c_balance=?, c_ytd_payment=? "
+                  + "WHERE w_id = ? AND d_id=? AND c_id=?")) {
+        int index = 0;
+        stmt.setBigDecimal(++index, balance);
+        stmt.setBigDecimal(++index, ytdPayment);
+        stmt.setLong(++index, customerWarehouseId);
+        stmt.setLong(++index, customerDistrictId);
+        stmt.setLong(++index, customerId);
+        executeParamStatement(stmt);
+      }
     }
-    execute(
-        statement,
-        String.format(
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
             "INSERT INTO history (d_id, w_id, c_id, h_d_id,  h_w_id, h_date, h_amount, h_data) "
-                + "VALUES (%d,%d,%d,%d,%d,NOW(),%s,'%s')",
-            customerDistrictId,
-            customerWarehouseId,
-            customerId,
-            districtId,
-            warehouseId,
-            amount,
-            String.format("%10s %10s", warehouseName, districtName)));
+                + "VALUES (?,?,?,?,?,NOW(),?,?)")) {
+      int index = 0;
+      stmt.setLong(++index, customerDistrictId);
+      stmt.setLong(++index, customerWarehouseId);
+      stmt.setLong(++index, customerId);
+      stmt.setLong(++index, districtId);
+      stmt.setLong(++index, warehouseId);
+      stmt.setBigDecimal(++index, amount);
+      stmt.setString(++index, String.format("%10s %10s", warehouseName, districtName));
+      executeParamStatement(stmt);
+    }
 
     LOG.debug("Committing payment");
     execute(statement, "commit");
@@ -640,13 +679,18 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       if (row != null) {
         long newOrderId = (long) row[0];
         long customerId = (long) row[1];
-        execute(
-            statement,
-            String.format(
+        try (PreparedStatement stmt =
+            connection.prepareStatement(
                 "DELETE "
                     + "FROM new_orders "
-                    + "WHERE o_id = %d AND c_id = %d AND d_id = %d AND w_id = %d",
-                newOrderId, customerId, districtId, warehouseId));
+                    + "WHERE o_id = ? AND c_id = ? AND d_id = ? AND w_id = ?")) {
+          int index = 0;
+          stmt.setLong(++index, newOrderId);
+          stmt.setLong(++index, customerId);
+          stmt.setLong(++index, districtId);
+          stmt.setLong(++index, warehouseId);
+          executeParamStatement(stmt);
+        }
         try (PreparedStatement stmt =
             connection.prepareStatement(
                 "SELECT c_id FROM orders WHERE o_id = ? AND d_id = ? AND w_id = ?")) {
@@ -657,20 +701,31 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           row = paramQueryRow(stmt);
         }
         // long customerId = (long) row[0];
-        execute(
-            statement,
-            String.format(
+        try (PreparedStatement stmt =
+            connection.prepareStatement(
                 "UPDATE orders "
-                    + "SET o_carrier_id = %d "
-                    + "WHERE o_id = %d AND c_id = %d AND d_id = %d AND w_id = %d",
-                carrierId, newOrderId, customerId, districtId, warehouseId));
-        execute(
-            statement,
-            String.format(
+                    + "SET o_carrier_id = ? "
+                    + "WHERE o_id = ? AND c_id = ? AND d_id = ? AND w_id = ?")) {
+          int index = 0;
+          stmt.setLong(++index, carrierId);
+          stmt.setLong(++index, newOrderId);
+          stmt.setLong(++index, customerId);
+          stmt.setLong(++index, districtId);
+          stmt.setLong(++index, warehouseId);
+          executeParamStatement(stmt);
+        }
+        try (PreparedStatement stmt =
+            connection.prepareStatement(
                 "UPDATE order_line "
                     + "SET ol_delivery_d = NOW() "
-                    + "WHERE o_id = %d AND c_id = %d AND d_id = %d AND w_id = %d",
-                newOrderId, customerId, districtId, warehouseId));
+                    + "WHERE o_id = ? AND c_id = ? AND d_id = ? AND w_id = ?")) {
+          int index = 0;
+          stmt.setLong(++index, newOrderId);
+          stmt.setLong(++index, customerId);
+          stmt.setLong(++index, districtId);
+          stmt.setLong(++index, warehouseId);
+          executeParamStatement(stmt);
+        }
         try (PreparedStatement stmt =
             connection.prepareStatement(
                 "SELECT SUM(ol_amount) sm "
@@ -684,13 +739,18 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           row = paramQueryRow(stmt);
         }
         BigDecimal sumOrderLineAmount = (BigDecimal) row[0];
-        execute(
-            statement,
-            String.format(
+        try (PreparedStatement stmt =
+            connection.prepareStatement(
                 "UPDATE customer "
-                    + "SET c_balance = c_balance + %s, c_delivery_cnt = c_delivery_cnt + 1 "
-                    + "WHERE c_id = %d AND d_id = %d AND w_id = %d",
-                sumOrderLineAmount, customerId, districtId, warehouseId));
+                    + "SET c_balance = c_balance + ?, c_delivery_cnt = c_delivery_cnt + 1 "
+                    + "WHERE c_id = ? AND d_id = ? AND w_id = ?")) {
+          int index = 0;
+          stmt.setBigDecimal(++index, sumOrderLineAmount);
+          stmt.setLong(++index, customerId);
+          stmt.setLong(++index, districtId);
+          stmt.setLong(++index, warehouseId);
+          executeParamStatement(stmt);
+        }
       }
     }
 
@@ -795,6 +855,13 @@ abstract class AbstractBenchmarkRunner implements Runnable {
   private void execute(Statement statement, String dml) throws SQLException {
     Stopwatch stopwatch = Stopwatch.createStarted();
     statement.execute(dml);
+    Duration executionDuration = stopwatch.elapsed();
+    metrics.recordLatency(executionDuration.toMillis());
+  }
+
+  private void executeParamStatement(PreparedStatement statement) throws SQLException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    statement.execute();
     Duration executionDuration = stopwatch.elapsed();
     metrics.recordLatency(executionDuration.toMillis());
   }
