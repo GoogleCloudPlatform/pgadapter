@@ -126,7 +126,21 @@ public class PgCatalog {
               Suppliers.ofInstance(" IN ('pg_catalog', 'public')")),
           RegexQueryPartReplacer.replace(
               Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*false\\s*\\)\\)"),
-              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")));
+              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)\\s*AS\\s+"),
+              "''::varchar AS "),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
+              "''::varchar AS obj_description"),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)\\s*AS\\s+"),
+              "''::varchar AS "),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
+              "''::varchar AS obj_description"));
 
   private final ImmutableSet<String> checkPrefixes;
 

@@ -318,6 +318,8 @@ public abstract class ControlMessage extends WireMessage {
   SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
     Tracer tracer = connection.getExtendedQueryProtocolHandler().getTracer();
+    // Ignore deprecation for now, as there is no alternative offered (yet?).
+    //noinspection deprecation
     Span span =
         tracer
             .spanBuilder("send_result_set")
@@ -403,20 +405,19 @@ public abstract class ControlMessage extends WireMessage {
         describedResult instanceof CopyToStatement && ((CopyToStatement) describedResult).isBinary()
             ? new CountDownLatch(1)
             : new CountDownLatch(0);
-    for (int i = 0; i < partitions.size(); i++) {
+    for (Partition partition : partitions) {
       futures.add(
           executorService.submit(
               context.wrap(
                   SendResultSetRunnable.forPartition(
                       describedResult,
                       batchReadOnlyTransaction,
-                      partitions.get(i),
+                      partition,
                       mode,
                       binaryCopyHeaderSentLatch))));
     }
     executorService.shutdown();
     try {
-      @SuppressWarnings("UnstableApiUsage")
       List<Long> rowCounts = Futures.allAsList(futures).get();
       long rowCount = rowCounts.stream().reduce(Long::sum).orElse(0L);
       logger.log(Level.INFO, String.format("Sent %d rows from partitioned query", rowCount));

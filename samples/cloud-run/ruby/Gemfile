@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 gem 'pg'
-gem "sinatra", "~>3.0"
+gem "sinatra", "~>4.0"
 gem "thin"
 
 group :test do

@@ -26,6 +26,7 @@ samples/**/dotnet/**/obj
 src/test/nodejs/**/.DS_Store
 samples/nodejs/**/.DS_Store
 samples/cloud-run/nodejs/**/.DS_Store
+samples/nodejs/sequelize/**/*.js
 
 src/test/ruby/**/Gemfile.lock
 samples/**/ruby/**/Gemfile.lock

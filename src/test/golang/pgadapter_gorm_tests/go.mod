@@ -4,10 +4,10 @@ go 1.17
 
 require (
 	github.com/jackc/pgtype v1.14.3
-	github.com/shopspring/decimal v1.3.1
+	github.com/shopspring/decimal v1.4.0
 	gorm.io/datatypes v1.2.0
 	gorm.io/driver/postgres v1.5.7
-	gorm.io/gorm v1.25.9
+	gorm.io/gorm v1.25.10
 )
 
 require (
