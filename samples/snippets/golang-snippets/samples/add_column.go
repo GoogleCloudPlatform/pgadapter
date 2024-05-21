@@ -11,9 +11,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package golang_snippets
+package samples
 
-// [START spanner_data_boost]
+// [START spanner_add_column]
 import (
 	"context"
 	"fmt"
@@ -21,7 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func dataBoost(host string, port int, database string) error {
+func AddColumn(host string, port int, database string) error {
 	ctx := context.Background()
 	connString := fmt.Sprintf(
 		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",
@@ -32,26 +32,15 @@ func dataBoost(host string, port int, database string) error {
 	}
 	defer conn.Close(ctx)
 
-	// This enables Data Boost for all partitioned queries on this connection.
-	_, _ = conn.Exec(ctx, "set spanner.data_boost_enabled=true")
-
-	// Run a partitioned query. This query will use Data Boost.
-	rows, err := conn.Query(ctx, "run partitioned query select singer_id, first_name, last_name from singers")
-	defer rows.Close()
+	_, err = conn.Exec(ctx,
+		"ALTER TABLE albums "+
+			"ADD COLUMN marketing_budget bigint")
 	if err != nil {
 		return err
 	}
-	for rows.Next() {
-		var singerId int64
-		var firstName, lastName string
-		err = rows.Scan(&singerId, &firstName, &lastName)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("%v %v %v\n", singerId, firstName, lastName)
-	}
+	fmt.Println("Added marketing_budget column")
 
 	return nil
 }
 
-// [END spanner_data_boost]
+// [END spanner_add_column]

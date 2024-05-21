@@ -11,9 +11,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package golang_snippets
+package samples
 
-// [START spanner_create_connection]
+// [START spanner_query_data]
 import (
 	"context"
 	"fmt"
@@ -21,11 +21,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func createConnection(host string, port int, database string) error {
+func QueryData(host string, port int, database string) error {
 	ctx := context.Background()
-	// Connect to Cloud Spanner using pgx through PGAdapter.
-	// 'sslmode=disable' is optional, but adding it reduces the connection time,
-	// as pgx will then skip first trying to create an SSL connection.
 	connString := fmt.Sprintf(
 		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",
 		host, port, database)
@@ -35,14 +32,23 @@ func createConnection(host string, port int, database string) error {
 	}
 	defer conn.Close(ctx)
 
-	row := conn.QueryRow(ctx, "select 'Hello world!' as hello")
-	var msg string
-	if err := row.Scan(&msg); err != nil {
+	rows, err := conn.Query(ctx, "SELECT singer_id, album_id, album_title "+
+		"FROM albums")
+	defer rows.Close()
+	if err != nil {
 		return err
 	}
-	fmt.Printf("Greeting from Cloud Spanner PostgreSQL: %s\n", msg)
+	for rows.Next() {
+		var singerId, albumId int64
+		var title string
+		err = rows.Scan(&singerId, &albumId, &title)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%v %v %v\n", singerId, albumId, title)
+	}
 
-	return nil
+	return rows.Err()
 }
 
-// [END spanner_create_connection]
+// [END spanner_query_data]

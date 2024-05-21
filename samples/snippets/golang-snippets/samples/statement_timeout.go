@@ -11,9 +11,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package golang_snippets
+package samples
 
-// [START spanner_query_with_parameter]
+// [START spanner_statement_timeout]
 import (
 	"context"
 	"fmt"
@@ -21,7 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func queryDataWithParameter(host string, port int, database string) error {
+func QueryDataWithTimeout(host string, port int, database string) error {
 	ctx := context.Background()
 	connString := fmt.Sprintf(
 		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",
@@ -32,25 +32,37 @@ func queryDataWithParameter(host string, port int, database string) error {
 	}
 	defer conn.Close(ctx)
 
+	// Set the statement timeout that should be used for all statements
+	// on this connection to 5 seconds.
+	// Supported time units are 's' (seconds), 'ms' (milliseconds),
+	// 'us' (microseconds), and 'ns' (nanoseconds).
+	if _, err := conn.Exec(ctx, "set statement_timeout='5s'"); err != nil {
+		return err
+	}
 	rows, err := conn.Query(ctx,
-		"SELECT singer_id, first_name, last_name "+
-			"FROM singers "+
-			"WHERE last_name = $1", "Garcia")
+		"SELECT singer_id, album_id, album_title "+
+			"FROM albums "+
+			"WHERE album_title in ("+
+			"  SELECT first_name "+
+			"  FROM singers "+
+			"  WHERE last_name LIKE '%a%'"+
+			"     OR last_name LIKE '%m%'"+
+			")")
 	defer rows.Close()
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
-		var singerId int64
-		var firstName, lastName string
-		err = rows.Scan(&singerId, &firstName, &lastName)
+		var singerId, albumId int64
+		var title string
+		err = rows.Scan(&singerId, &albumId, &title)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%v %v %v\n", singerId, firstName, lastName)
+		fmt.Printf("%v %v %v\n", singerId, albumId, title)
 	}
 
 	return rows.Err()
 }
 
-// [END spanner_query_with_parameter]
+// [END spanner_statement_timeout]

@@ -11,9 +11,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package golang_snippets
+package samples
 
-// [START spanner_dml_batch]
+// [START spanner_create_connection]
 import (
 	"context"
 	"fmt"
@@ -21,8 +21,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func writeDataWithDmlBatch(host string, port int, database string) error {
+func CreateConnection(host string, port int, database string) error {
 	ctx := context.Background()
+	// Connect to Cloud Spanner using pgx through PGAdapter.
+	// 'sslmode=disable' is optional, but adding it reduces the connection time,
+	// as pgx will then skip first trying to create an SSL connection.
 	connString := fmt.Sprintf(
 		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",
 		host, port, database)
@@ -32,24 +35,14 @@ func writeDataWithDmlBatch(host string, port int, database string) error {
 	}
 	defer conn.Close(ctx)
 
-	sql := "INSERT INTO singers (singer_id, first_name, last_name) " +
-		"VALUES ($1, $2, $3)"
-	batch := &pgx.Batch{}
-	batch.Queue(sql, 16, "Sarah", "Wilson")
-	batch.Queue(sql, 17, "Ethan", "Miller")
-	batch.Queue(sql, 18, "Maya", "Patel")
-	br := conn.SendBatch(ctx, batch)
-	_, err = br.Exec()
-	if err := br.Close(); err != nil {
+	row := conn.QueryRow(ctx, "select 'Hello world!' as hello")
+	var msg string
+	if err := row.Scan(&msg); err != nil {
 		return err
 	}
-
-	if err != nil {
-		return err
-	}
-	fmt.Printf("%v records inserted\n", batch.Len())
+	fmt.Printf("Greeting from Cloud Spanner PostgreSQL: %s\n", msg)
 
 	return nil
 }
 
-// [END spanner_dml_batch]
+// [END spanner_create_connection]

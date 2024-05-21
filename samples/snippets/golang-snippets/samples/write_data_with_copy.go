@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package golang_snippets
+package samples
 
 // [START spanner_copy_from_stdin]
 import (
@@ -22,7 +22,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func writeDataWithCopy(host string, port int, database string) error {
+func WriteDataWithCopy(host string, port int, database string) error {
 	ctx := context.Background()
 	connString := fmt.Sprintf(
 		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",

@@ -11,17 +11,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package golang_snippets
+package samples
 
-// [START spanner_add_column]
+// [START spanner_query_data_with_new_column]
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
 )
 
-func addColumn(host string, port int, database string) error {
+func QueryDataWithNewColumn(host string, port int, database string) error {
 	ctx := context.Background()
 	connString := fmt.Sprintf(
 		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",
@@ -32,15 +33,30 @@ func addColumn(host string, port int, database string) error {
 	}
 	defer conn.Close(ctx)
 
-	_, err = conn.Exec(ctx,
-		"ALTER TABLE albums "+
-			"ADD COLUMN marketing_budget bigint")
+	rows, err := conn.Query(ctx, "SELECT singer_id, album_id, marketing_budget "+
+		"FROM albums "+
+		"ORDER BY singer_id, album_id")
+	defer rows.Close()
 	if err != nil {
 		return err
 	}
-	fmt.Println("Added marketing_budget column")
+	for rows.Next() {
+		var singerId, albumId int64
+		var marketingBudget sql.NullString
+		err = rows.Scan(&singerId, &albumId, &marketingBudget)
+		if err != nil {
+			return err
+		}
+		var budget string
+		if marketingBudget.Valid {
+			budget = marketingBudget.String
+		} else {
+			budget = "NULL"
+		}
+		fmt.Printf("%v %v %v\n", singerId, albumId, budget)
+	}
 
-	return nil
+	return rows.Err()
 }
 
-// [END spanner_add_column]
+// [END spanner_query_data_with_new_column]

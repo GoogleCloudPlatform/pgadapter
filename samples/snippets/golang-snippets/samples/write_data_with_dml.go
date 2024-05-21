@@ -11,9 +11,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package golang_snippets
+package samples
 
-// [START spanner_query_data]
+// [START spanner_dml_getting_started_insert]
 import (
 	"context"
 	"fmt"
@@ -21,7 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func queryData(host string, port int, database string) error {
+func WriteDataWithDml(host string, port int, database string) error {
 	ctx := context.Background()
 	connString := fmt.Sprintf(
 		"postgres://uid:pwd@%s:%d/%s?sslmode=disable",
@@ -32,23 +32,20 @@ func queryData(host string, port int, database string) error {
 	}
 	defer conn.Close(ctx)
 
-	rows, err := conn.Query(ctx, "SELECT singer_id, album_id, album_title "+
-		"FROM albums")
-	defer rows.Close()
+	tag, err := conn.Exec(ctx,
+		"INSERT INTO singers (singer_id, first_name, last_name) "+
+			"VALUES ($1, $2, $3), ($4, $5, $6), "+
+			"       ($7, $8, $9), ($10, $11, $12)",
+		12, "Melissa", "Garcia",
+		13, "Russel", "Morales",
+		14, "Jacqueline", "Long",
+		15, "Dylan", "Shaw")
 	if err != nil {
 		return err
 	}
-	for rows.Next() {
-		var singerId, albumId int64
-		var title string
-		err = rows.Scan(&singerId, &albumId, &title)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("%v %v %v\n", singerId, albumId, title)
-	}
+	fmt.Printf("%v records inserted\n", tag.RowsAffected())
 
-	return rows.Err()
+	return nil
 }
 
-// [END spanner_query_data]
+// [END spanner_dml_getting_started_insert]
