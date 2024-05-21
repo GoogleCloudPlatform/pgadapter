@@ -23,7 +23,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 
 class WriteDataWithCopy {
-  
+
   static void writeDataWithCopy(String host, int port, String database)
       throws SQLException, IOException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
@@ -32,20 +32,22 @@ class WriteDataWithCopy {
       // a CopyManager.
       PGConnection pgConnection = connection.unwrap(PGConnection.class);
       CopyManager copyManager = pgConnection.getCopyAPI();
-      
+
       // Enable 'partitioned_non_atomic' mode. This ensures that the COPY operation
       // will succeed even if it exceeds Spanner's mutation limit per transaction.
       connection
           .createStatement()
           .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
-      long numSingers = copyManager.copyIn(
-          "COPY singers (singer_id, first_name, last_name) FROM STDIN",
-          WriteDataWithCopy.class.getResourceAsStream("singers_data.txt"));
+      long numSingers =
+          copyManager.copyIn(
+              "COPY singers (singer_id, first_name, last_name) FROM STDIN",
+              WriteDataWithCopy.class.getResourceAsStream("singers_data.txt"));
       System.out.printf("Copied %d singers\n", numSingers);
-      
-      long numAlbums = copyManager.copyIn(
-          "COPY albums FROM STDIN",
-          WriteDataWithCopy.class.getResourceAsStream("albums_data.txt"));
+
+      long numAlbums =
+          copyManager.copyIn(
+              "COPY albums FROM STDIN",
+              WriteDataWithCopy.class.getResourceAsStream("albums_data.txt"));
       System.out.printf("Copied %d albums\n", numAlbums);
     }
   }

@@ -24,13 +24,10 @@ class CreateConnection {
   static void createConnection(String host, int port, String database) throws SQLException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
-      try (ResultSet resultSet = connection
-          .createStatement()
-          .executeQuery("select 'Hello world!' as hello")) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select 'Hello world!' as hello")) {
         while (resultSet.next()) {
-          System.out.printf(
-              "Greeting from Cloud Spanner PostgreSQL: %s\n",
-              resultSet.getString(1));
+          System.out.printf("Greeting from Cloud Spanner PostgreSQL: %s\n", resultSet.getString(1));
         }
       }
     }

@@ -34,7 +34,7 @@ class WriteDataWithDmlBatch {
       this.lastName = last;
     }
   }
-  
+
   static void writeDataWithDmlBatch(String host, int port, String database) throws SQLException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
@@ -42,8 +42,7 @@ class WriteDataWithDmlBatch {
       // JDBC always uses '?' as a parameter placeholder.
       try (PreparedStatement preparedStatement =
           connection.prepareStatement(
-              "INSERT INTO singers (singer_id, first_name, last_name)"
-                  + " VALUES (?, ?, ?)")) {
+              "INSERT INTO singers (singer_id, first_name, last_name) VALUES (?, ?, ?)")) {
         final List<Singer> singers =
             Arrays.asList(
                 new Singer(/* SingerId = */ 16L, "Sarah", "Wilson"),
@@ -60,9 +59,7 @@ class WriteDataWithDmlBatch {
         }
 
         int[] updateCounts = preparedStatement.executeBatch();
-        System.out.printf(
-            "%d records inserted.\n",
-            Arrays.stream(updateCounts).sum());
+        System.out.printf("%d records inserted.\n", Arrays.stream(updateCounts).sum());
       }
     }
   }

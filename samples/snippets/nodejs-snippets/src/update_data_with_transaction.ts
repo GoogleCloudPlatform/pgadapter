@@ -47,11 +47,13 @@ async function writeWithTransactionUsingDml(host: string, port: number, database
         "SET marketing_budget = $1 " +
         "WHERE singer_id = $2 and album_id = $3";
     // Start a DML batch. This batch will become part of the current transaction.
-    await connection.query("start batch dml");
+    // TODO: Enable when https://github.com/googleapis/java-spanner/pull/3114 has been merged
+    // await connection.query("start batch dml");
     // Update the marketing budget of both albums.
     await connection.query(updateSql, [album1Budget, 1, 1]);
     await connection.query(updateSql, [album2Budget, 2, 2]);
-    await connection.query("run batch");
+    // TODO: Enable when https://github.com/googleapis/java-spanner/pull/3114 has been merged
+    // await connection.query("run batch");
   }
   // Commit the current transaction.
   await connection.query("commit");

@@ -24,7 +24,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 
 class UpdateDataWithCopy {
-  
+
   static void updateDataWithCopy(String host, int port, String database)
       throws SQLException, IOException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
@@ -42,16 +42,13 @@ class UpdateDataWithCopy {
 
       // Instruct PGAdapter to use insert-or-update for COPY statements.
       // This enables us to use COPY to update existing data.
-      connection
-          .createStatement()
-          .execute("set spanner.copy_upsert=true");
-      
+      connection.createStatement().execute("set spanner.copy_upsert=true");
+
       // COPY uses mutations to insert or update existing data in Spanner.
-      long numAlbums = copyManager.copyIn(
-          "COPY albums (singer_id, album_id, marketing_budget) FROM STDIN",
-          new StringReader(
-              "1\t1\t100000\n"
-              + "2\t2\t500000\n"));
+      long numAlbums =
+          copyManager.copyIn(
+              "COPY albums (singer_id, album_id, marketing_budget) FROM STDIN",
+              new StringReader("1\t1\t100000\n" + "2\t2\t500000\n"));
       System.out.printf("Updated %d albums\n", numAlbums);
     }
   }

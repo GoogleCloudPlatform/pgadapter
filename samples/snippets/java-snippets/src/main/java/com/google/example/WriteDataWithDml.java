@@ -34,7 +34,7 @@ class WriteDataWithDml {
       this.lastName = last;
     }
   }
-  
+
   static void writeDataWithDml(String host, int port, String database) throws SQLException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {

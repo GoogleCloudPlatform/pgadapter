@@ -22,8 +22,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 class UpdateDataWithTransaction {
-  
-  static void writeWithTransactionUsingDml(String host, int port, String database) throws SQLException {
+
+  static void writeWithTransactionUsingDml(String host, int port, String database)
+      throws SQLException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
       // Set AutoCommit=false to enable transactions.
@@ -34,17 +35,14 @@ class UpdateDataWithTransaction {
       // to explicitly start the transaction. The first statement on the
       // connection will start a transaction when AutoCommit=false.
       String selectMarketingBudgetSql =
-          "SELECT marketing_budget "
-              + "from albums "
-              + "WHERE singer_id = ? and album_id = ?";
+          "SELECT marketing_budget from albums WHERE singer_id = ? and album_id = ?";
       long album2Budget = 0;
       try (PreparedStatement selectMarketingBudgetStatement =
           connection.prepareStatement(selectMarketingBudgetSql)) {
         // Bind the query parameters to SingerId=2 and AlbumId=2.
         selectMarketingBudgetStatement.setLong(1, 2);
         selectMarketingBudgetStatement.setLong(2, 2);
-        try (ResultSet resultSet =
-            selectMarketingBudgetStatement.executeQuery()) {
+        try (ResultSet resultSet = selectMarketingBudgetStatement.executeQuery()) {
           while (resultSet.next()) {
             album2Budget = resultSet.getLong("marketing_budget");
           }
@@ -59,8 +57,7 @@ class UpdateDataWithTransaction {
           // Bind the query parameters to SingerId=1 and AlbumId=1.
           selectMarketingBudgetStatement.setLong(1, 1);
           selectMarketingBudgetStatement.setLong(2, 1);
-          try (ResultSet resultSet =
-              selectMarketingBudgetStatement.executeQuery()) {
+          try (ResultSet resultSet = selectMarketingBudgetStatement.executeQuery()) {
             while (resultSet.next()) {
               album1Budget = resultSet.getLong("marketing_budget");
             }
@@ -73,8 +70,7 @@ class UpdateDataWithTransaction {
               "UPDATE albums "
                   + "SET marketing_budget = ? "
                   + "WHERE singer_id = ? and album_id = ?";
-          try (PreparedStatement updateStatement =
-              connection.prepareStatement(updateSql)) {
+          try (PreparedStatement updateStatement = connection.prepareStatement(updateSql)) {
             // Update Album 1.
             int paramIndex = 0;
             updateStatement.setLong(++paramIndex, album1Budget);
@@ -98,8 +94,7 @@ class UpdateDataWithTransaction {
       }
       // Commit the current transaction.
       connection.commit();
-      System.out.println(
-          "Transferred marketing budget from Album 2 to Album 1");
+      System.out.println("Transferred marketing budget from Album 2 to Album 1");
     }
   }
 }

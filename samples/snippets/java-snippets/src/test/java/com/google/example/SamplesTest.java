@@ -52,15 +52,10 @@ public class SamplesTest {
     assertEquals(
         "Greeting from Cloud Spanner PostgreSQL: Hello world!\n",
         runSample(CreateConnection::createConnection));
+    assertEquals("4 records inserted.\n", runSample(WriteDataWithDml::writeDataWithDml));
+    assertEquals("3 records inserted.\n", runSample(WriteDataWithDmlBatch::writeDataWithDmlBatch));
     assertEquals(
-        "4 records inserted.\n",
-        runSample(WriteDataWithDml::writeDataWithDml));
-    assertEquals(
-        "3 records inserted.\n",
-        runSample(WriteDataWithDmlBatch::writeDataWithDmlBatch));
-    assertEquals(
-        "Copied 5 singers\n"
-            + "Copied 5 albums\n",
+        "Copied 5 singers\n" + "Copied 5 albums\n",
         runSample(WriteDataWithCopy::writeDataWithCopy));
     assertEquals(
         "1 2 Go, Go, Go\n"
@@ -69,32 +64,18 @@ public class SamplesTest {
             + "2 1 Green\n"
             + "2 3 Terrified\n",
         runSample(QueryData::queryData));
-    assertEquals(
-        "12 Melissa Garcia\n",
-        runSample(QueryDataWithParameter::queryDataWithParameter));
+    assertEquals("12 Melissa Garcia\n", runSample(QueryDataWithParameter::queryDataWithParameter));
     assertEquals("", runSample(StatementTimeout::queryWithTimeout));
+    assertEquals("Added marketing_budget column\n", runSample(AddColumn::addColumn));
+    assertEquals("Added venues and concerts tables\n", runSample(DdlBatch::ddlBatch));
+    assertEquals("Updated 2 albums\n", runSample(UpdateDataWithCopy::updateDataWithCopy));
     assertEquals(
-        "Added marketing_budget column\n",
-        runSample(AddColumn::addColumn));
-    assertEquals(
-        "Added venues and concerts tables\n",
-        runSample(DdlBatch::ddlBatch));
-    assertEquals(
-        "Updated 2 albums\n",
-        runSample(UpdateDataWithCopy::updateDataWithCopy));
-    assertEquals(
-        "1 1 100000\n"
-            + "1 2 null\n"
-            + "2 1 null\n"
-            + "2 2 500000\n"
-            + "2 3 null\n",
+        "1 1 100000\n" + "1 2 null\n" + "2 1 null\n" + "2 2 500000\n" + "2 3 null\n",
         runSample(QueryDataWithNewColumn::queryDataWithNewColumn));
     assertEquals(
         "Transferred marketing budget from Album 2 to Album 1\n",
         runSample(UpdateDataWithTransaction::writeWithTransactionUsingDml));
-    assertEquals(
-        "Reduced marketing budget\n",
-        runSample(Tags::tags));
+    assertEquals("Reduced marketing budget\n", runSample(Tags::tags));
     assertEquals(
         "1 1 Total Junk\n"
             + "1 2 Go, Go, Go\n"
@@ -121,9 +102,7 @@ public class SamplesTest {
             + "15 Dylan Shaw\n"
             + "17 Ethan Miller\n",
         runSample(DataBoost::dataBoost));
-    assertEquals(
-        "Updated at least 3 albums\n",
-        runSample(PartitionedDml::partitionedDml));
+    assertEquals("Updated at least 3 albums\n", runSample(PartitionedDml::partitionedDml));
   }
 
   interface Sample {

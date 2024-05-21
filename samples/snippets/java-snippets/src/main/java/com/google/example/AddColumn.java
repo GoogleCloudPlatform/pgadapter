@@ -18,15 +18,12 @@ package com.google.example;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
 
 class AddColumn {
   static void addColumn(String host, int port, String database) throws SQLException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
-      connection
-          .createStatement()
-          .execute("alter table albums add column marketing_budget bigint");
+      connection.createStatement().execute("alter table albums add column marketing_budget bigint");
       System.out.println("Added marketing_budget column");
     }
   }

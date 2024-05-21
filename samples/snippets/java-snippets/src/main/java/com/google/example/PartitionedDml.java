@@ -20,7 +20,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 class PartitionedDml {
-  
+
   static void partitionedDml(String host, int port, String database) throws SQLException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
@@ -32,9 +32,8 @@ class PartitionedDml {
       long lowerBoundUpdateCount =
           connection
               .createStatement()
-              .executeUpdate("update albums "
-                  + "set marketing_budget=0 "
-                  + "where marketing_budget is null");
+              .executeUpdate(
+                  "update albums set marketing_budget=0 where marketing_budget is null");
       System.out.printf("Updated at least %d albums\n", lowerBoundUpdateCount);
     }
   }

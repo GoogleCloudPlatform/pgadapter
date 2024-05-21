@@ -31,6 +31,8 @@ import updateDataWithCopy from "../src/update_data_with_copy";
 import queryDataWithNewColumn from "../src/query_data_with_new_column";
 import writeWithTransactionUsingDml from "../src/update_data_with_transaction";
 import tags from "../src/tags";
+import readOnlyTransaction from "../src/read_only_transaction";
+import dataBoost from "../src/data_boost";
 
 const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withExposedPorts(5432)
@@ -112,5 +114,28 @@ describe('running samples', () => {
     test('transaction and statement tags', async () => {
         await tags(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
         expect(console.log).toHaveBeenCalledWith("Reduced marketing budget");
+    }, 30000);
+    test('read-only transaction', async () => {
+        await readOnlyTransaction(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("1 1 Total Junk");
+        expect(console.log).toHaveBeenCalledWith("1 2 Go, Go, Go");
+        expect(console.log).toHaveBeenCalledWith("2 1 Green");
+        expect(console.log).toHaveBeenCalledWith("2 2 Forever Hold Your Peace");
+        expect(console.log).toHaveBeenCalledWith("2 3 Terrified");
+    }, 30000);
+    test('data boost', async () => {
+        await dataBoost(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("2 Catalina Smith");
+        expect(console.log).toHaveBeenCalledWith("4 Lea Martin");
+        expect(console.log).toHaveBeenCalledWith("12 Melissa Garcia");
+        expect(console.log).toHaveBeenCalledWith("14 Jacqueline Long");
+        expect(console.log).toHaveBeenCalledWith("16 Sarah Wilson");
+        expect(console.log).toHaveBeenCalledWith("18 Maya Patel");
+        expect(console.log).toHaveBeenCalledWith("1 Marc Richards");
+        expect(console.log).toHaveBeenCalledWith("3 Alice Trentor");
+        expect(console.log).toHaveBeenCalledWith("5 David Lomond");
+        expect(console.log).toHaveBeenCalledWith("13 Russel Morales");
+        expect(console.log).toHaveBeenCalledWith("15 Dylan Shaw");
+        expect(console.log).toHaveBeenCalledWith("17 Ethan Miller");
     }, 30000);
 });

@@ -25,9 +25,7 @@ class DataBoost {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
       // This enables Data Boost for all partitioned queries on this connection.
-      connection
-          .createStatement()
-          .execute("set spanner.data_boost_enabled=true");
+      connection.createStatement().execute("set spanner.data_boost_enabled=true");
 
       // Run a partitioned query. This query will use Data Boost.
       try (ResultSet resultSet =

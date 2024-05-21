@@ -81,4 +81,11 @@ func TestSamples(t *testing.T) {
 	if err := tags(host, port, db); err != nil {
 		t.Fatalf("transaction and statement tag test failed: %v", err)
 	}
+	if err := tags(host, port, db); err != nil {
+		t.Fatalf("read-only transaction failed: %v", err)
+	}
+	// TODO: Enable once https://github.com/googleapis/java-spanner/pull/3111 has been added to PGAdapter.
+	//if err := dataBoost(host, port, db); err != nil {
+	//	t.Fatalf("data boost failed: %v", err)
+	//}
 }

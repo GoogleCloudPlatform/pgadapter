@@ -30,8 +30,8 @@ class StatementTimeout {
         // This sets the query timeout for this statement to 5 seconds.
         statement.setQueryTimeout(5);
         try (ResultSet resultSet =
-            statement
-                .executeQuery("SELECT singer_id, album_id, album_title "
+            statement.executeQuery(
+                "SELECT singer_id, album_id, album_title "
                     + "FROM albums "
                     + "WHERE album_title in ("
                     + "  SELECT first_name "

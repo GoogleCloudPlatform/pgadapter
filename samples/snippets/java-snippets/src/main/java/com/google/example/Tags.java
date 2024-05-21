@@ -22,7 +22,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 class Tags {
-  
+
   static void tags(String host, int port, String database) throws SQLException {
     String connectionUrl = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
     try (Connection connection = DriverManager.getConnection(connectionUrl)) {
@@ -30,22 +30,17 @@ class Tags {
       connection.setAutoCommit(false);
       // Set the TRANSACTION_TAG session variable to set a transaction tag
       // for the current transaction.
-      connection
-          .createStatement()
-          .execute("set spanner.transaction_tag='example-tx-tag'");
+      connection.createStatement().execute("set spanner.transaction_tag='example-tx-tag'");
 
       // Set the STATEMENT_TAG session variable to set the request tag
       // that should be included with the next SQL statement.
-      connection
-          .createStatement()
-          .execute("set spanner.statement_tag='query-marketing-budget'");
+      connection.createStatement().execute("set spanner.statement_tag='query-marketing-budget'");
       long marketingBudget = 0L;
       long singerId = 1L;
       long albumId = 1L;
-      try (PreparedStatement statement = connection.prepareStatement(
-          "select marketing_budget "
-              + "from albums "
-              + "where singer_id=? and album_id=?")) {
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              "select marketing_budget from albums where singer_id=? and album_id=?")) {
         statement.setLong(1, singerId);
         statement.setLong(2, albumId);
         try (ResultSet albumResultSet = statement.executeQuery()) {
@@ -59,12 +54,10 @@ class Tags {
       final float reduction = 0.1f;
       if (marketingBudget > maxMarketingBudget) {
         marketingBudget -= (long) (marketingBudget * reduction);
-        connection
-            .createStatement()
-            .execute("set spanner.statement_tag='reduce-marketing-budget'");
-        try (PreparedStatement statement = connection.prepareStatement(
-            "update albums set marketing_budget=? "
-                + "where singer_id=? AND album_id=?")) {
+        connection.createStatement().execute("set spanner.statement_tag='reduce-marketing-budget'");
+        try (PreparedStatement statement =
+            connection.prepareStatement(
+                "update albums set marketing_budget=? where singer_id=? AND album_id=?")) {
           int paramIndex = 0;
           statement.setLong(++paramIndex, marketingBudget);
           statement.setLong(++paramIndex, singerId);

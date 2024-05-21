@@ -27,9 +27,7 @@ class QueryData {
       try (ResultSet resultSet =
           connection
               .createStatement()
-              .executeQuery(
-                  "SELECT singer_id, album_id, album_title "
-                      + "FROM albums")) {
+              .executeQuery("SELECT singer_id, album_id, album_title FROM albums")) {
         while (resultSet.next()) {
           System.out.printf(
               "%d %d %s\n",

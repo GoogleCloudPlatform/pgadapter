@@ -29,7 +29,7 @@ class QueryDataWithNewColumn {
               .createStatement()
               .executeQuery(
                   "SELECT singer_id, album_id, marketing_budget "
-                      + "FROM albums " 
+                      + "FROM albums "
                       + "ORDER BY singer_id, album_id")) {
         while (resultSet.next()) {
           System.out.printf(
