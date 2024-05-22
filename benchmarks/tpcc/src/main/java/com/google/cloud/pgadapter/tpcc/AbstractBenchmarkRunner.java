@@ -169,8 +169,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     row =
         paramQueryRow(
             connection,
-            (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
-                + "SELECT c_discount, c_last, c_credit, w_tax "
+            "SELECT c_discount, c_last, c_credit, w_tax "
                 + "FROM customer c, warehouse w "
                 + "WHERE w.w_id = ? AND c.w_id = w.w_id AND c.d_id = ? AND c.c_id = ?",
             new Object[] {warehouseId, districtId, customerId});
@@ -182,8 +181,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     row =
         paramQueryRow(
             connection,
-            (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
-                + "SELECT d_next_o_id, d_tax "
+            "SELECT d_next_o_id, d_tax "
                 + "FROM district "
                 + "WHERE w_id = ? AND d_id = ?",
             new Object[] {warehouseId, districtId});
@@ -230,13 +228,10 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       row =
           paramQueryRow(
               connection,
-              (tpccConfiguration.isLockScannedRanges()
-                      ? "/*@ lock_scanned_ranges=exclusive */"
-                      : "")
-                  + "SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10 "
+              "SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10 "
                   + "FROM stock "
                   + "WHERE s_i_id = ? AND w_id= ?",
-              new Object[] {orderLineItemId, orderLineSupplyWarehouseId});
+              new Object[] { orderLineItemId, orderLineSupplyWarehouseId });
       long stockQuantity = (long) row[0];
       String stockData = (String) row[1];
       String[] stockDistrict = new String[10];
@@ -366,7 +361,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       }
       try (PreparedStatement stmt =
           connection.prepareStatement(
-              "SELECT c_id "
+              (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
+                  + "SELECT c_id "
                   + "FROM customer "
                   + "WHERE w_id = ? AND d_id= ? AND c_last=? "
                   + "ORDER BY c_first")) {
@@ -386,11 +382,10 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     row =
         paramQueryRow(
             connection,
-            (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
-                + "SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_since "
+            "SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_since "
                 + "FROM customer "
                 + "WHERE w_id = ? AND d_id= ? AND c_id=?",
-            new Object[] {customerWarehouseId, customerDistrictId, customerId});
+            new Object[] { customerWarehouseId, customerDistrictId, customerId });
     String firstName = (String) row[0];
     String middleName = (String) row[1];
     lastName = (String) row[2];
@@ -507,7 +502,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       }
       try (PreparedStatement stmt =
           connection.prepareStatement(
-              "SELECT c_balance, c_first, c_middle, c_id "
+              (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
+                  + "SELECT c_balance, c_first, c_middle, c_id "
                   + "FROM customer WHERE w_id = ? AND d_id= ? AND c_last=? "
                   + "ORDER BY c_first")) {
         int index = 0;
@@ -550,7 +546,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     long orderId = (long) row[0];
     try (PreparedStatement stmt =
         connection.prepareStatement(
-            "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d "
+            (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
+                + "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d "
                 + "FROM order_line "
                 + "WHERE w_id = ? AND d_id = ?  AND o_id = ?")) {
       int index = 0;
@@ -586,15 +583,12 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       row =
           paramQueryRow(
               connection,
-              (tpccConfiguration.isLockScannedRanges()
-                      ? "/*@ lock_scanned_ranges=exclusive */"
-                      : "")
-                  + "SELECT o_id, c_id "
+              "SELECT o_id, c_id "
                   + "FROM new_orders "
                   + "WHERE d_id = ? AND w_id = ? "
                   + "ORDER BY o_id ASC "
                   + "LIMIT 1",
-              new Object[] {districtId, warehouseId});
+              new Object[] { districtId, warehouseId });
       if (row != null) {
         long newOrderId = (long) row[0];
         long customerId = (long) row[1];
@@ -609,7 +603,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
                 connection,
                 "SELECT c_id FROM orders WHERE o_id = ? AND d_id = ? AND w_id = ?",
                 new Object[] {newOrderId, districtId, warehouseId});
-        // long customerId = (long) row[0];
         executeParamStatement(
             connection,
             "UPDATE orders "
@@ -665,7 +658,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     long nextOrderId = (long) row[0];
     try (PreparedStatement stmt =
         connection.prepareStatement(
-            "SELECT COUNT(DISTINCT (s_i_id)) "
+            (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
+                + "SELECT COUNT(DISTINCT (s_i_id)) "
                 + "FROM order_line ol, stock s "
                 + "WHERE ol.w_id = ? "
                 + "AND ol.d_id = ? "
@@ -722,7 +716,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
   private Object[] paramQueryRow(Connection connection, String sql, Object[] params)
       throws SQLException {
     Object[] row;
-    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+    try (PreparedStatement statement = connection.prepareStatement(
+        (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "") + sql)) {
       int index = 0;
       setParams(statement, params);
       Stopwatch stopwatch = Stopwatch.createStarted();
@@ -762,7 +757,8 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
   private void executeParamStatement(Connection connection, String sql, Object[] params)
       throws SQLException {
-    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+    try (PreparedStatement statement = connection.prepareStatement(
+        (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "") + sql)) {
       setParams(statement, params);
       Stopwatch stopwatch = Stopwatch.createStarted();
       statement.execute();
