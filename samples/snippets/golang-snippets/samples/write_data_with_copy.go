@@ -37,7 +37,7 @@ func WriteDataWithCopy(host string, port int, database string) error {
 	// will succeed even if it exceeds Spanner's mutation limit per transaction.
 	conn.Exec(ctx, "set spanner.autocommit_dml_mode='partitioned_non_atomic'")
 
-	file, err := os.Open("singers_data.txt")
+	file, err := os.Open("samples/singers_data.txt")
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func WriteDataWithCopy(host string, port int, database string) error {
 	}
 	fmt.Printf("Copied %v singers\n", tag.RowsAffected())
 
-	file, err = os.Open("albums_data.txt")
+	file, err = os.Open("samples/albums_data.txt")
 	if err != nil {
 		return err
 	}

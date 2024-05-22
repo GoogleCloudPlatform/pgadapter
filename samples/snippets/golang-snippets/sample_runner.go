@@ -15,6 +15,34 @@ func main() {
 	switch sample {
 	case "createtables":
 		err = samples.CreateTables(host, port, database)
+	case "createconnection":
+		err = samples.CreateConnection(host, port, database)
+	case "writeusingdml":
+		err = samples.WriteDataWithDml(host, port, database)
+	case "writeusingdmlbatch":
+		err = samples.WriteDataWithDmlBatch(host, port, database)
+	case "write":
+		err = samples.WriteDataWithCopy(host, port, database)
+	case "query":
+		err = samples.QueryData(host, port, database)
+	case "querywithparameter":
+		err = samples.QueryDataWithParameter(host, port, database)
+	case "addmarketingbudget":
+		err = samples.AddColumn(host, port, database)
+	case "ddlbatch":
+		err = samples.DdlBatch(host, port, database)
+	case "update":
+		err = samples.UpdateDataWithCopy(host, port, database)
+	case "querymarketingbudget":
+		err = samples.QueryDataWithNewColumn(host, port, database)
+	case "writewithtransactionusingdml":
+		err = samples.WriteWithTransactionUsingDml(host, port, database)
+	case "tags":
+		err = samples.Tags(host, port, database)
+	case "readonlytransaction":
+		err = samples.ReadOnlyTransaction(host, port, database)
+	case "databoost":
+		err = samples.DataBoost(host, port, database)
 	default:
 		err = fmt.Errorf("unknown sample: %s\n", sample)
 		os.Exit(1)
@@ -36,7 +64,7 @@ func extractArguments() (host string, port int, sample, database string) {
 	host = "localhost"
 	port = 5432
 	if len(os.Args) == 4 {
-		if strings.Contains(os.Args[3], ":") {
+		if !strings.Contains(os.Args[3], ":") {
 			fmt.Println("The PGAdapter host/port must be given in the format 'host:port' (e.g. localhost:5432)")
 			os.Exit(1)
 		}
