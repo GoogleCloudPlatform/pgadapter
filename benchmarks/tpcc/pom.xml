@@ -9,23 +9,35 @@
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
   <groupId>com.google.cloud.spanner</groupId>
-  <artifactId>pgadapter-spring-jpa-example</artifactId>
+  <artifactId>pgadapter-tpcc-benchmark</artifactId>
   <version>0.0.1-SNAPSHOT</version>
-  <name>pgadapter-spring-jpa-example</name>
-  <description>Example application for using Spring Data JPA with PGAdapter</description>
+  <name>PGAdapter tpcc benchmark</name>
+  <description>tpcc Benchmark Runner for PGAdapter</description>
   <properties>
     <java.version>17</java.version>
   </properties>
+    <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>26.39.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>1.38.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
   <dependencies>
-    <!-- Add Spring Boot Data JPA -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-data-jpa</artifactId>
-    </dependency>
-    <!-- Add Liquibase for schema management -->
-    <dependency>
-      <groupId>org.liquibase</groupId>
-      <artifactId>liquibase-core</artifactId>
+      <artifactId>spring-boot-starter</artifactId>
     </dependency>
     <!-- Add the PostgreSQL JDBC driver -->
     <dependency>
@@ -33,10 +45,10 @@
       <artifactId>postgresql</artifactId>
       <version>42.7.3</version>
     </dependency>
-    <!-- Add Jackson for json parsing. This is required for using JSONB columns with Spring Data JPA. -->
+    <!-- Add the Cloud Spanner JDBC driver -->
     <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-jdbc</artifactId>
     </dependency>
     <!-- Add PGAdapter as a dependency, so we can start it in-process -->
     <dependency>
@@ -44,32 +56,17 @@
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
       <version>0.33.1</version>
     </dependency>
-    <!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
     <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-spanner-hibernate-tools</artifactId>
-      <version>3.4.1</version>
-    </dependency>
-    <!-- Add Hypersistence Utils for access to additional data type mappings, for example for arrays. -->
-    <dependency>
-      <groupId>io.hypersistence</groupId>
-      <artifactId>hypersistence-utils-hibernate-63</artifactId>
-      <version>3.7.5</version>
+          <groupId>io.opentelemetry</groupId>
+          <artifactId>opentelemetry-sdk</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-autoconfigure</artifactId>
+          <groupId>io.opentelemetry</groupId>
+          <artifactId>opentelemetry-sdk-metrics</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-configuration-processor</artifactId>
-      <optional>true</optional>
-    </dependency>
-    
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-test</artifactId>
-      <scope>test</scope>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-exporter-otlp</artifactId>
     </dependency>
   </dependencies>
 
@@ -82,7 +79,7 @@
       <plugin>
         <groupId>com.spotify.fmt</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.23</version>
+        <version>2.21.1</version>
         <executions>
           <execution>
             <goals>
