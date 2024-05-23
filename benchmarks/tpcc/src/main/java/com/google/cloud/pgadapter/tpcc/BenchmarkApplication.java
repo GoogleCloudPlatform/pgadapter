@@ -90,8 +90,10 @@ public class BenchmarkApplication implements CommandLineRunner {
             spannerConfiguration.getInstance(),
             spannerConfiguration.getDatabase(),
             pgAdapterConfiguration.getNumChannels(),
-            Math.max(pgAdapterConfiguration.getMinSessions(), tpccConfiguration.getBenchmarkThreads()),
-            Math.max(pgAdapterConfiguration.getMaxSessions(), tpccConfiguration.getBenchmarkThreads()));
+            Math.max(
+                pgAdapterConfiguration.getMinSessions(), tpccConfiguration.getBenchmarkThreads()),
+            Math.max(
+                pgAdapterConfiguration.getMaxSessions(), tpccConfiguration.getBenchmarkThreads()));
     try {
       if (tpccConfiguration.isLoadData()) {
         System.out.println("Checking schema");
