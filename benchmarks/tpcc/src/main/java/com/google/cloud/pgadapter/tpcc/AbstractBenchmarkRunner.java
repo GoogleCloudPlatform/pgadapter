@@ -725,7 +725,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       int index = 0;
       setParams(statement, params);
       Stopwatch stopwatch = Stopwatch.createStarted();
-      row = paramQueryRow(QueryRowMode.REQUIRE_ONE, statement);
+      row = paramQueryRow(QueryRowMode.ALLOW_MORE_THAN_ONE, statement);
       Duration executionDuration = stopwatch.elapsed();
       metrics.recordLatency(executionDuration.toMillis());
     }
