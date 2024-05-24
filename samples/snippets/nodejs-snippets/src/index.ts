@@ -29,6 +29,7 @@ import writeWithTransactionUsingDml from "./update_data_with_transaction";
 import tags from "./tags";
 import readOnlyTransaction from "./read_only_transaction";
 import dataBoost from "./data_boost";
+import partitionedDml from "./partitioned_dml";
 
 yargs(hideBin(process.argv))
   .command('createtables <database> [host] [port]', 'Create sample tables', (yargs) => {
@@ -150,6 +151,14 @@ yargs(hideBin(process.argv))
     .positional('port', {optional: true, describe: "PGAdapter port number", type: "number", default: 5432});
   }, async (argv) => {
     await dataBoost(argv.host, argv.port, argv.database);
+  })
+  .command('partitioneddml <database> [host] [port]', 'Execute a Partitioned DML statement.', (yargs) => {
+    return yargs
+    .positional('database', {describe: "Sample database name", type: "string"})
+    .positional('host', {optional: true, describe: "PGAdapter host name", type: "string", default: "localhost"})
+    .positional('port', {optional: true, describe: "PGAdapter port number", type: "number", default: 5432});
+  }, async (argv) => {
+    await partitionedDml(argv.host, argv.port, argv.database);
   })
   .demandCommand(1)
   .parse();

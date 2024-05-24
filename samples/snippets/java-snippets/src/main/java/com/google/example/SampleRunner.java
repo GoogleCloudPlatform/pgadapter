@@ -75,6 +75,9 @@ public class SampleRunner {
       case "databoost":
         DataBoost.dataBoost(host, port, database);
         break;
+      case "partitioneddml":
+        PartitionedDml.partitionedDml(host, port, database);
+        break;
       default:
         throw new IllegalArgumentException("Unknown sample: " + sample);
     }

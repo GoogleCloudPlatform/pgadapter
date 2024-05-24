@@ -33,6 +33,7 @@ import writeWithTransactionUsingDml from "../src/update_data_with_transaction";
 import tags from "../src/tags";
 import readOnlyTransaction from "../src/read_only_transaction";
 import dataBoost from "../src/data_boost";
+import partitionedDml from "../src/partitioned_dml";
 
 const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withExposedPorts(5432)
@@ -137,5 +138,9 @@ describe('running samples', () => {
         expect(console.log).toHaveBeenCalledWith("13 Russel Morales");
         expect(console.log).toHaveBeenCalledWith("15 Dylan Shaw");
         expect(console.log).toHaveBeenCalledWith("17 Ethan Miller");
+    }, 30000);
+    test('partitioned DML', async () => {
+        await partitionedDml(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
+        expect(console.log).toHaveBeenCalledWith("Updated at least 3 albums");
     }, 30000);
 });

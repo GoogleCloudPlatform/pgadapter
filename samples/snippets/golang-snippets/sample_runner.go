@@ -43,6 +43,8 @@ func main() {
 		err = samples.ReadOnlyTransaction(host, port, database)
 	case "databoost":
 		err = samples.DataBoost(host, port, database)
+	case "partitioneddml":
+		err = samples.PartitionedDML(host, port, database)
 	default:
 		err = fmt.Errorf("unknown sample: %s\n", sample)
 		os.Exit(1)

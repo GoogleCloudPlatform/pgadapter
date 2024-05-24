@@ -90,4 +90,7 @@ func TestSamples(t *testing.T) {
 	//if err := dataBoost(host, port, db); err != nil {
 	//	t.Fatalf("data boost failed: %v", err)
 	//}
+	if err := samples.PartitionedDML(host, port, db); err != nil {
+		t.Fatalf("partitioned DML failed: %v", err)
+	}
 }
