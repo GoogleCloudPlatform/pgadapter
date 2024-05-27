@@ -94,6 +94,7 @@ public class DiscardStatement extends IntermediatePortalStatement {
                         SQLState.ActiveSqlTransaction)));
             return;
           }
+          backendConnection.getSessionState().resetAll();
           connectionHandler.closeAllStatements();
           break;
         case PLANS:

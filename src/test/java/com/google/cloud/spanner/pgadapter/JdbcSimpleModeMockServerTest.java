@@ -597,6 +597,22 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
           SQLState.InvalidSqlStatementName.toString(),
           exception.getServerErrorMessage().getSQLState());
 
+      // Verify that DISCARD ALL resets all session state.
+      connection.createStatement().execute("set spanner.copy_upsert=true");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.copy_upsert")) {
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+      connection.createStatement().execute("discard all");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.copy_upsert")) {
+        assertTrue(resultSet.next());
+        assertFalse(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+
       // Verify that 'discard all' is not accepted in a transaction block.
       connection.setAutoCommit(false);
       exception =
