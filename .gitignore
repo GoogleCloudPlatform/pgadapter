@@ -22,8 +22,8 @@ src/test/csharp/**/bin
 src/test/csharp/**/obj
 samples/**/dotnet/**/bin
 samples/**/dotnet/**/obj
-samples/snippets/**/dotnet/**/bin
-samples/snippets/**/dotnet/**/obj
+samples/snippets/**/dotnet-snippets/**/bin
+samples/snippets/**/dotnet-snippets/**/obj
 
 src/test/nodejs/**/.DS_Store
 samples/nodejs/**/.DS_Store

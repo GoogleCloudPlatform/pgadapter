@@ -1,5 +1,0 @@
-1	1	Total Junk
-1	2	Go, Go, Go
-2	1	Green
-2	2	Forever Hold Your Peace
-2	3	Terrified
