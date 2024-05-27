@@ -12,26 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START spanner_create_connection]
+// [START spanner_add_column]
 using Npgsql;
 
 namespace dotnet_snippets;
 
-static class CreateConnectionSample
+static class AddColumnSample
 {
-    internal static void CreateConnection(string host, int port, string database)
+    internal static void AddColumn(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);
         connection.Open();
 
-        using var cmd = new NpgsqlCommand("select 'Hello World!' as hello", connection);
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            var greeting = reader.GetString(0);
-            Console.WriteLine($"Greeting from Cloud Spanner PostgreSQL: {greeting}");
-        }
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "alter table albums add column marketing_budget bigint";
+        cmd.ExecuteNonQuery();
+        Console.WriteLine("Added marketing_budget column");
     }
 }
-// [END spanner_create_connection]
+// [END spanner_add_column]

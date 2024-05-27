@@ -71,6 +71,159 @@ public class SampleTests
         Assert.That(output, Is.EqualTo(expected));
     }
     
+    [Test, Order(3)]
+    public void WriteDataWithDml()
+    {
+        var output = CaptureOutput(() =>
+            WriteDataWithDmlSample.WriteDataWithDml(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        var expected = $"4 records inserted.{Environment.NewLine}";
+        Assert.That(output, Is.EqualTo(expected));
+    }
+    
+    [Test, Order(4)]
+    public void WriteDataWithDmlBatch()
+    {
+        var output = CaptureOutput(() =>
+            WriteDataWithDmlBatchSample.WriteDataWithDmlBatch(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        var expected = $"3 records inserted.{Environment.NewLine}";
+        Assert.That(output, Is.EqualTo(expected));
+    }
+    
+    [Test, Order(5)]
+    public void WriteDataWithCopy()
+    {
+        var output = CaptureOutput(() =>
+            WriteDataWithCopySample.WriteDataWithCopy(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        var expected = $"Copied 5 singers{Environment.NewLine}Copied 5 albums{Environment.NewLine}";
+        Assert.That(output, Is.EqualTo(expected));
+    }
+    
+    [Test, Order(6)]
+    public void QueryData()
+    {
+        var output = CaptureOutput(() =>
+            QueryDataSample.QueryData(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        var expected = $"1 2 Go, Go, Go{Environment.NewLine}" +
+                       $"2 2 Forever Hold Your Peace{Environment.NewLine}" +
+                       $"1 1 Total Junk{Environment.NewLine}" +
+                       $"2 1 Green{Environment.NewLine}" +
+                       $"2 3 Terrified{Environment.NewLine}";
+        Assert.That(output, Is.EqualTo(expected));
+    }
+    
+    [Test, Order(7)]
+    public void QueryDataWithParameter()
+    {
+        var output = CaptureOutput(() =>
+            QueryDataWithParameterSample.QueryDataWithParameter(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        var expected = $"12 Melissa Garcia{Environment.NewLine}";
+        Assert.That(output, Is.EqualTo(expected));
+    }
+    
+    [Test, Order(8)]
+    public void QueryWithTimeout()
+    {
+        var output = CaptureOutput(() =>
+            QueryWithTimeoutSample.QueryWithTimeout(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo(""));
+    }
+    
+    [Test, Order(9)]
+    public void AddColumn()
+    {
+        var output = CaptureOutput(() =>
+            AddColumnSample.AddColumn(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"Added marketing_budget column{Environment.NewLine}"));
+    }
+    
+    [Test, Order(10)]
+    public void DdlBatch()
+    {
+        var output = CaptureOutput(() =>
+            DdlBatchSample.DdlBatch(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"Added venues and concerts tables{Environment.NewLine}"));
+    }
+    
+    [Test, Order(11)]
+    public void UpdateDataWithCopy()
+    {
+        var output = CaptureOutput(() =>
+            UpdateDataWithCopySample.UpdateDataWithCopy(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"Updated 2 albums{Environment.NewLine}"));
+    }
+    
+    [Test, Order(12)]
+    public void QueryDataWithNewColumn()
+    {
+        var output = CaptureOutput(() =>
+            QueryDataWithNewColumnSample.QueryWithNewColumnData(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"1 1 100000{Environment.NewLine}" +
+                                       $"1 2 {Environment.NewLine}" +
+                                       $"2 1 {Environment.NewLine}" +
+                                       $"2 2 500000{Environment.NewLine}" +
+                                       $"2 3 {Environment.NewLine}"));
+    }
+    
+    [Test, Order(13)]
+    public void WriteDataWithTransaction()
+    {
+        var output = CaptureOutput(() =>
+            UpdateDataWithTransactionSample.WriteWithTransactionUsingDml(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"Transferred marketing budget from Album 2 to Album 1{Environment.NewLine}"));
+    }
+    
+    [Test, Order(14)]
+    public void Tags()
+    {
+        var output = CaptureOutput(() =>
+            TagsSample.Tags(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"Reduced marketing budget{Environment.NewLine}"));
+    }
+    
+    [Test, Order(15)]
+    public void ReadOnlyTransaction()
+    {
+        var output = CaptureOutput(() =>
+            ReadOnlyTransactionSample.ReadOnlyTransaction(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"1 1 Total Junk{Environment.NewLine}"
+                                       + $"1 2 Go, Go, Go{Environment.NewLine}"
+                                       + $"2 1 Green{Environment.NewLine}"
+                                       + $"2 2 Forever Hold Your Peace{Environment.NewLine}"
+                                       + $"2 3 Terrified{Environment.NewLine}"
+                                       + $"2 2 Forever Hold Your Peace{Environment.NewLine}"
+                                       + $"1 2 Go, Go, Go{Environment.NewLine}"
+                                       + $"2 1 Green{Environment.NewLine}"
+                                       + $"2 3 Terrified{Environment.NewLine}"
+                                       + $"1 1 Total Junk{Environment.NewLine}"));
+    }
+    
+    [Test, Order(16)]
+    public void DataBoost()
+    {
+        var output = CaptureOutput(() =>
+            DataBoostSample.DataBoost(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"2 Catalina Smith{Environment.NewLine}"
+                                       + $"4 Lea Martin{Environment.NewLine}"
+                                       + $"12 Melissa Garcia{Environment.NewLine}"
+                                       + $"14 Jacqueline Long{Environment.NewLine}"
+                                       + $"16 Sarah Wilson{Environment.NewLine}"
+                                       + $"18 Maya Patel{Environment.NewLine}"
+                                       + $"1 Marc Richards{Environment.NewLine}"
+                                       + $"3 Alice Trentor{Environment.NewLine}"
+                                       + $"5 David Lomond{Environment.NewLine}"
+                                       + $"13 Russel Morales{Environment.NewLine}"
+                                       + $"15 Dylan Shaw{Environment.NewLine}"
+                                       + $"17 Ethan Miller{Environment.NewLine}"));
+    }
+        
+    [Test, Order(17)]
+    public void PartitionedDml()
+    {
+        var output = CaptureOutput(() =>
+            PartitionedDmlSample.PartitionedDml(_container.Hostname, _container.GetMappedPublicPort(5432), Database));
+        Assert.That(output, Is.EqualTo($"Updated at least 3 albums{Environment.NewLine}"));
+    }
+
     private static async Task<IContainer> StartPGAdapterAndEmulator()
     {
         var container = new ContainerBuilder()

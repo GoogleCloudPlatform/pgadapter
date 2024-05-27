@@ -21,7 +21,7 @@ static class CreateTablesSample
 {
     internal static void CreateTables(string host, int port, string database)
     {
-        var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable";
+        var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);
         connection.Open();
 

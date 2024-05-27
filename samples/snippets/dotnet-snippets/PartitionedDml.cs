@@ -12,26 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START spanner_create_connection]
+// [START spanner_partitioned_dml]
 using Npgsql;
 
 namespace dotnet_snippets;
 
-static class CreateConnectionSample
+static class PartitionedDmlSample
 {
-    internal static void CreateConnection(string host, int port, string database)
+    internal static void PartitionedDml(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);
         connection.Open();
+        
+        // Enable Partitioned DML on this connection.
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "set spanner.autocommit_dml_mode='partitioned_non_atomic'";
+        cmd.ExecuteNonQuery();
 
-        using var cmd = new NpgsqlCommand("select 'Hello World!' as hello", connection);
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            var greeting = reader.GetString(0);
-            Console.WriteLine($"Greeting from Cloud Spanner PostgreSQL: {greeting}");
-        }
+        // Back-fill a default value for the MarketingBudget column.
+        cmd.CommandText = "update albums set marketing_budget=0 where marketing_budget is null";
+        var lowerBoundUpdateCount = cmd.ExecuteNonQuery();
+        
+        Console.WriteLine($"Updated at least {lowerBoundUpdateCount} albums");
     }
 }
-// [END spanner_create_connection]
+// [END spanner_partitioned_dml]

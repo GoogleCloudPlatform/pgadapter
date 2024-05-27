@@ -12,26 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [START spanner_create_connection]
+// [START spanner_query_data_with_new_column]
 using Npgsql;
 
 namespace dotnet_snippets;
 
-static class CreateConnectionSample
+static class QueryDataWithNewColumnSample
 {
-    internal static void CreateConnection(string host, int port, string database)
+    internal static void QueryWithNewColumnData(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);
         connection.Open();
 
-        using var cmd = new NpgsqlCommand("select 'Hello World!' as hello", connection);
+        using var cmd = new NpgsqlCommand("SELECT singer_id, album_id, marketing_budget "
+                                          + "FROM albums "
+                                          + "ORDER BY singer_id, album_id", connection);
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
-            var greeting = reader.GetString(0);
-            Console.WriteLine($"Greeting from Cloud Spanner PostgreSQL: {greeting}");
+            Console.WriteLine($"{reader["singer_id"]} {reader["album_id"]} {reader["marketing_budget"]}");
         }
     }
 }
-// [END spanner_create_connection]
+// [END spanner_query_data_with_new_column]

@@ -15,4 +15,15 @@
       <PackageReference Include="Testcontainers" Version="3.8.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="singers_data.txt" />
+      <EmbeddedResource Include="singers_data.txt">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <None Remove="albums_data.txt" />
+      <EmbeddedResource Include="albums_data.txt">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+    </ItemGroup>
+
 </Project>
