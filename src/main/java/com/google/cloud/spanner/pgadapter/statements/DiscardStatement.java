@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
