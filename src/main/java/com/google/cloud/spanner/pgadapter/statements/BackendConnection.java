@@ -1168,15 +1168,18 @@ public class BackendConnection {
               sessionState.rollback();
             }
             closeAllPortals.run();
-            transactionMode = TransactionMode.IMPLICIT;
-            connectionState = ConnectionState.IDLE;
-            currentTransactionId = null;
+            clearCurrentTransaction();
           }
           index++;
         }
       }
     } catch (Exception exception) {
-      connectionState = ConnectionState.ABORTED;
+      // The connection should not transition to the ABORTED state if a COMMIT or ROLLBACK fails.
+      if (isCommit(index) || isRollback(index)) {
+        clearCurrentTransaction();
+      } else {
+        connectionState = ConnectionState.ABORTED;
+      }
       closeAllPortals.run();
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
@@ -1191,6 +1194,12 @@ public class BackendConnection {
     } finally {
       bufferedStatements.clear();
     }
+  }
+
+  private void clearCurrentTransaction() {
+    transactionMode = TransactionMode.IMPLICIT;
+    connectionState = ConnectionState.IDLE;
+    currentTransactionId = null;
   }
 
   /** Starts an implicit transaction if that is necessary. */
