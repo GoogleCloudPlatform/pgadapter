@@ -62,7 +62,8 @@ def update_data_with_transaction(host: string, port: int, database: string):
         print("Transferred marketing budget from Album 2 to Album 1")
 # [END spanner_dml_getting_started_update]
 
-import sample_runner
-
-sample_runner.parse_arguments()
-update_data_with_transaction(sample_runner.host, sample_runner.port, sample_runner.database)
+if __name__ == "__main__":
+    import sample_runner
+    
+    sample_runner.parse_arguments()
+    update_data_with_transaction(sample_runner.host, sample_runner.port, sample_runner.database)

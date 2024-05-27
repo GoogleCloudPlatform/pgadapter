@@ -33,7 +33,8 @@ def write_data_with_dml_batch(host: string, port: int, database: string):
             print("%d records inserted" % cur.rowcount)
 # [END spanner_dml_batch]
 
-import sample_runner
-
-sample_runner.parse_arguments()
-write_data_with_dml_batch(sample_runner.host, sample_runner.port, sample_runner.database)
+if __name__ == "__main__":
+    import sample_runner
+    
+    sample_runner.parse_arguments()
+    write_data_with_dml_batch(sample_runner.host, sample_runner.port, sample_runner.database)

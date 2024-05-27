@@ -38,7 +38,8 @@ def data_boost(host: string, port: int, database: string):
                 print(singer)
 # [END spanner_data_boost]
 
-import sample_runner
-
-sample_runner.parse_arguments()
-data_boost(sample_runner.host, sample_runner.port, sample_runner.database)
+if __name__ == "__main__":
+    import sample_runner
+    
+    sample_runner.parse_arguments()
+    data_boost(sample_runner.host, sample_runner.port, sample_runner.database)

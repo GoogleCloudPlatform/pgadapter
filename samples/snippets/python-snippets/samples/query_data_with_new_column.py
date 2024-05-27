@@ -31,7 +31,8 @@ def query_data_with_new_column(host: string, port: int, database: string):
                 print(album)
 # [END spanner_query_data_with_new_column]
 
-import sample_runner
-
-sample_runner.parse_arguments()
-query_data_with_new_column(sample_runner.host, sample_runner.port, sample_runner.database)
+if __name__ == "__main__":
+    import sample_runner
+    
+    sample_runner.parse_arguments()
+    query_data_with_new_column(sample_runner.host, sample_runner.port, sample_runner.database)

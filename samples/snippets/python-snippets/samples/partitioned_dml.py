@@ -39,7 +39,8 @@ def execute_partitioned_dml(host: string, port: int, database: string):
 
 # [END spanner_partitioned_dml]
 
-import sample_runner
-
-sample_runner.parse_arguments()
-execute_partitioned_dml(sample_runner.host, sample_runner.port, sample_runner.database)
+if __name__ == "__main__":
+    import sample_runner
+    
+    sample_runner.parse_arguments()
+    execute_partitioned_dml(sample_runner.host, sample_runner.port, sample_runner.database)

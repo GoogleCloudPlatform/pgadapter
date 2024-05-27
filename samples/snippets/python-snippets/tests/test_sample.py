@@ -17,7 +17,7 @@ from samples import create_tables, create_connection, write_data_with_dml, \
     write_data_with_copy, query_data, query_data_with_parameter, add_column, \
     ddl_batch, partitioned_dml, update_data_with_copy, \
     update_data_with_transaction, tags, read_only_transaction, data_boost, \
-    statement_timeout
+    statement_timeout, query_data_with_new_column
 import socket
 import time
 import unittest.mock
@@ -106,6 +106,14 @@ class SampleTest(unittest.TestCase):
         update_data_with_copy.update_data_with_copy(host, port, db)
         self.assertEqual("Updated 2 albums\n",
                          mock_stdout.getvalue())
+        reset_mock_stdout(mock_stdout)
+
+        query_data_with_new_column.query_data_with_new_column(host, port, db)
+        self.assertEqual("(1, 1, 100000)\n"
+                         "(1, 2, None)\n"
+                         "(2, 1, None)\n"
+                         "(2, 2, 500000)\n"
+                         "(2, 3, None)\n", mock_stdout.getvalue())
         reset_mock_stdout(mock_stdout)
 
         update_data_with_transaction.update_data_with_transaction(

@@ -46,7 +46,8 @@ def write_data_with_copy(host: string, port: int, database: string):
             print("Copied %d albums" % cur.rowcount)
 # [END spanner_copy_from_stdin]
 
-import sample_runner
-
-sample_runner.parse_arguments()
-write_data_with_copy(sample_runner.host, sample_runner.port, sample_runner.database)
+if __name__ == "__main__":
+    import sample_runner
+    
+    sample_runner.parse_arguments()
+    write_data_with_copy(sample_runner.host, sample_runner.port, sample_runner.database)
