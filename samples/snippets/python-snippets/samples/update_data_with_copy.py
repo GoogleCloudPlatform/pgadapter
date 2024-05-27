@@ -35,3 +35,8 @@ def update_data_with_copy(host: string, port: int, database: string):
                 copy.write_row((2, 2, 500000))
             print("Updated %d albums" % cur.rowcount)
 # [END spanner_update_data]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+update_data_with_copy(sample_runner.host, sample_runner.port, sample_runner.database)

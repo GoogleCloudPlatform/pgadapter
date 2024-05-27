@@ -61,3 +61,8 @@ def tags(host: string, port: int, database: string):
         conn.commit()
         print("Reduced marketing budget")
 # [END spanner_transaction_and_statement_tag]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+tags(sample_runner.host, sample_runner.port, sample_runner.database)

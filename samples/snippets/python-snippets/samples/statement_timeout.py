@@ -44,3 +44,8 @@ def query_with_timeout(host: string, port: int, database: string):
             except DatabaseError as exception:
                 print("Error occurred during query execution: %s" % exception)
 # [END spanner_statement_timeout]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+query_with_timeout(sample_runner.host, sample_runner.port, sample_runner.database)

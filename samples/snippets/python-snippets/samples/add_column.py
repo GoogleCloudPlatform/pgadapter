@@ -29,3 +29,8 @@ def add_column(host: string, port: int, database: string):
                         "ADD COLUMN marketing_budget bigint")
             print("Added marketing_budget column")
 # [END spanner_add_column]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+add_column(sample_runner.host, sample_runner.port, sample_runner.database)

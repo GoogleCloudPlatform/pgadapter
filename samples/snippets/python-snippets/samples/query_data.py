@@ -29,3 +29,8 @@ def query_data(host: string, port: int, database: string):
             for album in cur:
                 print(album)
 # [END spanner_query_data]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+query_data(sample_runner.host, sample_runner.port, sample_runner.database)

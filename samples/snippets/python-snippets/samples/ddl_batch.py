@@ -49,3 +49,8 @@ def ddl_batch(host: string, port: int, database: string):
                          ")")
         print("Added venues and concerts tables")
 # [END spanner_ddl_batch]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+ddl_batch(sample_runner.host, sample_runner.port, sample_runner.database)

@@ -38,3 +38,8 @@ def execute_partitioned_dml(host: string, port: int, database: string):
             print("Updated at least %d albums" % cur.rowcount)
 
 # [END spanner_partitioned_dml]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+execute_partitioned_dml(sample_runner.host, sample_runner.port, sample_runner.database)

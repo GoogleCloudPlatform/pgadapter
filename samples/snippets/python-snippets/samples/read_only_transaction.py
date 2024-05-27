@@ -48,3 +48,8 @@ def read_only_transaction(host: string, port: int, database: string):
         # rolling back or committing a read-only transaction.
         conn.commit()
 # [END spanner_read_only_transaction]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+read_only_transaction(sample_runner.host, sample_runner.port, sample_runner.database)

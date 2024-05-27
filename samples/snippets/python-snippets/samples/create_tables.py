@@ -46,3 +46,8 @@ def create_tables(host: string, port: int, database: string):
         print("Created Singers & Albums tables in database: [{database}]"
               .format(database=database))
 # [END spanner_create_database]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+create_tables(sample_runner.host, sample_runner.port, sample_runner.database)

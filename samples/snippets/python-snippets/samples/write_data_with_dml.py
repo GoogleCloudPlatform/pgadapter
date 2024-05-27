@@ -33,3 +33,8 @@ def write_data_with_dml(host: string, port: int, database: string):
                          15, "Dylan", "Shaw",))
             print("%d records inserted" % cur.rowcount)
 # [END spanner_dml_getting_started_insert]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+write_data_with_dml(sample_runner.host, sample_runner.port, sample_runner.database)

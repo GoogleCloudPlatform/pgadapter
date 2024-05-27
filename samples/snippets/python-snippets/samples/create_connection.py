@@ -30,3 +30,8 @@ def create_connection(host: string, port: int, database: string):
             cur.execute("select 'Hello world!' as hello")
             print("Greeting from Cloud Spanner PostgreSQL:", cur.fetchone()[0])
 # [END spanner_create_connection]
+
+import sample_runner
+
+sample_runner.parse_arguments()
+create_connection(sample_runner.host, sample_runner.port, sample_runner.database)
