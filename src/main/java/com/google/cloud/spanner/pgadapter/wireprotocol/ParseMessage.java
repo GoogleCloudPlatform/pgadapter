@@ -19,6 +19,7 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.CLOSE
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DEALLOCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DECLARE;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DISCARD;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.EXECUTE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.FETCH;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.MOVE;
@@ -44,6 +45,7 @@ import com.google.cloud.spanner.pgadapter.statements.CloseStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.DeallocateStatement;
 import com.google.cloud.spanner.pgadapter.statements.DeclareStatement;
+import com.google.cloud.spanner.pgadapter.statements.DiscardStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExecuteStatement;
 import com.google.cloud.spanner.pgadapter.statements.FetchStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
@@ -143,6 +145,13 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
             originalStatement);
       } else if (isCommand(DEALLOCATE, originalStatement.getSql())) {
         return new DeallocateStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(DISCARD, originalStatement.getSql())) {
+        return new DiscardStatement(
             connectionHandler,
             connectionHandler.getServer().getOptions(),
             name,

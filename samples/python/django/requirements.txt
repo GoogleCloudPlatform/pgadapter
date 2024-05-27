@@ -3,5 +3,5 @@ pytz==2024.1
 Django==5.0.6
 google==3.0.0
 google.auth==2.29.0
-testcontainers==4.4.1
+testcontainers==4.5.0
 requests<2.32.0  # `requests` renamed `get_connection` to `_get_connection`, which is a method docker-py monkeypatches. See https://github.com/docker/docker-py/issues/3256 Should be able to un-pin when docker-py hotfix is out.

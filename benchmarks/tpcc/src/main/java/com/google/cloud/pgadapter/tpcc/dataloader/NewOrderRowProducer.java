@@ -18,7 +18,8 @@ import com.google.common.collect.ImmutableList;
 
 class NewOrderRowProducer extends AbstractOrderedIdRowProducer {
   private static final String TABLE = "new_orders";
-  private static final String COLUMNS = """
+  private static final String COLUMNS =
+      """
     o_id,
     c_id,
     d_id,
