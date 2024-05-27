@@ -203,7 +203,7 @@ public class PgAdapterTestEnv {
       for (Database database : client.listDatabases(getInstanceId()).iterateAll()) {
         if ((database.getId().getDatabase().startsWith("testdb_")
                 || database.getId().getDatabase().startsWith(getDatabaseId()))
-            && database.getCreateTime().getSeconds() >= thresholdTime) {
+            && database.getCreateTime().getSeconds() <= thresholdTime) {
           logger.info("Dropping stale test database " + database.getId().getName());
           database.drop();
         }
