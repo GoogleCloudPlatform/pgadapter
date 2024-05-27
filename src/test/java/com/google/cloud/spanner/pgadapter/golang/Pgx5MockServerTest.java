@@ -1357,12 +1357,13 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     // Read-only transactions are not really committed.
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
-  
+
   @Ignore("Requires https://github.com/googleapis/java-spanner/pull/3111")
   @Test
   public void testDataBoost() {
     RandomResultSetGenerator generator = new RandomResultSetGenerator(10);
-    mockSpanner.putStatementResults(StatementResult.query(Statement.of("select * from random"), generator.generate()));
+    mockSpanner.putStatementResults(
+        StatementResult.query(Statement.of("select * from random"), generator.generate()));
 
     String res = pgxTest.TestDataBoost(createConnString());
 
