@@ -50,6 +50,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -58,6 +60,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -67,6 +70,7 @@ public class PgAdapterTestEnv {
   private static final int INIT_PROTOCOL = 80877103;
   private static final int OPTIONS_PROTOCOL = 196608;
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
+  private static final AtomicBoolean DELETED_STALE_DATABASES = new AtomicBoolean();
 
   // GCP credentials file should be set through the 'GOOGLE_APPLICATION_CREDENTIALS' environment
   // variable.
@@ -189,6 +193,26 @@ public class PgAdapterTestEnv {
     spannerHost = getSpannerUrl();
     logger.info("Using Spanner host: " + spannerHost);
     options = createSpannerOptions();
+    deleteStaleTestDatabases();
+  }
+
+  private void deleteStaleTestDatabases() {
+    if (isDropStaleTestDatabases() && DELETED_STALE_DATABASES.compareAndSet(false, true)) {
+      DatabaseAdminClient client = getSpanner().getDatabaseAdminClient();
+      long thresholdTime = Instant.now().getEpochSecond() - Duration.ofHours(6L).getSeconds();
+      for (Database database : client.listDatabases(getInstanceId()).iterateAll()) {
+        if ((database.getId().getDatabase().startsWith("testdb_")
+                || database.getId().getDatabase().startsWith(getDatabaseId()))
+            && database.getCreateTime().getSeconds() <= thresholdTime) {
+          logger.info("Dropping stale test database " + database.getId().getName());
+          database.drop();
+        }
+      }
+    }
+  }
+
+  private boolean isDropStaleTestDatabases() {
+    return Boolean.parseBoolean(System.getenv("PG_ADAPTER_DROP_STALE_DATABASES"));
   }
 
   public void startPGAdapterServer(Iterable<String> additionalPGAdapterOptions) {
