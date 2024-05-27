@@ -17,9 +17,9 @@ using Npgsql;
 
 namespace dotnet_snippets;
 
-static class QueryWithTimeoutSample
+public static class QueryWithTimeoutSample
 {
-    internal static void QueryWithTimeout(string host, int port, string database)
+    public static void QueryWithTimeout(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);

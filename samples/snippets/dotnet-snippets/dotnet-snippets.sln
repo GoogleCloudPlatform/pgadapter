@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dotnet-snippets", "dotnet-snippets.csproj", "{76A7CDA1-53D7-408E-94F1-D6019864BB68}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sample-tests", "sample-tests\sample-tests.csproj", "{2477F93F-59BC-40E5-8931-F9B918A4D28B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{76A7CDA1-53D7-408E-94F1-D6019864BB68}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{76A7CDA1-53D7-408E-94F1-D6019864BB68}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{76A7CDA1-53D7-408E-94F1-D6019864BB68}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2477F93F-59BC-40E5-8931-F9B918A4D28B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2477F93F-59BC-40E5-8931-F9B918A4D28B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2477F93F-59BC-40E5-8931-F9B918A4D28B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2477F93F-59BC-40E5-8931-F9B918A4D28B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

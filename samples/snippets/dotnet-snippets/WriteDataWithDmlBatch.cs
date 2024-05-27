@@ -17,7 +17,7 @@ using Npgsql;
 
 namespace dotnet_snippets;
 
-static class WriteDataWithDmlBatchSample
+public static class WriteDataWithDmlBatchSample
 {
     readonly struct Singer
     {
@@ -33,7 +33,7 @@ static class WriteDataWithDmlBatchSample
         public string LastName { get; }
     }
     
-    internal static void WriteDataWithDmlBatch(string host, int port, string database)
+    public static void WriteDataWithDmlBatch(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);

@@ -9,10 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
       <PackageReference Include="Npgsql" Version="8.0.3" />
-      <PackageReference Include="NUnit" Version="4.1.0" />
-      <PackageReference Include="Testcontainers" Version="3.8.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -24,6 +21,12 @@
       <EmbeddedResource Include="albums_data.txt">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </EmbeddedResource>
+      <EmbeddedResource Remove="sample-tests\**" />
+      <None Remove="sample-tests\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="sample-tests\**" />
     </ItemGroup>
 
 </Project>

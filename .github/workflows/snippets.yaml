@@ -69,3 +69,14 @@ jobs:
         run: |
           npm install
           npm test
+  dotnet-snippets:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - run: node --version
+      - name: Run dotnet snippets
+        working-directory: ./samples/snippets/dotnet-snippets
+        run: dotnet test

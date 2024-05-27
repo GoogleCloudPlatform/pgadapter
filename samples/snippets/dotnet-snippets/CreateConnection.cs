@@ -17,9 +17,9 @@ using Npgsql;
 
 namespace dotnet_snippets;
 
-static class CreateConnectionSample
+public static class CreateConnectionSample
 {
-    internal static void CreateConnection(string host, int port, string database)
+    public static void CreateConnection(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);

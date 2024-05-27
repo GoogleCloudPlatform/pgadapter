@@ -18,9 +18,9 @@ using System.Data;
 
 namespace dotnet_snippets;
 
-static class UpdateDataWithTransactionSample
+public static class UpdateDataWithTransactionSample
 {
-    internal static void WriteWithTransactionUsingDml(string host, int port, string database)
+    public static void WriteWithTransactionUsingDml(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);

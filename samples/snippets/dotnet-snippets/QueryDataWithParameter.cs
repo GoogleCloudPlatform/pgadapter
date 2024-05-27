@@ -17,9 +17,9 @@ using Npgsql;
 
 namespace dotnet_snippets;
 
-static class QueryDataWithParameterSample
+public static class QueryDataWithParameterSample
 {
-    internal static void QueryDataWithParameter(string host, int port, string database)
+    public static void QueryDataWithParameter(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);

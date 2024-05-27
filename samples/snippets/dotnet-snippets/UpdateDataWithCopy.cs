@@ -17,9 +17,9 @@ using Npgsql;
 
 namespace dotnet_snippets;
 
-static class UpdateDataWithCopySample
+public static class UpdateDataWithCopySample
 {
-    internal static void UpdateDataWithCopy(string host, int port, string database)
+    public static void UpdateDataWithCopy(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);

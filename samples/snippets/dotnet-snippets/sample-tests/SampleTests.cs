@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using dotnet_snippets;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Images;
-using NUnit.Framework;
 
-namespace dotnet_snippets;
+namespace sample_tests;
 
 [TestFixture]
 public class SampleTests

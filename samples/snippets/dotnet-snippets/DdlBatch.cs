@@ -17,9 +17,9 @@ using Npgsql;
 
 namespace dotnet_snippets;
 
-static class DdlBatchSample
+public static class DdlBatchSample
 {
-    internal static void DdlBatch(string host, int port, string database)
+    public static void DdlBatch(string host, int port, string database)
     {
         var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
         using var connection = new NpgsqlConnection(connectionString);
