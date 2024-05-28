@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PGHOST="${PGHOST:-localhost}"
-PGPORT="${PGPORT:-5432}"
-PGDATABASE="${PGDATABASE:-example-db}"
+export PGHOST="${PGHOST:-localhost}"
+export PGPORT="${PGPORT:-5432}"
+export PGDATABASE="${PGDATABASE:-example-db}"
 
 # Instruct PGAdapter to use insert-or-update for COPY statements.
 # This enables us to use COPY to update data.

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PGHOST="${PGHOST:-localhost}"
-PGPORT="${PGPORT:-5432}"
-PGDATABASE="${PGDATABASE:-example-db}"
+export PGHOST="${PGHOST:-localhost}"
+export PGPORT="${PGPORT:-5432}"
+export PGDATABASE="${PGDATABASE:-example-db}"
 
 # Set the statement timeout that should be used for all statements
 # on this connection to 5 seconds.

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PGHOST="${PGHOST:-localhost}"
-PGPORT="${PGPORT:-5432}"
-PGDATABASE="${PGDATABASE:-example-db}"
+export PGHOST="${PGHOST:-localhost}"
+export PGPORT="${PGPORT:-5432}"
+export PGDATABASE="${PGDATABASE:-example-db}"
 
 psql -c "INSERT INTO singers (singer_id, first_name, last_name) VALUES
                              (12, 'Melissa', 'Garcia'),

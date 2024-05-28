@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PGHOST="${PGHOST:-localhost}"
-PGPORT="${PGPORT:-5432}"
-PGDATABASE="${PGDATABASE:-example-db}"
+export PGHOST="${PGHOST:-localhost}"
+export PGPORT="${PGPORT:-5432}"
+export PGDATABASE="${PGDATABASE:-example-db}"
 
 # 'set spanner.data_boost_enabled=true' enables Data Boost for
 # all partitioned queries on this connection.

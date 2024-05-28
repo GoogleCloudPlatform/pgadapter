@@ -1,8 +1,8 @@
 #!/bin/bash
 
-PGHOST="${PGHOST:-localhost}"
-PGPORT="${PGPORT:-5432}"
-PGDATABASE="${PGDATABASE:-example-db}"
+export PGHOST="${PGHOST:-localhost}"
+export PGPORT="${PGPORT:-5432}"
+export PGDATABASE="${PGDATABASE:-example-db}"
 
 # Change the DML mode that is used by this connection to Partitioned
 # DML. Partitioned DML is designed for bulk updates and deletes.

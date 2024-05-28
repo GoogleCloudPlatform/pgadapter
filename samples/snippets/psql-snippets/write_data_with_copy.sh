@@ -3,9 +3,9 @@
 # Get the source directory of this script.
 directory=${BASH_SOURCE%/*}/
 
-PGHOST="${PGHOST:-localhost}"
-PGPORT="${PGPORT:-5432}"
-PGDATABASE="${PGDATABASE:-example-db}"
+export PGHOST="${PGHOST:-localhost}"
+export PGPORT="${PGPORT:-5432}"
+export PGDATABASE="${PGDATABASE:-example-db}"
 
 # Copy data to Spanner from a tab-separated text file using the COPY command.
 psql -c "COPY singers (singer_id, first_name, last_name) FROM STDIN" \
