@@ -12,3 +12,5 @@ psql -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'" \
      -c "update albums
          set marketing_budget=0
          where marketing_budget is null"
+
+echo "Updated albums using Partitioned DML"

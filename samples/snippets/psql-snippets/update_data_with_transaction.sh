@@ -37,3 +37,5 @@ psql << SQL
   -- durably stored in the database and visible to other transactions.
   commit;  
 SQL
+
+echo "Transferred marketing budget from Album 2 to Album 1"

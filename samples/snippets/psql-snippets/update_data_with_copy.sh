@@ -13,3 +13,5 @@ psql -c "set spanner.copy_upsert=true" \
 1;1;100000
 2;2;500000
 DATA
+
+echo "Copied albums using upsert"

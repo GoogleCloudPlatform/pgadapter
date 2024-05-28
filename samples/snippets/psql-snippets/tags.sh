@@ -33,3 +33,5 @@ psql << SQL
   
   commit;  
 SQL
+
+echo "Reduced marketing budget"

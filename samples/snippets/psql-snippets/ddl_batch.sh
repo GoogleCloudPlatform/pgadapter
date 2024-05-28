@@ -29,3 +29,5 @@ CREATE TABLE concerts (
 );
 
 SQL
+
+echo "Added venues and concerts tables"

@@ -14,3 +14,5 @@ psql -c "PREPARE insert_singer AS
      -c "EXECUTE insert_singer (16, 'Sarah', 'Wilson');
          EXECUTE insert_singer (17, 'Ethan', 'Miller');
          EXECUTE insert_singer (18, 'Maya', 'Patel');"
+
+echo "3 records inserted"

@@ -9,3 +9,5 @@ psql -c "INSERT INTO singers (singer_id, first_name, last_name) VALUES
                              (13, 'Russel', 'Morales'),
                              (14, 'Jacqueline', 'Long'),
                              (15, 'Dylan', 'Shaw')"
+
+echo "4 records inserted"

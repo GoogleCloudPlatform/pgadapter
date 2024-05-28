@@ -31,3 +31,5 @@ CREATE TABLE albums (
 -- open-source PostgreSQL.
 INTERLEAVE IN PARENT singers ON DELETE CASCADE;
 SQL
+
+echo "Created Singers & Albums tables in database: [${PGDATABASE}]"
