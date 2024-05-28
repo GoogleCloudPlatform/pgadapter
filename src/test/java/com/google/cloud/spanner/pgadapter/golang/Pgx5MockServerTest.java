@@ -1358,6 +1358,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
+  // TODO: Enable
   @Ignore("Requires https://github.com/googleapis/java-spanner/pull/3111")
   @Test
   public void testDataBoost() {
