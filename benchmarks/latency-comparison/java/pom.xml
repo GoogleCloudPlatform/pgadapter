@@ -94,6 +94,11 @@
       <artifactId>commons-cli</artifactId>
       <version>1.7.0</version>
     </dependency>
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <version>3.43.0</version>
+    </dependency>
 
     <dependency>
       <groupId>junit</groupId>
