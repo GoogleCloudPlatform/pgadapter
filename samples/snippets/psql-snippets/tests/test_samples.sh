@@ -13,19 +13,23 @@ sleep 2
 MESSAGE=""
 
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh create_tables $'CREATE\nCREATE'
+  source ./test_sample.sh create_tables $'CREATE\nCREATE
+Created Singers & Albums tables in database: [example-db]'
 fi
 if [ "$MESSAGE" == "" ]; then
   source ./test_sample.sh create_connection $'    hello     \n--------------\n Hello world!\n(1 row)'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh write_data_with_dml $'INSERT 0 4'
+  source ./test_sample.sh write_data_with_dml $'INSERT 0 4
+4 records inserted'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh write_data_with_dml_batch $'PREPARE\nINSERT 0 1'
+  source ./test_sample.sh write_data_with_dml_batch $'PREPARE\nINSERT 0 1
+3 records inserted'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh write_data_with_copy $'COPY 5\nCOPY 5'
+  source ./test_sample.sh write_data_with_copy $'COPY 5\nCOPY 5
+Copied singers and albums'
 fi
 if [ "$MESSAGE" == "" ]; then
   source ./test_sample.sh query_data $' singer_id | album_id |       album_title       
@@ -51,16 +55,28 @@ if [ "$MESSAGE" == "" ]; then
 (0 rows)'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh add_column $'ALTER'
+  source ./test_sample.sh add_column $'ALTER\nAdded marketing_budget column'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh ddl_batch $'CREATE\nCREATE'
+  source ./test_sample.sh ddl_batch $'CREATE\nCREATE
+Added venues and concerts tables'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh update_data_with_copy $'SET\nCOPY 2'
+  source ./test_sample.sh update_data_with_copy $'SET\nCOPY 2\nCopied albums using upsert'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh update_data_with_transaction $'BEGIN\nUPDATE 1\nUPDATE 1\nCOMMIT'
+  source ./test_sample.sh query_data_with_new_column $' singer_id | album_id | marketing_budget 
+-----------+----------+------------------
+         1 |        1 |           100000
+         1 |        2 |                 
+         2 |        1 |                 
+         2 |        2 |           500000
+         2 |        3 |                 
+(5 rows)'
+fi
+if [ "$MESSAGE" == "" ]; then
+  source ./test_sample.sh update_data_with_transaction $'BEGIN\nUPDATE 1\nUPDATE 1\nCOMMIT
+Transferred marketing budget from Album 2 to Album 1'
 fi
 if [ "$MESSAGE" == "" ]; then
   source ./test_sample.sh tags $'BEGIN
@@ -73,7 +89,8 @@ SET
 
 SET
 UPDATE 1
-COMMIT'
+COMMIT
+Reduced marketing budget'
 fi
 if [ "$MESSAGE" == "" ]; then
   source ./test_sample.sh read_only_transaction $'BEGIN
@@ -117,7 +134,7 @@ if [ "$MESSAGE" == "" ]; then
 (12 rows)'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh partitioned_dml $'SET\nUPDATE 3'
+  source ./test_sample.sh partitioned_dml $'SET\nUPDATE 3\nUpdated albums using Partitioned DML'
 fi
 
 
