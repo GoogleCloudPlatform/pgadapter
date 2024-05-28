@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <RootNamespace>dotnet_snippets</RootNamespace>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Npgsql" Version="8.0.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="singers_data.txt" />
+      <EmbeddedResource Include="singers_data.txt">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <None Remove="albums_data.txt" />
+      <EmbeddedResource Include="albums_data.txt">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Remove="sample-tests\**" />
+      <None Remove="sample-tests\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="sample-tests\**" />
+    </ItemGroup>
+
+</Project>

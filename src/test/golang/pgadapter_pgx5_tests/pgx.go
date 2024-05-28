@@ -1017,3 +1017,31 @@ func TestReadOnlySerializableTransaction(connString string) *C.char {
 
 	return nil
 }
+
+//export TestDataBoost
+func TestDataBoost(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	_, _ = conn.Exec(ctx, "set spanner.data_boost_enabled=true")
+	rows, err := conn.Query(ctx, "run partitioned query select * from random")
+	defer rows.Close()
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to run partitioned query: %v", err.Error()))
+	}
+	for rows.Next() {
+		var singerId int64
+		var firstName, lastName string
+		err = rows.Scan(&singerId, &firstName, &lastName)
+		if err != nil {
+			return C.CString(fmt.Sprintf("failed to scan values: %v", err.Error()))
+		}
+		fmt.Printf("%v %v %v\n", singerId, firstName, lastName)
+	}
+
+	return nil
+}
