@@ -17,7 +17,10 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replaceForUpdate;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.ROLLBACK;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
@@ -302,7 +305,8 @@ public class BackendConnection {
         //  SELECT statements, then we should create a read-only transaction. Also, if a transaction
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
-        SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
+        SessionStatement sessionStatement =
+            getSessionManagementStatement(updatedStatement, parsedStatement);
         if (!localStatements.get().isEmpty()
             && localStatements.get().containsKey(statement.getSql())
             && localStatements.get().get(statement.getSql()) != null
@@ -312,7 +316,7 @@ public class BackendConnection {
               Objects.requireNonNull(localStatements.get().get(statement.getSql()));
           result.set(localStatement.execute(BackendConnection.this));
         } else if (sessionStatement != null) {
-          result.set(sessionStatement.execute(sessionState));
+          result.set(sessionStatement.execute(sessionState, spannerConnection));
         } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
@@ -519,14 +523,14 @@ public class BackendConnection {
     }
 
     @Nullable
-    SessionStatement getSessionManagementStatement(ParsedStatement parsedStatement) {
+    SessionStatement getSessionManagementStatement(
+        Statement statement, ParsedStatement parsedStatement) {
       if (parsedStatement.getType() == StatementType.UNKNOWN
           || (parsedStatement.getType() == StatementType.QUERY
-              && parsedStatement.getSqlWithoutComments().length() >= 4
-              && parsedStatement
-                  .getSqlWithoutComments()
-                  .substring(0, 4)
-                  .equalsIgnoreCase("show"))) {
+              && isCommand(SHOW, statement.getSql()))
+          || (parsedStatement.getType() == StatementType.CLIENT_SIDE
+              && parsedStatement.getClientSideStatementType()
+                  == ClientSideStatementType.RESET_ALL)) {
         return SessionStatementParser.parse(parsedStatement);
       }
       return null;

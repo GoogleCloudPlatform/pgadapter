@@ -23,7 +23,9 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
@@ -63,7 +65,7 @@ public class SessionStatementParser {
       return "all";
     }
 
-    abstract StatementResult execute(SessionState sessionState);
+    abstract StatementResult execute(SessionState sessionState, Connection connection);
   }
 
   static class SetStatement extends SessionStatement {
@@ -103,7 +105,7 @@ public class SessionStatementParser {
     }
 
     @Override
-    public StatementResult execute(SessionState sessionState) {
+    public StatementResult execute(SessionState sessionState, Connection connection) {
       if (local) {
         sessionState.setLocal(extension, name, value);
       } else {
@@ -145,7 +147,7 @@ public class SessionStatementParser {
     }
 
     @Override
-    public StatementResult execute(SessionState sessionState) {
+    public StatementResult execute(SessionState sessionState, Connection connection) {
       if (extension == null && name != null) {
         PGSetting setting = sessionState.get(null, name);
         sessionState.set(null, name, setting.getResetVal());
@@ -153,6 +155,7 @@ public class SessionStatementParser {
         sessionState.set(extension, name, null);
       } else {
         sessionState.resetAll();
+        connection.reset();
       }
       return RESET_RESULT;
     }
@@ -190,7 +193,7 @@ public class SessionStatementParser {
     }
 
     @Override
-    public StatementResult execute(SessionState sessionState) {
+    public StatementResult execute(SessionState sessionState, Connection connection) {
       if (name != null) {
         String value;
         if (missingOk) {
@@ -263,7 +266,8 @@ public class SessionStatementParser {
   }
 
   public static @Nullable SessionStatement parse(ParsedStatement parsedStatement) {
-    if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+    if (parsedStatement.getType() == StatementType.CLIENT_SIDE
+        && parsedStatement.getClientSideStatementType() != ClientSideStatementType.RESET_ALL) {
       // This statement is handled by the Connection API.
       return null;
     }

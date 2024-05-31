@@ -113,7 +113,9 @@ public class SelectCurrentSettingStatement extends IntermediatePortalStatement {
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
     setFutureStatementResult(
-        Futures.immediateFuture(showStatement.execute(backendConnection.getSessionState())));
+        Futures.immediateFuture(
+            showStatement.execute(
+                backendConnection.getSessionState(), backendConnection.getSpannerConnection())));
   }
 
   @Override
