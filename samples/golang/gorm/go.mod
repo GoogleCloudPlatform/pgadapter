@@ -3,7 +3,7 @@ module gorm
 go 1.21
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240523180507-ef04d3b56a37
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240531182318-42178b4a174e
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgtype v1.14.3
 	github.com/shopspring/decimal v1.4.0
