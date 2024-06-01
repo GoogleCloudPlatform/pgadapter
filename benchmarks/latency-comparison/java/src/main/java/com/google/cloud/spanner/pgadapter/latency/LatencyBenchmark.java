@@ -92,6 +92,10 @@ public class LatencyBenchmark {
         "Create the results table in the test database if it does not exist.");
     options.addOption("s", "store_results", false, "Store results in the test database.");
     options.addOption("name", true, "Name of this test run");
+    options.addOption(
+        "warmup",
+        true,
+        "The number of warmup iterations to run before executing the actual benchmark.");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -118,6 +122,10 @@ public class LatencyBenchmark {
     boolean runJdbc = !commandLine.hasOption("skip_jdbc");
     boolean runSpanner = !commandLine.hasOption("skip_spanner");
     String name = commandLine.getOptionValue("name");
+    int warmupIterations =
+        commandLine.hasOption("warmup")
+            ? Integer.parseInt(commandLine.getOptionValue("warmup"))
+            : 60 * 1000 / 5;
 
     System.out.println();
     System.out.println("Running benchmark with the following options");
@@ -126,6 +134,14 @@ public class LatencyBenchmark {
     System.out.printf("Operations: %d\n", operations);
     System.out.printf("Transaction type: %s\n", transactionType);
     System.out.printf("Wait between queries: %dms\n", waitMillis);
+
+    if (warmupIterations > 0) {
+      System.out.println();
+      System.out.println("Running warmup script");
+      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
+      int warmupClients = Runtime.getRuntime().availableProcessors();
+      pgJdbcRunner.execute(transactionType, warmupClients, warmupIterations, 0);
+    }
 
     List<Duration> pgJdbcResults = null;
     if (runPg) {

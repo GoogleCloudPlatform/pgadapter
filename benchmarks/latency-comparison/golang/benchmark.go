@@ -100,11 +100,13 @@ func main() {
 	} else {
 		sql = querySql
 	}
-	fmt.Println("Running warmup script against PGAdapter")
-	warmupClients := runtime.NumCPU()
-	_, err = runners.RunPgx(*db, sql, readWrite, *warmupIterations, warmupClients, 0, *host, *port, false)
-	if err != nil {
-		panic(err)
+	if *warmupIterations > 0 {
+		fmt.Println("Running warmup script against PGAdapter")
+		warmupClients := runtime.NumCPU()
+		_, err = runners.RunPgx(*db, sql, readWrite, *warmupIterations, warmupClients, 0, *host, *port, false)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	fmt.Println("Running pgx v5 benchmark using TCP against PGAdapter")
