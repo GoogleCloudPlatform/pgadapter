@@ -83,6 +83,11 @@ public class LatencyBenchmark {
         "transaction",
         true,
         "The type of transaction to execute. Must be either READ_ONLY or READ_WRITE. Defaults to READ_ONLY.");
+    options.addOption(
+        "uds",
+        "unix_domain_sockets",
+        false,
+        "Also run the PostgreSQL benchmark using Unix Domain Sockets.");
     options.addOption("skip_pg", false, "Skip PostgreSQL JDBC benchmarks.");
     options.addOption("skip_jdbc", false, "Skip Cloud Spanner JDBC benchmarks.");
     options.addOption("skip_spanner", false, "Skip Cloud Spanner client library benchmarks.");
@@ -92,6 +97,11 @@ public class LatencyBenchmark {
         "Create the results table in the test database if it does not exist.");
     options.addOption("s", "store_results", false, "Store results in the test database.");
     options.addOption("name", true, "Name of this test run");
+    options.addOption(
+        "warmup",
+        "warmup_iterations",
+        true,
+        "The number of warmup iterations to run before executing the actual benchmark.");
     CommandLineParser parser = new DefaultParser();
     return parser.parse(options, args);
   }
@@ -117,7 +127,12 @@ public class LatencyBenchmark {
     boolean runPg = !commandLine.hasOption("skip_pg");
     boolean runJdbc = !commandLine.hasOption("skip_jdbc");
     boolean runSpanner = !commandLine.hasOption("skip_spanner");
+    boolean useUnixDomainSockets = commandLine.hasOption("uds");
     String name = commandLine.getOptionValue("name");
+    int warmupIterations =
+        commandLine.hasOption("warmup")
+            ? Integer.parseInt(commandLine.getOptionValue("warmup"))
+            : 60 * 1000 / 5;
 
     System.out.println();
     System.out.println("Running benchmark with the following options");
@@ -127,12 +142,27 @@ public class LatencyBenchmark {
     System.out.printf("Transaction type: %s\n", transactionType);
     System.out.printf("Wait between queries: %dms\n", waitMillis);
 
+    if (warmupIterations > 0) {
+      System.out.println();
+      System.out.println("Running warmup script");
+      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, false);
+      int warmupClients = Runtime.getRuntime().availableProcessors();
+      pgJdbcRunner.execute(transactionType, warmupClients, warmupIterations, 0);
+    }
+
     List<Duration> pgJdbcResults = null;
     if (runPg) {
       System.out.println();
-      System.out.println("Running benchmark for PostgreSQL JDBC driver");
-      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId);
+      System.out.println("Running benchmark for PostgreSQL JDBC driver using TCP");
+      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, false);
       pgJdbcResults = pgJdbcRunner.execute(transactionType, clients, operations, waitMillis);
+    }
+    List<Duration> pgJdbcUdsResults = null;
+    if (runPg && useUnixDomainSockets) {
+      System.out.println();
+      System.out.println("Running benchmark for PostgreSQL JDBC driver using Unix Domain Sockets");
+      PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, true);
+      pgJdbcUdsResults = pgJdbcRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
     List<Duration> jdbcResults = null;
@@ -152,7 +182,8 @@ public class LatencyBenchmark {
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
-    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
+    printResults("PostgreSQL JDBC Driver (TCP)", pgJdbcResults);
+    printResults("PostgreSQL JDBC Driver (Unix Domain Sockets)", pgJdbcUdsResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
     printResults("Java Client Library", javaClientResults);
 

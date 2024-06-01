@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"cloud.google.com/pgadapter-latency-benchmark/runners"
@@ -51,6 +52,7 @@ func main() {
 	uds := flag.Bool("uds", false, "Run a benchmark using Unix Domain Socket in addition to TCP.")
 	dir := flag.String("dir", "/tmp", "The directory where PGAdapter listens for Unix Domain Socket connections. Only used if embedded=false.")
 	udsPort := flag.Int("udsport", 0, "The port number where PGAdapter is listening for Unix Domain Sockets. Only used if embedded=false.")
+	warmupIterations := flag.Int("warmup", 60*1000/5, "The number of warmup iterations to run on PGAdapter before executing the actual benchmark.")
 	flag.Parse()
 	var readWrite bool
 	if strings.EqualFold(*transaction, "READ_WRITE") {
@@ -98,6 +100,15 @@ func main() {
 	} else {
 		sql = querySql
 	}
+	if *warmupIterations > 0 {
+		fmt.Println("Running warmup script against PGAdapter")
+		warmupClients := runtime.NumCPU()
+		_, err = runners.RunPgx(*db, sql, readWrite, *warmupIterations, warmupClients, 0, *host, *port, false)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	fmt.Println("Running pgx v5 benchmark using TCP against PGAdapter")
 	pgxTcpRunTimes, err := runners.RunPgx(*db, sql, readWrite, *numOperations, *numClients, *wait, *host, *port, false)
 	if err != nil {
