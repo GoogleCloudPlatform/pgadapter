@@ -27,8 +27,11 @@ import java.util.logging.Logger;
 public class PgJdbcRunner extends AbstractJdbcRunner {
   private ProxyServer proxyServer;
 
-  PgJdbcRunner(DatabaseId databaseId) {
+  private final boolean useUnixDomainSockets;
+
+  PgJdbcRunner(DatabaseId databaseId, boolean useUnixDomainSockets) {
     super(databaseId);
+    this.useUnixDomainSockets = useUnixDomainSockets;
   }
 
   @Override
@@ -41,15 +44,17 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
       handler.setLevel(Level.WARNING);
     }
     // Start PGAdapter in-process.
-    OptionsMetadata options =
+    OptionsMetadata.Builder builder =
         OptionsMetadata.newBuilder()
             .setProject(databaseId.getInstanceId().getProject())
             .setInstance(databaseId.getInstanceId().getInstance())
-            .disableUnixDomainSockets()
             .setPort(0)
             .useVirtualThreads()
-            .useVirtualGrpcTransportThreads()
-            .build();
+            .useVirtualGrpcTransportThreads();
+    if (!useUnixDomainSockets) {
+      builder.disableUnixDomainSockets();
+    }
+    OptionsMetadata options = builder.build();
     proxyServer = new ProxyServer(options);
     try {
       proxyServer.startServer();
@@ -63,6 +68,13 @@ public class PgJdbcRunner extends AbstractJdbcRunner {
 
   @Override
   protected String createUrl() {
+    if (useUnixDomainSockets) {
+      return String.format(
+          "jdbc:postgresql://localhost/%s?"
+              + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
+          databaseId.getDatabase(), proxyServer.getLocalPort());
+    }
     return String.format(
         "jdbc:postgresql://localhost:%d/%s", proxyServer.getLocalPort(), databaseId.getDatabase());
   }

@@ -35,7 +35,7 @@ The benchmark application accepts the following command line arguments:
 * --operations: The number of operations (queries) that each client executes. Defaults to 1,000.
 * --transaction: The type of transaction to execute. Must be either READ_ONLY or READ_WRITE. Defaults to READ_ONLY.
 * --wait: The wait time in milliseconds between each operation. Defaults to 0.
-* -warmup: The number of warmup iterations to run before executing the actual benchmark. Java uses a 
+* --warmup: The number of warmup iterations to run before executing the actual benchmark. Java uses a
   Just-in-Time compiler that compiles and optimizes code based on the actual usage pattern. Running a
   warmup script before the actual benchmark is therefore recommended to get results that are comparable
   to an actual application that runs for a longer period of time. Defaults to 12,000 per CPU core.
