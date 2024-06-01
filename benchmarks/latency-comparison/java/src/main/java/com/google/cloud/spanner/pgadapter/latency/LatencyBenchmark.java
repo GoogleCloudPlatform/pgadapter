@@ -99,6 +99,7 @@ public class LatencyBenchmark {
     options.addOption("name", true, "Name of this test run");
     options.addOption(
         "warmup",
+        "warmup_iterations",
         true,
         "The number of warmup iterations to run before executing the actual benchmark.");
     CommandLineParser parser = new DefaultParser();
@@ -156,11 +157,12 @@ public class LatencyBenchmark {
       PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, false);
       pgJdbcResults = pgJdbcRunner.execute(transactionType, clients, operations, waitMillis);
     }
+    List<Duration> pgJdbcUdsResults = null;
     if (runPg && useUnixDomainSockets) {
       System.out.println();
       System.out.println("Running benchmark for PostgreSQL JDBC driver using Unix Domain Sockets");
       PgJdbcRunner pgJdbcRunner = new PgJdbcRunner(databaseId, true);
-      pgJdbcResults = pgJdbcRunner.execute(transactionType, clients, operations, waitMillis);
+      pgJdbcUdsResults = pgJdbcRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
     List<Duration> jdbcResults = null;
@@ -180,7 +182,8 @@ public class LatencyBenchmark {
           javaClientRunner.execute(transactionType, clients, operations, waitMillis);
     }
 
-    printResults("PostgreSQL JDBC Driver", pgJdbcResults);
+    printResults("PostgreSQL JDBC Driver (TCP)", pgJdbcResults);
+    printResults("PostgreSQL JDBC Driver (Unix Domain Sockets)", pgJdbcUdsResults);
     printResults("Cloud Spanner JDBC Driver", jdbcResults);
     printResults("Java Client Library", javaClientResults);
 

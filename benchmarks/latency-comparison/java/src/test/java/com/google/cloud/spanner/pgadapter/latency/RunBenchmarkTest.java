@@ -34,7 +34,7 @@ public class RunBenchmarkTest {
         "clean",
         "compile",
         "exec:java",
-        "-Dexec.args=--clients=16 --operations=1000 -skip_pg -skip_jdbc -skip_spanner");
+        "-Dexec.args=--clients=16 --operations=1000 -skip_pg -skip_jdbc -skip_spanner --warmup_iterations=0");
     builder.environment().put("GOOGLE_CLOUD_PROJECT", "test-project");
     builder.environment().put("SPANNER_INSTANCE", "test-instance");
     builder.environment().put("SPANNER_DATABASE", "test-database");
