@@ -40,6 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -202,6 +203,7 @@ public class BenchmarkApplication implements CommandLineRunner {
 
   static Attributes createMetricAttributes(SpannerConfiguration spannerConfiguration) {
     AttributesBuilder attributesBuilder = Attributes.builder();
+    attributesBuilder.put("connection_id", UUID.randomUUID().toString());
     attributesBuilder.put("database", spannerConfiguration.getDatabase());
     attributesBuilder.put("instance_id", spannerConfiguration.getInstance());
     attributesBuilder.put("project_id", spannerConfiguration.getProject());
