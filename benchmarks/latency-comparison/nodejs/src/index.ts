@@ -24,6 +24,7 @@ export interface Config {
   readWrite: boolean,
   numOperations: number,
   numClients: number,
+  wait: number,
 }
 
 async function main() {
@@ -41,26 +42,29 @@ async function main() {
     e: { type: 'boolean', alias: 'embedded', default: false, description: 'Starts an embedded PGAdapter container along with the benchmark. Setting this option will ignore any host or port settings for PGAdapter.\nNOTE: Running PGAdapter in a Docker container while the application runs on the host machine will add significant latency, as all communication between the application and PGAdapter will have to cross the Docker network bridge. You should only use this option for testing purposes, and not for actual performance benchmarking.' },
     h: { type: 'string', alias: 'host', default: 'localhost', description: 'The host name where PGAdapter is running. Only used if embedded=false.' },
     p: { type: 'number', alias: 'port', default: 5432, description: 'The port number where PGAdapter is running. Only used if embedded=false.' },
-    u: { type: 'boolean', alias: 'uds', default: false, description: 'Run a benchmark using Unix Domain Socket in addition to TCP.' },
-    dir: { type: 'string', alias: 'udsdir', default: '/tmp', description: 'The directory where PGAdapter listens for Unix Domain Socket connections. Only used if embedded=false.' },
-    up: { type: 'number', alias: 'udsport', default: 5432, description: 'The port number where PGAdapter is listening for Unix Domain Sockets. Only used if embedded=false.' },
-    warm: { type: 'number', alias: 'warmup', default: 60*1000/5, description: 'The number of warmup iterations to run on PGAdapter before executing the actual benchmark.' },
+    s: { type: 'boolean', alias: 'uds', default: false, description: 'Run a benchmark using Unix Domain Socket in addition to TCP.' },
+    f: { type: 'string', alias: 'udsdir', default: '/tmp', description: 'The directory where PGAdapter listens for Unix Domain Socket connections. Only used if embedded=false.' },
+    u: { type: 'number', alias: 'udsport', default: 5432, description: 'The port number where PGAdapter is listening for Unix Domain Sockets. Only used if embedded=false.' },
+    m: { type: 'number', alias: 'warmup', default: 60*1000/5, description: 'The number of warmup iterations to run on PGAdapter before executing the actual benchmark.' },
   }).parse();
 
   const querySql = "select col_varchar from latency_test where col_bigint=$1"
   const updateSql = "update latency_test set col_varchar=$1 where col_bigint=$2"
   
   // Run a warmup benchmark before collecting results.
-  const warmupConfig: Config = {
-    sql: querySql,
-    readWrite: false,
-    numClients: os.cpus().length,
-    numOperations: args.warm,
-    database: args.d,
-  };
-  console.log(`Running warmup on database ${warmupConfig.database}`);
-  await runPostgresBenchmark(warmupConfig, args.h, args.p);
-  console.log('\n');
+  if (args.m > 0) {
+    const warmupConfig: Config = {
+      sql: querySql,
+      readWrite: false,
+      numClients: os.cpus().length,
+      numOperations: args.m,
+      database: args.d,
+      wait: 0,
+    };
+    console.log(`Running warmup on database ${warmupConfig.database}`);
+    await runPostgresBenchmark(warmupConfig, args.h, args.p);
+    console.log('\n');
+  }
 
   const config: Config = {
     sql: querySql,
@@ -68,6 +72,7 @@ async function main() {
     numClients: args.c,
     numOperations: args.o,
     database: args.d,
+    wait: args.w,
   };
   // Run PGAdapter benchmark.
   console.log(`Running benchmark using PGAdapter on ${args.h}:${args.p} and database ${config.database}`);
@@ -77,7 +82,7 @@ async function main() {
 
   // Run Spanner client library benchmark.
   console.log(`Running benchmark using the Spanner client library on database ${config.database}`);
-  const spannerResults = await runSpannerBenchmark(config, args.h, args.p);
+  const spannerResults = await runSpannerBenchmark(config);
   const mergedSpannerResults = spannerResults.flat(1);
   printResults('Spanner Client Library', mergedSpannerResults);
 }

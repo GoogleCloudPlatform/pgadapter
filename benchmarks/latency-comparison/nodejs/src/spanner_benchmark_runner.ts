@@ -15,11 +15,12 @@
 import {Config} from "./index";
 import {Database, Spanner} from "@google-cloud/spanner";
 import {Json} from "@google-cloud/spanner/build/src/codec";
+import {randomInt} from "crypto";
 
 let totalOperations: number;
 let progress: number;
 
-export async function runBenchmark(config: Config, host: string, port: number): Promise<number[][]> {
+export async function runBenchmark(config: Config): Promise<number[][]> {
   progress = 0;
   totalOperations = config.numClients * config.numOperations;
   
@@ -35,7 +36,7 @@ export async function runBenchmark(config: Config, host: string, port: number): 
   
   const promises: Promise<number[]>[] = [];
   for (let i=0; i<config.numClients; i++) {
-    promises.push(run(database, config.numOperations, config.sql));
+    promises.push(run(database, config.numOperations, config.sql, config.wait));
   }
   const results = await Promise.all(promises);
 
@@ -46,7 +47,7 @@ export async function runBenchmark(config: Config, host: string, port: number): 
   return results;
 }
 
-async function run(database: Database, numOperations: number, sql: string): Promise<number[]> {
+async function run(database: Database, numOperations: number, sql: string, wait: number): Promise<number[]> {
   let numNull: number = 0;
   let numNotNull: number = 0;
   const results: number[] = [];
@@ -69,6 +70,10 @@ async function run(database: Database, numOperations: number, sql: string): Prom
     }
     const elapsed = performance.now() - start;
     results.push(elapsed);
+    if (wait > 0) {
+      const t = randomInt(0, 2 * wait);
+      await new Promise(f => setTimeout(f, t));
+    }
   }
   return results;
 }
