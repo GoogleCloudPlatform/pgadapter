@@ -60,6 +60,7 @@ async function main() {
   };
   console.log(`Running warmup on database ${warmupConfig.database}`);
   await runPostgresBenchmark(warmupConfig, args.h, args.p);
+  console.log('\n');
 
   const config: Config = {
     sql: querySql,
@@ -89,7 +90,7 @@ function printResults(name: string, results: number[]) {
   console.log('--------------------------------------------------------------');
   console.log(name);
   console.log(`Avg: ${avg}`);
-  console.log(`P50: ${sortedResults[sortedResults.length / 2]}`);
+  console.log(`P50: ${sortedResults[Math.floor((sortedResults.length * 50) / 100)]}`);
   console.log(`P95: ${sortedResults[Math.floor((sortedResults.length * 95) / 100)]}`);
   console.log(`P99: ${sortedResults[Math.floor((sortedResults.length * 99) / 100)]}`);
   console.log('\n\n');

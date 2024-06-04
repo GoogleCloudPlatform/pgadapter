@@ -16,9 +16,10 @@ import {Client} from "pg";
 import {Config} from "./index";
 
 let totalOperations: number;
-let progress: number = 0;
+let progress: number;
 
 export async function runBenchmark(config: Config, host: string, port: number): Promise<number[][]> {
+  progress = 0;
   totalOperations = config.numClients * config.numOperations;
   const progressPrinter = setInterval(printProgress, 1000);
   
