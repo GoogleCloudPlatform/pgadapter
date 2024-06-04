@@ -83,16 +83,16 @@ async function main() {
 }
 
 function printResults(name: string, results: number[]) {
-  const sortedResults = results.sort();
-  const sum = sortedResults.reduce((a, b) => a + b, 0);
-  const avg = (sum / sortedResults.length) || 0;
+  results.sort((a, b) => a - b);
+  const sum = results.reduce((a, b) => a + b, 0);
+  const avg = (sum / results.length) || 0;
   console.log('\n\n');
   console.log('--------------------------------------------------------------');
   console.log(name);
   console.log(`Avg: ${avg}`);
-  console.log(`P50: ${sortedResults[Math.floor((sortedResults.length * 50) / 100)]}`);
-  console.log(`P95: ${sortedResults[Math.floor((sortedResults.length * 95) / 100)]}`);
-  console.log(`P99: ${sortedResults[Math.floor((sortedResults.length * 99) / 100)]}`);
+  console.log(`P50: ${results[Math.floor((results.length * 50) / 100)]}`);
+  console.log(`P95: ${results[Math.floor((results.length * 95) / 100)]}`);
+  console.log(`P99: ${results[Math.floor((results.length * 99) / 100)]}`);
   console.log('\n\n');
 }
 
