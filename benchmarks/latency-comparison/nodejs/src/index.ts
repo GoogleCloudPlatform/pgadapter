@@ -50,18 +50,18 @@ async function main() {
 
   const querySql = "select col_varchar from latency_test where col_bigint=$1"
   const updateSql = "update latency_test set col_varchar=$1 where col_bigint=$2"
-  
+
+  const warmupConfig: Config = {
+    sql: querySql,
+    readWrite: false,
+    numClients: os.cpus().length,
+    numOperations: args.m,
+    database: args.d,
+    wait: 0,
+  };
   // Run a warmup benchmark before collecting results.
   if (args.m > 0) {
-    const warmupConfig: Config = {
-      sql: querySql,
-      readWrite: false,
-      numClients: os.cpus().length,
-      numOperations: args.m,
-      database: args.d,
-      wait: 0,
-    };
-    console.log(`Running warmup on database ${warmupConfig.database}`);
+    console.log(`Running warmup for PGAdapter on ${args.h}:${args.p} and database ${warmupConfig.database}`);
     await runPostgresBenchmark(warmupConfig, args.h, args.p);
     console.log('\n');
   }
@@ -79,6 +79,13 @@ async function main() {
   const pgadapterResults = await runPostgresBenchmark(config, args.h, args.p);
   const mergedPgadapterResults = pgadapterResults.flat(1);
   printResults('PGAdapter', mergedPgadapterResults);
+  
+  // Also run a warmup for the Spanner client library, as Javascript is a JIT language.
+  if (args.m > 0) {
+    console.log(`Running warmup for the Spanner client library on database ${warmupConfig.database}`);
+    await runSpannerBenchmark(warmupConfig);
+    console.log('\n');
+  }
 
   // Run Spanner client library benchmark.
   console.log(`Running benchmark using the Spanner client library on database ${config.database}`);
