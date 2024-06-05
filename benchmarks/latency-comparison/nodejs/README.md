@@ -1,6 +1,6 @@
 # Latency Comparison - node-postgres driver vs Cloud Spanner Node.js Client Library
 
-This benchmark tests the latency of executing a simple, single-row query using the PostgreSQL
+This benchmark compares the latency of executing a simple, single-row query using the PostgreSQL
 `node-postgres` driver against PGAdapter compared to executing the same query using the [native Cloud Spanner
 Node.js client library](https://www.npmjs.com/package/@google-cloud/spanner).
 
@@ -40,7 +40,7 @@ docker run \
 ```
 
 
-## Run directly the host machine
+## Run directly on the host machine
 
 You can run the benchmark as a Node.js application directly on your host machine if you have Node
 and Java installed on your system. This requires you to first start PGAdapter:
@@ -67,8 +67,8 @@ The benchmark application accepts the following command line arguments:
 * -w, --wait: The wait time in milliseconds between each operation. Defaults to 0.
 * -e, --embedded (true/false): Whether to start PGAdapter as an embedded test container together with the
   benchmark application. Defaults to false.
-* -h, --host: The host name where PGAdapter runs. This argument is only used if `embedded=false`.
-* -p, --port: The port number where PGAdapter runs. This argument is only used if `embedded=false`.
+* -h, --host: The host name where PGAdapter runs. This argument is only used if `embedded=false`. Defaults to `localhost`.
+* -p, --port: The port number where PGAdapter runs. This argument is only used if `embedded=false`. Defaults to `5432`.
 * -s, --uds (true/false): Also execute benchmarks using Unix Domain Sockets. Defaults to false.
 * -f, --dir: The directory where PGAdapter listens for Unix Domain Socket connections. Defaults to `/tmp`. This argument is only used if `embedded=false`.
 * -u, --udsport: The port number where PGAdapter listens for Unix Domain Socket connections. Defaults to
@@ -77,7 +77,7 @@ The benchmark application accepts the following command line arguments:
   and Java uses a Just-in-Time compiler that compiles and optimizes code based on the actual usage pattern. Running a
   warmup script before the actual benchmark is therefore recommended to get results that are comparable to an actual
   application that runs for a longer period of time. The same warmup is also executed for the Spanner Node.js client
-  library, as Javascript also uses a Just-in-Time compiler. Defaults to 12,000 per CPU core.
+  library, as Javascript also uses a Just-in-Time compiler. Defaults to 12,000 operations per CPU core.
 
 ## Examples
 

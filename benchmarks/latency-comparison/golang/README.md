@@ -1,6 +1,6 @@
 # Latency Comparison - pgx driver vs Cloud Spanner Go Client Library
 
-This benchmark tests the latency of executing a simple, single-row query using the PostgreSQL
+This benchmark compares the latency of executing a simple, single-row query using the PostgreSQL
 `pgx` driver against PGAdapter compared to executing the same query using the [native Cloud Spanner
 Go client library](https://pkg.go.dev/cloud.google.com/go/spanner).
 
@@ -40,7 +40,7 @@ docker run \
 ```
 
 
-## Run directly the host machine
+## Run directly on the host machine
 
 You can run the benchmark as a native Go application directly on your host machine if you have Go
 and Java installed on your system. This requires you to first start PGAdapter:
