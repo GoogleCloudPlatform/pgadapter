@@ -12,16 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Config} from "./index";
+import {Config, generate_random_string} from "./index";
 import {Database, Spanner} from "@google-cloud/spanner";
 import {Json} from "@google-cloud/spanner/build/src/codec";
 import {randomInt} from "crypto";
 
 let totalOperations: number;
 let progress: number;
+let numNull: number;
+let numNotNull: number;
 
 export async function runBenchmark(config: Config): Promise<number[][]> {
   progress = 0;
+  numNull = 0;
+  numNotNull = 0;
   totalOperations = config.numClients * config.numOperations;
   
   const progressPrinter = setInterval(printProgress, 1000);
@@ -36,7 +40,7 @@ export async function runBenchmark(config: Config): Promise<number[][]> {
   
   const promises: Promise<number[]>[] = [];
   for (let i=0; i<config.numClients; i++) {
-    promises.push(run(database, config.numOperations, config.sql, config.wait));
+    promises.push(run(database, config));
   }
   const results = await Promise.all(promises);
 
@@ -47,35 +51,51 @@ export async function runBenchmark(config: Config): Promise<number[][]> {
   return results;
 }
 
-async function run(database: Database, numOperations: number, sql: string, wait: number): Promise<number[]> {
-  let numNull: number = 0;
-  let numNotNull: number = 0;
+async function run(database: Database, config: Config): Promise<number[]> {
   const results: number[] = [];
-  for (let i= 0; i < numOperations; i++) {
+  for (let i= 0; i < config.numOperations; i++) {
     const start = performance.now();
     const id: number = getRandomInt(100000);
-    const [rows] = await database.run({
-      sql: sql,
-      params: {p1: `${id}`},
-      types: {p1: {type: 'int64'}},
-      json: true,
-    });
-    for (const row of rows) {
-      if ((row as Json).col_varchar) {
-        numNotNull++;
-      } else {
-        numNull++;
-      }
-      progress++;
+    if (config.readWrite) {
+      await executeUpdate(database, config, id);
+    } else {
+      await executeQuery(database, config, id);
     }
+    progress++;
     const elapsed = performance.now() - start;
     results.push(elapsed);
-    if (wait > 0) {
-      const t = randomInt(0, 2 * wait);
+    if (config.wait > 0) {
+      const t = randomInt(0, 2 * config.wait);
       await new Promise(f => setTimeout(f, t));
     }
   }
   return results;
+}
+
+async function executeQuery(database: Database, config: Config, id: number) {
+  const [rows] = await database.run({
+    sql: config.sql,
+    params: {p1: `${id}`},
+    types: {p1: {type: 'int64'}},
+    json: true,
+  });
+  for (const row of rows) {
+    if ((row as Json).col_varchar) {
+      numNotNull++;
+    } else {
+      numNull++;
+    }
+  }
+}
+
+async function executeUpdate(database: Database, config: Config, id: number) {
+  await database.runTransactionAsync(transaction => {
+    return transaction.runUpdate({
+      sql: config.sql,
+      params: {p1: generate_random_string(64), p2: `${id}`},
+      types: {p1: {type: 'string'}, p2: {type: 'int64'}},
+    });
+  });
 }
 
 function printProgress() {

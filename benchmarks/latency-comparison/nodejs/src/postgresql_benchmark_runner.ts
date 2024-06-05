@@ -13,14 +13,18 @@
 // limitations under the License.
 
 import {Client} from "pg";
-import {Config} from "./index";
+import {Config, generate_random_string} from "./index";
 import {randomInt} from "crypto";
 
 let totalOperations: number;
 let progress: number;
+let numNull: number;
+let numNotNull: number;
 
 export async function runBenchmark(config: Config, host: string, port: number): Promise<number[][]> {
   progress = 0;
+  numNull = 0;
+  numNotNull = 0;
   totalOperations = config.numClients * config.numOperations;
   const progressPrinter = setInterval(printProgress, 1000);
   
@@ -37,7 +41,7 @@ export async function runBenchmark(config: Config, host: string, port: number): 
   
   const promises: Promise<number[]>[] = [];
   for (let client of clients) {
-    promises.push(run(client, config.numOperations, config.sql, config.wait));
+    promises.push(run(client, config));
   }
   const results = await Promise.all(promises);
 
@@ -50,30 +54,47 @@ export async function runBenchmark(config: Config, host: string, port: number): 
   return results;
 }
 
-async function run(client: Client, numOperations: number, sql: string, wait: number): Promise<number[]> {
-  let numNull: number = 0;
-  let numNotNull: number = 0;
+async function run(client: Client, config: Config): Promise<number[]> {
   const results: number[] = [];
-  for (let i= 0; i < numOperations; i++) {
+  for (let i= 0; i < config.numOperations; i++) {
     const start = performance.now();
     const id: number = getRandomInt(100000);
-    const result = await client.query(sql, [id]);
-    for (const row of result.rows) {
-      if (row['col_varchar']) {
-        numNotNull++;
-      } else {
-        numNull++;
-      }
-      progress++;
+    if (config.readWrite) {
+      await executeUpdate(client, config, id);
+    } else {
+      await executeQuery(client, config, id);
     }
+    progress++;
     const elapsed = performance.now() - start;
     results.push(elapsed);
-    if (wait > 0) {
-      const t = randomInt(0, 2 * wait);
+    if (config.wait > 0) {
+      const t = randomInt(0, 2 * config.wait);
       await new Promise(f => setTimeout(f, t));
     }
   }
   return results;
+}
+
+async function executeQuery(client: Client, config: Config, id: number) {
+  const result = await client.query(config.sql, [id]);
+  for (const row of result.rows) {
+    if (row['col_varchar']) {
+      numNotNull++;
+    } else {
+      numNull++;
+    }
+  }
+}
+
+async function executeUpdate(client: Client, config: Config, id: number) {
+  try {
+    await client.query('begin');
+    await client.query(config.sql, [generate_random_string(64), id]);
+    await client.query('commit');
+  } catch (e) {
+    await client.query('rollback');
+    throw e;
+  }
 }
 
 function printProgress() {

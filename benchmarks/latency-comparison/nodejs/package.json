@@ -13,10 +13,13 @@
     "@types/pg": "^8.11.6",
     "dotenv": "^16.4.5",
     "pg": "^8.11.3",
+    "testcontainers": "^10.7.1",
     "ts-node": "^10.9.2",
     "yargs": "^17.7.2"
   },
   "scripts": {
-    "start": "ts-node src/index.ts"
+    "start": "ts-node src/index.ts",
+    "build": "tsc --build",
+    "clean": "tsc --build --clean"
   }
 }
