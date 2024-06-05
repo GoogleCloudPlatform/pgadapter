@@ -76,7 +76,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
   private void runTransactions(Connection connection) throws SQLException, InterruptedException {
     try (Statement statement = connection.createStatement()) {
-      while (true) {
+      while (!Thread.interrupted()) {
         try {
           int transaction = random.nextInt(23);
           if (transaction < 10) {
@@ -97,9 +97,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           } else {
             LOG.info("No transaction");
           }
-          if (Thread.interrupted()) {
-            break;
-          }
         } catch (Throwable exception) {
           if ((exception instanceof PSQLException psqlException)
               && psqlException.getServerErrorMessage() != null
@@ -117,7 +114,11 @@ abstract class AbstractBenchmarkRunner implements Runnable {
             LOG.warn("Transaction failed", exception);
             statistics.incFailed();
           }
-          execute(statement, "rollback");
+          try {
+            execute(statement, "rollback");
+          } catch (Throwable rollbackException) {
+            // Ignore errors. For an interrupted error, the while loop will be ended.
+          }
         }
       }
     }
