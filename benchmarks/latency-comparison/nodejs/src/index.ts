@@ -47,7 +47,7 @@ async function main() {
     p: { type: 'number', alias: 'port', default: 5432, description: 'The port number where PGAdapter is running. Only used if embedded=false.' },
     s: { type: 'boolean', alias: 'uds', default: false, description: 'Run a benchmark using Unix Domain Socket in addition to TCP.' },
     f: { type: 'string', alias: 'dir', default: '/tmp', description: 'The directory where PGAdapter listens for Unix Domain Socket connections. Only used if embedded=false.' },
-    u: { type: 'number', alias: 'udsport', default: 5432, description: 'The port number where PGAdapter is listening for Unix Domain Sockets. Only used if embedded=false.' },
+    u: { type: 'number', alias: 'udsport', description: 'The port number where PGAdapter is listening for Unix Domain Sockets. Only used if embedded=false.' },
     m: { type: 'number', alias: 'warmup', default: 60*1000/5, description: 'The number of warmup iterations to run on PGAdapter before executing the actual benchmark.' },
   }).parse();
   
@@ -96,7 +96,14 @@ async function main() {
   console.log(`Running benchmark using PGAdapter on ${args.h}:${args.p} and database ${config.database}`);
   const pgadapterResults = await runPostgresBenchmark(config, args.h, args.p);
   const mergedPgadapterResults = pgadapterResults.flat(1);
-  printResults('PGAdapter', mergedPgadapterResults);
+  printResults('PGAdapter TCP', mergedPgadapterResults);
+  
+  if (args.uds) {
+    console.log(`Running benchmark using PGAdapter and Unix Domain Sockets on ${args.f}.${args.u || args.p} and database ${config.database}`);
+    const pgadapterResults = await runPostgresBenchmark(config, args.f, args.u || args.p);
+    const mergedPgadapterResults = pgadapterResults.flat(1);
+    printResults('PGAdapter Unix Domain Sockets', mergedPgadapterResults);
+  }
   
   // Also run a warmup for the Spanner client library, as Javascript is a JIT language.
   if (args.m > 0) {
