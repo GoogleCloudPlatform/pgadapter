@@ -12,6 +12,7 @@ venv
 package-lock.json
 node_modules
 .DotSettings.user
+*sln.DotSettings.user
 
 src/test/golang/**/*.h
 src/test/golang/**/*.so
