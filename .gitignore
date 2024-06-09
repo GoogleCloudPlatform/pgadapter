@@ -33,3 +33,6 @@ samples/nodejs/sequelize/**/*.js
 
 src/test/ruby/**/Gemfile.lock
 samples/**/ruby/**/Gemfile.lock
+
+samples/**/vendor
+samples/**/composer.lock
