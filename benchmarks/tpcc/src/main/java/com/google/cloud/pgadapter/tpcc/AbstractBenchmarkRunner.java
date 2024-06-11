@@ -26,6 +26,8 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import org.postgresql.util.PSQLException;
@@ -365,23 +367,16 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       if (nameCount % 2 == 0) {
         nameCount++;
       }
-      try (PreparedStatement stmt =
-          connection.prepareStatement(
+      List<Object[]> resultSet =
+          executeParamQuery(
+              connection,
               "SELECT c_id "
                   + "FROM customer "
                   + "WHERE w_id = ? AND d_id= ? AND c_last=? "
-                  + "ORDER BY c_first")) {
-        int index = 0;
-        stmt.setLong(++index, customerWarehouseId);
-        stmt.setLong(++index, customerDistrictId);
-        stmt.setString(++index, lastName);
-        try (ResultSet resultSet = executeParamQuery(stmt)) {
-          for (int counter = 0; counter < nameCount; counter++) {
-            if (resultSet.next()) {
-              customerId = resultSet.getLong(1);
-            }
-          }
-        }
+                  + "ORDER BY c_first",
+              new Object[] {customerWarehouseId, customerDistrictId, lastName});
+      for (int counter = 0; counter < Math.min(nameCount, resultSet.size()); counter++) {
+        customerId = (long) resultSet.get(counter)[0];
       }
     }
     row =
@@ -506,25 +501,18 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       if (nameCount % 2 == 0) {
         nameCount++;
       }
-      try (PreparedStatement stmt =
-          connection.prepareStatement(
+      List<Object[]> resultSet =
+          executeParamQuery(
+              connection,
               "SELECT c_balance, c_first, c_middle, c_id "
                   + "FROM customer WHERE w_id = ? AND d_id= ? AND c_last=? "
-                  + "ORDER BY c_first")) {
-        int index = 0;
-        stmt.setLong(++index, warehouseId);
-        stmt.setLong(++index, districtId);
-        stmt.setString(++index, lastName);
-        try (ResultSet resultSet = executeParamQuery(stmt)) {
-          for (int counter = 0; counter < nameCount; counter++) {
-            if (resultSet.next()) {
-              balance = resultSet.getBigDecimal(1);
-              first = resultSet.getString(2);
-              middle = resultSet.getString(3);
-              customerId = resultSet.getLong(4);
-            }
-          }
-        }
+                  + "ORDER BY c_first",
+              new Object[] {warehouseId, districtId, lastName});
+      for (int counter = 0; counter < Math.min(nameCount, resultSet.size()); counter++) {
+        balance = (BigDecimal) resultSet.get(counter)[0];
+        first = (String) resultSet.get(counter)[1];
+        middle = (String) resultSet.get(counter)[2];
+        customerId = (long) resultSet.get(counter)[3];
       }
     } else {
       row =
@@ -549,25 +537,23 @@ abstract class AbstractBenchmarkRunner implements Runnable {
                 + "ORDER BY o_id DESC",
             new Object[] {warehouseId, districtId, customerId});
     long orderId = (long) row[0];
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
+
+    long item_id, supply_warehouse_id, quantity;
+    BigDecimal amount;
+    Timestamp delivery_date;
+    List<Object[]> resultSet =
+        executeParamQuery(
+            connection,
             "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d "
                 + "FROM order_line "
-                + "WHERE w_id = ? AND d_id = ?  AND o_id = ?")) {
-      int index = 0;
-      stmt.setLong(++index, warehouseId);
-      stmt.setLong(++index, districtId);
-      stmt.setLong(++index, orderId);
-
-      try (ResultSet resultSet = executeParamQuery(stmt)) {
-        while (resultSet.next()) {
-          resultSet.getLong(1); // item_id
-          resultSet.getLong(2); // supply_warehouse_id
-          resultSet.getLong(3); // quantity
-          resultSet.getBigDecimal(4); // amount
-          resultSet.getTimestamp(5); // delivery_date
-        }
-      }
+                + "WHERE w_id = ? AND d_id = ?  AND o_id = ?",
+            new Object[] {warehouseId, districtId, orderId});
+    for (int counter = 0; counter < resultSet.size(); counter++) {
+      item_id = (long) resultSet.get(counter)[0]; // item_id
+      supply_warehouse_id = (long) resultSet.get(counter)[1]; // supply_warehouse_id
+      quantity = (long) resultSet.get(counter)[2]; // quantity
+      amount = (BigDecimal) resultSet.get(counter)[3]; // amount
+      delivery_date = (Timestamp) resultSet.get(counter)[4]; // delivery_date
     }
 
     LOG.debug("Committing order_status");
@@ -663,8 +649,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
             "SELECT d_next_o_id " + "FROM district " + "WHERE d_id = ? AND w_id= ?",
             new Object[] {districtId, warehouseId});
     long nextOrderId = (long) row[0];
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
+    List<Object[]> resultSet =
+        executeParamQuery(
+            connection,
             "SELECT COUNT(DISTINCT (s_i_id)) "
                 + "FROM order_line ol, stock s "
                 + "WHERE ol.w_id = ? "
@@ -673,30 +660,23 @@ abstract class AbstractBenchmarkRunner implements Runnable {
                 + "AND ol.o_id >= ? "
                 + "AND s.w_id= ? "
                 + "AND s_i_id=ol_i_id "
-                + "AND s_quantity < ?")) {
-      int index = 0;
-      stmt.setLong(++index, warehouseId);
-      stmt.setLong(++index, districtId);
-      stmt.setLong(++index, nextOrderId);
-      stmt.setLong(++index, nextOrderId - 20);
-      stmt.setLong(++index, warehouseId);
-      stmt.setLong(++index, level);
-      try (ResultSet resultSet = executeParamQuery(stmt)) {
-        while (resultSet.next()) {
-          long orderLineItemId = resultSet.getLong(1);
-          // Note: We need a separate statement, because we already have an open result
-          // set on the
-          // original statement.
-          row =
-              paramQueryRow(
-                  connection,
-                  "SELECT count(*) FROM stock "
-                      + "WHERE w_id = ? AND s_i_id = ? "
-                      + "AND s_quantity < ?",
-                  new Object[] {warehouseId, orderLineItemId, level});
-          long stockCount = (long) row[0];
-        }
-      }
+                + "AND s_quantity < ?",
+            new Object[] {
+              warehouseId, districtId, nextOrderId, nextOrderId - 20, warehouseId, level
+            });
+    for (int counter = 0; counter < resultSet.size(); counter++) {
+      long orderLineItemId = (long) resultSet.get(counter)[0];
+      // Note: We need a separate statement, because we already have an open result
+      // set on the
+      // original statement.
+      row =
+          paramQueryRow(
+              connection,
+              "SELECT count(*) FROM stock "
+                  + "WHERE w_id = ? AND s_i_id = ? "
+                  + "AND s_quantity < ?",
+              new Object[] {warehouseId, orderLineItemId, level});
+      long stockCount = (long) row[0];
     }
 
     LOG.debug("Committing stock_level");
@@ -771,11 +751,23 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
   }
 
-  private ResultSet executeParamQuery(PreparedStatement statement) throws SQLException {
-    Stopwatch stopwatch = Stopwatch.createStarted();
-    ResultSet result = statement.executeQuery();
-    Duration executionDuration = stopwatch.elapsed();
-    metrics.recordLatency(executionDuration.toMillis());
-    return result;
+  private List<Object[]> executeParamQuery(Connection connection, String sql, Object[] params)
+      throws SQLException {
+    List<Object[]> results = new ArrayList<>();
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      setParams(statement, params);
+      Stopwatch stopwatch = Stopwatch.createStarted();
+      ResultSet resultSet = statement.executeQuery();
+      Duration executionDuration = stopwatch.elapsed();
+      metrics.recordLatency(executionDuration.toMillis());
+      while (resultSet.next()) {
+        Object[] result = new Object[resultSet.getMetaData().getColumnCount()];
+        for (int i = 0; i < result.length; i++) {
+          result[i] = resultSet.getObject(i + 1);
+        }
+        results.add(result);
+      }
+    }
+    return results;
   }
 }
