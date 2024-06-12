@@ -431,6 +431,21 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
 
     String insertSql =
         "INSERT INTO \"users\" (\"id\",\"name\",\"createdAt\",\"updatedAt\") VALUES (DEFAULT,$1,$2,$3) RETURNING \"id\",\"name\",\"createdAt\",\"updatedAt\";";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    metadata
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(
+                                        TypeCode.STRING, TypeCode.TIMESTAMP, TypeCode.TIMESTAMP))
+                                .getUndeclaredParameters())
+                        .build())
+                .setStats(ResultSetStats.getDefaultInstance())
+                .build()));
     mockSpanner.putPartialStatementResult(
         StatementResult.query(
             Statement.of(insertSql),

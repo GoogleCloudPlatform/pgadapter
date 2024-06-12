@@ -203,7 +203,7 @@ require('yargs')
     'testSelectUsers <host> <port> <database>',
     'Executes SELECT * FROM users',
     {},
-    opts => runTest(opts.host, opts.port, opts.database, testSelectUsers)
+    opts => runTest(opts.host, opts.port, opts.database, testSelectUsers, true)
 )
 .command(
     'testSelectUsersInTransaction <host> <port> <database>',
