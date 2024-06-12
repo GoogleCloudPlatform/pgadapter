@@ -14,8 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgDescription.PG_DESCRIPTION_CTE_FORMAT;
-
 import com.google.api.core.InternalApi;
 import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Statement;
@@ -397,9 +395,9 @@ public class PgCatalog {
   // This is defined outside the PgDescription class, because Java 8 does not allow static
   // initialization inside inner classes.
   public static final String PG_DESCRIPTION_CTE =
-      String.format(PG_DESCRIPTION_CTE_FORMAT, "0::bigint", "0::bigint");
+      String.format(PgDescription.PG_DESCRIPTION_CTE_FORMAT, "0::bigint", "0::bigint");
   public static final String PG_DESCRIPTION_CTE_EMULATED =
-      String.format(PG_DESCRIPTION_CTE_FORMAT, "''::varchar", "''::varchar");
+      String.format(PgDescription.PG_DESCRIPTION_CTE_FORMAT, "''::varchar", "''::varchar");
 
   public class PgDescription implements PgCatalogTable {
     static final String PG_DESCRIPTION_CTE_FORMAT =
