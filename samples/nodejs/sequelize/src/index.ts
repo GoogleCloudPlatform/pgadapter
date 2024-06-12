@@ -14,7 +14,7 @@
 
 import {createDataModel, startPGAdapter} from './init'
 import {Album, Concert, initModels, Singer, TicketSale, Track, Venue} from '../models/models';
-import {QueryTypes, Sequelize} from "sequelize";
+import {literal, Op, QueryTypes, Sequelize} from "sequelize";
 import {randomInt} from "crypto";
 import {randomAlbumTitle, randomFirstName, randomLastName, randomTrackTitle} from "./random";
 
@@ -60,6 +60,8 @@ async function main() {
   // Create and then print some random data.
   await createRandomSingersAndAlbums(sequelize, 20);
   await printSingersAlbums();
+  // Print all singers whose name start with an 'C'.
+  await printSingersWithLastNameLike('C%');
 
   // Create Venues and Concerts rows.
   // The "venues" table contains a JSONB column.
@@ -140,6 +142,33 @@ async function printSingersAlbums() {
       console.log(`\t${album.title}`);
     }
   }
+}
+
+// Selects all Singers whose last name match the given pattern.
+async function printSingersWithLastNameLike(pattern: string) {
+  // Use `literal('$param_name')` in combination with an array of bind parameters
+  // to use parameterized queries on Spanner. This will reduce latency, as Spanner
+  // can cache the execution plan for the query.
+  // See https://sequelize.org/docs/v6/core-concepts/raw-queries/#bind-parameter for
+  // more information on bind parameters in Sequelize.
+  const singers = await Singer.findAll({
+    where: {
+      lastName: {[Op.like]: literal('$pattern') },
+    },
+    bind: {pattern},
+  });
+  console.log(`Found singers whose last name match the pattern ${pattern}:`);
+  for (const singer of singers) {
+    console.log(`Singer ${singer.fullName}`);
+  }
+
+  // This gives the same result, but is inefficient.
+  // DO NOT USE!
+  // const singers = await Singer.findAll({
+  //   where: {
+  //     lastName: {[Op.like]: pattern },
+  //   },
+  // });
 }
 
 // Shows how to execute a stale read on Spanner.
