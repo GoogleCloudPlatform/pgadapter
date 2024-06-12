@@ -42,6 +42,7 @@ function runTest(host: string, port: number, database: string, test: (client) =>
       port: port,
       database: database,
       ssl: false,
+      timezone: 'UTC',
     }
   }) as Knex;
   runTestWithClient(knex, test);
