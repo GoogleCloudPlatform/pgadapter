@@ -28,6 +28,8 @@ import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryLockStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryUnlockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.StartTransactionIsolationLevelRepeatableRead;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
@@ -458,6 +460,227 @@ public class ClientAutoDetector {
         return functionReplacements;
       }
     },
+    PRISMA {
+      final ImmutableMap<String, String> tableReplacements =
+          ImmutableMap.of("_prisma_migrations", "prisma_migrations");
+      private final ImmutableSet<String> checkPgCatalogPrefixes =
+          ImmutableSet.<String>builder()
+              .addAll(DEFAULT_CHECK_PG_CATALOG_PREFIXES)
+              .add("_prisma_migrations")
+              .build();
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // Prisma does not send any unique connection parameters.
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
+        // https://github.com/prisma/quaint/blob/6df49f14efe99696e577ffb9902c83b09bec8de2/src/connector/postgres.rs#L554
+        return statements.size() == 1
+            && Character.isWhitespace(statements.get(0).getSql().charAt(0))
+            && statements.get(0).getSql().contains("SET NAMES 'UTF8';");
+      }
+
+      @Override
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
+        return ImmutableMap.of(
+            "spanner.emulate_pg_class_tables", "true",
+            "spanner.support_drop_cascade", "true",
+            "spanner.auto_add_limit_clause", "true");
+      }
+
+      @Override
+      public ImmutableSet<String> getPgCatalogCheckPrefixes() {
+        return checkPgCatalogPrefixes;
+      }
+
+      @Override
+      public ImmutableMap<String, String> getTableReplacements() {
+        return tableReplacements;
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(SelectPrismaAdvisoryLockStatement.INSTANCE)
+              .add(SelectPrismaAdvisoryUnlockStatement.INSTANCE)
+              .build();
+        }
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getDdlReplacements() {
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("(\\s+)_prisma_migrations"), "$1prisma_migrations"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])timestamp([\\s,()])", Pattern.CASE_INSENSITIVE),
+                "$1timestamptz$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])timestamptz\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1timestamptz$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])numeric\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1numeric$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])decimal\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1numeric$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("CONSTRAINT\\s+.*\\s+PRIMARY KEY\\s*\\(", Pattern.CASE_INSENSITIVE),
+                "PRIMARY KEY ("),
+            RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+DELETE\\s+RESTRICT"), ""),
+            RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+UPDATE\\s+CASCADE"), ""));
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), namespace.nspname) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+schemainfo\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () ->
+                    " strpos(array_to_string(cast(\\$1 as text[]), ','), schemainfo.nspname) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+pg_namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () ->
+                    " strpos(array_to_string(cast(\\$1 as text[]), ','), pg_namespace.nspname) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+n\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), n.nspname) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+table_schema\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), table_schema) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+schemaname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), schemaname) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("\\s+sequence_schema\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+                () -> " strpos(array_to_string(cast(\\$1 as text[]), ','), sequence_schema) > 0"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("JOIN pg_description d ON d\\.objoid = t\\.oid"),
+                () -> "JOIN pg_description d ON false"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("pg_get_constraintdef\\s*\\(.+\\)\\s*AS\\s+"), "conbin AS "),
+            RegexQueryPartReplacer.replace(Pattern.compile("pg_get_functiondef\\s*\\(.+\\)"), "''"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile(
+                    "format_type\\(att\\.atttypid, att\\.atttypmod\\) as formatted_type"),
+                "att.spanner_type as formatted_type"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("pg_get_expr\\(attdef\\.adbin, attdef\\.adrelid\\) AS "),
+                Suppliers.ofInstance("attdef.adbin AS ")),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("SELECT\\s+" + "tbl\\.relname\\s+AS\\s+table_name"),
+                "SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile(
+                    "SELECT\\s+"
+                        + "oid\\.namespace,\\s*"
+                        + "info\\.table_name,\\s*"
+                        + "info\\.column_name,"),
+                "SELECT oid.namespace, replace(info.table_name, 'prisma_migrations', '_prisma_migrations') AS table_name, info.column_name,"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("info\\.udt_name as full_data_type"),
+                "(select typname from pg_type where spanner_type=regexp_replace(info.spanner_type, '\\\\(.*\\\\)', '')) as full_data_type"),
+            RegexQueryPartReplacer.replaceAllAndStop(
+                Pattern.compile(
+                    "SELECT\\s+"
+                        + "\\s+con.oid\\s+AS \"con_id\",\\s*"
+                        + "\\s+att2.attname\\s+AS \"child_column\",\\s*"
+                        + "\\s+cl.relname\\s+AS \"parent_table\",\\s*"
+                        + "\\s+att.attname\\s+AS \"parent_column\",\\s*"
+                        + "\\s+con.confdeltype,\\s*"
+                        + "\\s+con.confupdtype,\\s*"
+                        + "\\s+rel_ns.nspname\\s+AS \"referenced_schema_name\",\\s*"
+                        + "\\s+conname\\s+AS constraint_name,\\s*"
+                        + "\\s+child,\\s*"
+                        + "\\s+parent,\\s*"
+                        + "\\s+table_name,\\s*"
+                        + "\\s+namespace,\\s*"
+                        + "\\s+condeferrable,\\s*"
+                        + "\\s+condeferred\\s+"
+                        + "FROM\\s+\\(SELECT\\s+"
+                        + "\\s+ns.nspname AS \"namespace\",\\s*"
+                        + "\\s+unnest\\(con1.conkey\\)\\s+AS \"parent\",\\s*"
+                        + "\\s+unnest\\(con1.confkey\\)\\s+AS \"child\",\\s*"),
+                "select '''\"' || rc.constraint_schema || '\".\"' || rc.constraint_name || '\"''' as \"con_id\",\n"
+                    + "       kcu.column_name as \"child_column\", unique_ccu.table_name as \"parent_table\",\n"
+                    + "       unique_ccu.column_name as \"parent_column\",\n"
+                    + "       case rc.delete_rule\n"
+                    + "           when 'NO_ACTION' then 'a'\n"
+                    + "           else 'a'\n"
+                    + "           end as confdeltype,\n"
+                    + "       case rc.update_rule\n"
+                    + "           when 'NO_ACTION' then 'a'\n"
+                    + "           else 'a'\n"
+                    + "           end as confupdtype,\n"
+                    + "       unique_ccu.table_schema as \"referenced_schema_name\", rc.constraint_name as constraint_name,\n"
+                    + "       parent_col.ordinal_position as child,\n"
+                    + "       child_col.ordinal_position as parent,\n"
+                    + "       tc.table_name as table_name, tc.table_schema as namespace,\n"
+                    + "       tc.is_deferrable != 'NO' as condeferrable, false as condeferred\n"
+                    + "from information_schema.referential_constraints rc\n"
+                    + "inner join information_schema.table_constraints tc on\n"
+                    + "    rc.constraint_catalog=tc.constraint_catalog and\n"
+                    + "    rc.constraint_schema=tc.constraint_schema and\n"
+                    + "    rc.constraint_name=tc.constraint_name\n"
+                    + "inner join information_schema.key_column_usage kcu on\n"
+                    + "    rc.constraint_catalog=kcu.constraint_catalog and\n"
+                    + "    rc.constraint_schema=kcu.constraint_schema and\n"
+                    + "    rc.constraint_name=kcu.constraint_name\n"
+                    + "inner join information_schema.key_column_usage unique_ccu on\n"
+                    + "    rc.unique_constraint_catalog=unique_ccu.constraint_catalog and\n"
+                    + "    rc.unique_constraint_schema=unique_ccu.constraint_schema and\n"
+                    + "    rc.unique_constraint_name=unique_ccu.constraint_name and\n"
+                    + "    kcu.position_in_unique_constraint=unique_ccu.ordinal_position\n"
+                    + "inner join information_schema.columns parent_col on\n"
+                    + "    unique_ccu.table_catalog=parent_col.table_catalog and\n"
+                    + "    unique_ccu.table_schema=parent_col.table_schema and\n"
+                    + "    unique_ccu.table_name=parent_col.table_name and\n"
+                    + "    unique_ccu.column_name=parent_col.column_name\n"
+                    + "inner join information_schema.columns child_col on\n"
+                    + "    kcu.table_catalog=child_col.table_catalog and\n"
+                    + "    kcu.table_schema=child_col.table_schema and\n"
+                    + "    kcu.table_name=child_col.table_name and\n"
+                    + "    kcu.column_name=child_col.column_name\n"
+                    + "where rc.constraint_schema=(cast($1 as text[]))[0]"
+                    + "order by namespace, table_name, constraint_name, con_id, kcu.ordinal_position;\n"),
+            RegexQueryPartReplacer.replaceAllAndStop(
+                Pattern.compile(
+                    "\\s*WITH rawindex AS \\(\\s*"
+                        + "\\s*SELECT\\s*"
+                        + "\\s*indrelid,\\s*"
+                        + "\\s*indexrelid,\\s*"
+                        + "\\s*indisunique,\\s*"
+                        + "\\s*indisprimary,\\s*"),
+                "select\n"
+                    + "    i.table_schema as namespace,\n"
+                    + "    i.index_name as index_name,\n"
+                    + "    i.table_name AS table_name,\n"
+                    + "    ic.column_name AS column_name,\n"
+                    + "    i.is_unique = 'YES' as is_unique,\n"
+                    + "    i.index_type = 'PRIMARY_KEY' as is_primary_key,\n"
+                    + "    ic.ordinal_position as column_index,\n"
+                    + "    null as opclass,\n"
+                    + "    null as opcdefault,\n"
+                    + "    'btree' as index_algo,\n"
+                    + "    ic.column_ordering as column_order,\n"
+                    + "    false as nulls_first,\n"
+                    + "    false as condeferrable,\n"
+                    + "    false as condeferred\n"
+                    + "from information_schema.indexes i\n"
+                    + "inner join information_schema.index_columns ic using (table_catalog, table_schema, table_name, index_name)\n"
+                    + "where i.table_schema=(cast($1 as text[]))[0]\n"
+                    + "order by namespace, table_name, index_name, column_index\n"));
+      }
+    },
     UNSPECIFIED {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -493,10 +716,6 @@ public class ClientAutoDetector {
 
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
 
-    boolean isClient(PGSetting setting) {
-      return false;
-    }
-
     /** Resets any cached or temporary settings for the client. */
     @VisibleForTesting
     public void reset() {}
@@ -506,6 +725,10 @@ public class ClientAutoDetector {
     }
 
     boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
+      return false;
+    }
+
+    boolean isClient(PGSetting setting) {
       return false;
     }
 
