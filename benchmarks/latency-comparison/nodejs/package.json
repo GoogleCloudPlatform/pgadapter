@@ -1,0 +1,25 @@
+{
+  "name": "latency-comparison",
+  "version": "0.0.1",
+  "description": "Node.js Latency Comparison for PGAdapter and the Spanner client library",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^20.1.4",
+    "@types/yargs": "^17.0.32",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@google-cloud/spanner": "^7.8.0",
+    "@types/pg": "^8.11.6",
+    "dotenv": "^16.4.5",
+    "pg": "^8.11.3",
+    "testcontainers": "^10.7.1",
+    "ts-node": "^10.9.2",
+    "yargs": "^17.7.2"
+  },
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "build": "tsc --build",
+    "clean": "tsc --build --clean"
+  }
+}

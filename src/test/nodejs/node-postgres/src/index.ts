@@ -278,6 +278,21 @@ async function testDmlBatch(client) {
   }
 }
 
+async function testDmlBatchInTransaction(client) {
+  try {
+    await client.query("begin");
+    const queryText = 'INSERT INTO users(name) VALUES($1)';
+    await client.query('start batch dml');
+    await client.query(queryText, ['foo']);
+    await client.query(queryText, ['bar']);
+    await client.query('run batch');
+    console.log('executed dml batch');
+    await client.query("commit");
+  } catch (e) {
+    console.error(`Dml batch error: ${e}`);
+  }
+}
+
 async function testDdlBatch(client) {
   try {
     await client.query('start batch ddl');
@@ -381,6 +396,12 @@ require('yargs')
     'Tests DML batch',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testDmlBatch)
+)
+.command(
+    'testDmlBatchInTransaction <host> <port> <database>',
+    'Tests DML batch in transaction',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testDmlBatchInTransaction)
 )
 .command(
     'testDdlBatch <host> <port> <database>',

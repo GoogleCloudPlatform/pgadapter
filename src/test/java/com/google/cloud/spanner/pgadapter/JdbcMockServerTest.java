@@ -4140,13 +4140,19 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set application_name to 'my-app'");
       connection.createStatement().execute("set search_path to 'my_schema'");
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode to 'partitioned_non_atomic'");
       verifySettingValue(connection, "application_name", "my-app");
       verifySettingValue(connection, "search_path", "my_schema");
+      verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
 
       connection.createStatement().execute("reset all");
 
       verifySettingIsNull(connection, "application_name");
       verifySettingValue(connection, "search_path", "public");
+      // TODO: Change this when the Spanner Connection API also supports RESET ALL.
+      verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
     }
   }
 

@@ -29,6 +29,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -60,6 +61,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -1354,5 +1356,18 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     }
     // Read-only transactions are not really committed.
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  // TODO: Enable
+  @Ignore("Requires https://github.com/googleapis/java-spanner/pull/3111")
+  @Test
+  public void testDataBoost() {
+    RandomResultSetGenerator generator = new RandomResultSetGenerator(10);
+    mockSpanner.putStatementResults(
+        StatementResult.query(Statement.of("select * from random"), generator.generate()));
+
+    String res = pgxTest.TestDataBoost(createConnString());
+
+    assertNull(res);
   }
 }

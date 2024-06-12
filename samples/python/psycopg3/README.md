@@ -7,7 +7,7 @@ container by the sample application.
 Run the sample with the following command:
 
 ```shell
-python psycopg3_sample-py \
+python psycopg3_sample.py \
     -p my-project \
     -i my-instance \
     -i my-database

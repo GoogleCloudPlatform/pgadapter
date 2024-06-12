@@ -688,6 +688,56 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testDmlBatchInTransaction() throws Exception {
+    String sql = "INSERT INTO users(name) VALUES($1)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("bar").build(), 1L));
+
+    String output = runTest("testDmlBatch", getHost(), pgServer.getLocalPort());
+
+    assertEquals("executed dml batch\n", output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
+    assertEquals(sql, describeRequest.getSql());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+
+    List<ExecuteBatchDmlRequest> batchDmlRequests =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
+    assertEquals(1, batchDmlRequests.size());
+    ExecuteBatchDmlRequest request = batchDmlRequests.get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, request.getStatementsCount());
+    String[] expectedValues = new String[] {"foo", "bar"};
+    for (int i = 0; i < request.getStatementsCount(); i++) {
+      assertEquals(sql, request.getStatements(i).getSql());
+      assertEquals(1, request.getStatements(i).getParamTypesCount());
+      assertEquals(
+          expectedValues[i],
+          request.getStatements(i).getParams().getFieldsMap().get("p1").getStringValue());
+    }
+    // We get two commits, because PGAdapter auto-describes the DML statement in a separate
+    // transaction if the auto-describe happens during a DML batch.
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
   public void testDdlBatch() throws Exception {
     addDdlResponseToSpannerAdmin();
 

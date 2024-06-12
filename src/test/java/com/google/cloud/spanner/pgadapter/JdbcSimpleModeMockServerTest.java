@@ -16,12 +16,14 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
@@ -54,6 +56,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.jdbc.TimestampUtils;
+import org.postgresql.util.PSQLException;
 
 /**
  * Tests the native PG JDBC driver in simple query mode. This is similar to the protocol that is
@@ -568,6 +571,57 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         assertThrows(SQLException.class, () -> statement.execute("execute my_statement"));
       }
+    }
+  }
+
+  @Test
+  public void testDiscard() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(true);
+      // Verify that all variants are supported.
+      connection.createStatement().execute("discard all");
+      connection.createStatement().execute("discard plans");
+      connection.createStatement().execute("discard sequences");
+      connection.createStatement().execute("discard temp");
+      connection.createStatement().execute("discard temporary");
+
+      // Create a prepared statement verify that it is dropped by DISCARD ALL.
+      connection.createStatement().execute("prepare foo as SELECT 1");
+      connection.createStatement().execute("execute foo");
+      connection.createStatement().execute("discard all");
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class, () -> connection.createStatement().execute("execute foo"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          SQLState.InvalidSqlStatementName.toString(),
+          exception.getServerErrorMessage().getSQLState());
+
+      // Verify that DISCARD ALL resets all session state.
+      connection.createStatement().execute("set spanner.copy_upsert=true");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.copy_upsert")) {
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+      connection.createStatement().execute("discard all");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.copy_upsert")) {
+        assertTrue(resultSet.next());
+        assertFalse(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Verify that 'discard all' is not accepted in a transaction block.
+      connection.setAutoCommit(false);
+      exception =
+          assertThrows(
+              PSQLException.class, () -> connection.createStatement().execute("discard all"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          SQLState.ActiveSqlTransaction.toString(),
+          exception.getServerErrorMessage().getSQLState());
     }
   }
 

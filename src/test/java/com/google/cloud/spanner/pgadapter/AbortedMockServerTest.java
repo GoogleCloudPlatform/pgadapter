@@ -37,6 +37,7 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSetStats;
@@ -68,6 +69,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class AbortedMockServerTest extends AbstractMockServerTest {
@@ -934,6 +936,32 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
       // Close the resources used by the normal Spanner client.
       spannerResult.close();
       spanner.close();
+    }
+  }
+
+  @Test
+  public void testCommitFailsDueToConcurrentModification() throws SQLException {
+    String sql = "insert into foo (id, value) values (1, 'One') on conflict do nothing";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+      assertEquals(1, connection.createStatement().executeUpdate(sql));
+
+      // Change the update count that is returned and abort the transaction. This will cause the
+      // commit() to fail due to a concurrent modification.
+      mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0));
+      mockSpanner.abortNextStatement();
+
+      PSQLException psqlException = assertThrows(PSQLException.class, connection::commit);
+      assertNotNull(psqlException.getServerErrorMessage());
+      assertEquals(
+          SQLState.SerializationFailure.toString(),
+          psqlException.getServerErrorMessage().getSQLState());
+
+      // Verify that the connection is usable for a new transaction after a failed commit.
+      assertEquals(0, connection.createStatement().executeUpdate(sql));
+      connection.commit();
     }
   }
 

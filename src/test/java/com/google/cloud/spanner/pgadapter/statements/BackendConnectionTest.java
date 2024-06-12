@@ -44,6 +44,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.connection.TransactionMode;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
@@ -53,6 +54,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -492,6 +494,133 @@ public class BackendConnectionTest {
     ExecutionException executionException =
         assertThrows(ExecutionException.class, resultFuture::get);
     assertEquals(executionException.getCause(), PGExceptionFactory.toPGException(error));
+  }
+
+  @Test
+  public void testUpdateException_leavesConnectionInAbortedState() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+
+    Statement statement = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
+    RuntimeException error = new RuntimeException("test error");
+    when(connection.execute(statement)).thenThrow(error);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+    Future<StatementResult> resultFuture =
+        backendConnection.execute("INSERT", parsedStatement, statement, Function.identity());
+    backendConnection.flush();
+
+    ExecutionException executionException =
+        assertThrows(ExecutionException.class, resultFuture::get);
+    assertEquals(PGException.class, executionException.getCause().getClass());
+    PGException pgException = (PGException) executionException.getCause();
+    assertTrue(pgException.getMessage().contains("test error"));
+
+    // Verify that the connection is now in the Aborted state.
+    assertEquals(ConnectionState.ABORTED, backendConnection.getConnectionState());
+  }
+
+  @Test
+  public void testCommitException_leavesConnectionInIdleState() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+
+    Statement commitStatement = Statement.of("commit");
+    ParsedStatement parsedCommitStatement = mock(ParsedStatement.class);
+    when(parsedCommitStatement.getSqlWithoutComments()).thenReturn(commitStatement.getSql());
+    when(parsedCommitStatement.getType()).thenReturn(StatementType.CLIENT_SIDE);
+    when(parsedCommitStatement.getClientSideStatementType())
+        .thenReturn(ClientSideStatementType.COMMIT);
+    StatementResult commitResult = mock(StatementResult.class);
+    when(commitResult.getResultType()).thenReturn(ResultType.NO_RESULT);
+    when(connection.execute(commitStatement))
+        .thenThrow(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION, "internal error"));
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+    Future<StatementResult> commitFuture =
+        backendConnection.execute(
+            "COMMIT", parsedCommitStatement, commitStatement, Function.identity());
+    backendConnection.flush();
+
+    ExecutionException executionException =
+        assertThrows(ExecutionException.class, commitFuture::get);
+    assertEquals(PGException.class, executionException.getCause().getClass());
+    PGException pgException = (PGException) executionException.getCause();
+    assertTrue(pgException.getMessage().contains("internal error"));
+
+    // Verify that the connection is now in the idle state.
+    assertEquals(ConnectionState.IDLE, backendConnection.getConnectionState());
+  }
+
+  @Test
+  public void testRollbackException_leavesConnectionInIdleState() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+
+    Statement rollbackStatement = Statement.of("rollback");
+    ParsedStatement parsedRollbackStatement = mock(ParsedStatement.class);
+    when(parsedRollbackStatement.getSqlWithoutComments()).thenReturn(rollbackStatement.getSql());
+    when(parsedRollbackStatement.getType()).thenReturn(StatementType.CLIENT_SIDE);
+    when(parsedRollbackStatement.getClientSideStatementType())
+        .thenReturn(ClientSideStatementType.ROLLBACK);
+    StatementResult rollbackResult = mock(StatementResult.class);
+    when(rollbackResult.getResultType()).thenReturn(ResultType.NO_RESULT);
+    when(connection.execute(rollbackStatement))
+        .thenThrow(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION, "internal error"));
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+    Future<StatementResult> rollbackFuture =
+        backendConnection.execute(
+            "ROLLBACK", parsedRollbackStatement, rollbackStatement, Function.identity());
+    backendConnection.flush();
+
+    ExecutionException executionException =
+        assertThrows(ExecutionException.class, rollbackFuture::get);
+    assertEquals(PGException.class, executionException.getCause().getClass());
+    PGException pgException = (PGException) executionException.getCause();
+    assertTrue(pgException.getMessage().contains("internal error"));
+
+    // Verify that the connection is now in the idle state.
+    assertEquals(ConnectionState.IDLE, backendConnection.getConnectionState());
   }
 
   @Test

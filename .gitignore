@@ -9,6 +9,10 @@ output.txt
 __pycache__
 venv
 .DS_Store
+package-lock.json
+node_modules
+.DotSettings.user
+*sln.DotSettings.user
 
 src/test/golang/**/*.h
 src/test/golang/**/*.so
@@ -22,18 +26,19 @@ src/test/csharp/**/bin
 src/test/csharp/**/obj
 samples/**/dotnet/**/bin
 samples/**/dotnet/**/obj
+samples/snippets/**/dotnet-snippets/**/bin
+samples/snippets/**/dotnet-snippets/**/obj
 
-src/test/nodejs/**/node_modules
-src/test/nodejs/**/package-lock.json
 src/test/nodejs/**/.DS_Store
 src/test/nodejs/**/.env
 samples/nodejs/**/node_modules
 samples/nodejs/**/package-lock.json
 samples/nodejs/**/.DS_Store
-samples/cloud-run/nodejs/**/node_modules
-samples/cloud-run/nodejs/**/package-lock.json
 samples/cloud-run/nodejs/**/.DS_Store
 samples/nodejs/sequelize/**/*.js
 
 src/test/ruby/**/Gemfile.lock
 samples/**/ruby/**/Gemfile.lock
+
+samples/**/vendor
+samples/**/composer.lock

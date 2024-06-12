@@ -665,7 +665,8 @@ public class ConnectionHandler implements Runnable {
   public IntermediatePreparedStatement getStatement(String statementName) {
     if (!hasStatement(statementName)) {
       throw PGExceptionFactory.newPGException(
-          "prepared statement " + statementName + " does not exist");
+          "prepared statement " + statementName + " does not exist",
+          SQLState.InvalidSqlStatementName);
     }
     return this.statementsMap.get(statementName);
   }
@@ -841,8 +842,8 @@ public class ConnectionHandler implements Runnable {
       // chosen as a reasonable number of statements that should be enough. It can safely be
       // increased if we encounter clients that send more than 10 client-side statements before
       // sending anything that we can use to automatically recognize them.
-      if (/*parseMessage.getStatement().getStatementType() == StatementType.CLIENT_SIDE
-          &&*/ skippedAutoDetectParseMessages.size() < 10) {
+      if (parseMessage.getStatement().getStatementType() == StatementType.CLIENT_SIDE
+          && skippedAutoDetectParseMessages.size() < 10) {
         skippedAutoDetectParseMessages.add(parseMessage);
       } else {
         if (this.wellKnownClient == WellKnownClient.UNSPECIFIED

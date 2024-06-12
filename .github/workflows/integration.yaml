@@ -21,6 +21,7 @@ env:
   GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
   GOOGLE_CLOUD_DATABASE: "testdb_integration"
   GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
+  PG_ADAPTER_DROP_STALE_DATABASES: true
 jobs:
   check-env:
     outputs:

@@ -2,12 +2,12 @@ module github.com/GoogleCloudPlatform/pgadapter/wrappers/golang
 
 go 1.21
 
-toolchain go1.22.3
+toolchain go1.22.4
 
 require (
-	github.com/docker/docker v26.1.3+incompatible
+	github.com/docker/docker v26.1.4+incompatible
 	github.com/testcontainers/testcontainers-go v0.31.0
-	golang.org/x/oauth2 v0.20.0
+	golang.org/x/oauth2 v0.21.0
 )
 
 require (

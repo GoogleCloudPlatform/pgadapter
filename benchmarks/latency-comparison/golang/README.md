@@ -1,7 +1,7 @@
 # Latency Comparison - pgx driver vs Cloud Spanner Go Client Library
 
-This benchmark tests the latency of executing a simple, single-row query using the PostgreSQL
-`pgx` driver with PGAdapter compared to executing the same query using the [native Cloud Spanner
+This benchmark compares the latency of executing a simple, single-row query using the PostgreSQL
+`pgx` driver against PGAdapter compared to executing the same query using the [native Cloud Spanner
 Go client library](https://pkg.go.dev/cloud.google.com/go/spanner).
 
 ## Setup
@@ -40,7 +40,7 @@ docker run \
 ```
 
 
-## Run directly the host machine
+## Run directly on the host machine
 
 You can run the benchmark as a native Go application directly on your host machine if you have Go
 and Java installed on your system. This requires you to first start PGAdapter:
@@ -75,6 +75,10 @@ The benchmark application accepts the following command line arguments:
 * -dir: The directory where PGAdapter listens for Unix Domain Socket connections. Defaults to `/tmp`. This argument is only used if `embedded=false`.
 * -udsport: The port number where PGAdapter listens for Unix Domain Socket connections. Defaults to
   the same port number as for TCP.  This argument is only used if `embedded=false`.
+* -warmup: The number of warmup iterations to run before executing the actual benchmark. PGAdapter is a Java application,
+  and Java uses a Just-in-Time compiler that compiles and optimizes code based on the actual usage pattern. Running a
+  warmup script before the actual benchmark is therefore recommended to get results that are comparable to an actual
+  application that runs for a longer period of time. Defaults to 12,000 per CPU core.
 
 ## Examples
 

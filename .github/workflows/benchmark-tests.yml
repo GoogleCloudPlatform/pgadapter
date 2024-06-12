@@ -18,3 +18,6 @@ jobs:
       - name: Run Java Latency Benchmark tests
         working-directory: ./benchmarks/latency-comparison/java
         run: mvn test -B
+      - name: Run TPCC Benchmark tests (only data loading)
+        working-directory: ./benchmarks/tpcc
+        run: mvn test -B
