@@ -121,6 +121,15 @@ async function testErrorInTransaction(client) {
 }
 
 async function testSelectAllTypes(client) {
+  const pg = require('pg')
+  // Make sure that DATE data types are shown as string values, otherwise node-postgres will convert
+  // it to a Javascript date object using the local timezone.
+  pg.types.setTypeParser(1082, function(stringValue) {
+    return stringValue;
+  });
+  pg.types.setTypeParser(1182, function(stringValue) {
+    return stringValue;
+  });
   try {
     const id = 1;
     const rows = await AllTypes.findAll({where: literal('col_bigint = $id'), bind: {id}});

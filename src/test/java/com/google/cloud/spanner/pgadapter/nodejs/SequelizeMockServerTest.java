@@ -246,7 +246,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             + "    \"col_int\": \"100\",\n"
             + "    \"col_numeric\": \"6.626\",\n"
             + "    \"col_timestamptz\": \"2022-02-16T13:18:02.123Z\",\n"
-            + "    \"col_date\": \"2022-03-28T22:00:00.000Z\",\n"
+            + "    \"col_date\": \"2022-03-29\",\n"
             + "    \"col_varchar\": \"test\",\n"
             + "    \"col_jsonb\": {\n"
             + "      \"key\": \"value\"\n"
