@@ -42,8 +42,7 @@ function runTest(host: string, port: number, database: string, test: (client) =>
       port: port,
       database: database,
       ssl: false,
-      timezone: 'UTC',
-    }
+    },
   }) as Knex;
   runTestWithClient(knex, test);
 }
@@ -75,6 +74,16 @@ async function testSelectUser(client: Knex) {
 }
 
 async function testSelectAllTypes(client: Knex) {
+  const pg = require('pg')
+  // Make sure that DATE data types are shown as string values, otherwise node-postgres will convert
+  // it to a Javascript date object using the local timezone.
+  pg.types.setTypeParser(1082, function(stringValue) {
+    return stringValue;
+  });
+  pg.types.setTypeParser(1182, function(stringValue) {
+    return stringValue;
+  });
+  
   try {
     const all_types = await client<AllTypes>('all_types').where('col_bigint', 1).first();
     console.log(all_types);

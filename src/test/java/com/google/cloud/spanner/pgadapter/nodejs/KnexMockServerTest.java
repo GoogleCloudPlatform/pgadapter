@@ -149,7 +149,7 @@ public class KnexMockServerTest extends AbstractMockServerTest {
             + "  col_int: '100',\n"
             + "  col_numeric: '6.626',\n"
             + "  col_timestamptz: 2022-02-16T13:18:02.123Z,\n"
-            + "  col_date: 2022-03-28T22:00:00.000Z,\n"
+            + "  col_date: '2022-03-29',\n"
             + "  col_varchar: 'test',\n"
             + "  col_jsonb: { key: 'value' },\n"
             + "  col_array_bigint: [ '1', null, '2' ],\n"
@@ -160,7 +160,7 @@ public class KnexMockServerTest extends AbstractMockServerTest {
             + "  col_array_int: [ '-100', null, '-200' ],\n"
             + "  col_array_numeric: [ 6.626, null, -3.14 ],\n"
             + "  col_array_timestamptz: [ 2022-02-16T16:18:02.123Z, null, 2000-01-01T00:00:00.000Z ],\n"
-            + "  col_array_date: [ 2023-02-19T23:00:00.000Z, null, 1999-12-31T23:00:00.000Z ],\n"
+            + "  col_array_date: '{\"2023-02-20\",NULL,\"2000-01-01\"}',\n"
             + "  col_array_varchar: [ 'string1', null, 'string2' ],\n"
             + "  col_array_jsonb: [ { key: 'value1' }, null, { key: 'value2' } ]\n"
             + "}\n",
