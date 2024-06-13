@@ -4150,8 +4150,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       verifySettingIsNull(connection, "application_name");
       verifySettingValue(connection, "search_path", "public");
-      // TODO: Change this when the Spanner Connection API also supports RESET ALL.
-      verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
+      verifySettingValue(connection, "spanner.autocommit_dml_mode", "TRANSACTIONAL");
     }
   }
 

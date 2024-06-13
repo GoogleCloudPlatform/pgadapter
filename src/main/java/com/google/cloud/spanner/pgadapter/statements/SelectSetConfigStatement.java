@@ -118,7 +118,8 @@ public class SelectSetConfigStatement extends IntermediatePortalStatement {
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
     try {
-      setStatement.execute(backendConnection.getSessionState());
+      setStatement.execute(
+          backendConnection.getSessionState(), backendConnection.getSpannerConnection());
     } catch (Throwable throwable) {
       setFutureStatementResult(Futures.immediateFailedFuture(throwable));
       return;
