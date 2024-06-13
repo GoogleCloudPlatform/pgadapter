@@ -238,7 +238,8 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testPgCatalogViews() throws SQLException {
-    for (String view : new String[] {"pg_sequence", "pg_sequences"}) {
+    for (String view :
+        new String[] {"pg_sequence", "pg_sequences", "pg_description", "pg_index", "pg_language"}) {
       for (String prefix : new String[] {"", "pg_catalog."}) {
         try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
           try (ResultSet resultSet =
@@ -264,6 +265,20 @@ public class ITJdbcTest implements IntegrationTest {
             assertNotEquals(0, resultSet.getMetaData().getColumnCount());
           }
         }
+      }
+    }
+  }
+
+  @Test
+  public void testServerVersionNum() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("SELECT current_setting('server_version_num')")) {
+        assertTrue(resultSet.next());
+        assertEquals(140001, resultSet.getInt(1));
+        assertFalse(resultSet.next());
       }
     }
   }
