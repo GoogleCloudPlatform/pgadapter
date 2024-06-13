@@ -38,6 +38,8 @@ import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
+import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.IOException;
@@ -350,8 +352,23 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
             .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
-                    .getRowType())
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("id")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("email")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("name")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
             .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -371,7 +388,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .to("Alice")
                 .build(),
             ResultSet.newBuilder()
-                .setMetadata(metadata)
+                .setMetadata(
+                    metadata
+                        .toBuilder()
+                        .setUndeclaredParameters(StructType.getDefaultInstance())
+                        .build())
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(
@@ -381,6 +402,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
                         .addValues(Value.newBuilder().setStringValue("Alice").build())
                         .build())
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
                 .build()));
 
     String output = runTest("testCreateUser", getHost(), pgServer.getLocalPort());
@@ -393,6 +415,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "}\n",
         output);
 
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(sql))
