@@ -42,7 +42,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.33.3-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.34.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -54,7 +54,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.7.7</version>
+    <version>1.8.0</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -77,14 +77,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.39.0</version>
+        <version>26.41.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.38.0</version>
+        <version>1.39.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -99,7 +99,7 @@
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.43.0</version>
+      <version>3.44.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>

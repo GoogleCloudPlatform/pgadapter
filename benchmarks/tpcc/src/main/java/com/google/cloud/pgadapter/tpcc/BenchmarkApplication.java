@@ -35,6 +35,7 @@ import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -202,6 +203,7 @@ public class BenchmarkApplication implements CommandLineRunner {
 
   static Attributes createMetricAttributes(SpannerConfiguration spannerConfiguration) {
     AttributesBuilder attributesBuilder = Attributes.builder();
+    attributesBuilder.put("connection_id", UUID.randomUUID().toString());
     attributesBuilder.put("database", spannerConfiguration.getDatabase());
     attributesBuilder.put("instance_id", spannerConfiguration.getInstance());
     attributesBuilder.put("project_id", spannerConfiguration.getProject());

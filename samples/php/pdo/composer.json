@@ -1,0 +1,7 @@
+{
+  "require": {
+    "ext-pgsql": "*",
+    "ext-pdo": "*",
+    "shyim/testcontainer": "^0.1.2"
+  }
+}

@@ -42,7 +42,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.33.2</version>
+      <version>0.34.0</version>
     </dependency>
     <!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
     <dependency>
@@ -54,7 +54,7 @@
     <dependency>
       <groupId>io.hypersistence</groupId>
       <artifactId>hypersistence-utils-hibernate-63</artifactId>
-      <version>3.7.5</version>
+      <version>3.7.6</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

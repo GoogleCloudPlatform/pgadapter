@@ -32,8 +32,7 @@ class PartitionedDml {
       long lowerBoundUpdateCount =
           connection
               .createStatement()
-              .executeUpdate(
-                  "update albums set marketing_budget=0 where marketing_budget is null");
+              .executeUpdate("update albums set marketing_budget=0 where marketing_budget is null");
       System.out.printf("Updated at least %d albums\n", lowerBoundUpdateCount);
     }
   }

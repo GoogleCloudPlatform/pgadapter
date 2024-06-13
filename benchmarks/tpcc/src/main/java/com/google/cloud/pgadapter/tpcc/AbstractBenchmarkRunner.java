@@ -15,17 +15,11 @@ package com.google.cloud.pgadapter.tpcc;
 
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.spanner.jdbc.JdbcSqlExceptionFactory.JdbcAbortedException;
-import com.google.common.base.Stopwatch;
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
-import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import org.postgresql.util.PSQLException;
@@ -40,21 +34,15 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
   private final Statistics statistics;
 
-  private final String connectionUrl;
-
   private final TpccConfiguration tpccConfiguration;
 
-  private final Metrics metrics;
+  protected final Metrics metrics;
 
   private boolean failed;
 
   AbstractBenchmarkRunner(
-      Statistics statistics,
-      String connectionUrl,
-      TpccConfiguration tpccConfiguration,
-      Metrics metrics) {
+      Statistics statistics, TpccConfiguration tpccConfiguration, Metrics metrics) {
     this.statistics = statistics;
-    this.connectionUrl = connectionUrl;
     this.tpccConfiguration = tpccConfiguration;
     this.metrics = metrics;
   }
@@ -62,8 +50,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
   @Override
   public void run() {
     LOG.info("Starting benchmark runner: " + statistics.getRunnerName());
-    try (Connection connection = DriverManager.getConnection(connectionUrl)) {
-      runTransactions(connection);
+    try {
+      setup();
+      runTransactions();
       LOG.info("Stopping benchmark runner: " + statistics.getRunnerName());
     } catch (InterruptedException interruptedException) {
       LOG.info("Stopping benchmark runner due to interruption: " + statistics.getRunnerName());
@@ -71,53 +60,59 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       throwable.printStackTrace();
       LOG.error("Benchmark runner failed:" + statistics.getRunnerName(), throwable);
       failed = true;
+    } finally {
+      try {
+        teardown();
+      } catch (Throwable teardownThrowable) {
+        teardownThrowable.printStackTrace();
+        LOG.error("Failed to clean up resources:" + statistics.getRunnerName(), teardownThrowable);
+      }
     }
   }
 
-  private void runTransactions(Connection connection) throws SQLException, InterruptedException {
-    try (Statement statement = connection.createStatement()) {
-      while (true) {
+  private void runTransactions() throws SQLException, InterruptedException {
+    while (!Thread.interrupted()) {
+      try {
+        int transaction = random.nextInt(23);
+        if (transaction < 10) {
+          newOrder();
+          statistics.incNewOrder();
+        } else if (transaction < 20) {
+          payment();
+          statistics.incPayment();
+        } else if (transaction < 21) {
+          orderStatus();
+          statistics.incOrderStatus();
+        } else if (transaction < 22) {
+          delivery();
+          statistics.incDelivery();
+        } else if (transaction < 23) {
+          stockLevel();
+          statistics.incStockLevel();
+        } else {
+          LOG.info("No transaction");
+        }
+      } catch (Throwable exception) {
+        if ((exception instanceof PSQLException psqlException)
+            && psqlException.getServerErrorMessage() != null
+            && Objects.equals(
+                psqlException.getServerErrorMessage().getSQLState(),
+                PSQLState.SERIALIZATION_FAILURE.getState())
+            && Objects.requireNonNull(psqlException.getServerErrorMessage().getMessage())
+                .contains("concurrent modification")) {
+          LOG.debug("Transaction aborted by Cloud Spanner via PG JDBC");
+          statistics.incAborted();
+        } else if (exception instanceof JdbcAbortedException) {
+          LOG.debug("Transaction aborted by Cloud Spanner via Spanner JDBC");
+          statistics.incAborted();
+        } else {
+          LOG.warn("Transaction failed", exception);
+          statistics.incFailed();
+        }
         try {
-          int transaction = random.nextInt(23);
-          if (transaction < 10) {
-            newOrder(connection, statement);
-            statistics.incNewOrder();
-          } else if (transaction < 20) {
-            payment(connection, statement);
-            statistics.incPayment();
-          } else if (transaction < 21) {
-            orderStatus(connection, statement);
-            statistics.incOrderStatus();
-          } else if (transaction < 22) {
-            delivery(connection, statement);
-            statistics.incDelivery();
-          } else if (transaction < 23) {
-            stockLevel(connection, statement);
-            statistics.incStockLevel();
-          } else {
-            LOG.info("No transaction");
-          }
-          if (Thread.interrupted()) {
-            break;
-          }
-        } catch (Throwable exception) {
-          if ((exception instanceof PSQLException psqlException)
-              && psqlException.getServerErrorMessage() != null
-              && Objects.equals(
-                  psqlException.getServerErrorMessage().getSQLState(),
-                  PSQLState.SERIALIZATION_FAILURE.getState())
-              && Objects.requireNonNull(psqlException.getServerErrorMessage().getMessage())
-                  .contains("concurrent modification")) {
-            LOG.debug("Transaction aborted by Cloud Spanner via PG JDBC");
-            statistics.incAborted();
-          } else if (exception instanceof JdbcAbortedException) {
-            LOG.debug("Transaction aborted by Cloud Spanner via Spanner JDBC");
-            statistics.incAborted();
-          } else {
-            LOG.warn("Transaction failed", exception);
-            statistics.incFailed();
-          }
-          execute(statement, "rollback");
+          executeStatement("rollback");
+        } catch (Throwable rollbackException) {
+          // Ignore errors. For an interrupted error, the while loop will be ended.
         }
       }
     }
@@ -135,7 +130,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
   }
 
-  private void newOrder(Connection connection, Statement statement) throws SQLException {
+  private void newOrder() throws SQLException {
     LOG.debug("Executing new_order");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
@@ -165,10 +160,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     Object[] row;
-    execute(statement, "begin transaction");
+    executeStatement("begin transaction");
     row =
         paramQueryRow(
-            connection,
             (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
                 + "SELECT c_discount, c_last, c_credit, w_tax "
                 + "FROM customer c, warehouse w "
@@ -181,7 +175,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
     row =
         paramQueryRow(
-            connection,
             (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
                 + "SELECT d_next_o_id, d_tax "
                 + "FROM district "
@@ -191,18 +184,15 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     BigDecimal districtTax = (BigDecimal) row[1];
 
     executeParamStatement(
-        connection,
         "UPDATE district " + "SET d_next_o_id = ? " + "WHERE d_id = ? AND w_id= ?",
         new Object[] {districtNextOrderId + 1L, districtId, warehouseId});
     executeParamStatement(
-        connection,
         "INSERT INTO orders (o_id, d_id, w_id, c_id, o_entry_d, o_ol_cnt, o_all_local) "
             + "VALUES (?,?,?,?,NOW(),?,?)",
         new Object[] {
           districtNextOrderId, districtId, warehouseId, customerId, orderLineCount, allLocal
         });
     executeParamStatement(
-        connection,
         "INSERT INTO new_orders (o_id, c_id, d_id, w_id) " + "VALUES (?,?,?,?)",
         new Object[] {districtNextOrderId, customerId, districtId, warehouseId});
 
@@ -214,13 +204,12 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       try {
         row =
             paramQueryRow(
-                connection,
                 "SELECT i_price, i_name, i_data FROM item WHERE i_id = ?",
                 new Object[] {orderLineItemId});
       } catch (RowNotFoundException ignore) {
         // TODO: Record deliberate rollback
         LOG.info("Rolling back new_order transaction");
-        execute(statement, "rollback transaction");
+        executeStatement("rollback transaction");
         return;
       }
       BigDecimal itemPrice = (BigDecimal) row[0];
@@ -229,7 +218,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
       row =
           paramQueryRow(
-              connection,
               (tpccConfiguration.isLockScannedRanges()
                       ? "/*@ lock_scanned_ranges=exclusive */"
                       : "")
@@ -252,7 +240,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       }
 
       executeParamStatement(
-          connection,
           "UPDATE stock " + "SET s_quantity = ? " + "WHERE s_i_id = ? AND w_id= ?",
           new Object[] {stockQuantity, orderLineItemId, orderLineSupplyWarehouseId});
 
@@ -264,7 +251,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
               .multiply(totalTax)
               .multiply(discountFactor);
       executeParamStatement(
-          connection,
           "INSERT INTO order_line (o_id, c_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) "
               + "VALUES (?,?,?,?,?,?,?,?,?,?)",
           new Object[] {
@@ -282,10 +268,10 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     LOG.debug("Committing new_order transaction");
-    execute(statement, "commit");
+    executeStatement("commit");
   }
 
-  private void payment(Connection connection, Statement statement) throws SQLException {
+  private void payment() throws SQLException {
     LOG.debug("Executing payment");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
@@ -313,15 +299,13 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     }
 
-    execute(statement, "begin transaction");
+    executeStatement("begin transaction");
     executeParamStatement(
-        connection,
         "UPDATE warehouse " + "SET w_ytd = w_ytd + ? " + "WHERE w_id = ?",
         new Object[] {amount, warehouseId});
 
     row =
         paramQueryRow(
-            connection,
             "SELECT w_street_1, w_street_2, w_city, w_state, w_zip, w_name "
                 + "FROM warehouse "
                 + "WHERE w_id = ?",
@@ -334,13 +318,11 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     String warehouseName = (String) row[5];
 
     executeParamStatement(
-        connection,
         "UPDATE district " + "SET d_ytd = d_ytd + ? " + "WHERE w_id = ? AND d_id= ?",
         new Object[] {amount, warehouseId, districtId});
 
     row =
         paramQueryRow(
-            connection,
             "SELECT d_street_1, d_street_2, d_city, d_state, d_zip, d_name "
                 + "FROM district "
                 + "WHERE w_id = ? AND d_id = ?",
@@ -355,7 +337,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     if (byName) {
       row =
           paramQueryRow(
-              connection,
               "SELECT count(c_id) namecnt "
                   + "FROM customer "
                   + "WHERE w_id = ? AND d_id= ? AND c_last=?",
@@ -364,28 +345,19 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       if (nameCount % 2 == 0) {
         nameCount++;
       }
-      try (PreparedStatement stmt =
-          connection.prepareStatement(
+      List<Object[]> resultSet =
+          executeParamQuery(
               "SELECT c_id "
                   + "FROM customer "
                   + "WHERE w_id = ? AND d_id= ? AND c_last=? "
-                  + "ORDER BY c_first")) {
-        int index = 0;
-        stmt.setLong(++index, customerWarehouseId);
-        stmt.setLong(++index, customerDistrictId);
-        stmt.setString(++index, lastName);
-        try (ResultSet resultSet = executeParamQuery(stmt)) {
-          for (int counter = 0; counter < nameCount; counter++) {
-            if (resultSet.next()) {
-              customerId = resultSet.getLong(1);
-            }
-          }
-        }
+                  + "ORDER BY c_first",
+              new Object[] {customerWarehouseId, customerDistrictId, lastName});
+      for (int counter = 0; counter < Math.min(nameCount, resultSet.size()); counter++) {
+        customerId = (long) resultSet.get(counter)[0];
       }
     }
     row =
         paramQueryRow(
-            connection,
             (tpccConfiguration.isLockScannedRanges() ? "/*@ lock_scanned_ranges=exclusive */" : "")
                 + "SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_since "
                 + "FROM customer "
@@ -412,7 +384,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     if ("BC".equals(credit)) {
       row =
           paramQueryRow(
-              connection,
               "SELECT c_data " + "FROM customer " + "WHERE w_id = ? AND d_id=? AND c_id= ?",
               new Object[] {customerWarehouseId, customerDistrictId, customerId});
       String customerData = (String) row[0];
@@ -432,7 +403,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       }
 
       executeParamStatement(
-          connection,
           "UPDATE customer "
               + "SET c_balance=?, c_ytd_payment=?, c_data=? "
               + "WHERE w_id = ? AND d_id=? AND c_id=?",
@@ -446,14 +416,12 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           });
     } else {
       executeParamStatement(
-          connection,
           "UPDATE customer "
               + "SET c_balance=?, c_ytd_payment=? "
               + "WHERE w_id = ? AND d_id=? AND c_id=?",
           new Object[] {balance, ytdPayment, customerWarehouseId, customerDistrictId, customerId});
     }
     executeParamStatement(
-        connection,
         "INSERT INTO history (d_id, w_id, c_id, h_d_id,  h_w_id, h_date, h_amount, h_data) "
             + "VALUES (?,?,?,?,?,NOW(),?,?)",
         new Object[] {
@@ -467,10 +435,10 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         });
 
     LOG.debug("Committing payment");
-    execute(statement, "commit");
+    executeStatement("commit");
   }
 
-  private void orderStatus(Connection connection, Statement statement) throws SQLException {
+  private void orderStatus() throws SQLException {
     LOG.debug("Executing order_status");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
@@ -489,14 +457,13 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     BigDecimal balance;
     String first, middle, last;
 
-    execute(statement, "begin transaction");
+    executeStatement("begin transaction");
     if (tpccConfiguration.isUseReadOnlyTransactions()) {
-      execute(statement, "set transaction read only");
+      executeStatement("set transaction read only");
     }
     if (byName) {
       row =
           paramQueryRow(
-              connection,
               "SELECT count(c_id) namecnt "
                   + "FROM customer "
                   + "WHERE w_id = ? AND d_id= ? AND c_last=?",
@@ -505,30 +472,21 @@ abstract class AbstractBenchmarkRunner implements Runnable {
       if (nameCount % 2 == 0) {
         nameCount++;
       }
-      try (PreparedStatement stmt =
-          connection.prepareStatement(
+      List<Object[]> resultSet =
+          executeParamQuery(
               "SELECT c_balance, c_first, c_middle, c_id "
                   + "FROM customer WHERE w_id = ? AND d_id= ? AND c_last=? "
-                  + "ORDER BY c_first")) {
-        int index = 0;
-        stmt.setLong(++index, warehouseId);
-        stmt.setLong(++index, districtId);
-        stmt.setString(++index, lastName);
-        try (ResultSet resultSet = executeParamQuery(stmt)) {
-          for (int counter = 0; counter < nameCount; counter++) {
-            if (resultSet.next()) {
-              balance = resultSet.getBigDecimal(1);
-              first = resultSet.getString(2);
-              middle = resultSet.getString(3);
-              customerId = resultSet.getLong(4);
-            }
-          }
-        }
+                  + "ORDER BY c_first",
+              new Object[] {warehouseId, districtId, lastName});
+      for (int counter = 0; counter < Math.min(nameCount, resultSet.size()); counter++) {
+        balance = (BigDecimal) resultSet.get(counter)[0];
+        first = (String) resultSet.get(counter)[1];
+        middle = (String) resultSet.get(counter)[2];
+        customerId = (long) resultSet.get(counter)[3];
       }
     } else {
       row =
           paramQueryRow(
-              connection,
               "SELECT c_balance, c_first, c_middle, c_last "
                   + "FROM customer "
                   + "WHERE w_id = ? AND d_id=? AND c_id=?",
@@ -541,51 +499,46 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
     row =
         paramQueryRow(
-            connection,
             "SELECT o_id, o_carrier_id, o_entry_d "
                 + "FROM orders "
                 + "WHERE w_id = ? AND d_id = ? AND c_id = ? "
                 + "ORDER BY o_id DESC",
             new Object[] {warehouseId, districtId, customerId});
     long orderId = (long) row[0];
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
+
+    long item_id, supply_warehouse_id, quantity;
+    BigDecimal amount;
+    Timestamp delivery_date;
+    List<Object[]> resultSet =
+        executeParamQuery(
             "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d "
                 + "FROM order_line "
-                + "WHERE w_id = ? AND d_id = ?  AND o_id = ?")) {
-      int index = 0;
-      stmt.setLong(++index, warehouseId);
-      stmt.setLong(++index, districtId);
-      stmt.setLong(++index, orderId);
-
-      try (ResultSet resultSet = executeParamQuery(stmt)) {
-        while (resultSet.next()) {
-          resultSet.getLong(1); // item_id
-          resultSet.getLong(2); // supply_warehouse_id
-          resultSet.getLong(3); // quantity
-          resultSet.getBigDecimal(4); // amount
-          resultSet.getTimestamp(5); // delivery_date
-        }
-      }
+                + "WHERE w_id = ? AND d_id = ?  AND o_id = ?",
+            new Object[] {warehouseId, districtId, orderId});
+    for (int counter = 0; counter < resultSet.size(); counter++) {
+      item_id = (long) resultSet.get(counter)[0]; // item_id
+      supply_warehouse_id = (long) resultSet.get(counter)[1]; // supply_warehouse_id
+      quantity = (long) resultSet.get(counter)[2]; // quantity
+      amount = (BigDecimal) resultSet.get(counter)[3]; // amount
+      delivery_date = (Timestamp) resultSet.get(counter)[4]; // delivery_date
     }
 
     LOG.debug("Committing order_status");
-    execute(statement, "commit");
+    executeStatement("commit");
   }
 
-  private void delivery(Connection connection, Statement statement) throws SQLException {
+  private void delivery() throws SQLException {
     LOG.debug("Executing delivery");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long carrierId = Long.reverse(random.nextInt(10));
     Object[] row;
 
-    execute(statement, "begin transaction");
+    executeStatement("begin transaction");
     for (long district = 0L; district < tpccConfiguration.getDistrictsPerWarehouse(); district++) {
       long districtId = Long.reverse(district);
       row =
           paramQueryRow(
-              connection,
               (tpccConfiguration.isLockScannedRanges()
                       ? "/*@ lock_scanned_ranges=exclusive */"
                       : "")
@@ -599,38 +552,32 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         long newOrderId = (long) row[0];
         long customerId = (long) row[1];
         executeParamStatement(
-            connection,
             "DELETE "
                 + "FROM new_orders "
                 + "WHERE o_id = ? AND c_id = ? AND d_id = ? AND w_id = ?",
             new Object[] {newOrderId, customerId, districtId, warehouseId});
         row =
             paramQueryRow(
-                connection,
                 "SELECT c_id FROM orders WHERE o_id = ? AND d_id = ? AND w_id = ?",
                 new Object[] {newOrderId, districtId, warehouseId});
         executeParamStatement(
-            connection,
             "UPDATE orders "
                 + "SET o_carrier_id = ? "
                 + "WHERE o_id = ? AND c_id = ? AND d_id = ? AND w_id = ?",
             new Object[] {carrierId, newOrderId, customerId, districtId, warehouseId});
         executeParamStatement(
-            connection,
             "UPDATE order_line "
                 + "SET ol_delivery_d = NOW() "
                 + "WHERE o_id = ? AND c_id = ? AND d_id = ? AND w_id = ?",
             new Object[] {newOrderId, customerId, districtId, warehouseId});
         row =
             paramQueryRow(
-                connection,
                 "SELECT SUM(ol_amount) sm "
                     + "FROM order_line "
                     + "WHERE o_id = ? AND c_id = ? AND d_id = ? AND w_id = ?",
                 new Object[] {newOrderId, customerId, districtId, warehouseId});
         BigDecimal sumOrderLineAmount = (BigDecimal) row[0];
         executeParamStatement(
-            connection,
             "UPDATE customer "
                 + "SET c_balance = c_balance + ?, c_delivery_cnt = c_delivery_cnt + 1 "
                 + "WHERE c_id = ? AND d_id = ? AND w_id = ?",
@@ -639,31 +586,30 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
 
     LOG.debug("Committing delivery");
-    execute(statement, "commit");
+    executeStatement("commit");
   }
 
-  private void stockLevel(Connection connection, Statement statement) throws SQLException {
+  private void stockLevel() throws SQLException {
     LOG.debug("Executing stock_level");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long districtId = Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     int level = random.nextInt(10, 21);
 
-    execute(statement, "begin transaction");
+    executeStatement("begin transaction");
     if (tpccConfiguration.isUseReadOnlyTransactions()) {
-      execute(statement, "set transaction read only");
+      executeStatement("set transaction read only");
     }
     String stockLevelQueries = "case1";
     Object[] row;
 
     row =
         paramQueryRow(
-            connection,
             "SELECT d_next_o_id " + "FROM district " + "WHERE d_id = ? AND w_id= ?",
             new Object[] {districtId, warehouseId});
     long nextOrderId = (long) row[0];
-    try (PreparedStatement stmt =
-        connection.prepareStatement(
+    List<Object[]> resultSet =
+        executeParamQuery(
             "SELECT COUNT(DISTINCT (s_i_id)) "
                 + "FROM order_line ol, stock s "
                 + "WHERE ol.w_id = ? "
@@ -672,34 +618,26 @@ abstract class AbstractBenchmarkRunner implements Runnable {
                 + "AND ol.o_id >= ? "
                 + "AND s.w_id= ? "
                 + "AND s_i_id=ol_i_id "
-                + "AND s_quantity < ?")) {
-      int index = 0;
-      stmt.setLong(++index, warehouseId);
-      stmt.setLong(++index, districtId);
-      stmt.setLong(++index, nextOrderId);
-      stmt.setLong(++index, nextOrderId - 20);
-      stmt.setLong(++index, warehouseId);
-      stmt.setLong(++index, level);
-      try (ResultSet resultSet = executeParamQuery(stmt)) {
-        while (resultSet.next()) {
-          long orderLineItemId = resultSet.getLong(1);
-          // Note: We need a separate statement, because we already have an open result
-          // set on the
-          // original statement.
-          row =
-              paramQueryRow(
-                  connection,
-                  "SELECT count(*) FROM stock "
-                      + "WHERE w_id = ? AND s_i_id = ? "
-                      + "AND s_quantity < ?",
-                  new Object[] {warehouseId, orderLineItemId, level});
-          long stockCount = (long) row[0];
-        }
-      }
+                + "AND s_quantity < ?",
+            new Object[] {
+              warehouseId, districtId, nextOrderId, nextOrderId - 20, warehouseId, level
+            });
+    for (int counter = 0; counter < resultSet.size(); counter++) {
+      long orderLineItemId = (long) resultSet.get(counter)[0];
+      // Note: We need a separate statement, because we already have an open result
+      // set on the
+      // original statement.
+      row =
+          paramQueryRow(
+              "SELECT count(*) FROM stock "
+                  + "WHERE w_id = ? AND s_i_id = ? "
+                  + "AND s_quantity < ?",
+              new Object[] {warehouseId, orderLineItemId, level});
+      long stockCount = (long) row[0];
     }
 
     LOG.debug("Committing stock_level");
-    execute(statement, "commit");
+    executeStatement("commit");
   }
 
   public boolean isFailed() {
@@ -712,69 +650,15 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
   }
 
-  public enum QueryRowMode {
-    REQUIRE_ONE,
-    ALLOW_MORE_THAN_ONE,
-    ALLOW_LESS_THAN_ONE,
-  }
+  abstract void setup() throws SQLException;
 
-  private Object[] paramQueryRow(Connection connection, String sql, Object[] params)
-      throws SQLException {
-    Object[] row;
-    try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      int index = 0;
-      setParams(statement, params);
-      Stopwatch stopwatch = Stopwatch.createStarted();
-      row = paramQueryRow(QueryRowMode.ALLOW_MORE_THAN_ONE, statement);
-      Duration executionDuration = stopwatch.elapsed();
-      metrics.recordLatency(executionDuration.toMillis());
-    }
-    return row;
-  }
+  abstract void teardown() throws SQLException;
 
-  abstract Object[] paramQueryRow(QueryRowMode queryRowMode, PreparedStatement statement)
-      throws SQLException;
+  abstract void executeStatement(String sql) throws SQLException;
 
-  private void execute(Statement statement, String dml) throws SQLException {
-    Stopwatch stopwatch = Stopwatch.createStarted();
-    statement.execute(dml);
-    Duration executionDuration = stopwatch.elapsed();
-    metrics.recordLatency(executionDuration.toMillis());
-  }
+  abstract Object[] paramQueryRow(String sql, Object[] params) throws SQLException;
 
-  private void setParams(PreparedStatement statement, Object[] params) throws SQLException {
-    int index = 0;
-    for (Object param : params) {
-      if (param instanceof BigDecimal) {
-        statement.setBigDecimal(++index, (BigDecimal) param);
-      } else if (param instanceof String) {
-        statement.setString(++index, (String) param);
-      } else if (param instanceof Integer) {
-        statement.setInt(++index, (int) param);
-      } else if (param instanceof Long) {
-        statement.setLong(++index, (long) param);
-      } else {
-        throw new SQLException(String.format("Unknown type for the parameter: %s", param));
-      }
-    }
-  }
+  abstract void executeParamStatement(String sql, Object[] params) throws SQLException;
 
-  private void executeParamStatement(Connection connection, String sql, Object[] params)
-      throws SQLException {
-    try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      setParams(statement, params);
-      Stopwatch stopwatch = Stopwatch.createStarted();
-      statement.execute();
-      Duration executionDuration = stopwatch.elapsed();
-      metrics.recordLatency(executionDuration.toMillis());
-    }
-  }
-
-  private ResultSet executeParamQuery(PreparedStatement statement) throws SQLException {
-    Stopwatch stopwatch = Stopwatch.createStarted();
-    ResultSet result = statement.executeQuery();
-    Duration executionDuration = stopwatch.elapsed();
-    metrics.recordLatency(executionDuration.toMillis());
-    return result;
-  }
+  abstract List<Object[]> executeParamQuery(String sql, Object[] params) throws SQLException;
 }

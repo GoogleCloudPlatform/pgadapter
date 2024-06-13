@@ -12,6 +12,7 @@ venv
 package-lock.json
 node_modules
 .DotSettings.user
+*sln.DotSettings.user
 
 src/test/golang/**/*.h
 src/test/golang/**/*.so
@@ -33,3 +34,6 @@ samples/nodejs/sequelize/**/*.js
 
 src/test/ruby/**/Gemfile.lock
 samples/**/ruby/**/Gemfile.lock
+
+samples/**/vendor
+samples/**/composer.lock

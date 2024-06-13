@@ -21,7 +21,7 @@ public static class CreateConnectionSample
 {
     public static void CreateConnection(string host, int port, string database)
     {
-        var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
+        var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable";
         using var connection = new NpgsqlConnection(connectionString);
         connection.Open();
 

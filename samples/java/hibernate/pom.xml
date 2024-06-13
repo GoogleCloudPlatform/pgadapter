@@ -33,7 +33,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.33.2</version>
+      <version>0.34.0</version>
     </dependency>
     <!-- Hibernate core dependency -->
     <dependency>
@@ -57,7 +57,7 @@
     <dependency>
       <groupId>io.hypersistence</groupId>
       <artifactId>hypersistence-utils-hibernate-63</artifactId>
-      <version>3.7.5</version>
+      <version>3.7.6</version>
     </dependency>
     <!-- Add testcontainers, so we can run a Docker container with PGAdapter+Spanner Emulator -->
     <dependency>

@@ -35,7 +35,7 @@ public static class WriteDataWithDmlSample
     
     public static void WriteDataWithDml(string host, int port, string database)
     {
-        var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable;Pooling=False";
+        var connectionString = $"Host={host};Port={port};Database={database};SSL Mode=Disable";
         using var connection = new NpgsqlConnection(connectionString);
         connection.Open();
         // Add 4 rows in one statement.
