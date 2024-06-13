@@ -204,8 +204,8 @@ async function testNestedWrite(client: PrismaClient) {
   // single transaction
   const newUser: User = await client.user.create({
     data: {
-      id: "1",
-      email: 'alice@prisma.io',
+      id: "4",
+      email: 'alice2@prisma.io',
       posts: {
         create: [
           { id: "1", title: 'Join the Prisma Slack on https://slack.prisma.io' },

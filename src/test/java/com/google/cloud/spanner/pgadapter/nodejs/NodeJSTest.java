@@ -73,6 +73,7 @@ public interface NodeJSTest {
             "DATABASE_URL",
             String.format(
                 "postgresql://localhost:%d/%s%s", port, database, extraDatabaseUrlParameters));
+    builder.environment().put("RUST_BACKTRACE", "1");
 
     Process process = builder.start();
     InputStream inputStream = process.getInputStream();
