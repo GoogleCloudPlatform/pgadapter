@@ -118,10 +118,7 @@ public class BenchmarkApplication implements CommandLineRunner {
       }
 
       if (tpccConfiguration.isRunBenchmark()
-          && (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.PGADAPTER_JDBC_RUNNER)
-              || tpccConfiguration
-                  .getBenchmarkRunner()
-                  .equals(TpccConfiguration.SPANNER_JDBC_RUNNER))) {
+          && (TpccConfiguration.RUNNERS.contains(tpccConfiguration.getBenchmarkRunner()))) {
         LOG.info("Starting benchmark");
         // Enable the OpenTelemetry metrics in the client library.
         OpenTelemetry openTelemetry = enableOpenTelemetryMetrics();
@@ -137,7 +134,12 @@ public class BenchmarkApplication implements CommandLineRunner {
             statistics.setRunnerName("PGAdapter benchmark");
             executor.submit(
                 new JdbcBenchmarkRunner(
-                    statistics, pgadapterConnectionUrl, tpccConfiguration, metrics));
+                    statistics,
+                    pgadapterConnectionUrl,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics));
           } else if (tpccConfiguration
               .getBenchmarkRunner()
               .equals(TpccConfiguration.SPANNER_JDBC_RUNNER)) {
@@ -145,7 +147,24 @@ public class BenchmarkApplication implements CommandLineRunner {
             statistics.setRunnerName("Spanner JDBC benchmark");
             executor.submit(
                 new JdbcBenchmarkRunner(
-                    statistics, spannerConnectionUrl, tpccConfiguration, metrics));
+                    statistics,
+                    spannerConnectionUrl,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics));
+          } else if (tpccConfiguration
+              .getBenchmarkRunner()
+              .equals(TpccConfiguration.CLIENT_LIB_PG_RUNNER)) {
+            // Run client library PG benchmark
+            statistics.setRunnerName("Client library PG benchmark");
+            executor.submit(
+                new JavaClientBenchmarkRunner(
+                    statistics,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics));
           }
         }
 

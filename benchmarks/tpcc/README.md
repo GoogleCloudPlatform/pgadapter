@@ -41,7 +41,7 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
 
 ### Run benchmark
 
-Currently, we support two options of benchmark runners: `pgadapter` and `spanner_jdbc`.
+Currently, we support benchmark runners: `pgadapter`, `spanner_jdbc`, and `client_lib_pg`.
 
 Run with the default benchmark runner (PGAdapter with PG JDBC):
 
@@ -74,6 +74,26 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.truncate-before-load=false
   --tpcc.run-benchmark=true
   --tpcc.benchmark-runner=spanner_jdbc
+  --tpcc.use-read-only-transactions=true
+  --tpcc.lock-scanned-ranges=false
+  --spanner.project=my-project
+  --spanner.instance=my-instance
+  --spanner.database=my-database
+  --pgadapter.credentials=/path/to/credentials.json
+  "
+```
+
+Run with the benchmark runner (Client library with PostgreSQL dialect):
+
+```shell
+mvn spring-boot:run -Dspring-boot.run.arguments="
+  --tpcc.benchmark-duration=PT600s
+  --tpcc.warehouses=10
+  --tpcc.benchmark-threads=1
+  --tpcc.load-data=false
+  --tpcc.truncate-before-load=false
+  --tpcc.run-benchmark=true
+  --tpcc.benchmark-runner=client_lib_pg
   --tpcc.use-read-only-transactions=true
   --tpcc.lock-scanned-ranges=false
   --spanner.project=my-project
