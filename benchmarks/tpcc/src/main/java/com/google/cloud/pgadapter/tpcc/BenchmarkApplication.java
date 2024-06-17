@@ -179,7 +179,8 @@ public class BenchmarkApplication implements CommandLineRunner {
           throw new TimeoutException("Timed out while waiting for benchmark runners to shut down");
         }
       } else {
-        LOG.error("Unknown benchmark runner option: " + tpccConfiguration.getBenchmarkRunner());
+        throw new RuntimeException(
+            "Unknown benchmark runner option: " + tpccConfiguration.getBenchmarkRunner());
       }
     } catch (IOException exception) {
       throw new RuntimeException(exception);

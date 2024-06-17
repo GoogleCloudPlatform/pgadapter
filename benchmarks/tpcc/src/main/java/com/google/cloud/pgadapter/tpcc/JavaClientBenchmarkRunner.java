@@ -27,10 +27,10 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.TransactionContext;
 import com.google.cloud.spanner.TransactionManager;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -43,8 +43,7 @@ import org.slf4j.LoggerFactory;
 
 class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
   private static final Logger LOG = LoggerFactory.getLogger(JavaClientBenchmarkRunner.class);
-  private final ThreadLocal<Spanner> spannerThreadLocal = new ThreadLocal<>();
-  private final ThreadLocal<DatabaseClient> databaseClientThreadLocal = new ThreadLocal<>();
+  private Spanner spanner;
   private final ThreadLocal<TransactionManager> transactionManagerThreadLocal = new ThreadLocal<>();
   private final ThreadLocal<TransactionContext> transactionThreadLocal = new ThreadLocal<>();
 
@@ -58,25 +57,22 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
   }
 
   void setup() throws SQLException, IOException {
-    Spanner spanner = createSpanner();
-    spannerThreadLocal.set(spanner);
-    databaseClientThreadLocal.set(
-        spanner.getDatabaseClient(
-            DatabaseId.of(
-                spannerConfiguration.getProject(),
-                spannerConfiguration.getInstance(),
-                spannerConfiguration.getDatabase())));
-    transactionManagerThreadLocal.set(databaseClientThreadLocal.get().transactionManager());
-    Uninterruptibles.sleepUninterruptibly(Duration.ofMillis(2000L));
+    this.spanner = createSpanner();
   }
 
   void teardown() throws SQLException {
-    transactionManagerThreadLocal.get().close();
-    spannerThreadLocal.get().close();
+    spanner.close();
   }
 
   void executeStatement(String sql) throws SQLException {
     if (sql.equals("begin transaction")) {
+      DatabaseClient databaseClient =
+          spanner.getDatabaseClient(
+              DatabaseId.of(
+                  spannerConfiguration.getProject(),
+                  spannerConfiguration.getInstance(),
+                  spannerConfiguration.getDatabase()));
+      transactionManagerThreadLocal.set(databaseClient.transactionManager());
       transactionThreadLocal.set(transactionManagerThreadLocal.get().begin());
     } else if (sql.equals("commit")) {
       try {
@@ -87,9 +83,12 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
       } catch (AbortedException e) {
         // Ignore the aborted exception. Roll back the transaction.
         transactionManagerThreadLocal.get().rollback();
+      } finally {
+        transactionManagerThreadLocal.get().close();
       }
     } else if (sql.startsWith("rollback")) {
       transactionManagerThreadLocal.get().rollback();
+      transactionManagerThreadLocal.get().close();
     } else if (sql.equals("set transaction read only")) {
       // No-op because TransactionManager only supports read/write transactions.
     }
@@ -118,12 +117,15 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
     bindParams(builder, params);
     Statement stmt = builder.build();
 
-    Stopwatch stopwatch = Stopwatch.createStarted();
     ResultSet resultSet = transactionThreadLocal.get().executeQuery(stmt);
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    // The above executeQuery() does not actually execute the query until we call
+    // next() for the first time.
+    boolean is_next_successful = resultSet.next();
     Duration executionDuration = stopwatch.elapsed();
     metrics.recordLatency(executionDuration.toMillis());
 
-    if (!resultSet.next()) {
+    if (!is_next_successful) {
       throw new RowNotFoundException(String.format("No results found for: %s", sql));
     }
 
@@ -190,25 +192,18 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
   // If getAsObject() in Struct can be a public method, then we should use it
   // instead of using the following approach.
   Object getObject(Value value) {
-    try {
+    if (value.getType().equals(Type.numeric())) {
       return value.getNumeric();
-    } catch (IllegalStateException exc) {
-    }
-    try {
+    } else if (value.getType().equals(Type.string())) {
       return value.getString();
-    } catch (IllegalStateException exc) {
-    }
-    try {
+    } else if (value.getType().equals(Type.int64())) {
       return value.getInt64();
-    } catch (IllegalStateException exc) {
-    }
-    try {
+    } else if (value.getType().equals(Type.float64())) {
       return value.getFloat64();
-    } catch (IllegalStateException exc) {
-    }
-    try {
+    } else if (value.getType().equals(Type.bool())) {
       return value.getBool();
-    } catch (IllegalStateException exc) {
+    } else if (value.getType().equals(Type.pgNumeric())) {
+      return new BigDecimal(value.getString());
     }
     return null;
   }
@@ -221,17 +216,21 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
     bindParams(builder, params);
     Statement stmt = builder.build();
 
-    Stopwatch stopwatch = Stopwatch.createStarted();
     ResultSet resultSet = transactionThreadLocal.get().executeQuery(stmt);
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    // The above executeQuery() does not actually execute the query until we call
+    // next() for the first time.
+    boolean is_next_successful = resultSet.next();
     Duration executionDuration = stopwatch.elapsed();
     metrics.recordLatency(executionDuration.toMillis());
 
-    while (resultSet.next()) {
+    while (is_next_successful) {
       Object[] result = new Object[resultSet.getColumnCount()];
       for (int i = 0; i < result.length; i++) {
         result[i] = getObject(resultSet.getValue(i));
       }
       results.add(result);
+      is_next_successful = resultSet.next();
     }
 
     return results;
