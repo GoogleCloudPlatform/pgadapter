@@ -117,8 +117,10 @@ public class BenchmarkApplication implements CommandLineRunner {
         System.out.printf("Finished loading %d rows\n", loadDataFuture.get());
       }
 
-      if (tpccConfiguration.isRunBenchmark()
-          && (TpccConfiguration.RUNNERS.contains(tpccConfiguration.getBenchmarkRunner()))) {
+      if (!tpccConfiguration.isRunBenchmark()) {
+        return;
+      }
+      if (TpccConfiguration.RUNNERS.contains(tpccConfiguration.getBenchmarkRunner())) {
         LOG.info("Starting benchmark");
         // Enable the OpenTelemetry metrics in the client library.
         OpenTelemetry openTelemetry = enableOpenTelemetryMetrics();
