@@ -28,6 +28,8 @@ import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryLockStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryUnlockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.StartTransactionIsolationLevelRepeatableRead;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
@@ -456,6 +458,68 @@ public class ClientAutoDetector {
       @Override
       public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
+      }
+    },
+    PRISMA {
+      final ImmutableMap<String, String> tableReplacements =
+          ImmutableMap.of("_prisma_migrations", "prisma_migrations");
+      private final ImmutableSet<String> checkPgCatalogPrefixes =
+          ImmutableSet.<String>builder()
+              .addAll(DEFAULT_CHECK_PG_CATALOG_PREFIXES)
+              .add("_prisma_migrations")
+              .build();
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // Prisma does not send any unique connection parameters, so the user has to set the
+        // client name in the connection string.
+        return false;
+      }
+
+      @Override
+      public ImmutableSet<String> getPgCatalogCheckPrefixes() {
+        return checkPgCatalogPrefixes;
+      }
+
+      @Override
+      public ImmutableMap<String, String> getTableReplacements() {
+        return tableReplacements;
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(SelectPrismaAdvisoryLockStatement.INSTANCE)
+              .add(SelectPrismaAdvisoryUnlockStatement.INSTANCE)
+              .build();
+        }
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getDdlReplacements() {
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("(\\s+)_prisma_migrations"), "$1prisma_migrations"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])timestamp([\\s,()])", Pattern.CASE_INSENSITIVE),
+                "$1timestamptz$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])timestamptz\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1timestamptz$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])numeric\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1numeric$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])decimal\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1numeric$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("CONSTRAINT\\s+.*\\s+PRIMARY KEY\\s*\\(", Pattern.CASE_INSENSITIVE),
+                "PRIMARY KEY ("),
+            RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+DELETE\\s+RESTRICT"), ""),
+            RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+UPDATE\\s+CASCADE"), ""));
       }
     },
     UNSPECIFIED {
