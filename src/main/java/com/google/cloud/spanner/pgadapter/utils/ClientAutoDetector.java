@@ -477,6 +477,11 @@ public class ClientAutoDetector {
       }
 
       @Override
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
+        return ImmutableMap.of("spanner.auto_add_limit_clause", "true");
+      }
+
+      @Override
       public ImmutableSet<String> getPgCatalogCheckPrefixes() {
         return checkPgCatalogPrefixes;
       }
