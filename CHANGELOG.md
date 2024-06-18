@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.35.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.34.0...v0.35.0) (2024-06-17)
+
+
+### Features
+
+* support RESET ALL for the Spanner connection ([#1904](https://github.com/GoogleCloudPlatform/pgadapter/issues/1904)) ([1056075](https://github.com/GoogleCloudPlatform/pgadapter/commit/105607572d790af689c13c0ebed1a7aa53b3d565))
+
+
+### Dependencies
+
+* update dependency testcontainers to v3.9.0 ([#1962](https://github.com/GoogleCloudPlatform/pgadapter/issues/1962)) ([70723b6](https://github.com/GoogleCloudPlatform/pgadapter/commit/70723b636022dbed5bda0e4e6b6c82b89f653ea1))
+* update module google.golang.org/api to v0.184.0 ([#1959](https://github.com/GoogleCloudPlatform/pgadapter/issues/1959)) ([5b883e4](https://github.com/GoogleCloudPlatform/pgadapter/commit/5b883e445c8a93a1bae6b40607163ba05f350cca))
+* update module gorm.io/datatypes to v1.2.1 ([#1952](https://github.com/GoogleCloudPlatform/pgadapter/issues/1952)) ([2ce76e9](https://github.com/GoogleCloudPlatform/pgadapter/commit/2ce76e92ab4441fcbade6d7878118c5086c8b878))
+* update module gorm.io/driver/postgres to v1.5.8 ([#1950](https://github.com/GoogleCloudPlatform/pgadapter/issues/1950)) ([ab31da1](https://github.com/GoogleCloudPlatform/pgadapter/commit/ab31da10238fc42e1e81f66d988c42e186c3b0ce))
+* update module gorm.io/driver/postgres to v1.5.9 ([#1951](https://github.com/GoogleCloudPlatform/pgadapter/issues/1951)) ([86d1498](https://github.com/GoogleCloudPlatform/pgadapter/commit/86d1498088bccbddcc9be8fbe9f76be2ce1f939d))
+
+
+### Documentation
+
+* add sample for PHP PDO ([#1945](https://github.com/GoogleCloudPlatform/pgadapter/issues/1945)) ([7844869](https://github.com/GoogleCloudPlatform/pgadapter/commit/78448690198b7f69e4e45bac4d5bd36f4d0405a3))
+* enable pooling for dotnet samples ([#1941](https://github.com/GoogleCloudPlatform/pgadapter/issues/1941)) ([b67b03d](https://github.com/GoogleCloudPlatform/pgadapter/commit/b67b03d4f05a48193c600c541683d3f716f62916))
+* update Sequelize tests and sample ([#1949](https://github.com/GoogleCloudPlatform/pgadapter/issues/1949)) ([5342ff8](https://github.com/GoogleCloudPlatform/pgadapter/commit/5342ff80fd3f248d64a6025f3a6dbd77ba773e37))
+
 ## [0.34.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.33.2...v0.34.0) (2024-06-07)
 
 
