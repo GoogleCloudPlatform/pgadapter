@@ -38,7 +38,7 @@ export function createPrismaClient() {
   staleReadClient = new PrismaClient({
     datasources: {
       db: {
-        url: `${process.env.DATABASE_URL}?options=-c spanner.read_only_staleness='MAX_STALENESS 10s'`,
+        url: `${process.env.DATABASE_URL}%20-c%20spanner.read_only_staleness='MAX_STALENESS 10s'`,
       },
     },
   });
@@ -134,13 +134,15 @@ export async function printSingersAndAlbums() {
         orderBy: {
           title: 'asc',
         },
-        take: 50000,
+        skip: 0,
+        take: 5,
       },
     },
     orderBy: {
       lastName: 'asc',
     },
-    take: 50000,
+    skip: 0,
+    take: 5,
   });
   for (const singer of singersAndAlbums) {
     console.log(`Singer ${singer.fullName} has ${singer.albums.length} albums:`);

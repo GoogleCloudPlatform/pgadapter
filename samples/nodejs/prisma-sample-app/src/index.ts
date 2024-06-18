@@ -27,13 +27,9 @@ console.log("Running sample application...");
 runSample()
   .then(async () => {
     console.log("Successfully executed sample application");
-    // await prisma.$disconnect();
-    // await staleReadClient.$disconnect();
   })
   .catch(async (e) => {
     console.error(e);
-    // await prisma.$disconnect();
-    // await staleReadClient.$disconnect();
   });
 
 async function runSample() {
@@ -43,10 +39,9 @@ async function runSample() {
   // See https://github.com/GoogleCloudPlatform/pgadapter/tree/postgresql-dialect/samples/cloud-run/nodejs
   // for a sample.
   const pgAdapter = await startPGAdapter();
-  const port = pgAdapter.getMappedPort(5432);
+  const port = 9999; // pgAdapter.getMappedPort(5432);
   console.log(`PGAdapter started on port ${port}`);
-  process.env.DATABASE_URL = `postgresql://localhost:${port}/prisma-sample`;
-  process.env.STALE_READ_DATABASE_URL = `postgresql://localhost:${port}/prisma-sample?sslmode=disable&options=-c%20spanner.well_known_client=prisma%20-c%20spanner.read_only_staleness='MAX_STALENESS 10s'`
+  process.env.DATABASE_URL = `postgresql://localhost:${port}/prisma-sample?options=-c%20spanner.well_known_client=prisma`;
   
   // Create the Prisma client.
   createPrismaClient();

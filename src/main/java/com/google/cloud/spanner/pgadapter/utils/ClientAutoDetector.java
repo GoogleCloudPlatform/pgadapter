@@ -477,6 +477,11 @@ public class ClientAutoDetector {
       }
 
       @Override
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
+        return ImmutableMap.of("spanner.auto_add_limit_clause", "true");
+      }
+
+      @Override
       public ImmutableSet<String> getPgCatalogCheckPrefixes() {
         return checkPgCatalogPrefixes;
       }
@@ -520,6 +525,15 @@ public class ClientAutoDetector {
                 "PRIMARY KEY ("),
             RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+DELETE\\s+RESTRICT"), ""),
             RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+UPDATE\\s+CASCADE"), ""));
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        // This ensures that Prisma sees the 'prisma_migrations" table as '_prisma_migrations'.
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("SELECT\\s+" + "tbl\\.relname\\s+AS\\s+table_name"),
+                "SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name"));
       }
     },
     UNSPECIFIED {
