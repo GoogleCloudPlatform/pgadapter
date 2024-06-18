@@ -16,14 +16,14 @@ import {Prisma, PrismaClient, User} from '@prisma/client'
 
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>, options?: string) {
   if (host.charAt(0) == '/') {
-    process.env.DATABASE_URL = `postgresql://localhost:${port}/${database}?host=${host}`;
+    process.env.DATABASE_URL = `postgresql://localhost:${port}/${database}?host=${host}&options=-c%20spanner.well_known_client=prisma`;
     if (options) {
       process.env.DATABASE_URL += `&${options}`;
     }
   } else {
-    process.env.DATABASE_URL = `postgresql://${host}:${port}/${database}`;
+    process.env.DATABASE_URL = `postgresql://${host}:${port}/${database}?options=-c%20spanner.well_known_client=prisma`;
     if (options) {
-      process.env.DATABASE_URL += `?${options}`;
+      process.env.DATABASE_URL += `&${options}`;
     }
   }
   const prisma = new PrismaClient();
@@ -46,6 +46,26 @@ async function testSelect1(client: PrismaClient) {
   try {
     const result = await client.$queryRaw`SELECT 1`;
     console.log(result)
+  } catch (e) {
+    console.error(`Query error: ${e}`);
+  }
+}
+
+async function testShowWellKnownClient(client: PrismaClient) {
+  try {
+    const wellKnownClient = await client.$queryRaw`show spanner.well_known_client`;
+    console.log(wellKnownClient);
+  } catch (e) {
+    console.error(`Query error: ${e}`);
+  }
+}
+
+async function testPgAdvisoryLock(client: PrismaClient) {
+  try {
+    const lock = await client.$queryRaw`SELECT pg_advisory_lock(72707369)`;
+    console.log(lock);
+    const unlock = await client.$queryRaw`SELECT pg_advisory_unlock(72707369)`;
+    console.log(unlock);
   } catch (e) {
     console.error(`Query error: ${e}`);
   }
@@ -333,6 +353,18 @@ require('yargs')
     'Executes SELECT 1',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testSelect1)
+)
+.command(
+    'testShowWellKnownClient <host> <port> <database>',
+    'Shows the client that is connected',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testShowWellKnownClient)
+)
+.command(
+    'testPgAdvisoryLock <host> <port> <database>',
+    'Locks/unlocks the specific advisory lock for Prisma',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testPgAdvisoryLock)
 )
 .command(
     'testFindAllUsers <host> <port> <database>',

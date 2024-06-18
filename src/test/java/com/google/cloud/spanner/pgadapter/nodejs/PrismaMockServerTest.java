@@ -99,6 +99,21 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowWellKnownClient() throws Exception {
+    String output = runTest("testShowWellKnownClient", getHost(), pgServer.getLocalPort());
+
+    assertEquals("[ { 'spanner.well_known_client': 'PRISMA' } ]\n", output);
+  }
+
+  @Test
+  public void testPgAdvisoryLock() throws Exception {
+    String output = runTest("testPgAdvisoryLock", getHost(), pgServer.getLocalPort());
+
+    assertEquals(
+        "[ { pg_advisory_lock: '72707369' } ]\n" + "[ { pg_advisory_unlock: true } ]\n", output);
+  }
+
+  @Test
   public void testFindAllUsers() throws Exception {
     String sql =
         "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" "
