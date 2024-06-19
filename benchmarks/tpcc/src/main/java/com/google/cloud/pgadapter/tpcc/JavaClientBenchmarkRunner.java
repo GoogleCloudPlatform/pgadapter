@@ -117,8 +117,8 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
     bindParams(builder, params);
     Statement stmt = builder.build();
 
-    ResultSet resultSet = transactionThreadLocal.get().executeQuery(stmt);
     Stopwatch stopwatch = Stopwatch.createStarted();
+    ResultSet resultSet = transactionThreadLocal.get().executeQuery(stmt);
     // The above executeQuery() does not actually execute the query until we call
     // next() for the first time.
     boolean is_next_successful = resultSet.next();
@@ -166,6 +166,10 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
     int paramIndex = 1;
     while (index < sql.length()) {
       char c = sql.charAt(index);
+      // We have an assumption in any SQL strings: 1) comments do not contain question
+      // marks; 2) string literals do not contain question marks. This is because we
+      // believe all benchmark queries are hard-coded and none of them can cause the
+      // above cases. If any of above cases happen, it should fail explicitly.
       if (c == paramChar) {
         named.append(namedParamPrefix).append(paramIndex);
         paramIndex++;
@@ -216,8 +220,8 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
     bindParams(builder, params);
     Statement stmt = builder.build();
 
-    ResultSet resultSet = transactionThreadLocal.get().executeQuery(stmt);
     Stopwatch stopwatch = Stopwatch.createStarted();
+    ResultSet resultSet = transactionThreadLocal.get().executeQuery(stmt);
     // The above executeQuery() does not actually execute the query until we call
     // next() for the first time.
     boolean is_next_successful = resultSet.next();
