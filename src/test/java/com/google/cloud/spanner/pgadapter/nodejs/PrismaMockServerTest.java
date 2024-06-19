@@ -114,6 +114,13 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowAutoAddLimitClause() throws Exception {
+    String output = runTest("testShowAutoAddLimitClause", getHost(), pgServer.getLocalPort());
+
+    assertEquals("[ { 'spanner.auto_add_limit_clause': 'true' } ]\n", output);
+  }
+
+  @Test
   public void testFindAllUsers() throws Exception {
     String sql =
         "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" "

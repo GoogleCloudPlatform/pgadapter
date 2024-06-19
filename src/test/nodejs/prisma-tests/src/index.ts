@@ -71,6 +71,15 @@ async function testPgAdvisoryLock(client: PrismaClient) {
   }
 }
 
+async function testShowAutoAddLimitClause(client: PrismaClient) {
+  try {
+    const wellKnownClient = await client.$queryRaw`show spanner.auto_add_limit_clause`;
+    console.log(wellKnownClient);
+  } catch (e) {
+    console.error(`Query error: ${e}`);
+  }
+}
+
 async function testFindAllUsers(client: PrismaClient) {
   const allUsers = await client.user.findMany({take: 10});
   console.log(allUsers);
@@ -365,6 +374,12 @@ require('yargs')
     'Locks/unlocks the specific advisory lock for Prisma',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testPgAdvisoryLock)
+)
+.command(
+    'testShowAutoAddLimitClause <host> <port> <database>',
+    'Shows whether a LIMIT clause is automatically added when needed',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testShowAutoAddLimitClause)
 )
 .command(
     'testFindAllUsers <host> <port> <database>',

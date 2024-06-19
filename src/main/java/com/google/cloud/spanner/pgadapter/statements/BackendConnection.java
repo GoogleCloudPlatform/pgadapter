@@ -1089,11 +1089,17 @@ public class BackendConnection {
         }
       }
     } else {
-      SimpleParser parser = new SimpleParser(name);
-      TableOrIndexName key = parser.readTableOrIndexName();
-      if (key == null) {
-        return;
-      }
+      initSessionSetting(name, value, true);
+    }
+  }
+
+  public void initSessionSetting(String name, String value, boolean overwrite) {
+    SimpleParser parser = new SimpleParser(name);
+    TableOrIndexName key = parser.readTableOrIndexName();
+    if (key == null) {
+      return;
+    }
+    if (overwrite || this.sessionState.tryGet(key.schema, key.name) == null) {
       this.sessionState.setConnectionStartupValue(key.schema, key.name, value);
     }
   }
