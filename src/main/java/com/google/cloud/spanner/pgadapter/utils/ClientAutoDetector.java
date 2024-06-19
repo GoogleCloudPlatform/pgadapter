@@ -385,6 +385,20 @@ public class ClientAutoDetector {
                 || parseMessage.getName().startsWith("stmtcache_"));
       }
     },
+    PHP_PDO {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // The Php PDO driver does not send enough unique parameters for it to be auto-detected.
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
+        // The Php PDO driver uses a relatively unique naming scheme for prepared statements (and
+        // uses prepared statements for everything by default).
+        return parseMessage.getName() != null && (parseMessage.getName().startsWith("pdo_stmt_"));
+      }
+    },
     NPGSQL {
       final ImmutableList<QueryPartReplacer> functionReplacements =
           ImmutableList.of(
