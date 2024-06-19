@@ -617,13 +617,19 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
     builder.direction = Direction.valueOf(parser.readKeyword().toUpperCase());
     if (builder.direction == Direction.FROM) {
-      if (!parser.eatKeyword("stdin")) {
+      // Silently ignore typo 'copy from stdout'.
+      // See
+      // https://github.com/postgres/postgres/blob/03ec203164119f11f0eab4c83c97a8527e2b108d/src/backend/parser/gram.y#L3463
+      if (!parser.eatKeyword("stdin") && !parser.eatKeyword("stdout")) {
         throw PGExceptionFactory.newPGException(
             "missing 'STDIN' keyword. PGAdapter only supports COPY ... FROM STDIN: " + sql,
             SQLState.SyntaxError);
       }
     } else {
-      if (!parser.eatKeyword("stdout")) {
+      // Silently ignore typo 'copy to stdin'.
+      // See
+      // https://github.com/postgres/postgres/blob/03ec203164119f11f0eab4c83c97a8527e2b108d/src/backend/parser/gram.y#L3463
+      if (!parser.eatKeyword("stdout") && !parser.eatKeyword("stdin")) {
         throw PGExceptionFactory.newPGException(
             "missing 'STDOUT' keyword. PGAdapter only supports COPY ... TO STDOUT: " + sql,
             SQLState.SyntaxError);
