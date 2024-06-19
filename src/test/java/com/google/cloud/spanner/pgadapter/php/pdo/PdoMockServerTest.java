@@ -27,6 +27,7 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
+import com.google.cloud.spanner.pgadapter.php.PhpTest;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
@@ -49,13 +50,21 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
+@Category(PhpTest.class)
 public class PdoMockServerTest extends AbstractMockServerTest {
   static final String DIRECTORY_NAME = "./src/test/php/pdo";
+
+  @BeforeClass
+  public static void installDependencies() throws Exception {
+    run(new String[] {"composer", "install"}, DIRECTORY_NAME);
+  }
 
   static String execute(String method) throws Exception {
     return run(
@@ -632,12 +641,7 @@ public class PdoMockServerTest extends AbstractMockServerTest {
   public void testTextCopyOut() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(
-                "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-                    + "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
-                    + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, "
-                    + "col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, "
-                    + "col_array_date, col_array_varchar, col_array_jsonb from all_types"),
+            Statement.of("select * from all_types"),
             ALL_TYPES_RESULTSET
                 .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
@@ -648,50 +652,13 @@ public class PdoMockServerTest extends AbstractMockServerTest {
 
     String result = execute("text_copy_out");
     assertEquals(
-        "col_bigint: 1\n"
-            + "col_bool: True\n"
-            + "col_bytea: b'test'\n"
-            + "col_float4: 3.14\n"
-            + "col_float8: 3.14\n"
-            + "col_int: 100\n"
-            + "col_numeric: 6.626\n"
-            + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
-            + "col_date: 2022-03-29\n"
-            + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n"
-            + "col_array_bigint: [1, None, 2]\n"
-            + "col_array_bool: [True, None, False]\n"
-            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
-            + "col_array_float4: [3.14, None, -99.99]\n"
-            + "col_array_float8: [3.14, None, -99.99]\n"
-            + "col_array_int: [-100, None, -200]\n"
-            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
-            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
-            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
-            + "col_array_string: ['string1', None, 'string2']\n"
-            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
-            + "col_bigint: None\n"
-            + "col_bool: None\n"
-            + "col_bytea: None\n"
-            + "col_float4: None\n"
-            + "col_float8: None\n"
-            + "col_int: None\n"
-            + "col_numeric: None\n"
-            + "col_timestamptz: None\n"
-            + "col_date: None\n"
-            + "col_string: None\n"
-            + "col_jsonb: None\n"
-            + "col_array_bigint: None\n"
-            + "col_array_bool: None\n"
-            + "col_array_bytea: None\n"
-            + "col_array_float4: None\n"
-            + "col_array_float8: None\n"
-            + "col_array_int: None\n"
-            + "col_array_numeric: None\n"
-            + "col_array_timestamptz: None\n"
-            + "col_array_date: None\n"
-            + "col_array_string: None\n"
-            + "col_array_jsonb: None\n",
+        "Array\n"
+            + "(\n"
+            + "    [0] => 1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
+            + "\n"
+            + "    [1] => \\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
+            + "\n"
+            + ")\n",
         result);
   }
 
@@ -730,17 +697,19 @@ public class PdoMockServerTest extends AbstractMockServerTest {
     }
 
     String result = execute("read_write_transaction");
-    assertEquals("Array\n"
-        + "(\n"
-        + "    [0] => Array\n"
-        + "        (\n"
-        + "            [C] => 1\n"
-        + "            [0] => 1\n"
-        + "        )\n"
-        + "\n"
-        + ")\n"
-        + "Insert count: 1\n"
-        + "Insert count: 1\n", result);
+    assertEquals(
+        "Array\n"
+            + "(\n"
+            + "    [0] => Array\n"
+            + "        (\n"
+            + "            [C] => 1\n"
+            + "            [0] => 1\n"
+            + "        )\n"
+            + "\n"
+            + ")\n"
+            + "Insert count: 1\n"
+            + "Insert count: 1\n",
+        result);
 
     List<ExecuteSqlRequest> select1Requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -770,24 +739,26 @@ public class PdoMockServerTest extends AbstractMockServerTest {
   @Test
   public void testReadOnlyTransaction() throws Exception {
     String result = execute("read_only_transaction");
-    assertEquals("Array\n"
-        + "(\n"
-        + "    [0] => Array\n"
-        + "        (\n"
-        + "            [C] => 1\n"
-        + "            [0] => 1\n"
-        + "        )\n"
-        + "\n"
-        + ")\n"
-        + "Array\n"
-        + "(\n"
-        + "    [0] => Array\n"
-        + "        (\n"
-        + "            [C] => 2\n"
-        + "            [0] => 2\n"
-        + "        )\n"
-        + "\n"
-        + ")\n", result);
+    assertEquals(
+        "Array\n"
+            + "(\n"
+            + "    [0] => Array\n"
+            + "        (\n"
+            + "            [C] => 1\n"
+            + "            [0] => 1\n"
+            + "        )\n"
+            + "\n"
+            + ")\n"
+            + "Array\n"
+            + "(\n"
+            + "    [0] => Array\n"
+            + "        (\n"
+            + "            [C] => 2\n"
+            + "            [0] => 2\n"
+            + "        )\n"
+            + "\n"
+            + ")\n",
+        result);
 
     assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
     BeginTransactionRequest beginTransactionRequest =
@@ -817,33 +788,6 @@ public class PdoMockServerTest extends AbstractMockServerTest {
         + "        (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int,\n"
         + "        col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)\n"
         + "        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
-  }
-
-  private static Statement createBatchInsertStatement(int index) {
-    return Statement.newBuilder(getInsertAllTypesSql())
-        .bind("p1")
-        .to(100L + index)
-        .bind("p2")
-        .to(index % 2 == 0)
-        .bind("p3")
-        .to(ByteArray.copyFrom(index + "test_bytes"))
-        .bind("p4")
-        .to(3.14d + index)
-        .bind("p5")
-        .to(3.14d + index)
-        .bind("p6")
-        .to(index)
-        .bind("p7")
-        .to(com.google.cloud.spanner.Value.pgNumeric(index + ".123"))
-        .bind("p8")
-        .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", index)))
-        .bind("p9")
-        .to(Date.parseDate(String.format("2022-04-%02d", index + 1)))
-        .bind("p10")
-        .to("test_string" + index)
-        .bind("p11")
-        .to(com.google.cloud.spanner.Value.pgJsonb(String.format("{\"key\": \"value%d\"}", index)))
-        .build();
   }
 
   private void addDescribeInsertAllTypesResult() {

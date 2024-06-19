@@ -51,6 +51,14 @@ public class CopyStatementTest {
   public void testParseDirection() {
     assertEquals(Direction.FROM, parse("copy my_table from stdin").direction);
     assertEquals(Direction.TO, parse("copy my_table to stdout").direction);
+
+    // PostgreSQL accepts this kind of typo.
+    // See
+    // https://github.com/postgres/postgres/blob/03ec203164119f11f0eab4c83c97a8527e2b108d/src/backend/parser/gram.y#L3463
+    assertEquals(Direction.FROM, parse("copy my_table from stdout").direction);
+    assertEquals(Direction.TO, parse("copy my_table to stdin").direction);
+
+    // COPY BOTH is not supported.
     assertThrows(PGException.class, () -> parse("copy my_table both stdin"));
   }
 
