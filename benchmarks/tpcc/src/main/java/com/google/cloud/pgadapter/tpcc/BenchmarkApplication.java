@@ -117,11 +117,10 @@ public class BenchmarkApplication implements CommandLineRunner {
         System.out.printf("Finished loading %d rows\n", loadDataFuture.get());
       }
 
-      if (tpccConfiguration.isRunBenchmark()
-          && (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.PGADAPTER_JDBC_RUNNER)
-              || tpccConfiguration
-                  .getBenchmarkRunner()
-                  .equals(TpccConfiguration.SPANNER_JDBC_RUNNER))) {
+      if (!tpccConfiguration.isRunBenchmark()) {
+        return;
+      }
+      if (TpccConfiguration.RUNNERS.contains(tpccConfiguration.getBenchmarkRunner())) {
         LOG.info("Starting benchmark");
         // Enable the OpenTelemetry metrics in the client library.
         OpenTelemetry openTelemetry = enableOpenTelemetryMetrics();
@@ -137,7 +136,12 @@ public class BenchmarkApplication implements CommandLineRunner {
             statistics.setRunnerName("PGAdapter benchmark");
             executor.submit(
                 new JdbcBenchmarkRunner(
-                    statistics, pgadapterConnectionUrl, tpccConfiguration, metrics));
+                    statistics,
+                    pgadapterConnectionUrl,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics));
           } else if (tpccConfiguration
               .getBenchmarkRunner()
               .equals(TpccConfiguration.SPANNER_JDBC_RUNNER)) {
@@ -145,7 +149,24 @@ public class BenchmarkApplication implements CommandLineRunner {
             statistics.setRunnerName("Spanner JDBC benchmark");
             executor.submit(
                 new JdbcBenchmarkRunner(
-                    statistics, spannerConnectionUrl, tpccConfiguration, metrics));
+                    statistics,
+                    spannerConnectionUrl,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics));
+          } else if (tpccConfiguration
+              .getBenchmarkRunner()
+              .equals(TpccConfiguration.CLIENT_LIB_PG_RUNNER)) {
+            // Run client library PG benchmark
+            statistics.setRunnerName("Client library PG benchmark");
+            executor.submit(
+                new JavaClientBenchmarkRunner(
+                    statistics,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics));
           }
         }
 
@@ -160,7 +181,8 @@ public class BenchmarkApplication implements CommandLineRunner {
           throw new TimeoutException("Timed out while waiting for benchmark runners to shut down");
         }
       } else {
-        LOG.error("Unknown benchmark runner option: " + tpccConfiguration.getBenchmarkRunner());
+        throw new RuntimeException(
+            "Unknown benchmark runner option: " + tpccConfiguration.getBenchmarkRunner());
       }
     } catch (IOException exception) {
       throw new RuntimeException(exception);

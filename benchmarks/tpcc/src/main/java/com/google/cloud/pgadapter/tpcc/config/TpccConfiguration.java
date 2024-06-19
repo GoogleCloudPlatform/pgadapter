@@ -14,6 +14,7 @@
 package com.google.cloud.pgadapter.tpcc.config;
 
 import java.time.Duration;
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,6 +23,9 @@ import org.springframework.context.annotation.Configuration;
 public class TpccConfiguration {
   public static final String PGADAPTER_JDBC_RUNNER = "pgadapter";
   public static final String SPANNER_JDBC_RUNNER = "spanner_jdbc";
+  public static final String CLIENT_LIB_PG_RUNNER = "client_lib_pg";
+  public static final Set<String> RUNNERS =
+      Set.of(PGADAPTER_JDBC_RUNNER, SPANNER_JDBC_RUNNER, CLIENT_LIB_PG_RUNNER);
 
   private boolean loadData;
 
