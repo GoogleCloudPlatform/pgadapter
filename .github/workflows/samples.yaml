@@ -78,6 +78,11 @@ jobs:
         run: |
           npm install
           npm start
+      - name: Run Prisma Sample tests
+        working-directory: ./samples/nodejs/prisma-sample-app
+        run: |
+          npm install
+          npm start
   ruby-samples:
     runs-on: ubuntu-latest
     steps:

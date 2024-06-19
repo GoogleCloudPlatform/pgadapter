@@ -39,7 +39,7 @@ async function runSample() {
   // See https://github.com/GoogleCloudPlatform/pgadapter/tree/postgresql-dialect/samples/cloud-run/nodejs
   // for a sample.
   const pgAdapter = await startPGAdapter();
-  const port = 9999; // pgAdapter.getMappedPort(5432);
+  const port = pgAdapter.getMappedPort(5432);
   console.log(`PGAdapter started on port ${port}`);
   process.env.DATABASE_URL = `postgresql://localhost:${port}/prisma-sample?options=-c%20spanner.well_known_client=prisma`;
   
@@ -57,6 +57,10 @@ async function runSample() {
   await printAlbumsReleasedBefore1900();
   await updateVenueDescription();
   await staleRead();
+  
+  // Run 'npx prisma migrate deploy' once more, just to verify that we can run this command multiple
+  // times on an existing database.
+  await deployMigrations();
 
   await pgAdapter.stop();
 }
