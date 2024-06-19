@@ -13,8 +13,11 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc;
 
+import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
+import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.spanner.jdbc.JdbcSqlExceptionFactory.JdbcAbortedException;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -36,14 +39,24 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
   private final TpccConfiguration tpccConfiguration;
 
+  // We have to define the following configuration in the abstract class.
+  // If we define them in inherited classes, they will be null in threads.
+  protected final PGAdapterConfiguration pgAdapterConfiguration;
+  protected final SpannerConfiguration spannerConfiguration;
   protected final Metrics metrics;
 
   private boolean failed;
 
   AbstractBenchmarkRunner(
-      Statistics statistics, TpccConfiguration tpccConfiguration, Metrics metrics) {
+      Statistics statistics,
+      TpccConfiguration tpccConfiguration,
+      PGAdapterConfiguration pgAdapterConfiguration,
+      SpannerConfiguration spannerConfiguration,
+      Metrics metrics) {
     this.statistics = statistics;
     this.tpccConfiguration = tpccConfiguration;
+    this.pgAdapterConfiguration = pgAdapterConfiguration;
+    this.spannerConfiguration = spannerConfiguration;
     this.metrics = metrics;
   }
 
@@ -650,7 +663,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
   }
 
-  abstract void setup() throws SQLException;
+  abstract void setup() throws SQLException, IOException;
 
   abstract void teardown() throws SQLException;
 

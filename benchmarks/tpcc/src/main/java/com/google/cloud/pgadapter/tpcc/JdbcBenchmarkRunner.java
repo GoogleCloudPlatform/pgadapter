@@ -13,8 +13,11 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc;
 
+import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
+import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.common.base.Stopwatch;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -40,12 +43,14 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
       Statistics statistics,
       String connectionUrl,
       TpccConfiguration tpccConfiguration,
+      PGAdapterConfiguration pgAdapterConfiguration,
+      SpannerConfiguration spannerConfiguration,
       Metrics metrics) {
-    super(statistics, tpccConfiguration, metrics);
+    super(statistics, tpccConfiguration, pgAdapterConfiguration, spannerConfiguration, metrics);
     this.connectionUrl = connectionUrl;
   }
 
-  void setup() throws SQLException {
+  void setup() throws SQLException, IOException {
     connectionThreadLocal.set(DriverManager.getConnection(connectionUrl));
     statementThreadLocal.set(connectionThreadLocal.get().createStatement());
   }
