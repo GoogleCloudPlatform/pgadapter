@@ -37,3 +37,5 @@ samples/**/ruby/**/Gemfile.lock
 
 samples/**/vendor
 samples/**/composer.lock
+src/test/**/vendor
+src/test/**/composer.lock

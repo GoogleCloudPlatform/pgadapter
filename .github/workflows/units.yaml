@@ -25,6 +25,11 @@ jobs:
         with:
           python-version: '3.9'
       - run: python --version
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+      - run: php --version
       - uses: actions/setup-node@v4
         with:
           node-version: 16
@@ -76,6 +81,11 @@ jobs:
         with:
           python-version: '3.9'
       - run: python --version
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+      - run: php --version
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
