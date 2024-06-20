@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.connection;
 
 import com.google.api.core.InternalApi;
+import com.google.api.gax.grpc.GrpcInterceptorProvider;
 import com.google.auth.Credentials;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.connection.ConnectionOptions.Builder;
@@ -32,5 +33,11 @@ public class ConnectionOptionsHelper {
 
   public static Spanner getSpanner(Connection connection) {
     return ((ConnectionImpl) connection).getSpanner();
+  }
+
+  public static Builder setInterceptorProvider(
+      Builder connectionOptionsBuilder, GrpcInterceptorProvider provider) {
+    connectionOptionsBuilder.setConfigurator(options -> options.setInterceptorProvider(provider));
+    return connectionOptionsBuilder;
   }
 }

@@ -90,6 +90,10 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest request = executeSqlRequests.get(0);
     assertTrue(request.getTransaction().hasSingleUse());
     assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+
+    // Verify that no header was sent to Spanner to indicate which client was connected to
+    // PGAdapter, as this client is not auto-detected.
+    assertTrue(WELL_KNOWN_CLIENT_HEADERS.isEmpty());
   }
 
   @Test

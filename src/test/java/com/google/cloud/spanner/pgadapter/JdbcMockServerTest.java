@@ -48,6 +48,7 @@ import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCollation;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgConstraint;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgExtension;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgIndex;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -420,6 +421,11 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
     }
+
+    // Verify that a header was sent to Spanner to indicate which client was connected to PGAdapter.
+    assertTrue(
+        WELL_KNOWN_CLIENT_HEADERS.toString(),
+        WELL_KNOWN_CLIENT_HEADERS.contains(WellKnownClient.JDBC.name()));
   }
 
   @Test
