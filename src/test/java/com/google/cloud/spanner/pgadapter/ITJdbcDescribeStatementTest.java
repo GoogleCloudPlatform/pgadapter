@@ -389,7 +389,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_numeric=? "
               + "and col_timestamptz=? "
               + "and col_date=? "
-              + "and col_varchar=?"
+              + "and col_varchar=? "
               + "and borked='really borked'"
         }) {
       try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
