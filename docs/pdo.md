@@ -78,7 +78,7 @@ See [README](../README.md) for more possibilities on how to run PGAdapter.
 
 The following will give you the best possible performance when using PHP PDO with PGAdapter.
 
-## Parameterized Queries
+### Parameterized Queries
 Use parameterized queries to reduce the number of times that Spanner has to parse the query. Spanner
 caches the query execution plan based on the SQL string. Using parameterized queries allows Spanner
 to re-use the query execution plan for different query parameter values, as the SQL string remains
