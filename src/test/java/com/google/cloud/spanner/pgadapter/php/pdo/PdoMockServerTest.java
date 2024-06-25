@@ -32,8 +32,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.Mutation;
@@ -68,7 +70,9 @@ public class PdoMockServerTest extends AbstractMockServerTest {
 
   static String execute(String method) throws Exception {
     return run(
-        new String[] {"php", "pdo_test.php", method, String.valueOf(pgServer.getLocalPort())},
+        new String[] {
+          "php", "pdo_test.php", method, "/tmp", String.valueOf(pgServer.getLocalPort())
+        },
         DIRECTORY_NAME);
   }
 
@@ -781,6 +785,48 @@ public class PdoMockServerTest extends AbstractMockServerTest {
     // Read-only transactions are not really committed or rolled back.
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testBatchDml() throws Exception {
+    String sql = "insert into my_table (id, value) values ($1, $2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.getDefaultInstance())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql).bind("p1").to(1L).bind("p2").to("One").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql).bind("p1").to(2L).bind("p2").to("Two").build(), 1L));
+
+    String actualOutput = execute("batch_dml");
+    String expectedOutput = "Inserted two rows\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+  }
+
+  @Test
+  public void testBatchDdl() throws Exception {
+    addDdlResponseToSpannerAdmin();
+
+    String actualOutput = execute("batch_ddl");
+    String expectedOutput = "Created a table and an index in one batch\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockDatabaseAdmin.getRequests().size());
+    assertEquals(
+        2,
+        ((UpdateDatabaseDdlRequest) mockDatabaseAdmin.getRequests().get(0)).getStatementsCount());
   }
 
   private static String getInsertAllTypesSql() {
