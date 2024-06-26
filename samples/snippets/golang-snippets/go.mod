@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.22.4
 
 require (
-	github.com/docker/docker v26.1.4+incompatible
+	github.com/docker/docker v27.0.2+incompatible
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/testcontainers/testcontainers-go v0.31.0
 )
