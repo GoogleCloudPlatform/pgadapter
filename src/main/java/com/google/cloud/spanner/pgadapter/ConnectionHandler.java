@@ -528,7 +528,9 @@ public class ConnectionHandler implements Runnable {
    * shutting down while the connection is still active.
    */
   void terminate() {
-    getThread().interrupt();
+    if (this.thread != null && this.thread.isAlive()) {
+      getThread().interrupt();
+    }
     handleTerminate();
     try {
       if (!socket.isClosed()) {
