@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.metadata;
 
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DEFAULT_STARTUP_TIMEOUT;
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.parseExitMode;
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.parseSslMode;
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.toServerVersionNum;
 import static org.junit.Assert.assertEquals;
@@ -32,6 +33,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.ExitMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
@@ -314,6 +316,26 @@ public class OptionsMetadataTest {
     assertFalse(SslMode.Disable.isSslEnabled());
     assertTrue(SslMode.Enable.isSslEnabled());
     assertTrue(SslMode.Require.isSslEnabled());
+  }
+
+  @Test
+  public void testParseExitMode() {
+    assertEquals(ExitMode.HALT_WITH_EXIT_CODE_ZERO_ON_SUCCESS, parseExitMode(null));
+    assertEquals(
+        ExitMode.HALT_WITH_EXIT_CODE_ZERO_ON_SUCCESS,
+        parseExitMode("HALT_WITH_EXIT_CODE_ZERO_ON_SUCCESS"));
+    assertEquals(
+        ExitMode.HALT_WITH_EXIT_CODE_ZERO_ON_SUCCESS,
+        parseExitMode("halt_with_exit_code_zero_on_success"));
+    assertEquals(ExitMode.USE_JVM_EXIT_CODE, parseExitMode("USE_JVM_EXIT_CODE"));
+    assertEquals(ExitMode.USE_JVM_EXIT_CODE, parseExitMode("use_jvm_exit_code"));
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> parseExitMode("foo"));
+    assertEquals(
+        "Invalid exit mode value specified: foo\n"
+            + "It must be one of HALT_WITH_EXIT_CODE_ZERO_ON_SUCCESS,USE_JVM_EXIT_CODE",
+        exception.getMessage());
   }
 
   @Test

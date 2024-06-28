@@ -213,6 +213,7 @@ public class ProxyServer extends AbstractApiService {
 
   @Override
   protected void doStop() {
+    // First close all server sockets to prevent new connections from being accepted.
     for (ServerSocket serverSocket : this.serverSockets) {
       try {
         logger.log(
@@ -227,6 +228,9 @@ public class ProxyServer extends AbstractApiService {
             () -> String.format("Closing server socket %s failed: %s", serverSocket, exception));
       }
     }
+    // Close all existing connections.
+    // TODO: Implement smart shutdown that waits for all connections to finish before shutting down.
+    // See https://www.postgresql.org/docs/current/server-shutdown.html
     for (ConnectionHandler handler : getConnectionHandlers()) {
       handler.terminate();
     }

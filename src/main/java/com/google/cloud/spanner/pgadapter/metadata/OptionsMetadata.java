@@ -24,6 +24,7 @@ import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.ConnectionOptions;
+import com.google.cloud.spanner.pgadapter.ExitMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.Server;
 import com.google.common.annotations.VisibleForTesting;
@@ -36,10 +37,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -586,6 +589,7 @@ public class OptionsMetadata {
   private static final String OPTION_JDBC_PROPERTIES = "r";
   private static final String OPTION_SERVER_VERSION = "v";
   private static final String OPTION_INTERNAL_DEBUG_MODE = "internal_debug";
+  private static final String OPTION_EXIT_MODE = "exit_mode";
   private static final String OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING =
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
@@ -619,6 +623,7 @@ public class OptionsMetadata {
   private final Map<String, String> propertyMap;
   private final String serverVersion;
   private final boolean debugMode;
+  private final ExitMode exitMode;
   private final Duration startupTimeout;
 
   /**
@@ -712,6 +717,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
+    this.exitMode = parseExitMode(commandLine.getOptionValue(OPTION_EXIT_MODE));
     this.startupTimeout = startupTimeout;
   }
 
@@ -785,6 +791,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
+    this.exitMode = ExitMode.HALT_WITH_EXIT_CODE_ZERO_ON_SUCCESS;
     this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
@@ -839,6 +846,24 @@ public class OptionsMetadata {
       // Catch and rethrow to give a better error message.
       throw new IllegalArgumentException(
           String.format("Invalid ddl-batching mode value specified: %s", value));
+    }
+  }
+
+  static ExitMode parseExitMode(String value) {
+    if (value == null) {
+      return ExitMode.HALT_WITH_EXIT_CODE_ZERO_ON_SUCCESS;
+    }
+    try {
+      return ExitMode.valueOf(value.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      // Catch and rethrow to give a better error message.
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid exit mode value specified: %s\nIt must be one of %s",
+              value,
+              Arrays.stream(ExitMode.values())
+                  .map(ExitMode::toString)
+                  .collect(Collectors.joining(","))));
     }
   }
 
@@ -1299,6 +1324,16 @@ public class OptionsMetadata {
         false,
         "Enables legacy logging using the default java.util.logging configuration.\n"
             + "This sends all log output to stderr.");
+    options.addOption(
+        OPTION_EXIT_MODE,
+        "exit_mode_on_success",
+        true,
+        "Sets the exit mode on successful shutdown. The default is to return exit code 0\n"
+            + "if the server shuts down successfully, also when the server was shutdown with SIGINT\n"
+            + "or SIGTERM. Set this option to "
+            + ExitMode.USE_JVM_EXIT_CODE
+            + " to let the server\n"
+            + "return the JVM exit code. This will be 130 for SIGINT and 143 for SIGTERM.");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);
@@ -1366,6 +1401,10 @@ public class OptionsMetadata {
 
   public boolean isDebugMode() {
     return this.debugMode;
+  }
+
+  public ExitMode getExitMode() {
+    return this.exitMode;
   }
 
   public boolean isUseVirtualThreads() {

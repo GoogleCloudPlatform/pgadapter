@@ -61,6 +61,10 @@ public class Server {
       OpenTelemetry openTelemetry = setupOpenTelemetry(optionsMetadata);
       ProxyServer server = new ProxyServer(optionsMetadata, openTelemetry);
       server.startServer();
+      // Register a shutdown hook that stops the ProxyServer when the JVM is being shut down.
+      // The exit code will be zero if the shutdown succeeds.
+      Runtime.getRuntime()
+          .addShutdownHook(new ServerShutdownHook(server, optionsMetadata.getExitMode()));
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }

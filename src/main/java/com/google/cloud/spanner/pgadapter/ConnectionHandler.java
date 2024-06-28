@@ -62,6 +62,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
@@ -371,9 +372,11 @@ public class ConnectionHandler implements Runnable {
    */
   private RunConnectionState runConnection(boolean ssl) {
     RunConnectionState result = RunConnectionState.TERMINATED;
+    String hostAddress = "";
     try (ConnectionMetadata connectionMetadata =
         new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream())) {
       this.connectionMetadata = connectionMetadata;
+      hostAddress = socket.getInetAddress().getHostAddress();
 
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
@@ -420,10 +423,10 @@ public class ConnectionHandler implements Runnable {
       logger.log(
           Level.WARNING,
           e,
-          () ->
+          Suppliers.ofInstance(
               String.format(
                   "Exception on connection handler with ID %s for client %s: %s",
-                  getName(), socket.getInetAddress().getHostAddress(), e));
+                  getName(), hostAddress, e)));
     } finally {
       if (result != RunConnectionState.RESTART_WITH_SSL) {
         logger.log(
@@ -525,6 +528,7 @@ public class ConnectionHandler implements Runnable {
    * shutting down while the connection is still active.
    */
   void terminate() {
+    getThread().interrupt();
     handleTerminate();
     try {
       if (!socket.isClosed()) {
