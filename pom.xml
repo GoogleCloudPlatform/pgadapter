@@ -38,7 +38,7 @@
     <excludedIntegrationTests/>
 
     <junixsocket.version>2.9.1</junixsocket.version>
-    <opentelemetry.exporter.version>0.23.0</opentelemetry.exporter.version>
+    <opentelemetry.exporter.version>0.30.0</opentelemetry.exporter.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -55,7 +55,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.8.0</version>
+    <version>1.8.1</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>

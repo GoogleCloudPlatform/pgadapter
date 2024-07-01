@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Use the official maven/Java image to create a build artifact.
-FROM maven:3.9.7-eclipse-temurin-17 as builder
+FROM maven:3.9.8-eclipse-temurin-17 as builder
 
 # Copy local code to the container image.
 WORKDIR /app

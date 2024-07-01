@@ -1,8 +1,9 @@
 <?php
 
 $method = $argv[1];
-$port = $argv[2];
-$dsn = sprintf("pgsql:host=localhost;port=%s;dbname=test", $port);
+$host = $argv[2];
+$port = $argv[3];
+$dsn = sprintf("pgsql:host=%s;port=%s;dbname=test", $host, $port);
 $method($dsn);
 
 function select1($dsn): void
@@ -268,4 +269,32 @@ function bind_insert_statement($id, $statement): void
     $statement->bindValue(9, "2022-03-24");
     $statement->bindValue(10, "test_string");
     $statement->bindValue(11, '{"key": "value"}');
+}
+
+function batch_dml($dsn): void
+{
+    $connection = new PDO($dsn);
+    $connection->exec("START BATCH DML");
+    $statement = $connection->prepare("insert into my_table (id, value) values (:id, :value)");
+    $statement->execute(["id" => 1, "value" => "One"]);
+    $statement->execute(["id" => 2, "value" => "Two"]);
+    $connection->exec("RUN BATCH");
+
+    print("Inserted two rows\n");
+
+    $statement = null;
+    $connection = null;
+}
+
+function batch_ddl($dsn): void
+{
+    $connection = new PDO($dsn);
+    $connection->exec("START BATCH DDL");
+    $connection->exec("CREATE TABLE my_table (id bigint primary key, value varchar)");
+    $connection->exec("CREATE INDEX my_index ON my_table (value)");
+    $connection->exec("RUN BATCH");
+
+    print("Created a table and an index in one batch\n");
+
+    $connection = null;
 }
