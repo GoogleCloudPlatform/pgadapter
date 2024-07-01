@@ -137,14 +137,19 @@ using (var reader = cmd.ExecuteReader())
 ### Batching / Pipelining
 Use [batching / pipelining](https://www.npgsql.org/doc/performance.html#batchingpipelining) for
 optimal performance when executing multiple statements. This both saves round-trips between your
-application and PGAdapter and between PGAdapter and Cloud Spanner.
+application and PGAdapter and between PGAdapter and Spanner.
 
 You can batch any type of statement. A batch can also contain a mix of different types of statements,
-such as both queries and DML statements. It is also possible (and recommended!) to batch DDL
-statements, but it is not recommended to mix DDL statements with other types of statements in one
-batch.
+such as both queries and DML statements, but Spanner will only execute DML and DDL statements as a
+batch. Queries are always sent and executed as single statements.
+
+__Note: It is not recommended to mix DDL statements with any other statements in a single batch.__
 
 #### DML Batch Example
+
+Creating batches for DML statements reduces the number of round-trips that are needed between your
+application and PGAdapter, and between PGAdapter and Spanner. It is recommended to use DML batches
+whenever possible.
 
 ```csharp
 var sql = "INSERT INTO my_table (key, value) values ($1, $2)";
@@ -164,7 +169,49 @@ for (var i = 0; i < batchSize; i++)
 var updateCount = batch.ExecuteNonQuery();
 ```
 
+#### DDL Batch Example
+
+Creating batches for DDL statements reduces the number of schema versions that are created by
+Spanner. This significantly reduces the time that it takes to make schema changes on Spanner. It is
+recommended to use DDL batches whenever possible.
+
+See https://cloud.google.com/spanner/docs/schema-updates for more information on how to make schema
+changes on Spanner.
+
+```csharp
+using var command = new NpgsqlBatch(connection);
+command.BatchCommands.Add(new NpgsqlBatchCommand(@"
+    create table singers (
+        id         varchar not null primary key,
+        first_name varchar,
+        last_name  varchar not null,
+        full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,
+        active     boolean,
+        created_at timestamptz,
+        updated_at timestamptz
+    )"));
+command.BatchCommands.Add(new NpgsqlBatchCommand(@"
+    create table albums (
+        id               varchar not null primary key,
+        title            varchar not null,
+        marketing_budget numeric,
+        release_date     date,
+        cover_picture    bytea,
+        singer_id        varchar not null,
+        created_at       timestamptz,
+        updated_at       timestamptz,
+        constraint fk_albums_singers foreign key (singer_id) references singers (id)
+    )"));
+command.ExecuteNonQuery();
+```
+
 #### Mixed Batch Example
+
+`npgsql` supports mixing different types of statements in one batch. PGAdapter accepts this, but
+only DML and DDL statements will be sent as batches to Spanner. Queries cannot be executed as a
+batch, and are therefore sent as single statements from PGAdapter to Spanner.
+
+__Note: It is not recommended to mix DDL statements with other statements in a batch.__
 
 ```csharp
 var sql = "INSERT INTO my_table (key, value) values ($1, $2)";
@@ -201,33 +248,4 @@ using (var reader = batch.ExecuteReader())
     // npgsql returns the total number of rows affected for the entire batch until here.
     Console.WriteLine($"Inserted and updated {reader.RecordsAffected} rows");
 }
-```
-
-#### DDL Batch Example
-
-```csharp
-using var command = new NpgsqlBatch(connection);
-command.BatchCommands.Add(new NpgsqlBatchCommand(@"
-    create table singers (
-        id         varchar not null primary key,
-        first_name varchar,
-        last_name  varchar not null,
-        full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,
-        active     boolean,
-        created_at timestamptz,
-        updated_at timestamptz
-    )"));
-command.BatchCommands.Add(new NpgsqlBatchCommand(@"
-    create table albums (
-        id               varchar not null primary key,
-        title            varchar not null,
-        marketing_budget numeric,
-        release_date     date,
-        cover_picture    bytea,
-        singer_id        varchar not null,
-        created_at       timestamptz,
-        updated_at       timestamptz,
-        constraint fk_albums_singers foreign key (singer_id) references singers (id)
-    )"));
-command.ExecuteNonQuery();
 ```
