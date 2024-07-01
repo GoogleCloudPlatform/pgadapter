@@ -63,7 +63,7 @@ e2e-psql)
   echo "Starting PGAdapter"
   ls -lh target
   UBER_JAR="pgadapter.jar"
-  (java -jar target/"${UBER_JAR}" -p "${GOOGLE_CLOUD_PROJECT}" -i "${GOOGLE_CLOUD_INSTANCE}" -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -e "${GOOGLE_CLOUD_ENDPOINT}" -s 4242 -v "${PG_BACKEND_VERSION}" -ddl AutocommitImplicitTransaction > /dev/null 2>&1) &
+  (java -jar target/"${UBER_JAR}" -p "${GOOGLE_CLOUD_PROJECT}" -i "${GOOGLE_CLOUD_INSTANCE}" -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -e "${GOOGLE_CLOUD_ENDPOINT}" -s 4242 -v "${PG_BACKEND_VERSION}" -ddl AutocommitImplicitTransaction -exit_mode USE_JVM_EXIT_CODE > /dev/null 2>&1) &
   BACK_PID=$!
   sleep 1
 #  execute psql and evaluate result
@@ -73,7 +73,8 @@ e2e-psql)
 #  cleanup and exit
   rm -r .ci/e2e-result
   kill ${BACK_PID}
-  sleep 1
+  wait ${BACK_PID}
+  RETURN_CODE=$?
   gcloud spanner databases delete "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance=${GOOGLE_CLOUD_INSTANCE} --quiet
   echo "exiting with ${RETURN_CODE}"
   exit ${RETURN_CODE}
