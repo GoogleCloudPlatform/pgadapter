@@ -14,6 +14,8 @@
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
+import java.util.List;
 
 class WarehouseRowProducer extends AbstractRowProducer {
   private static final String TABLE = "warehouse";
@@ -25,9 +27,8 @@ class WarehouseRowProducer extends AbstractRowProducer {
   }
 
   @Override
-  String createRow(long rowIndex) {
-    return String.join(
-        ",",
+  List<ImmutableList> createRowsAsList(long rowIndex) {
+    return Arrays.asList(
         ImmutableList.of(
             getId(rowIndex),
             getRandomName(),

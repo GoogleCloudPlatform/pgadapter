@@ -42,6 +42,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
+
+  public enum Dialect {
+    POSTGRESQL,
+    GOOGLE_STANDARD_SQL,
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(JavaClientBenchmarkRunner.class);
   private Spanner spanner;
   private final ThreadLocal<TransactionManager> transactionManagerThreadLocal = new ThreadLocal<>();

@@ -13,16 +13,22 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
+import com.google.cloud.Timestamp;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.LongStream;
 
 class OrderRowProducer extends AbstractOrderedIdRowProducer {
+  private final long SEED = 12345;
+
   static class DistrictId {
     final long warehouse;
     final long district;
@@ -62,10 +68,6 @@ class OrderRowProducer extends AbstractOrderedIdRowProducer {
     o_all_local
     """;
 
-  private final long warehouseId;
-
-  private final long districtId;
-
   private final ImmutableList<Long> customerIds;
 
   OrderRowProducer(
@@ -75,7 +77,9 @@ class OrderRowProducer extends AbstractOrderedIdRowProducer {
     this.districtId = districtId;
     ArrayList<Long> customerIds =
         Lists.newArrayList(LongStream.range(0L, customerCount).iterator());
-    Collections.shuffle(customerIds);
+    // We need this to be deterministic; otherwise, the new_orders table cannot find
+    // the right reference and break the foreign key.
+    Collections.shuffle(customerIds, new Random(SEED));
     this.customerIds = ImmutableList.copyOf(customerIds);
     CUSTOMER_IDS.put(new DistrictId(warehouseId, districtId), this.customerIds);
   }
@@ -89,7 +93,21 @@ class OrderRowProducer extends AbstractOrderedIdRowProducer {
             String.valueOf(districtId),
             String.valueOf(warehouseId),
             getCustomerId(rowIndex),
-            now(),
+            nowAsString(),
+            getRandomCarrierId(rowIndex),
+            getOrderLineCount(rowIndex),
+            getAllLocal()));
+  }
+
+  @Override
+  List<ImmutableList> createRowsAsList(long rowIndex) {
+    return Arrays.asList(
+        ImmutableList.of(
+            getId(rowIndex),
+            String.valueOf(districtId),
+            String.valueOf(warehouseId),
+            getCustomerId(rowIndex),
+            Timestamp.now(),
             getRandomCarrierId(rowIndex),
             getOrderLineCount(rowIndex),
             getAllLocal()));

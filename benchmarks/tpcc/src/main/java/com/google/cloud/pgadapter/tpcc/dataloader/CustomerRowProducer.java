@@ -13,8 +13,11 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.pgadapter.tpcc.LastNameGenerator;
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
+import java.util.List;
 
 class CustomerRowProducer extends AbstractRowProducer {
   private static final String TABLE = "customer";
@@ -43,10 +46,6 @@ class CustomerRowProducer extends AbstractRowProducer {
     c_data
     """;
 
-  private final long warehouseId;
-
-  private final long districtId;
-
   CustomerRowProducer(DataLoadStatus status, long warehouseId, long districtId, long rowCount) {
     super(TABLE, COLUMNS, rowCount, status::incCustomer);
     this.warehouseId = warehouseId;
@@ -70,7 +69,34 @@ class CustomerRowProducer extends AbstractRowProducer {
             getRandomState(),
             getRandomZip(),
             getRandomPhone(),
-            now(),
+            nowAsString(), // Use a timestamp as string.
+            getCredit(),
+            getCreditLimit(),
+            getDiscount(),
+            getBalance(),
+            getYtdPayment(),
+            getPaymentCount(),
+            getDeliveryCount(),
+            getData()));
+  }
+
+  @Override
+  List<ImmutableList> createRowsAsList(long rowIndex) {
+    return Arrays.asList(
+        ImmutableList.of(
+            getId(rowIndex),
+            String.valueOf(districtId),
+            String.valueOf(warehouseId),
+            getRandomName(),
+            getRandomString(2),
+            getLastName(rowIndex),
+            getRandomStreet(1),
+            getRandomStreet(2),
+            getRandomCity(),
+            getRandomState(),
+            getRandomZip(),
+            getRandomPhone(),
+            Timestamp.now(),
             getCredit(),
             getCreditLimit(),
             getDiscount(),

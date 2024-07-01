@@ -13,6 +13,7 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
+import com.google.common.collect.ImmutableList;
 import java.io.Writer;
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -21,6 +22,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -29,15 +32,37 @@ abstract class AbstractRowProducer {
 
   private final String table;
   private final String columns;
+  private final List<String> columnList;
   private final long rowCount;
   private final Runnable rowCounterIncrementer;
+  protected Long warehouseId = null;
+  protected Long districtId = null;
   final Random random = new Random();
 
   AbstractRowProducer(String table, String columns, long rowCount, Runnable rowCounterIncrementer) {
     this.table = table;
     this.columns = columns;
+    String[] parts = columns.split(",");
+    for (int i = 0; i < parts.length; i++) {
+      parts[i] = parts[i].trim().replace("\n", "");
+    }
+    this.columnList = Arrays.asList(parts);
     this.rowCount = rowCount;
     this.rowCounterIncrementer = rowCounterIncrementer;
+  }
+
+  void incRowCounterIncrementer(long count) {
+    for (int i = 0; i < count; i++) {
+      rowCounterIncrementer.run();
+    }
+  }
+
+  Long getWarehouseId() {
+    return warehouseId;
+  }
+
+  Long getDistrictId() {
+    return districtId;
   }
 
   String getTable() {
@@ -46,6 +71,14 @@ abstract class AbstractRowProducer {
 
   String getColumns() {
     return columns;
+  }
+
+  List<String> getColumnsAsList() {
+    return columnList;
+  }
+
+  long getRowCount() {
+    return rowCount;
   }
 
   Future<Long> asyncWriteRows(ExecutorService executor, Writer writer) {
@@ -64,7 +97,22 @@ abstract class AbstractRowProducer {
         });
   }
 
-  abstract String createRow(long rowIndex);
+  String createRow(long rowIndex) {
+    List<ImmutableList> list = createRowsAsList(rowIndex);
+    if (list == null) {
+      return null;
+    }
+    StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < list.size(); i++) {
+      if (i > 0) {
+        builder.append("\n");
+      }
+      builder.append(String.join(",", list.get(i)));
+    }
+    return builder.toString();
+  }
+
+  abstract List<ImmutableList> createRowsAsList(long rowIndex);
 
   String quote(String input) {
     return "'" + input + "'";
@@ -125,7 +173,7 @@ abstract class AbstractRowProducer {
     return getRandomInt(100_000_000, 999_999_999);
   }
 
-  String now() {
+  String nowAsString() {
     return DateTimeFormatter.ISO_OFFSET_DATE_TIME
         .format(ZonedDateTime.ofInstant(Instant.now(), ZoneId.systemDefault()))
         .replace('T', ' ');

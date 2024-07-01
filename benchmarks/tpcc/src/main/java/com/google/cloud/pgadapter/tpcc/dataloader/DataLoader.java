@@ -13,8 +13,14 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.pgadapter.tpcc.BenchmarkApplication;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
+import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.Mutation.WriteBuilder;
+import com.google.cloud.spanner.ValueBinder;
+import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -22,11 +28,14 @@ import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.io.PipedReader;
 import java.io.PipedWriter;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +48,11 @@ import org.slf4j.LoggerFactory;
 public class DataLoader implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkApplication.class);
 
+  private final int MUTATION_LIMIT_PER_COMMIT = 60000;
+
   private final String connectionUrl;
+
+  private final boolean isGoogleSQL;
 
   private final TpccConfiguration tpccConfiguration;
 
@@ -52,6 +65,7 @@ public class DataLoader implements AutoCloseable {
   public DataLoader(
       DataLoadStatus status, String connectionUrl, TpccConfiguration tpccConfiguration) {
     this.connectionUrl = connectionUrl;
+    this.isGoogleSQL = connectionUrl.startsWith("jdbc:cloudspanner");
     this.tpccConfiguration = tpccConfiguration;
     this.loadDataExecutor =
         MoreExecutors.listeningDecorator(
@@ -270,7 +284,167 @@ public class DataLoader implements AutoCloseable {
     return totalRowCount;
   }
 
-  long loadTable(AbstractRowProducer rowProducer) throws SQLException, IOException {
+  long loadTable(AbstractRowProducer rowProducer)
+      throws RuntimeException, SQLException, IOException {
+    if (isGoogleSQL) {
+      return loadTableInGSQL(rowProducer);
+    }
+    return loadTableInPG(rowProducer);
+  }
+
+  String unquote(String input) {
+    if (input.length() >= 2 && input.startsWith("'") && input.endsWith("'")) {
+      return input.substring(1, input.length() - 1);
+    }
+    return input;
+  }
+
+  void setMutationColumn(WriteBuilder writeBuilder, String name, Object value)
+      throws RuntimeException {
+    ValueBinder valueBinder = writeBuilder.set(name);
+    if (value instanceof Boolean) {
+      valueBinder.to((Boolean) value);
+    } else if (value instanceof Long) {
+      valueBinder.to((Long) value);
+    } else if (value instanceof Float) {
+      valueBinder.to((Float) value);
+    } else if (value instanceof Double) {
+      valueBinder.to((Double) value);
+    } else if (value instanceof BigDecimal) {
+      valueBinder.to((BigDecimal) value);
+    } else if (value instanceof Timestamp) {
+      Timestamp timestamp = (Timestamp) value;
+      if (timestamp.equals(Timestamp.MIN_VALUE)) {
+        // We use Timestamp.MIN_VALUE to represent NULL as ImmutableList does not permit
+        // NULLs.
+        valueBinder.to((Timestamp) null);
+      } else {
+        valueBinder.to(timestamp);
+      }
+    } else if (value instanceof String) {
+      // Unquote the string because the generated strings are wrapped with single
+      // quotes.
+      String stringValue = unquote((String) value);
+      if (stringValue.isEmpty()) {
+        valueBinder.to((String) null);
+      } else {
+        valueBinder.to(stringValue);
+      }
+    } else {
+      throw new RuntimeException(String.format("Unknown value for column %s: %s", name, value));
+    }
+  }
+
+  long loadTableInGSQL(AbstractRowProducer rowProducer)
+      throws RuntimeException, SQLException, IOException {
+    long count = 0;
+    try (Connection connection = createConnection();
+        Statement statement = connection.createStatement()) {
+      // Unwrap the Cloud Spanner specific interface to be able to access custom
+      // methods.
+      CloudSpannerJdbcConnection spannerConnection =
+          connection.unwrap(CloudSpannerJdbcConnection.class);
+      spannerConnection.setAutoCommit(false);
+
+      // If the table is alread filled up with some rows, resume from the last
+      // position.
+      long startRowIndex = 0;
+      if (rowProducer.getColumnsAsList().size() >= 1) {
+        String query =
+            String.format(
+                "select max(BIT_REVERSE(%s, false)) from %s",
+                rowProducer.getColumnsAsList().get(0), rowProducer.getTable());
+        if (rowProducer.getWarehouseId() != null && rowProducer.getDistrictId() == null) {
+          query =
+              String.format(
+                  "select max(BIT_REVERSE(%s, false)) from %s where w_id = %d",
+                  rowProducer.getColumnsAsList().get(0),
+                  rowProducer.getTable(),
+                  rowProducer.getWarehouseId());
+        } else if (rowProducer.getWarehouseId() != null && rowProducer.getDistrictId() != null) {
+          String formatString =
+              "select max(BIT_REVERSE(%s, false)) from %s where w_id = %d and d_id = %d";
+          if (Arrays.asList("orders", "new_orders", "order_line")
+              .contains(rowProducer.getTable())) {
+            formatString = "select max(%s) from %s where w_id = %d and d_id = %d";
+          }
+          query =
+              String.format(
+                  formatString,
+                  rowProducer.getColumnsAsList().get(0),
+                  rowProducer.getTable(),
+                  rowProducer.getWarehouseId(),
+                  rowProducer.getDistrictId());
+        }
+        try (ResultSet resultSet = statement.executeQuery(query)) {
+          if (!resultSet.next()) {
+            throw new SQLException(String.format("No results found for: %s", statement));
+          }
+          if (resultSet.getObject(1) != null) {
+            // The column index starts from 1.
+            startRowIndex = ((long) resultSet.getObject(1)) + 1;
+            // Update the counter status.
+            rowProducer.incRowCounterIncrementer(startRowIndex);
+          }
+        }
+      }
+      List<Mutation> mutations = new ArrayList<>(Math.round(MUTATION_LIMIT_PER_COMMIT / 4));
+      int columnCount = rowProducer.getColumnsAsList().size();
+      for (long rowIndex = startRowIndex; rowIndex < rowProducer.getRowCount(); rowIndex++) {
+        List<ImmutableList> rows = rowProducer.createRowsAsList(rowIndex);
+        if (rows == null) {
+          continue;
+        }
+        for (int i = 0; i < rows.size(); i++) {
+          ImmutableList row = rows.get(i);
+          WriteBuilder writeBuilder = Mutation.newInsertBuilder(rowProducer.getTable());
+          if (columnCount != row.size()) {
+            // This should never happen.
+            throw new RuntimeException(
+                String.format(
+                    "The number of generated columns does not match the target number - expected: %d, actual: %d",
+                    columnCount, row.size()));
+          }
+          for (int columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+            setMutationColumn(
+                writeBuilder,
+                rowProducer.getColumnsAsList().get(columnIndex),
+                row.get(columnIndex));
+          }
+          Mutation mutation = writeBuilder.build();
+          mutations.add(mutation);
+        }
+
+        if ((mutations.size() * columnCount) >= MUTATION_LIMIT_PER_COMMIT) {
+          spannerConnection.bufferedWrite(mutations);
+          spannerConnection.commit();
+          count += mutations.size();
+          mutations.clear();
+        }
+
+        // We need to put this increase here because `rows` only has multiple records
+        // for `order_line` table. The number of rows in the `order_line` table is
+        // greater than the computed total number:
+        //     count(`order_line` table) = warehouses * districts
+        //                                 * customers per district
+        //                                 * a pseudo-random value
+        // When we show the rows in the status, we only a number without the
+        // pseudo-random value.
+        rowProducer.incRowCounterIncrementer(1);
+      }
+
+      // This is needed because there are some uncommitted mutations.
+      if (mutations.size() != 0) {
+        spannerConnection.bufferedWrite(mutations);
+        spannerConnection.commit();
+        count += mutations.size();
+      }
+
+      return count;
+    }
+  }
+
+  long loadTableInPG(AbstractRowProducer rowProducer) throws SQLException, IOException {
     PipedWriter writer = new PipedWriter();
     try (PipedReader reader = new PipedReader(writer, 30_000);
         Connection connection = createConnection()) {
@@ -284,48 +458,67 @@ public class DataLoader implements AutoCloseable {
     }
   }
 
+  void truncateTable(Statement statement, String table) throws SQLException {
+    if (isGoogleSQL) {
+      statement.execute(String.format("delete from %s where true", table));
+    } else {
+      statement.execute("truncate table " + table);
+    }
+  }
+
   void truncate() throws SQLException {
     try (Connection connection = createConnection();
         Statement statement = connection.createStatement()) {
+      if (isGoogleSQL) {
+        statement.execute("set autocommit=true");
+      }
       LOG.info("truncating new_orders");
-      statement.execute("truncate table new_orders");
+      truncateTable(statement, "new_orders");
       status.setTruncatedNewOrders();
       LOG.info("truncating order_line");
-      statement.execute("truncate table order_line");
+      truncateTable(statement, "order_line");
       status.setTruncatedOrderLine();
       LOG.info("truncating orders");
-      statement.execute("truncate table orders");
+      truncateTable(statement, "orders");
       status.setTruncatedOrders();
       LOG.info("truncating history");
-      statement.execute("truncate table history");
+      truncateTable(statement, "history");
       status.setTruncatedHistory();
       LOG.info("truncating customer");
-      statement.execute("truncate table customer");
+      truncateTable(statement, "customer");
       status.setTruncatedCustomer();
       LOG.info("truncating stock");
-      statement.execute("truncate table stock");
+      truncateTable(statement, "stock");
       status.setTruncatedStock();
       LOG.info("truncating district");
-      statement.execute("truncate table district");
+      truncateTable(statement, "district");
       status.setTruncatedDistrict();
       LOG.info("truncating warehouse");
-      statement.execute("truncate table warehouse");
+      truncateTable(statement, "warehouse");
       status.setTruncatedWarehouse();
       LOG.info("truncating item");
-      statement.execute("truncate table item");
+      truncateTable(statement, "item");
       status.setTruncatedItem();
+      if (isGoogleSQL) {
+        statement.execute("set autocommit=false");
+      }
     }
   }
 
   private Connection createConnection() throws SQLException {
     Connection connection = DriverManager.getConnection(connectionUrl);
-    // Use upsert instead of insert for COPY to prevent data loading errors if the tables are
-    // already half-filled.
-    connection.createStatement().execute("set spanner.copy_upsert=true");
     // Allow copy operations to be non-atomic.
-    connection
-        .createStatement()
-        .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
+    if (isGoogleSQL) {
+      connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");
+    } else {
+      // Use upsert instead of insert for COPY to prevent data loading errors if the
+      // tables are
+      // already half-filled.
+      connection.createStatement().execute("set spanner.copy_upsert=true");
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
+    }
     return connection;
   }
 }

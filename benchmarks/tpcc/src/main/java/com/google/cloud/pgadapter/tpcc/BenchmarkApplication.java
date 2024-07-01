@@ -97,8 +97,12 @@ public class BenchmarkApplication implements CommandLineRunner {
                 pgAdapterConfiguration.getMaxSessions(), tpccConfiguration.getBenchmarkThreads()));
     try {
       if (tpccConfiguration.isLoadData()) {
+        String loadDataConnectionUrl =
+            tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.CLIENT_LIB_GSQL_RUNNER)
+                ? spannerConnectionUrl
+                : pgadapterConnectionUrl;
         System.out.println("Checking schema");
-        SchemaService schemaService = new SchemaService(pgadapterConnectionUrl);
+        SchemaService schemaService = new SchemaService(loadDataConnectionUrl);
         schemaService.createSchema();
         System.out.println("Checked schema, starting benchmark");
 
@@ -106,7 +110,7 @@ public class BenchmarkApplication implements CommandLineRunner {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         DataLoadStatus status = new DataLoadStatus(tpccConfiguration);
         Future<Long> loadDataFuture =
-            executor.submit(() -> loadData(status, pgadapterConnectionUrl));
+            executor.submit(() -> loadData(status, loadDataConnectionUrl));
         executor.shutdown();
         Stopwatch watch = Stopwatch.createStarted();
         while (!loadDataFuture.isDone()) {

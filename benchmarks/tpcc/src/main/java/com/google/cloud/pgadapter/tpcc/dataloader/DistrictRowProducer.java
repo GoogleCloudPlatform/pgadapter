@@ -14,6 +14,8 @@
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
+import java.util.List;
 
 class DistrictRowProducer extends AbstractRowProducer {
   private static final String TABLE = "district";
@@ -31,17 +33,14 @@ class DistrictRowProducer extends AbstractRowProducer {
       d_ytd,
       d_next_o_id""";
 
-  private final long warehouseId;
-
   DistrictRowProducer(DataLoadStatus status, long warehouseId, long rowCount) {
     super(TABLE, COLUMNS, rowCount, status::incDistrict);
     this.warehouseId = warehouseId;
   }
 
   @Override
-  String createRow(long rowIndex) {
-    return String.join(
-        ",",
+  List<ImmutableList> createRowsAsList(long rowIndex) {
+    return Arrays.asList(
         ImmutableList.of(
             getId(rowIndex),
             String.valueOf(warehouseId),
