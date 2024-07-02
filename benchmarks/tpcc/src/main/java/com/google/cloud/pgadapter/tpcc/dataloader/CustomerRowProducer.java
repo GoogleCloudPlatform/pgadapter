@@ -16,6 +16,7 @@ package com.google.cloud.pgadapter.tpcc.dataloader;
 import com.google.cloud.Timestamp;
 import com.google.cloud.pgadapter.tpcc.LastNameGenerator;
 import com.google.common.collect.ImmutableList;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
@@ -72,7 +73,7 @@ class CustomerRowProducer extends AbstractRowProducer {
             nowAsString(), // Use a timestamp as string.
             getCredit(),
             getCreditLimit(),
-            getDiscount(),
+            getDiscount().toPlainString(),
             getBalance(),
             getYtdPayment(),
             getPaymentCount(),
@@ -119,7 +120,7 @@ class CustomerRowProducer extends AbstractRowProducer {
     return "50000";
   }
 
-  String getDiscount() {
+  BigDecimal getDiscount() {
     return getRandomDecimal(2);
   }
 

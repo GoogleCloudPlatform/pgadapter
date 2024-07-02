@@ -14,6 +14,7 @@
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
 import com.google.common.collect.ImmutableList;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
@@ -33,6 +34,18 @@ class ItemRowProducer extends AbstractRowProducer {
   }
 
   @Override
+  String createRow(long rowIndex) {
+    return String.join(
+        ",",
+        ImmutableList.of(
+            getId(rowIndex),
+            getRandomImId(),
+            getName(rowIndex),
+            getRandomPrice().toPlainString(),
+            getData()));
+  }
+
+  @Override
   List<ImmutableList> createRowsAsList(long rowIndex) {
     return Arrays.asList(
         ImmutableList.of(
@@ -43,7 +56,7 @@ class ItemRowProducer extends AbstractRowProducer {
     return getRandomInt(1, 10000);
   }
 
-  String getRandomPrice() {
+  BigDecimal getRandomPrice() {
     return getRandomDecimal(100, 2);
   }
 

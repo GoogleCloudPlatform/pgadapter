@@ -143,7 +143,7 @@ abstract class AbstractRowProducer {
   }
 
   String getRandomTax() {
-    return getRandomDecimal(2);
+    return getRandomDecimal(2).toPlainString();
   }
 
   String getRandomString(int length) {
@@ -159,14 +159,13 @@ abstract class AbstractRowProducer {
     return String.valueOf(random.nextInt(max - min + 1) + min);
   }
 
-  String getRandomDecimal(int precision) {
+  BigDecimal getRandomDecimal(int precision) {
     return getRandomDecimal(1, precision);
   }
 
-  String getRandomDecimal(int factor, int precision) {
+  BigDecimal getRandomDecimal(int factor, int precision) {
     return BigDecimal.valueOf(random.nextDouble() * factor)
-        .round(new MathContext(precision, RoundingMode.HALF_UP))
-        .toPlainString();
+        .round(new MathContext(precision, RoundingMode.HALF_UP));
   }
 
   String getRandomPhone() {

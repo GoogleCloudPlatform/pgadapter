@@ -16,6 +16,7 @@ package com.google.cloud.pgadapter.tpcc.dataloader;
 import com.google.cloud.Timestamp;
 import com.google.cloud.pgadapter.tpcc.dataloader.OrderRowProducer.DistrictId;
 import com.google.common.collect.ImmutableList;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -70,7 +71,7 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
                   String.valueOf(warehouseId),
                   getDeliveryDateAsString(rowIndex),
                   getQuantity(),
-                  getPrice(rowIndex),
+                  getPrice(rowIndex).toPlainString(),
                   getData())));
     }
     return builder.toString();
@@ -123,8 +124,8 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
     return "5";
   }
 
-  String getPrice(long rowIndex) {
-    return rowIndex % 3L == 0 ? "0.0" : getRandomDecimal(10000, 2);
+  BigDecimal getPrice(long rowIndex) {
+    return rowIndex % 3L == 0 ? BigDecimal.valueOf(0.0) : getRandomDecimal(10000, 2);
   }
 
   String getData() {
