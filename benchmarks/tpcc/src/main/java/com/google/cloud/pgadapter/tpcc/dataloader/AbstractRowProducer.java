@@ -51,18 +51,8 @@ abstract class AbstractRowProducer {
     this.rowCounterIncrementer = rowCounterIncrementer;
   }
 
-  void incRowCounterIncrementer(long count) {
-    for (int i = 0; i < count; i++) {
-      rowCounterIncrementer.run();
-    }
-  }
-
-  Long getWarehouseId() {
-    return warehouseId;
-  }
-
-  Long getDistrictId() {
-    return districtId;
+  void incRowCounterIncrementer() {
+    rowCounterIncrementer.run();
   }
 
   String getTable() {

@@ -386,7 +386,7 @@ public class DataLoader implements AutoCloseable {
         //                                 * a pseudo-random value
         // When we show the rows in the status, we only a number without the
         // pseudo-random value.
-        rowProducer.incRowCounterIncrementer(1);
+        rowProducer.incRowCounterIncrementer();
       }
 
       // This is needed because there are some uncommitted mutations.
