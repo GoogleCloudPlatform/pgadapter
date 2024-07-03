@@ -31,11 +31,9 @@ import java.io.PipedWriter;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -346,51 +344,9 @@ public class DataLoader implements AutoCloseable {
           connection.unwrap(CloudSpannerJdbcConnection.class);
       spannerConnection.setAutoCommit(false);
 
-      // If the table is alread filled up with some rows, resume from the last
-      // position.
-      long startRowIndex = 0;
-      if (rowProducer.getColumnsAsList().size() >= 1) {
-        String query =
-            String.format(
-                "select max(BIT_REVERSE(%s, false)) from %s",
-                rowProducer.getColumnsAsList().get(0), rowProducer.getTable());
-        if (rowProducer.getWarehouseId() != null && rowProducer.getDistrictId() == null) {
-          query =
-              String.format(
-                  "select max(BIT_REVERSE(%s, false)) from %s where w_id = %d",
-                  rowProducer.getColumnsAsList().get(0),
-                  rowProducer.getTable(),
-                  rowProducer.getWarehouseId());
-        } else if (rowProducer.getWarehouseId() != null && rowProducer.getDistrictId() != null) {
-          String formatString =
-              "select max(BIT_REVERSE(%s, false)) from %s where w_id = %d and d_id = %d";
-          if (Arrays.asList("orders", "new_orders", "order_line")
-              .contains(rowProducer.getTable())) {
-            formatString = "select max(%s) from %s where w_id = %d and d_id = %d";
-          }
-          query =
-              String.format(
-                  formatString,
-                  rowProducer.getColumnsAsList().get(0),
-                  rowProducer.getTable(),
-                  rowProducer.getWarehouseId(),
-                  rowProducer.getDistrictId());
-        }
-        try (ResultSet resultSet = statement.executeQuery(query)) {
-          if (!resultSet.next()) {
-            throw new SQLException(String.format("No results found for: %s", statement));
-          }
-          if (resultSet.getObject(1) != null) {
-            // The column index starts from 1.
-            startRowIndex = ((long) resultSet.getObject(1)) + 1;
-            // Update the counter status.
-            rowProducer.incRowCounterIncrementer(startRowIndex);
-          }
-        }
-      }
       List<Mutation> mutations = new ArrayList<>(Math.round(MUTATION_LIMIT_PER_COMMIT / 4));
       int columnCount = rowProducer.getColumnsAsList().size();
-      for (long rowIndex = startRowIndex; rowIndex < rowProducer.getRowCount(); rowIndex++) {
+      for (long rowIndex = 0L; rowIndex < rowProducer.getRowCount(); rowIndex++) {
         List<ImmutableList> rows = rowProducer.createRowsAsList(rowIndex);
         if (rows == null) {
           continue;
