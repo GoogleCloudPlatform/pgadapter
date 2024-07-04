@@ -60,7 +60,7 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
   private GoString createConnString() {
     return new GoString(
         String.format(
-            "postgres://uid:pwd@localhost:%d/?prefer_simple_protocol=true&sslmode=disable",
+            "postgres://uid:pwd@localhost:%d/d?prefer_simple_protocol=true&sslmode=disable",
             pgServer.getLocalPort()));
   }
 
