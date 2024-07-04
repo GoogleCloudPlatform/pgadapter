@@ -1192,7 +1192,7 @@ public abstract class AbstractMockServerTest {
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
         createMockSpannerThatReturnsOneQueryPartition(),
-        "d",
+        null,
         configurator -> {},
         OpenTelemetry.noop());
   }
@@ -1291,7 +1291,7 @@ public abstract class AbstractMockServerTest {
     TestOptionsMetadataBuilder builder = new TestOptionsMetadataBuilder();
     builder.setProject("p").setInstance("i");
     if (defaultDatabase != null) {
-      builder.setDatabase("d");
+      builder.setDatabase(defaultDatabase);
     }
     builder
         .enableDebugMode()

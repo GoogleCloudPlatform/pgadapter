@@ -103,7 +103,8 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements.
    */
   private String createUrl(String extraOptions) {
-    return String.format("jdbc:postgresql://localhost:%d/" + extraOptions, pgServer.getLocalPort());
+    return String.format(
+        "jdbc:postgresql://localhost:%d/d" + extraOptions, pgServer.getLocalPort());
   }
 
   private Connection createConnection() throws SQLException {
