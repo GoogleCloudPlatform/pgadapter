@@ -98,7 +98,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
       return new GoString(String.format("host=/tmp port=%d database=d", pgServer.getLocalPort()));
     }
     return new GoString(
-        String.format("postgres://uid:pwd@localhost:%d/d?sslmode=disable", pgServer.getLocalPort()));
+        String.format(
+            "postgres://uid:pwd@localhost:%d/d?sslmode=disable", pgServer.getLocalPort()));
   }
 
   @Test
