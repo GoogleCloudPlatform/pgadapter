@@ -14,12 +14,16 @@
 
 package com.google.cloud.spanner;
 
+import com.google.api.core.InternalApi;
 import com.google.spanner.v1.Session;
 
+/** This file will be removed in the future. */
+@InternalApi
 public class MockServerHelper {
 
   private MockServerHelper() {}
 
+  @InternalApi
   public static Session getSession(MockSpannerServiceImpl server, String sessionName) {
     return server.getSession(sessionName);
   }
