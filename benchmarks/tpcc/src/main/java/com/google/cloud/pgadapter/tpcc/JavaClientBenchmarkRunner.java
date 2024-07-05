@@ -89,9 +89,6 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
         transactionManagerThreadLocal.get().commit();
         Duration executionDuration = stopwatch.elapsed();
         metrics.recordLatency(executionDuration.toMillis());
-      } catch (AbortedException e) {
-        // Ignore the aborted exception. Roll back the transaction.
-        transactionManagerThreadLocal.get().rollback();
       } finally {
         transactionManagerThreadLocal.get().close();
       }
