@@ -33,6 +33,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.MockServerHelper;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
@@ -60,12 +61,14 @@ import com.google.spanner.admin.database.v1.GetDatabaseDdlResponse;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.CreateSessionRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
+import com.google.spanner.v1.Session;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
@@ -386,9 +389,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements.
    */
   private String createUrl() {
+    return createUrl("d");
+  }
+
+  private String createUrl(String database) {
     return String.format(
-        "jdbc:postgresql://localhost:%d/?options=-c%%20server_version=%s",
-        pgServer.getLocalPort(), pgVersion);
+        "jdbc:postgresql://localhost:%d/%s?options=-c%%20server_version=%s",
+        pgServer.getLocalPort(), database, pgVersion);
   }
 
   private String getExpectedInitialApplicationName() {
@@ -5414,6 +5421,116 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           SQLState.SerializationFailure.toString(),
           exception.getServerErrorMessage().getSQLState());
     }
+  }
+
+  @Test
+  public void testUsesMultiplexedSessionForQueryInAutoCommit() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl(UUID.randomUUID().toString()))) {
+      assertTrue(connection.getAutoCommit());
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        //noinspection StatementWithEmptyBody
+        while (resultSet.next()) {
+          // Just consume the results
+        }
+      }
+    }
+    // Verify that one multiplexed session was created and used.
+    assertEquals(1, mockSpanner.countRequestsOfType(CreateSessionRequest.class));
+    CreateSessionRequest request = mockSpanner.getRequestsOfType(CreateSessionRequest.class).get(0);
+    assertTrue(request.getSession().getMultiplexed());
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    String sessionId = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSession();
+    Session session = MockServerHelper.getSession(mockSpanner, sessionId);
+    assertNotNull(session);
+    assertTrue(session.getMultiplexed());
+  }
+
+  @Test
+  public void testUsesMultiplexedSessionForQueryInReadOnlyTransaction() throws SQLException {
+    int numQueries = 2;
+    try (Connection connection =
+        DriverManager.getConnection(createUrl(UUID.randomUUID().toString()))) {
+      connection.setReadOnly(true);
+      connection.setAutoCommit(false);
+
+      for (int ignore = 0; ignore < numQueries; ignore++) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+          //noinspection StatementWithEmptyBody
+          while (resultSet.next()) {
+            // Just consume the results
+          }
+        }
+      }
+    }
+    // Verify that one multiplexed session was created and used.
+    assertEquals(1, mockSpanner.countRequestsOfType(CreateSessionRequest.class));
+    CreateSessionRequest request = mockSpanner.getRequestsOfType(CreateSessionRequest.class).get(0);
+    assertTrue(request.getSession().getMultiplexed());
+
+    // Verify that both queries used the multiplexed session.
+    assertEquals(numQueries, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (int index = 0; index < numQueries; index++) {
+      String sessionId =
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(index).getSession();
+      Session session = MockServerHelper.getSession(mockSpanner, sessionId);
+      assertNotNull(session);
+      assertTrue(session.getMultiplexed());
+    }
+  }
+
+  @Test
+  public void testUsesRegularSessionForDmlInAutoCommit() throws SQLException {
+    String sql = "insert into foo (id) values (1)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl(UUID.randomUUID().toString()))) {
+      assertTrue(connection.getAutoCommit());
+      assertEquals(1, connection.createStatement().executeUpdate(sql));
+    }
+    // The JDBC connection creates a multiplexed session by default, because it executes a query to
+    // check what dialect the database uses. This query is executed using a multiplexed session.
+    assertEquals(1, mockSpanner.countRequestsOfType(CreateSessionRequest.class));
+    CreateSessionRequest request = mockSpanner.getRequestsOfType(CreateSessionRequest.class).get(0);
+    assertTrue(request.getSession().getMultiplexed());
+    // Verify that a regular session was used for the insert statement.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+    String sessionId = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSession();
+    Session session = MockServerHelper.getSession(mockSpanner, sessionId);
+    assertNotNull(session);
+    assertFalse(session.getMultiplexed());
+  }
+
+  @Test
+  public void testUsesRegularSessionForQueryInTransaction() throws SQLException {
+    String sql = "SELECT 1";
+    try (Connection connection =
+        DriverManager.getConnection(createUrl(UUID.randomUUID().toString()))) {
+      connection.setAutoCommit(false);
+      assertFalse(connection.getAutoCommit());
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        //noinspection StatementWithEmptyBody
+        while (resultSet.next()) {
+          // Just consume the results
+        }
+      }
+      connection.commit();
+    }
+    // The JDBC connection creates a multiplexed session by default, because it executes a query to
+    // check what dialect the database uses. This query is executed using a multiplexed session.
+    assertEquals(1, mockSpanner.countRequestsOfType(CreateSessionRequest.class));
+    CreateSessionRequest request = mockSpanner.getRequestsOfType(CreateSessionRequest.class).get(0);
+    assertTrue(request.getSession().getMultiplexed());
+    // Verify that a regular session was used for the select statement.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+    String sessionId = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSession();
+    Session session = MockServerHelper.getSession(mockSpanner, sessionId);
+    assertNotNull(session);
+    assertFalse(session.getMultiplexed());
   }
 
   @Ignore("Only used for manual performance testing")
