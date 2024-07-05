@@ -20,6 +20,7 @@ import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoadStatus;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoader;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
@@ -170,7 +171,21 @@ public class BenchmarkApplication implements CommandLineRunner {
                     tpccConfiguration,
                     pgAdapterConfiguration,
                     spannerConfiguration,
-                    metrics));
+                    metrics,
+                    Dialect.POSTGRESQL));
+          } else if (tpccConfiguration
+              .getBenchmarkRunner()
+              .equals(TpccConfiguration.CLIENT_LIB_GSQL_RUNNER)) {
+            // Run client library PG benchmark
+            statistics.setRunnerName("Client library GSQL benchmark");
+            executor.submit(
+                new JavaClientBenchmarkRunner(
+                    statistics,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics,
+                    Dialect.GOOGLE_STANDARD_SQL));
           }
         }
 

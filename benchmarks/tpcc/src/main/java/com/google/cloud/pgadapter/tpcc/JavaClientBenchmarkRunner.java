@@ -20,6 +20,7 @@ import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.spanner.AbortedException;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
@@ -43,11 +44,6 @@ import org.slf4j.LoggerFactory;
 
 class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
 
-  public enum Dialect {
-    POSTGRESQL,
-    GOOGLE_STANDARD_SQL,
-  }
-
   private static final Logger LOG = LoggerFactory.getLogger(JavaClientBenchmarkRunner.class);
   private Spanner spanner;
   private final ThreadLocal<TransactionManager> transactionManagerThreadLocal = new ThreadLocal<>();
@@ -58,8 +54,15 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
       TpccConfiguration tpccConfiguration,
       PGAdapterConfiguration pgAdapterConfiguration,
       SpannerConfiguration spannerConfiguration,
-      Metrics metrics) {
-    super(statistics, tpccConfiguration, pgAdapterConfiguration, spannerConfiguration, metrics);
+      Metrics metrics,
+      Dialect dialect) {
+    super(
+        statistics,
+        tpccConfiguration,
+        pgAdapterConfiguration,
+        spannerConfiguration,
+        metrics,
+        dialect);
   }
 
   void setup() throws SQLException, IOException {
@@ -104,7 +107,11 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
     for (int i = 0; i < params.length; i++) {
       Object param = params[i];
       if (param instanceof BigDecimal) {
-        builder.bind("p" + (i + 1)).to(Value.pgNumeric(((BigDecimal) param).toPlainString()));
+        if (dialect == Dialect.POSTGRESQL) {
+          builder.bind("p" + (i + 1)).to(Value.pgNumeric(((BigDecimal) param).toPlainString()));
+        } else {
+          builder.bind("p" + (i + 1)).to((BigDecimal) param);
+        }
       } else if (param instanceof String) {
         builder.bind("p" + (i + 1)).to((String) param);
       } else if (param instanceof Integer) {
@@ -118,7 +125,8 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
   }
 
   Object[] paramQueryRow(String sql, Object[] params) throws SQLException {
-    ParametersInfo parametersInfo = convertPositionalParametersToNamedParameters(sql, '?', "$");
+    ParametersInfo parametersInfo =
+        convertPositionalParametersToNamedParameters(sql, '?', getNamedParameterPrefix());
     Statement.Builder builder = Statement.newBuilder(parametersInfo.sqlWithNamedParameters);
     bindParams(builder, params);
     Statement stmt = builder.build();
@@ -143,7 +151,8 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
   }
 
   void executeParamStatement(String sql, Object[] params) throws SQLException {
-    ParametersInfo parametersInfo = convertPositionalParametersToNamedParameters(sql, '?', "$");
+    ParametersInfo parametersInfo =
+        convertPositionalParametersToNamedParameters(sql, '?', getNamedParameterPrefix());
     Statement.Builder builder = Statement.newBuilder(parametersInfo.sqlWithNamedParameters);
     bindParams(builder, params);
     Statement stmt = builder.build();
@@ -202,7 +211,9 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
   // If getAsObject() in Struct can be a public method, then we should use it
   // instead of using the following approach.
   Object getObject(Value value) {
-    if (value.getType().equals(Type.numeric())) {
+    if (value == null) {
+      return null;
+    } else if (value.getType().equals(Type.numeric())) {
       return value.getNumeric();
     } else if (value.getType().equals(Type.string())) {
       return value.getString();
@@ -218,8 +229,13 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
     return null;
   }
 
+  String getNamedParameterPrefix() {
+    return dialect == Dialect.POSTGRESQL ? "$" : "@p";
+  }
+
   List<Object[]> executeParamQuery(String sql, Object[] params) throws SQLException {
-    ParametersInfo parametersInfo = convertPositionalParametersToNamedParameters(sql, '?', "$");
+    ParametersInfo parametersInfo =
+        convertPositionalParametersToNamedParameters(sql, '?', getNamedParameterPrefix());
     List<Object[]> results = new ArrayList<>();
 
     Statement.Builder builder = Statement.newBuilder(parametersInfo.sqlWithNamedParameters);
