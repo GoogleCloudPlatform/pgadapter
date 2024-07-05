@@ -211,7 +211,7 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
   // If getAsObject() in Struct can be a public method, then we should use it
   // instead of using the following approach.
   Object getObject(Value value) {
-    if (value == null) {
+    if (value == null || value.isNull()) {
       return null;
     } else if (value.getType().equals(Type.numeric())) {
       return value.getNumeric();
