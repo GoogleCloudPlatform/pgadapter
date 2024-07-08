@@ -147,10 +147,6 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
   }
 
-  private String getNowFunctionInQuery() {
-    return dialect == Dialect.POSTGRESQL ? "Now()" : "CURRENT_TIMESTAMP()";
-  }
-
   private void newOrder() throws SQLException {
     LOG.debug("Executing new_order");
 
@@ -209,9 +205,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         new Object[] {districtNextOrderId + 1L, districtId, warehouseId});
     executeParamStatement(
         "INSERT INTO orders (o_id, d_id, w_id, c_id, o_entry_d, o_ol_cnt, o_all_local) "
-            + "VALUES (?,?,?,?,"
-            + getNowFunctionInQuery()
-            + ",?,?)",
+            + "VALUES (?,?,?,?,CURRENT_TIMESTAMP,?,?)",
         new Object[] {
           districtNextOrderId, districtId, warehouseId, customerId, orderLineCount, allLocal
         });
@@ -446,9 +440,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
     executeParamStatement(
         "INSERT INTO history (d_id, w_id, c_id, h_d_id,  h_w_id, h_date, h_amount, h_data) "
-            + "VALUES (?,?,?,?,?,"
-            + getNowFunctionInQuery()
-            + ",?,?)",
+            + "VALUES (?,?,?,?,?,CURRENT_TIMESTAMP,?,?)",
         new Object[] {
           customerDistrictId,
           customerWarehouseId,
@@ -592,9 +584,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
             new Object[] {carrierId, newOrderId, customerId, districtId, warehouseId});
         executeParamStatement(
             "UPDATE order_line "
-                + "SET ol_delivery_d = "
-                + getNowFunctionInQuery()
-                + " "
+                + "SET ol_delivery_d = CURRENT_TIMESTAMP "
                 + "WHERE o_id = ? AND c_id = ? AND d_id = ? AND w_id = ?",
             new Object[] {newOrderId, customerId, districtId, warehouseId});
         row =

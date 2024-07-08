@@ -16,6 +16,7 @@ package com.google.cloud.pgadapter.tpcc.dataloader;
 import com.google.cloud.Timestamp;
 import com.google.cloud.pgadapter.tpcc.BenchmarkApplication;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
 import com.google.cloud.spanner.ValueBinder;
@@ -50,8 +51,6 @@ public class DataLoader implements AutoCloseable {
 
   private final String connectionUrl;
 
-  private final boolean isGoogleSQL;
-
   private final TpccConfiguration tpccConfiguration;
 
   private final ListeningExecutorService loadDataExecutor;
@@ -60,10 +59,11 @@ public class DataLoader implements AutoCloseable {
 
   private final DataLoadStatus status;
 
+  private final Dialect dialect;
+
   public DataLoader(
       DataLoadStatus status, String connectionUrl, TpccConfiguration tpccConfiguration) {
     this.connectionUrl = connectionUrl;
-    this.isGoogleSQL = connectionUrl.startsWith("jdbc:cloudspanner");
     this.tpccConfiguration = tpccConfiguration;
     this.loadDataExecutor =
         MoreExecutors.listeningDecorator(
@@ -72,6 +72,10 @@ public class DataLoader implements AutoCloseable {
         MoreExecutors.listeningDecorator(
             Executors.newFixedThreadPool(tpccConfiguration.getLoadDataThreads()));
     this.status = status;
+    this.dialect =
+        tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.CLIENT_LIB_GSQL_RUNNER)
+            ? Dialect.GOOGLE_STANDARD_SQL
+            : Dialect.POSTGRESQL;
   }
 
   @Override
@@ -284,7 +288,7 @@ public class DataLoader implements AutoCloseable {
 
   long loadTable(AbstractRowProducer rowProducer)
       throws RuntimeException, SQLException, IOException {
-    if (isGoogleSQL) {
+    if (dialect == Dialect.GOOGLE_STANDARD_SQL) {
       return loadTableInGSQL(rowProducer);
     }
     return loadTableInPG(rowProducer);
@@ -344,6 +348,9 @@ public class DataLoader implements AutoCloseable {
           connection.unwrap(CloudSpannerJdbcConnection.class);
       spannerConnection.setAutoCommit(false);
 
+      // The smallest table `new_orders` only has 4 columns. So the largest number of
+      // mutations that we may need to store in a batch can be the predefined mutation
+      // limit divided by 4.
       List<Mutation> mutations = new ArrayList<>(Math.round(MUTATION_LIMIT_PER_COMMIT / 4));
       int columnCount = rowProducer.getColumnsAsList().size();
       for (long rowIndex = 0L; rowIndex < rowProducer.getRowCount(); rowIndex++) {
@@ -415,7 +422,7 @@ public class DataLoader implements AutoCloseable {
   }
 
   void truncateTable(Statement statement, String table) throws SQLException {
-    if (isGoogleSQL) {
+    if (dialect == Dialect.GOOGLE_STANDARD_SQL) {
       statement.execute(String.format("delete from %s where true", table));
     } else {
       statement.execute("truncate table " + table);
@@ -425,7 +432,7 @@ public class DataLoader implements AutoCloseable {
   void truncate() throws SQLException {
     try (Connection connection = createConnection();
         Statement statement = connection.createStatement()) {
-      if (isGoogleSQL) {
+      if (dialect == Dialect.GOOGLE_STANDARD_SQL) {
         statement.execute("set autocommit=true");
       }
       LOG.info("truncating new_orders");
@@ -455,7 +462,7 @@ public class DataLoader implements AutoCloseable {
       LOG.info("truncating item");
       truncateTable(statement, "item");
       status.setTruncatedItem();
-      if (isGoogleSQL) {
+      if (dialect == Dialect.GOOGLE_STANDARD_SQL) {
         statement.execute("set autocommit=false");
       }
     }
@@ -464,12 +471,11 @@ public class DataLoader implements AutoCloseable {
   private Connection createConnection() throws SQLException {
     Connection connection = DriverManager.getConnection(connectionUrl);
     // Allow copy operations to be non-atomic.
-    if (isGoogleSQL) {
+    if (dialect == Dialect.GOOGLE_STANDARD_SQL) {
       connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");
     } else {
       // Use upsert instead of insert for COPY to prevent data loading errors if the
-      // tables are
-      // already half-filled.
+      // tables are already half-filled.
       connection.createStatement().execute("set spanner.copy_upsert=true");
       connection
           .createStatement()

@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.LongStream;
 
 class OrderRowProducer extends AbstractOrderedIdRowProducer {
-  private final long SEED = 12345;
+  private static final long SEED = 12345;
 
   static class DistrictId {
     final long warehouse;

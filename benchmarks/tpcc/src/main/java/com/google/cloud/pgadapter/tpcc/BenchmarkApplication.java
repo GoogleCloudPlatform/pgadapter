@@ -98,12 +98,13 @@ public class BenchmarkApplication implements CommandLineRunner {
                 pgAdapterConfiguration.getMaxSessions(), tpccConfiguration.getBenchmarkThreads()));
     try {
       if (tpccConfiguration.isLoadData()) {
+        boolean isClientLibGSQLRunner =
+            tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.CLIENT_LIB_GSQL_RUNNER);
+        Dialect dialect = isClientLibGSQLRunner ? Dialect.GOOGLE_STANDARD_SQL : Dialect.POSTGRESQL;
         String loadDataConnectionUrl =
-            tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.CLIENT_LIB_GSQL_RUNNER)
-                ? spannerConnectionUrl
-                : pgadapterConnectionUrl;
+            isClientLibGSQLRunner ? spannerConnectionUrl : pgadapterConnectionUrl;
         System.out.println("Checking schema");
-        SchemaService schemaService = new SchemaService(loadDataConnectionUrl);
+        SchemaService schemaService = new SchemaService(loadDataConnectionUrl, dialect);
         schemaService.createSchema();
         System.out.println("Checked schema, starting benchmark");
 
