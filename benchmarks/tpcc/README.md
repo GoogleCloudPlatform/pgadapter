@@ -41,7 +41,7 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   "
 ```
 
-Load data into a GoogleSQL-dialect DB (we need to specify `client_lib_gsql` in `benchmark-runner` to indicate to load GSQL data):
+To load data into a GoogleSQL-dialect DB, you need to specify `client_lib_gsql` as the `benchmark-runner`. This instructs the benchmark application that it should use the Spanner Java client to connect to the database, and that it should use the GoogleSQL dialect:
 
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
@@ -63,7 +63,7 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
 
 ### Run benchmark
 
-Currently, we support benchmark runners: `pgadapter`, `spanner_jdbc`, `client_lib_pg`, and `client_lib_gsql`.
+Currently, we support the following benchmark runners: `pgadapter`, `spanner_jdbc`, `client_lib_pg`, and `client_lib_gsql`.
 
 Run with the default benchmark runner (PGAdapter with PG JDBC):
 
