@@ -16,6 +16,7 @@ package com.google.cloud.pgadapter.tpcc;
 import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
+import com.google.cloud.spanner.Dialect;
 import com.google.common.base.Stopwatch;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -46,7 +47,13 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
       PGAdapterConfiguration pgAdapterConfiguration,
       SpannerConfiguration spannerConfiguration,
       Metrics metrics) {
-    super(statistics, tpccConfiguration, pgAdapterConfiguration, spannerConfiguration, metrics);
+    super(
+        statistics,
+        tpccConfiguration,
+        pgAdapterConfiguration,
+        spannerConfiguration,
+        metrics,
+        Dialect.POSTGRESQL);
     this.connectionUrl = connectionUrl;
   }
 

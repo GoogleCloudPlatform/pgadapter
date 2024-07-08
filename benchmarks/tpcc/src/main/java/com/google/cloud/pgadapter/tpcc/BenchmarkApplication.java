@@ -20,6 +20,7 @@ import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoadStatus;
 import com.google.cloud.pgadapter.tpcc.dataloader.DataLoader;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
@@ -97,8 +98,13 @@ public class BenchmarkApplication implements CommandLineRunner {
                 pgAdapterConfiguration.getMaxSessions(), tpccConfiguration.getBenchmarkThreads()));
     try {
       if (tpccConfiguration.isLoadData()) {
+        boolean isClientLibGSQLRunner =
+            tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.CLIENT_LIB_GSQL_RUNNER);
+        Dialect dialect = isClientLibGSQLRunner ? Dialect.GOOGLE_STANDARD_SQL : Dialect.POSTGRESQL;
+        String loadDataConnectionUrl =
+            isClientLibGSQLRunner ? spannerConnectionUrl : pgadapterConnectionUrl;
         System.out.println("Checking schema");
-        SchemaService schemaService = new SchemaService(pgadapterConnectionUrl);
+        SchemaService schemaService = new SchemaService(loadDataConnectionUrl, dialect);
         schemaService.createSchema();
         System.out.println("Checked schema, starting benchmark");
 
@@ -106,7 +112,7 @@ public class BenchmarkApplication implements CommandLineRunner {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         DataLoadStatus status = new DataLoadStatus(tpccConfiguration);
         Future<Long> loadDataFuture =
-            executor.submit(() -> loadData(status, pgadapterConnectionUrl));
+            executor.submit(() -> loadData(status, loadDataConnectionUrl));
         executor.shutdown();
         Stopwatch watch = Stopwatch.createStarted();
         while (!loadDataFuture.isDone()) {
@@ -166,7 +172,21 @@ public class BenchmarkApplication implements CommandLineRunner {
                     tpccConfiguration,
                     pgAdapterConfiguration,
                     spannerConfiguration,
-                    metrics));
+                    metrics,
+                    Dialect.POSTGRESQL));
+          } else if (tpccConfiguration
+              .getBenchmarkRunner()
+              .equals(TpccConfiguration.CLIENT_LIB_GSQL_RUNNER)) {
+            // Run client library PG benchmark
+            statistics.setRunnerName("Client library GSQL benchmark");
+            executor.submit(
+                new JavaClientBenchmarkRunner(
+                    statistics,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics,
+                    Dialect.GOOGLE_STANDARD_SQL));
           }
         }
 

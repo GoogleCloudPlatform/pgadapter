@@ -13,8 +13,12 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.pgadapter.tpcc.dataloader.OrderRowProducer.DistrictId;
 import com.google.common.collect.ImmutableList;
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
@@ -33,10 +37,6 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
     ol_amount,
     ol_dist_info
     """;
-
-  private final long warehouseId;
-
-  private final long districtId;
 
   private final int itemCount;
 
@@ -69,12 +69,33 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
                   String.valueOf(line),
                   getRandomItem(),
                   String.valueOf(warehouseId),
-                  getDeliveryDate(rowIndex),
+                  getDeliveryDateAsString(rowIndex),
                   getQuantity(),
-                  getPrice(rowIndex),
+                  getPrice(rowIndex).toPlainString(),
                   getData())));
     }
     return builder.toString();
+  }
+
+  @Override
+  List<ImmutableList> createRowsAsList(long rowIndex) {
+    ImmutableList[] array = new ImmutableList[getOrderLineCount(rowIndex)];
+    for (int line = 0; line < getOrderLineCount(rowIndex); line++) {
+      array[line] =
+          ImmutableList.of(
+              getId(rowIndex),
+              getCustomerId(rowIndex),
+              String.valueOf(districtId),
+              String.valueOf(warehouseId),
+              String.valueOf(line),
+              getRandomItem(),
+              String.valueOf(warehouseId),
+              getDeliveryDate(rowIndex),
+              getQuantity(),
+              getPrice(rowIndex),
+              getData());
+    }
+    return Arrays.asList(array);
   }
 
   String getCustomerId(long rowIndex) {
@@ -89,16 +110,22 @@ class OrderLineRowProducer extends AbstractOrderedIdRowProducer {
     return String.valueOf(Long.reverse(random.nextInt(itemCount)));
   }
 
-  String getDeliveryDate(long rowIndex) {
-    return rowIndex % 3L == 0 ? "" : now();
+  Timestamp getDeliveryDate(long rowIndex) {
+    // Use smallest timestamp to represent NULL because ImmutableList does not
+    // permit NULLs.
+    return rowIndex % 3L == 0 ? Timestamp.MIN_VALUE : Timestamp.now();
+  }
+
+  String getDeliveryDateAsString(long rowIndex) {
+    return rowIndex % 3L == 0 ? "" : nowAsString();
   }
 
   String getQuantity() {
     return "5";
   }
 
-  String getPrice(long rowIndex) {
-    return rowIndex % 3L == 0 ? "0.0" : getRandomDecimal(10000, 2);
+  BigDecimal getPrice(long rowIndex) {
+    return rowIndex % 3L == 0 ? BigDecimal.valueOf(0.0) : getRandomDecimal(10000, 2);
   }
 
   String getData() {

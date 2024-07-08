@@ -22,6 +22,8 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
 
 ### Load data
 
+Load data into a PostgreSQL-dialect DB:
+
 ```shell
 mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.benchmark-duration=PT600s
@@ -39,9 +41,29 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   "
 ```
 
+To load data into a GoogleSQL-dialect DB, you need to specify `client_lib_gsql` as the `benchmark-runner`. This instructs the benchmark application that it should use the Spanner Java client to connect to the database, and that it should use the GoogleSQL dialect:
+
+```shell
+mvn spring-boot:run -Dspring-boot.run.arguments="
+  --tpcc.benchmark-duration=PT600s
+  --tpcc.warehouses=10
+  --tpcc.benchmark-threads=1
+  --tpcc.load-data=true
+  --tpcc.truncate-before-load=false
+  --tpcc.run-benchmark=false
+  --tpcc.benchmark-runner=client_lib_gsql
+  --tpcc.use-read-only-transactions=false
+  --tpcc.lock-scanned-ranges=false
+  --spanner.project=my-project
+  --spanner.instance=my-instance
+  --spanner.database=my-database
+  --pgadapter.credentials=/path/to/credentials.json
+  "
+```
+
 ### Run benchmark
 
-Currently, we support benchmark runners: `pgadapter`, `spanner_jdbc`, and `client_lib_pg`.
+Currently, we support the following benchmark runners: `pgadapter`, `spanner_jdbc`, `client_lib_pg`, and `client_lib_gsql`.
 
 Run with the default benchmark runner (PGAdapter with PG JDBC):
 
@@ -94,6 +116,26 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
   --tpcc.truncate-before-load=false
   --tpcc.run-benchmark=true
   --tpcc.benchmark-runner=client_lib_pg
+  --tpcc.use-read-only-transactions=true
+  --tpcc.lock-scanned-ranges=false
+  --spanner.project=my-project
+  --spanner.instance=my-instance
+  --spanner.database=my-database
+  --pgadapter.credentials=/path/to/credentials.json
+  "
+```
+
+Run with the benchmark runner (Client library with GoogleSQL dialect):
+
+```shell
+mvn spring-boot:run -Dspring-boot.run.arguments="
+  --tpcc.benchmark-duration=PT600s
+  --tpcc.warehouses=10
+  --tpcc.benchmark-threads=1
+  --tpcc.load-data=false
+  --tpcc.truncate-before-load=false
+  --tpcc.run-benchmark=true
+  --tpcc.benchmark-runner=client_lib_gsql
   --tpcc.use-read-only-transactions=true
   --tpcc.lock-scanned-ranges=false
   --spanner.project=my-project
