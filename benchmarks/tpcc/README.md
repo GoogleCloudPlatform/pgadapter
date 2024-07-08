@@ -63,7 +63,7 @@ mvn spring-boot:run -Dspring-boot.run.arguments="
 
 ### Run benchmark
 
-Currently, we support benchmark runners: `pgadapter`, `spanner_jdbc`, `client_lib_pg`, and `client_lib_gsql`.
+Currently, we support the following benchmark runners: `pgadapter`, `spanner_jdbc`, `client_lib_pg`, and `client_lib_gsql`.
 
 Run with the default benchmark runner (PGAdapter with PG JDBC):
 
