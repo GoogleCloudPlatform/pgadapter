@@ -21,8 +21,8 @@ import com.google.api.core.InternalApi;
  * be removed in the future.
  */
 @InternalApi
-public class SessionPoolOptionsHelper {
-  private SessionPoolOptionsHelper() {}
+public class PGAdapterSessionPoolOptionsHelper {
+  private PGAdapterSessionPoolOptionsHelper() {}
 
   @InternalApi
   public static SessionPoolOptions.Builder useMultiplexedSessions(

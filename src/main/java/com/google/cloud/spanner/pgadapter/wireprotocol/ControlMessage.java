@@ -26,7 +26,6 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
@@ -386,7 +385,7 @@ public abstract class ControlMessage extends WireMessage {
                 Math.min(8 * Runtime.getRuntime().availableProcessors(), partitions.size())));
     List<ListenableFuture<Long>> futures = new ArrayList<>(partitions.size());
     Connection spannerConnection = connection.getSpannerConnection();
-    Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+    Spanner spanner = spannerConnection.getSpanner();
     BatchClient batchClient = spanner.getBatchClient(connection.getDatabaseId());
     BatchReadOnlyTransaction batchReadOnlyTransaction =
         batchClient.batchReadOnlyTransaction(batchTransactionId);

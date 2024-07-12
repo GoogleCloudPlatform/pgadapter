@@ -25,8 +25,8 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Instance;
 import com.google.cloud.spanner.InstanceAdminClient;
 import com.google.cloud.spanner.InstanceNotFoundException;
+import com.google.cloud.spanner.PGAdapterSessionPoolOptionsHelper;
 import com.google.cloud.spanner.SessionPoolOptions;
-import com.google.cloud.spanner.SessionPoolOptionsHelper;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
@@ -209,9 +209,10 @@ public class ConnectionHandler implements Runnable {
     }
     SessionPoolOptions sessionPoolOptions =
         options.getSessionPoolOptions() == null
-            ? SessionPoolOptionsHelper.useMultiplexedSessions(SessionPoolOptions.newBuilder())
+            ? PGAdapterSessionPoolOptionsHelper.useMultiplexedSessions(
+                    SessionPoolOptions.newBuilder())
                 .build()
-            : SessionPoolOptionsHelper.useMultiplexedSessions(
+            : PGAdapterSessionPoolOptionsHelper.useMultiplexedSessions(
                     options.getSessionPoolOptions().toBuilder())
                 .build();
     connectionOptionsBuilder.setSessionPoolOptions(sessionPoolOptions);
@@ -243,7 +244,7 @@ public class ConnectionHandler implements Runnable {
         // Include more information about the available databases if someone tried to connect using
         // psql.
         if (getWellKnownClient() == WellKnownClient.PSQL) {
-          Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+          Spanner spanner = spannerConnection.getSpanner();
           String availableDatabases =
               listDatabasesOrInstances(
                   notFoundException, getServer().getOptions().getDatabaseName(database), spanner);

@@ -49,7 +49,6 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
@@ -558,7 +557,7 @@ public class BackendConnection {
         if (transactionMode != TransactionMode.IMPLICIT) {
           result.set(spannerConnection.execute(statement));
         } else {
-          Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+          Spanner spanner = spannerConnection.getSpanner();
           BatchClient batchClient = spanner.getBatchClient(databaseId);
           BatchReadOnlyTransaction batchReadOnlyTransaction =
               batchClient.batchReadOnlyTransaction(spannerConnection.getReadOnlyStaleness());
