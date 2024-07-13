@@ -37,8 +37,8 @@
     </excludedTests>
     <excludedIntegrationTests/>
 
-    <junixsocket.version>2.9.1</junixsocket.version>
-    <opentelemetry.exporter.version>0.30.0</opentelemetry.exporter.version>
+    <junixsocket.version>2.10.0</junixsocket.version>
+    <opentelemetry.exporter.version>0.31.0</opentelemetry.exporter.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -55,7 +55,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.8.1</version>
+    <version>1.9.0</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -78,7 +78,7 @@
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.39.0</version>
+        <version>1.40.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -101,10 +101,6 @@
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
       <version>3.45.0</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-spanner</artifactId>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
@@ -130,7 +126,7 @@
       <!-- Not managed by opentelemetry-bom -->
       <groupId>io.opentelemetry.semconv</groupId>
       <artifactId>opentelemetry-semconv</artifactId>
-      <version>1.25.0-alpha</version>
+      <version>1.26.0-alpha</version>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
@@ -155,6 +151,10 @@
       <artifactId>kotlin-stdlib-jdk8</artifactId>
       <version>2.0.0</version>
       <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner</artifactId>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
