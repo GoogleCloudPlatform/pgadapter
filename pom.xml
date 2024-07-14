@@ -76,16 +76,16 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>libraries-bom</artifactId>
-        <version>26.42.0</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>1.40.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>io.opentelemetry</groupId>
-        <artifactId>opentelemetry-bom</artifactId>
-        <version>1.40.0</version>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>26.43.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -101,10 +101,6 @@
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
       <version>3.45.0</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-spanner</artifactId>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
@@ -155,6 +151,10 @@
       <artifactId>kotlin-stdlib-jdk8</artifactId>
       <version>2.0.0</version>
       <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner</artifactId>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
