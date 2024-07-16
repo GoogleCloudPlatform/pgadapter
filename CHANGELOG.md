@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.36.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.36.0...v0.36.1) (2024-07-16)
+
+
+### Dependencies
+
+* update dependency com.fasterxml.jackson.core:jackson-databind to v2.17.2 ([#2045](https://github.com/GoogleCloudPlatform/pgadapter/issues/2045)) ([2834f07](https://github.com/GoogleCloudPlatform/pgadapter/commit/2834f073baf5ada265f347025787d3fa4f8fd9e5))
+* update dependency django to v5.0.7 [security] ([#2066](https://github.com/GoogleCloudPlatform/pgadapter/issues/2066)) ([2f43b4b](https://github.com/GoogleCloudPlatform/pgadapter/commit/2f43b4b1891a1e89da465ebe83e3cff0cbedad65))
+* update dependency google.auth to v2.32.0 ([#2054](https://github.com/GoogleCloudPlatform/pgadapter/issues/2054)) ([1aeaf7a](https://github.com/GoogleCloudPlatform/pgadapter/commit/1aeaf7aed4ce871ea41ad32f192d8679e4de5bc1))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.40.0 ([#2050](https://github.com/GoogleCloudPlatform/pgadapter/issues/2050)) ([1e65c70](https://github.com/GoogleCloudPlatform/pgadapter/commit/1e65c70176f0ef66aa4f4ba5c4f3d0c4eff429d6))
+* update dependency psycopg to v3.2.1 ([#2016](https://github.com/GoogleCloudPlatform/pgadapter/issues/2016)) ([31cbabb](https://github.com/GoogleCloudPlatform/pgadapter/commit/31cbabbbbb3171eae35807dcbf875427f1ef5495))
+* update dependency testcontainers to v4.7.2 ([#2074](https://github.com/GoogleCloudPlatform/pgadapter/issues/2074)) ([6ad1f81](https://github.com/GoogleCloudPlatform/pgadapter/commit/6ad1f81d215a74e56a233d46005b3b9cb3e67ff4))
+* update junixsocket.version to v2.10.0 ([#2055](https://github.com/GoogleCloudPlatform/pgadapter/issues/2055)) ([dc0915b](https://github.com/GoogleCloudPlatform/pgadapter/commit/dc0915b7554baa55f647ac5310d6e924a03bfb36))
+* update module github.com/testcontainers/testcontainers-go to v0.32.0 ([#2046](https://github.com/GoogleCloudPlatform/pgadapter/issues/2046)) ([64e2c43](https://github.com/GoogleCloudPlatform/pgadapter/commit/64e2c438dafb04688f80bcb5762aaeebc28c4b82))
+* update module github.com/testcontainers/testcontainers-go/modules/postgres to v0.32.0 ([#2048](https://github.com/GoogleCloudPlatform/pgadapter/issues/2048)) ([c37206e](https://github.com/GoogleCloudPlatform/pgadapter/commit/c37206e596966eb562247c1ed3cae066e7c3b653))
+* update module google.golang.org/api to v0.188.0 ([#2061](https://github.com/GoogleCloudPlatform/pgadapter/issues/2061)) ([a68e064](https://github.com/GoogleCloudPlatform/pgadapter/commit/a68e0644c84edb8364188eee96f4c986aa14b2c4))
+* update module gorm.io/gorm to v1.25.11 ([#2067](https://github.com/GoogleCloudPlatform/pgadapter/issues/2067)) ([18ce032](https://github.com/GoogleCloudPlatform/pgadapter/commit/18ce032c89498f3fa2375a5d46b1f91f0744d35d))
+
 ## [0.36.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.35.0...v0.36.0) (2024-07-05)
 
 
