@@ -47,6 +47,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.newsclub.net.unix.AFUNIXServerSocket;
@@ -63,7 +64,7 @@ public class ProxyServer extends AbstractApiService {
   private final OpenTelemetry openTelemetry;
   private final Metrics metrics;
   private final Properties properties;
-  private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
+  private final List<ConnectionHandler> handlers = new LinkedList<>();
 
   /**
    * Latch that is closed when the TCP server has started. We need this to know the exact port that
@@ -87,6 +88,34 @@ public class ProxyServer extends AbstractApiService {
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
   private final ThreadFactory threadFactory;
+
+  /**
+   * Shutdown mode determines how the server handles any open connections when the server is being
+   * terminated. These modes correspond with the <a
+   * href="https://www.postgresql.org/docs/current/server-shutdown.html">shutdown modes of
+   * PostgreSQL</a>.
+   */
+  public enum ShutdownMode {
+    /**
+     * Stop accepting incoming connections and wait for all existing connections to finish before
+     * shutting down.
+     */
+    SMART,
+
+    /** Actively terminate all existing connections and shut down the server. */
+    FAST,
+
+    /**
+     * Actively terminate all existing connections and shut down the server. There is currently no
+     * difference between FAST and IMMEDIATE, but this could change in the future.
+     */
+    IMMEDIATE,
+  }
+
+  private final AtomicReference<ShutdownMode> shutdownMode = new AtomicReference<>();
+
+  private final AtomicReference<CountDownLatch> allHandlersTerminatedLatch =
+      new AtomicReference<>();
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -213,6 +242,7 @@ public class ProxyServer extends AbstractApiService {
 
   @Override
   protected void doStop() {
+    logger.log(Level.INFO, "Stopping server using shutdown mode {0}", this.shutdownMode.get());
     for (ServerSocket serverSocket : this.serverSockets) {
       try {
         logger.log(
@@ -227,8 +257,14 @@ public class ProxyServer extends AbstractApiService {
             () -> String.format("Closing server socket %s failed: %s", serverSocket, exception));
       }
     }
-    for (ConnectionHandler handler : getConnectionHandlers()) {
-      handler.terminate();
+    if (this.shutdownMode.get() == ShutdownMode.SMART) {
+      try {
+        waitForAllConnectionsToTerminate();
+      } catch (InterruptedException interruptedException) {
+        terminateAllConnectionHandlers();
+      }
+    } else {
+      terminateAllConnectionHandlers();
     }
     try {
       SpannerPool.closeSpannerPool();
@@ -237,10 +273,36 @@ public class ProxyServer extends AbstractApiService {
     notifyStopped();
   }
 
-  /** Safely stops the server (iff started), closing specific socket and cleaning up. */
+  private void terminateAllConnectionHandlers() {
+    logger.log(Level.INFO, "Terminating {0} connections", getNumberOfConnections());
+    for (ConnectionHandler handler : getConnectionHandlers()) {
+      handler.terminate();
+    }
+  }
+
+  private void waitForAllConnectionsToTerminate() throws InterruptedException {
+    logger.log(Level.INFO, "Waiting for {0} connections to terminate", getNumberOfConnections());
+    createConnectionHandlersTerminatedLatch();
+    this.allHandlersTerminatedLatch.get().await();
+  }
+
+  /**
+   * Stops the server using the FAST shutdown mode, terminating all existing connections and
+   * cleaning up.
+   */
   public void stopServer() {
+    stopServer(ShutdownMode.FAST);
+  }
+
+  /** Stops the server using the specified shutdown mode. */
+  public void stopServer(ShutdownMode shutdownMode) {
+    setShutdownMode(shutdownMode);
     stopAsync();
     awaitTerminated();
+  }
+
+  void setShutdownMode(ShutdownMode shutdownMode) {
+    this.shutdownMode.set(shutdownMode);
   }
 
   /**
@@ -350,7 +412,15 @@ public class ProxyServer extends AbstractApiService {
 
   /** Returns an immutable copy of the current connection handlers at this server. */
   ImmutableList<ConnectionHandler> getConnectionHandlers() {
-    return ImmutableList.copyOf(this.handlers);
+    synchronized (this.handlers) {
+      return ImmutableList.copyOf(this.handlers);
+    }
+  }
+
+  private void createConnectionHandlersTerminatedLatch() {
+    synchronized (this.handlers) {
+      this.allHandlersTerminatedLatch.set(new CountDownLatch(this.handlers.size()));
+    }
   }
 
   /**
@@ -359,7 +429,9 @@ public class ProxyServer extends AbstractApiService {
    * @param handler The handler currently in use.
    */
   private void register(ConnectionHandler handler) {
-    this.handlers.add(handler);
+    synchronized (this.handlers) {
+      this.handlers.add(handler);
+    }
   }
 
   /**
@@ -368,7 +440,12 @@ public class ProxyServer extends AbstractApiService {
    * @param handler The handler to revoke.
    */
   void deregister(ConnectionHandler handler) {
-    this.handlers.remove(handler);
+    synchronized (this.handlers) {
+      this.handlers.remove(handler);
+      if (this.allHandlersTerminatedLatch.get() != null) {
+        this.allHandlersTerminatedLatch.get().countDown();
+      }
+    }
   }
 
   public OptionsMetadata getOptions() {
@@ -396,7 +473,9 @@ public class ProxyServer extends AbstractApiService {
 
   /** @return the current number of connections. */
   public int getNumberOfConnections() {
-    return this.handlers.size();
+    synchronized (this.handlers) {
+      return this.handlers.size();
+    }
   }
 
   /** @return the local TCP port that this server is using. */

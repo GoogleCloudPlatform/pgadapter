@@ -52,11 +52,6 @@ public class PythonTestUtil {
     builder
         .environment()
         .put("PGADAPTER_FLOAT4_OID", String.valueOf(useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
-    builder
-        .environment()
-        .put(
-            "C_INCLUDE_PATH",
-            "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.8/Headers");
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
     Scanner errorScanner = new Scanner(process.getErrorStream());

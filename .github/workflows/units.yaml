@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [8, 11, 21]
+        java: [11, 17, 21]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -23,7 +23,7 @@ jobs:
       - run: go version
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.12'
       - run: python --version
       - uses: shivammathur/setup-php@v2
         with:
@@ -45,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [8, 17]
+        java: [11, 17]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [8, 17]
+        java: [11, 17]
     steps:
       - uses: actions/checkout@v4
       - name: install coreutils
@@ -79,7 +79,7 @@ jobs:
       - run: go version
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.12'
       - run: python --version
       - uses: shivammathur/setup-php@v2
         with:

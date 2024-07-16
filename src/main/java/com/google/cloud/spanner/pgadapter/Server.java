@@ -21,6 +21,7 @@ import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
+import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
 import com.google.cloud.spanner.pgadapter.logging.DefaultLogConfiguration;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableMap;
@@ -46,6 +47,7 @@ import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import sun.misc.Signal;
 
 /** Effectively this is the main class */
 public class Server {
@@ -59,8 +61,19 @@ public class Server {
       DefaultLogConfiguration.configureLogging(args);
       OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
       OpenTelemetry openTelemetry = setupOpenTelemetry(optionsMetadata);
-      ProxyServer server = new ProxyServer(optionsMetadata, openTelemetry);
-      server.startServer();
+      ProxyServer proxyServer = new ProxyServer(optionsMetadata, openTelemetry);
+      proxyServer.startServer();
+
+      // Create a shutdown handler and register signal handlers for the signals that should
+      // terminate the server.
+      ShutdownHandler shutdownHandler = new ShutdownHandler(proxyServer);
+      try {
+        Signal.handle(new Signal("TERM"), signal -> shutdownHandler.shutdown(ShutdownMode.SMART));
+        Signal.handle(new Signal("INT"), signal -> shutdownHandler.shutdown(ShutdownMode.FAST));
+        Signal.handle(
+            new Signal("QUIT"), signal -> shutdownHandler.shutdown(ShutdownMode.IMMEDIATE));
+      } catch (IllegalArgumentException ignore) {
+      }
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }

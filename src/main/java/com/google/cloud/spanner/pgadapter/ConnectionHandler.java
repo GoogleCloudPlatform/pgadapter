@@ -33,6 +33,8 @@ import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
@@ -452,13 +454,14 @@ public class ConnectionHandler implements Runnable {
                   () ->
                       String.format(
                           "Exception while closing connection handler with ID %s", getName())));
+        } finally {
+          this.server.deregister(this);
+          logger.log(
+              Level.INFO,
+              Logging.format(
+                  "RunConnection",
+                  () -> String.format("Connection handler with ID %s closed", getName())));
         }
-        this.server.deregister(this);
-        logger.log(
-            Level.INFO,
-            Logging.format(
-                "RunConnection",
-                () -> String.format("Connection handler with ID %s closed", getName())));
       }
     }
     return result;
@@ -826,6 +829,15 @@ public class ConnectionHandler implements Runnable {
         setWellKnownClient(
             ClientAutoDetector.detectClient(
                 skippedAutoDetectParseMessages, ImmutableList.of(statement)));
+        if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+            && skippedAutoDetectParseMessages.size() < 10) {
+          ParsedStatement parsedStatement =
+              AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+          if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+            skippedAutoDetectParseMessages.add(new ParseMessage(this, parsedStatement, statement));
+            return;
+          }
+        }
       }
       maybeSetApplicationName();
       skippedAutoDetectParseMessages.clear();
