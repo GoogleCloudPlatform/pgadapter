@@ -36,7 +36,7 @@ func UpdateDataWithCopy(host string, port int, database string) error {
 	// Enable non-atomic mode. This makes the COPY operation non-atomic,
 	// and allows it to exceed the Spanner mutation limit.
 	if _, err := conn.Exec(ctx,
-		"set spanner.autocommit_dml_mode='partitioned_non_atomic"); err != nil {
+		"set spanner.autocommit_dml_mode='partitioned_non_atomic'"); err != nil {
 		return err
 	}
 	// Instruct PGAdapter to use insert-or-update for COPY statements.
