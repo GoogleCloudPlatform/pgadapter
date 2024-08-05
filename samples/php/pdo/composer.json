@@ -2,6 +2,6 @@
   "require": {
     "ext-pgsql": "*",
     "ext-pdo": "*",
-    "shyim/testcontainer": "^0.1.2"
+    "shyim/testcontainer": "^0.2.0"
   }
 }
