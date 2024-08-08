@@ -94,6 +94,16 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>io.opentelemetry</groupId>
+          <artifactId>opentelemetry-api-incubator</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
     </dependency>
@@ -151,10 +161,6 @@
       <artifactId>kotlin-stdlib-jdk8</artifactId>
       <version>2.0.10</version>
       <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-spanner</artifactId>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
