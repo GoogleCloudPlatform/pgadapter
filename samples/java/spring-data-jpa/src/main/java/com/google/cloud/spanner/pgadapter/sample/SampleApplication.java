@@ -18,11 +18,16 @@ import com.google.cloud.spanner.pgadapter.sample.model.Concert;
 import com.google.cloud.spanner.pgadapter.sample.repository.ConcertRepository;
 import com.google.cloud.spanner.pgadapter.sample.service.AlbumService;
 import com.google.cloud.spanner.pgadapter.sample.service.ConcertService;
+import com.google.cloud.spanner.pgadapter.sample.service.DirectedReadService;
 import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
 import com.google.cloud.spanner.pgadapter.sample.service.StaleReadService;
 import com.google.cloud.spanner.pgadapter.sample.service.TicketSaleService;
 import com.google.cloud.spanner.pgadapter.sample.service.TrackService;
 import com.google.cloud.spanner.pgadapter.sample.service.VenueService;
+import com.google.spanner.v1.DirectedReadOptions;
+import com.google.spanner.v1.DirectedReadOptions.IncludeReplicas;
+import com.google.spanner.v1.DirectedReadOptions.ReplicaSelection;
+import com.google.spanner.v1.DirectedReadOptions.ReplicaSelection.Type;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Random;
@@ -76,6 +81,8 @@ public class SampleApplication implements CommandLineRunner {
    */
   private final StaleReadService staleReadService;
 
+  private final DirectedReadService directedReadService;
+
   private final ConcertRepository concertRepository;
 
   private final TicketSaleService ticketSaleService;
@@ -87,6 +94,7 @@ public class SampleApplication implements CommandLineRunner {
       VenueService venueService,
       ConcertService concertService,
       StaleReadService staleReadService,
+      DirectedReadService directedReadService,
       ConcertRepository concertRepository,
       TicketSaleService ticketSaleService) {
     this.singerService = singerService;
@@ -95,6 +103,7 @@ public class SampleApplication implements CommandLineRunner {
     this.venueService = venueService;
     this.concertService = concertService;
     this.staleReadService = staleReadService;
+    this.directedReadService = directedReadService;
     this.concertRepository = concertRepository;
     this.ticketSaleService = ticketSaleService;
   }
@@ -130,6 +139,8 @@ public class SampleApplication implements CommandLineRunner {
     printData();
     // Show how to do a stale read.
     staleRead();
+    // Show how to execute queries with directed read options.
+    directedRead();
   }
 
   void printData() {
@@ -156,6 +167,20 @@ public class SampleApplication implements CommandLineRunner {
         staleReadService.executeReadOnlyTransactionAtTimestamp(
             currentTime, concertRepository::findAll);
     log.info("Found {} concerts using a stale read.", concerts.size());
+  }
+
+  void directedRead() {
+    DirectedReadOptions options =
+        DirectedReadOptions.newBuilder()
+            .setIncludeReplicas(
+                IncludeReplicas.newBuilder()
+                    .addReplicaSelections(
+                        ReplicaSelection.newBuilder().setType(Type.READ_ONLY).build())
+                    .build())
+            .build();
+    List<Concert> concerts =
+        directedReadService.executeReadOnlyTransactionWithDirectedRead(options, concertRepository::findAll);
+    log.info("Found {} concerts using a query with directed read options", concerts.size());
   }
 
   @PreDestroy
