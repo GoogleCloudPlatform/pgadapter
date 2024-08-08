@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.sample;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.base.Strings;
 
 /** Util class for managing the in-process PGAdapter instance used by thie sample. */
 class PGAdapter {
@@ -34,7 +35,11 @@ class PGAdapter {
   static ProxyServer startPGAdapter() {
     // Start PGAdapter using the default credentials of the runtime environment on port a random
     // port.
-    OptionsMetadata options = OptionsMetadata.newBuilder().setPort(0).build();
+    OptionsMetadata.Builder builder = OptionsMetadata.newBuilder().setPort(0);
+    if (!Strings.isNullOrEmpty(System.getenv("SPANNER_EMULATOR_HOST"))) {
+      builder.autoConfigureEmulator();
+    }
+    OptionsMetadata options = builder.build();
     ProxyServer server = new ProxyServer(options);
     server.startServer();
     server.awaitRunning();
