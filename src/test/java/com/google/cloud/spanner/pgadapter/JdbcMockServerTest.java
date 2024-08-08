@@ -5533,6 +5533,24 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertFalse(session.getMultiplexed());
   }
 
+  @Test
+  public void testMaxCommitDelay() throws SQLException {
+    String sql = "insert into foo (id) values (1)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      connection.createStatement().execute("set spanner.max_commit_delay='20ms'");
+      connection.createStatement().execute(sql);
+      connection.commit();
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest request = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertTrue(request.hasMaxCommitDelay());
+    assertEquals(TimeUnit.MILLISECONDS.toNanos(20), request.getMaxCommitDelay().getNanos());
+  }
+
   @Ignore("Only used for manual performance testing")
   @Test
   public void testBasePerformance() throws SQLException {
