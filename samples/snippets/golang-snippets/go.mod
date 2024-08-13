@@ -2,7 +2,7 @@ module golang-snippets
 
 go 1.21
 
-toolchain go1.22.5
+toolchain go1.23.0
 
 require (
 	github.com/docker/docker v27.1.0+incompatible
