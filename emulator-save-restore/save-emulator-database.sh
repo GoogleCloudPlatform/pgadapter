@@ -75,3 +75,5 @@ psql -v ON_ERROR_STOP=1 -h "$PGADAPTER_HOST" -p "$PGADAPTER_PORT" -d "$SPANNER_D
        -c "copy $table_name ($column_names) to stdout" \
        >> $sql_file
 done
+
+echo "Finished exporting database $SPANNER_DATABASE"

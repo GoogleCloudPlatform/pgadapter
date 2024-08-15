@@ -348,16 +348,18 @@ public class ITPsqlTest implements IntegrationTest {
   }
 
   private String createJdbcUrlForPGAdapter() {
+    return createJdbcUrlForPGAdapter(database.getId().getDatabase());
+  }
+
+  private String createJdbcUrlForPGAdapter(String database) {
     if (POSTGRES_HOST.startsWith("/")) {
       return String.format(
           "jdbc:postgresql://localhost/%s?"
               + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
               + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
-          database.getId().getDatabase(), testEnv.getPGAdapterPort());
+          database, testEnv.getPGAdapterPort());
     }
-    return String.format(
-        "jdbc:postgresql://%s/%s",
-        testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase());
+    return String.format("jdbc:postgresql://%s/%s", testEnv.getPGAdapterHostAndPort(), database);
   }
 
   /**
@@ -1395,5 +1397,125 @@ public class ITPsqlTest implements IntegrationTest {
     }
     int res = process.waitFor();
     assertEquals(errors, 0, res);
+  }
+
+  @Test
+  public void testSaveRestore() throws Exception {
+    addRowsToSpanner();
+
+    ProcessBuilder backupBuilder = new ProcessBuilder();
+    String[] backupCommand = new String[] {"./save-emulator-database.sh"};
+
+    backupBuilder.directory(new File("./emulator-save-restore"));
+    backupBuilder.environment().put("PGADAPTER_HOST", "localhost");
+    backupBuilder.environment().put("PGADAPTER_PORT", String.valueOf(testEnv.getPGAdapterPort()));
+    backupBuilder.environment().put("SPANNER_DATABASE", database.getId().getDatabase());
+
+    backupBuilder.command(backupCommand);
+    Process backupProcess = backupBuilder.start();
+    String backupErrors;
+    String backupOutput;
+    try (OutputStreamWriter writer = new OutputStreamWriter(backupProcess.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(backupProcess.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(backupProcess.getErrorStream()))) {
+      writer.write("Y\n");
+      writer.flush();
+      backupErrors = errorReader.lines().collect(Collectors.joining("\n"));
+      backupOutput = reader.lines().collect(Collectors.joining("\n"));
+    }
+    assertEquals(backupErrors, 0, backupProcess.waitFor());
+    assertTrue(
+        backupOutput,
+        backupOutput.contains("Finished exporting database " + database.getId().getDatabase()));
+
+    // Read the backup back into a new database.
+    Database restoreDatabase = testEnv.createDatabase(ImmutableList.of());
+    ProcessBuilder restoreBuilder = new ProcessBuilder();
+    String[] restoreCommand = new String[] {"./restore-emulator-database.sh"};
+
+    restoreBuilder.directory(new File("./emulator-save-restore"));
+    restoreBuilder.environment().put("PGADAPTER_HOST", "localhost");
+    restoreBuilder.environment().put("PGADAPTER_PORT", String.valueOf(testEnv.getPGAdapterPort()));
+    restoreBuilder.environment().put("SPANNER_DATABASE", restoreDatabase.getId().getDatabase());
+    restoreBuilder.command(restoreCommand);
+    Process restoreProcess = restoreBuilder.start();
+    String restoreErrors;
+    String restoreOutput;
+    try (OutputStreamWriter writer = new OutputStreamWriter(restoreProcess.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(restoreProcess.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(restoreProcess.getErrorStream()))) {
+      writer.write("Y\n");
+      writer.flush();
+      restoreErrors = errorReader.lines().collect(Collectors.joining("\n"));
+      restoreOutput = reader.lines().collect(Collectors.joining("\n"));
+    }
+    assertEquals(restoreErrors, 0, restoreProcess.waitFor());
+    assertTrue(
+        restoreOutput,
+        restoreOutput.contains(
+            "Finished restoring database " + restoreDatabase.getId().getDatabase()));
+
+    // Verify that the tables were created in the restored database.
+    try (Connection connection =
+        DriverManager.getConnection(
+            createJdbcUrlForPGAdapter(restoreDatabase.getId().getDatabase()))) {
+      try (ResultSet tableCount =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select count(1) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'")) {
+        assertTrue(tableCount.next());
+        assertEquals(8, tableCount.getInt(1));
+        assertFalse(tableCount.next());
+      }
+      try (ResultSet viewCount =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select count(1) from information_schema.tables where table_schema='public' and table_type='VIEW'")) {
+        assertTrue(viewCount.next());
+        assertEquals(1, viewCount.getInt(1));
+        assertFalse(viewCount.next());
+      }
+    }
+    // Verify that the data was restored.
+    verifyRestoredRows(restoreDatabase.getId().getDatabase());
+  }
+
+  private void addRowsToSpanner() throws Exception {
+    try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement(
+              "insert into singers (id, first_name, last_name, full_name, active, created_at, updated_at) values (?, ?, ?, default, ?, current_timestamp, current_timestamp)")) {
+        preparedStatement.setLong(1, 1L);
+        preparedStatement.setString(2, "Alice");
+        preparedStatement.setString(3, "Wonderland");
+        preparedStatement.setBoolean(4, true);
+        assertEquals(1, preparedStatement.executeUpdate());
+      }
+    }
+    // TODO: Add more test data.
+  }
+
+  private void verifyRestoredRows(String database) throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter(database))) {
+      try (ResultSet singers =
+          connection.createStatement().executeQuery("select * from singers order by id")) {
+        assertTrue(singers.next());
+        int col = 0;
+        assertEquals(1, singers.getLong(++col));
+        assertEquals("Alice", singers.getString(++col));
+        assertEquals("Wonderland", singers.getString(++col));
+        assertEquals("Alice Wonderland", singers.getString(++col));
+        assertTrue(singers.getBoolean(++col));
+        assertNotNull(singers.getTimestamp(++col));
+        assertNotNull(singers.getTimestamp(++col));
+        assertFalse(singers.next());
+      }
+    }
   }
 }

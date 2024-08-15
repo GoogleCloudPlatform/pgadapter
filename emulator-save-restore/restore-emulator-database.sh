@@ -122,7 +122,8 @@ table_names=$(psql -v ON_ERROR_STOP=1 \
     -qAtX \
     -c "select table_name from information_schema.tables
             where table_schema not in ('information_schema', 'spanner_sys', 'pg_catalog')
-	    and parent_table_name is NULL")
+	    and parent_table_name is NULL
+	    and table_type='BASE TABLE'")
 
 while : ; do
   delim=""
@@ -143,15 +144,19 @@ while : ; do
     delim=", "
   done
 
-  # Get the tables that have the current set of tables as a parent.
-  table_names=$(psql -v ON_ERROR_STOP=1 \
-    --host "$PGADAPTER_HOST" \
-    --port "$PGADAPTER_PORT" \
-    -d "$spanner_restore_database" \
-    -qAtX \
-    -c "select table_name from information_schema.tables
-            where table_schema not in ('information_schema', 'spanner_sys', 'pg_catalog')
-	    and parent_table_name in ($parent_table_str)")
+  table_names=""
+  if [[ ! $parent_table_str = "" ]] ; then
+    # Get the tables that have the current set of tables as a parent.
+    table_names=$(psql -v ON_ERROR_STOP=1 \
+      --host "$PGADAPTER_HOST" \
+      --port "$PGADAPTER_PORT" \
+      -d "$spanner_restore_database" \
+      -qAtX \
+      -c "select table_name from information_schema.tables
+              where table_schema not in ('information_schema', 'spanner_sys', 'pg_catalog')
+        and parent_table_name in ($parent_table_str)
+        and table_type='BASE TABLE'")
+  fi
 
   # No further child tables left to copy.
   if [[ $table_names = "" ]] ; then
@@ -168,3 +173,5 @@ psql -v ON_ERROR_STOP=1 -a \
   -c "start batch ddl" \
   -f "create_foreign_keys.sql" \
   -c "run batch"
+
+echo "Finished restoring database $spanner_restore_database"
