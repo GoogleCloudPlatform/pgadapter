@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -161,6 +162,16 @@ public class ITPsqlTest implements IntegrationTest {
                         + "    primary key (id, track_number, recording_number)\n"
                         + ") interleave in parent tracks on delete cascade\n"
                         + "ttl interval '30 days' on recorded_at")
+                .add(
+                    "create table if not exists track_data (\n"
+                        + "    id           varchar not null primary key,\n"
+                        + "    track_id     varchar not null,\n"
+                        + "    track_number bigint not null,\n"
+                        + "    data         bytea not null,\n"
+                        + "    constraint fk_track_data_track\n"
+                        + "       foreign key (track_number, track_id)\n"
+                        + "       references tracks (track_number, id)\n"
+                        + ")")
                 .add(
                     "create table if not exists venues (\n"
                         + "    id          varchar not null primary key,\n"
@@ -348,16 +359,18 @@ public class ITPsqlTest implements IntegrationTest {
   }
 
   private String createJdbcUrlForPGAdapter() {
+    return createJdbcUrlForPGAdapter(database.getId().getDatabase());
+  }
+
+  private String createJdbcUrlForPGAdapter(String database) {
     if (POSTGRES_HOST.startsWith("/")) {
       return String.format(
           "jdbc:postgresql://localhost/%s?"
               + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
               + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
-          database.getId().getDatabase(), testEnv.getPGAdapterPort());
+          database, testEnv.getPGAdapterPort());
     }
-    return String.format(
-        "jdbc:postgresql://%s/%s",
-        testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase());
+    return String.format("jdbc:postgresql://%s/%s", testEnv.getPGAdapterHostAndPort(), database);
   }
 
   /**
@@ -1395,5 +1408,190 @@ public class ITPsqlTest implements IntegrationTest {
     }
     int res = process.waitFor();
     assertEquals(errors, 0, res);
+  }
+
+  @Test
+  public void testLocalBackupRestore() throws Exception {
+    addRowsToSpanner();
+
+    ProcessBuilder backupBuilder = new ProcessBuilder();
+    String[] backupCommand = new String[] {"./backup-database.sh"};
+
+    backupBuilder.directory(new File("./local-backup-restore"));
+    backupBuilder.environment().put("PGADAPTER_HOST", "localhost");
+    backupBuilder.environment().put("PGADAPTER_PORT", String.valueOf(testEnv.getPGAdapterPort()));
+    backupBuilder.environment().put("SPANNER_DATABASE", database.getId().getDatabase());
+
+    backupBuilder.command(backupCommand);
+    Process backupProcess = backupBuilder.start();
+    String backupErrors;
+    String backupOutput;
+    try (OutputStreamWriter writer = new OutputStreamWriter(backupProcess.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(backupProcess.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(backupProcess.getErrorStream()))) {
+      writer.write("Y\n");
+      writer.flush();
+      backupErrors = errorReader.lines().collect(Collectors.joining("\n"));
+      backupOutput = reader.lines().collect(Collectors.joining("\n"));
+    }
+    assertEquals(backupErrors, 0, backupProcess.waitFor());
+    assertTrue(
+        backupOutput,
+        backupOutput.contains("Finished exporting database " + database.getId().getDatabase()));
+
+    // Read the backup back into a new database.
+    Database restoreDatabase = testEnv.createDatabase(ImmutableList.of());
+    ProcessBuilder restoreBuilder = new ProcessBuilder();
+    String[] restoreCommand = new String[] {"./restore-database.sh"};
+
+    restoreBuilder.directory(new File("./local-backup-restore"));
+    restoreBuilder.environment().put("PGADAPTER_HOST", "localhost");
+    restoreBuilder.environment().put("PGADAPTER_PORT", String.valueOf(testEnv.getPGAdapterPort()));
+    restoreBuilder.environment().put("SPANNER_DATABASE", restoreDatabase.getId().getDatabase());
+    restoreBuilder.command(restoreCommand);
+    Process restoreProcess = restoreBuilder.start();
+    String restoreErrors;
+    String restoreOutput;
+    try (OutputStreamWriter writer = new OutputStreamWriter(restoreProcess.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(restoreProcess.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(restoreProcess.getErrorStream()))) {
+      writer.write("Y\n");
+      writer.flush();
+      restoreErrors = errorReader.lines().collect(Collectors.joining("\n"));
+      restoreOutput = reader.lines().collect(Collectors.joining("\n"));
+    }
+    assertEquals(restoreErrors, 0, restoreProcess.waitFor());
+    assertTrue(
+        restoreOutput,
+        restoreOutput.contains(
+            "Finished restoring database " + restoreDatabase.getId().getDatabase()));
+
+    // Verify that the tables were created in the restored database.
+    try (Connection connection =
+        DriverManager.getConnection(
+            createJdbcUrlForPGAdapter(restoreDatabase.getId().getDatabase()))) {
+      try (ResultSet tableCount =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select count(1) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'")) {
+        assertTrue(tableCount.next());
+        assertEquals(9, tableCount.getInt(1));
+        assertFalse(tableCount.next());
+      }
+      try (ResultSet viewCount =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select count(1) from information_schema.tables where table_schema='public' and table_type='VIEW'")) {
+        assertTrue(viewCount.next());
+        assertEquals(1, viewCount.getInt(1));
+        assertFalse(viewCount.next());
+      }
+    }
+    // Verify that the data was restored.
+    verifyRestoredRows(restoreDatabase.getId().getDatabase());
+  }
+
+  private void addRowsToSpanner() throws Exception {
+    try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement(
+              "insert into singers (id, first_name, last_name, full_name, active, created_at, updated_at) values (?, ?, ?, default, ?, current_timestamp, current_timestamp)")) {
+        long id = 0L;
+        preparedStatement.setLong(1, ++id);
+        preparedStatement.setString(2, "Alice");
+        preparedStatement.setString(3, "Wonderland");
+        preparedStatement.setBoolean(4, true);
+        preparedStatement.addBatch();
+
+        preparedStatement.setLong(1, ++id);
+        preparedStatement.setString(2, "\"Pete's");
+        preparedStatement.setString(3, "Strangename\n");
+        preparedStatement.setBoolean(4, true);
+        preparedStatement.addBatch();
+
+        preparedStatement.setLong(1, ++id);
+        preparedStatement.setNull(2, Types.VARCHAR);
+        preparedStatement.setString(3, "Nofirstname");
+        preparedStatement.setBoolean(4, true);
+        preparedStatement.addBatch();
+
+        assertArrayEquals(new int[] {1, 1, 1}, preparedStatement.executeBatch());
+      }
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement(
+              "insert into albums (id, title, marketing_budget, release_date, cover_picture, singer_id, created_at, updated_at)"
+                  + "values (?, ?, ?, ?, ?, ?, current_timestamp, current_timestamp)")) {
+        long id = 0L;
+        preparedStatement.setLong(1, ++id);
+        preparedStatement.setString(2, "Hot Potato");
+        preparedStatement.setBigDecimal(3, new BigDecimal("1000"));
+        preparedStatement.setObject(4, LocalDate.of(2024, 8, 15));
+        preparedStatement.setBytes(5, new byte[] {1, 2, 3});
+        preparedStatement.setLong(6, 1L);
+        preparedStatement.addBatch();
+
+        assertArrayEquals(new int[] {1}, preparedStatement.executeBatch());
+      }
+    }
+  }
+
+  private void verifyRestoredRows(String database) throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter(database))) {
+      try (ResultSet singers =
+          connection.createStatement().executeQuery("select * from singers order by id")) {
+        assertTrue(singers.next());
+        int col = 0;
+        assertEquals(1, singers.getLong(++col));
+        assertEquals("Alice", singers.getString(++col));
+        assertEquals("Wonderland", singers.getString(++col));
+        assertEquals("Alice Wonderland", singers.getString(++col));
+        assertTrue(singers.getBoolean(++col));
+        assertNotNull(singers.getTimestamp(++col));
+        assertNotNull(singers.getTimestamp(++col));
+
+        assertTrue(singers.next());
+        col = 0;
+        assertEquals(2, singers.getLong(++col));
+        assertEquals("\"Pete's", singers.getString(++col));
+        assertEquals("Strangename\n", singers.getString(++col));
+        assertEquals("\"Pete's Strangename\n", singers.getString(++col));
+        assertTrue(singers.getBoolean(++col));
+        assertNotNull(singers.getTimestamp(++col));
+        assertNotNull(singers.getTimestamp(++col));
+
+        assertTrue(singers.next());
+        col = 0;
+        assertEquals(3, singers.getLong(++col));
+        assertNull(singers.getString(++col));
+        assertEquals("Nofirstname", singers.getString(++col));
+        assertEquals("Nofirstname", singers.getString(++col));
+        assertTrue(singers.getBoolean(++col));
+        assertNotNull(singers.getTimestamp(++col));
+        assertNotNull(singers.getTimestamp(++col));
+
+        assertFalse(singers.next());
+      }
+      try (ResultSet albums =
+          connection.createStatement().executeQuery("select * from albums order by id")) {
+        assertTrue(albums.next());
+        int col = 0;
+        assertEquals(1, albums.getLong(++col));
+        assertEquals("Hot Potato", albums.getString(++col));
+        assertEquals(new BigDecimal("1000"), albums.getBigDecimal(++col));
+        assertEquals(LocalDate.of(2024, 8, 15), albums.getObject(++col, LocalDate.class));
+        assertArrayEquals(new byte[] {1, 2, 3}, albums.getBytes(++col));
+        assertEquals(1, albums.getLong(++col));
+        assertNotNull(albums.getTimestamp(++col));
+        assertNotNull(albums.getTimestamp(++col));
+
+        assertFalse(albums.next());
+      }
+    }
   }
 }
