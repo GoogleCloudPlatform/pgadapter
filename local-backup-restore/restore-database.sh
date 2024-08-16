@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script imports the schema and data from a local file to a Cloud Spanner
+# This script imports the schema and data from a local file to a Spanner
 # database.
 
 set -e
@@ -10,7 +10,7 @@ if [ -z "$schema_file" ]; then schema_file="./backup/schema.sql"; fi;
 if [ -z "$data_dir" ]; then data_dir="./backup/data"; fi;
 
 echo
-echo "--- RESTORING CLOUD SPANNER DATABASE ---"
+echo "--- RESTORING SPANNER DATABASE ---"
 echo "Schema file will be loaded from $schema_file."
 echo "Data will be loaded from $data_dir."
 
@@ -22,7 +22,7 @@ then
     [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1
 fi
 
-# Check whether the Cloud Spanner database is empty. That is; no user-tables.
+# Check whether the Spanner database is empty. That is; no user-tables.
 table_count=$(psql -v ON_ERROR_STOP=1 -h "$PGADAPTER_HOST" -p "$PGADAPTER_PORT" \
   -d "$spanner_restore_database" \
   -qAtX \
@@ -30,14 +30,14 @@ table_count=$(psql -v ON_ERROR_STOP=1 -h "$PGADAPTER_HOST" -p "$PGADAPTER_PORT" 
 if [[ ! $table_count = "0" ]]
 then
   echo "Number of tables found in the restore database: $table_count"
-  echo "The destination Cloud Spanner database is not empty."
+  echo "The destination Spanner database is not empty."
   echo "This script only supports restoring into an empty database."
   [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1
 fi
 
-# Create the schema on the Cloud Spanner database. We run the script between
+# Create the schema on the Spanner database. We run the script between
 # START BATCH DDL and RUN BATCH to run the entire script as one batch.
-echo "Creating schema on Cloud Spanner database $spanner_restore_database"
+echo "Creating schema on Spanner database $spanner_restore_database"
 psql -v ON_ERROR_STOP=1 -a \
   --host "$PGADAPTER_HOST" \
   --port "$PGADAPTER_PORT" \
@@ -46,7 +46,7 @@ psql -v ON_ERROR_STOP=1 -a \
   -f "$schema_file" \
   -c "run batch"
 
-# Generate a script to drop all foreign keys on Cloud Spanner.
+# Generate a script to drop all foreign keys on Spanner.
 psql -v ON_ERROR_STOP=1 \
   -h "$PGADAPTER_HOST" \
   -p "$PGADAPTER_PORT" \
@@ -100,8 +100,8 @@ psql -v ON_ERROR_STOP=1 \
           and fk.unique_constraint_schema=pk_tc.constraint_schema
           and fk.unique_constraint_name=pk_tc.constraint_name;" > create_foreign_keys.sql
 
-# Drop all foreign keys in the Cloud Spanner database.
-echo "Dropping all foreign keys in the Cloud Spanner database before importing data"
+# Drop all foreign keys in the Spanner database.
+echo "Dropping all foreign keys in the Spanner database before importing data"
 psql -v ON_ERROR_STOP=1 \
   --host "$PGADAPTER_HOST" \
   --port "$PGADAPTER_PORT" \
@@ -121,7 +121,7 @@ table_names=$(psql -v ON_ERROR_STOP=1 \
     -d "$spanner_restore_database" \
     -qAtX \
     -c "select table_name from information_schema.tables
-            where table_schema not in ('information_schema', 'spanner_sys', 'pg_catalog')
+            where table_schema = 'public'
 	    and parent_table_name is NULL
 	    and table_type='BASE TABLE'")
 
@@ -153,7 +153,7 @@ while : ; do
       -d "$spanner_restore_database" \
       -qAtX \
       -c "select table_name from information_schema.tables
-              where table_schema not in ('information_schema', 'spanner_sys', 'pg_catalog')
+              where table_schema = 'public'
         and parent_table_name in ($parent_table_str)
         and table_type='BASE TABLE'")
   fi
@@ -164,8 +164,8 @@ while : ; do
   fi
 done
 
-# Re-create all foreign keys in the Cloud Spanner database.
-echo "Re-creating all foreign keys in the Cloud Spanner database"
+# Re-create all foreign keys in the Spanner database.
+echo "Re-creating all foreign keys in the Spanner database"
 psql -v ON_ERROR_STOP=1 -a \
   --host "$PGADAPTER_HOST" \
   --port "$PGADAPTER_PORT" \

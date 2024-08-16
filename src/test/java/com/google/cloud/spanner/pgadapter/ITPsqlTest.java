@@ -1400,13 +1400,13 @@ public class ITPsqlTest implements IntegrationTest {
   }
 
   @Test
-  public void testSaveRestore() throws Exception {
+  public void testLocalBackupRestore() throws Exception {
     addRowsToSpanner();
 
     ProcessBuilder backupBuilder = new ProcessBuilder();
-    String[] backupCommand = new String[] {"./save-emulator-database.sh"};
+    String[] backupCommand = new String[] {"./backup-database.sh"};
 
-    backupBuilder.directory(new File("./emulator-save-restore"));
+    backupBuilder.directory(new File("./local-backup-restore"));
     backupBuilder.environment().put("PGADAPTER_HOST", "localhost");
     backupBuilder.environment().put("PGADAPTER_PORT", String.valueOf(testEnv.getPGAdapterPort()));
     backupBuilder.environment().put("SPANNER_DATABASE", database.getId().getDatabase());
@@ -1433,9 +1433,9 @@ public class ITPsqlTest implements IntegrationTest {
     // Read the backup back into a new database.
     Database restoreDatabase = testEnv.createDatabase(ImmutableList.of());
     ProcessBuilder restoreBuilder = new ProcessBuilder();
-    String[] restoreCommand = new String[] {"./restore-emulator-database.sh"};
+    String[] restoreCommand = new String[] {"./restore-database.sh"};
 
-    restoreBuilder.directory(new File("./emulator-save-restore"));
+    restoreBuilder.directory(new File("./local-backup-restore"));
     restoreBuilder.environment().put("PGADAPTER_HOST", "localhost");
     restoreBuilder.environment().put("PGADAPTER_PORT", String.valueOf(testEnv.getPGAdapterPort()));
     restoreBuilder.environment().put("SPANNER_DATABASE", restoreDatabase.getId().getDatabase());
