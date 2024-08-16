@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -161,6 +162,16 @@ public class ITPsqlTest implements IntegrationTest {
                         + "    primary key (id, track_number, recording_number)\n"
                         + ") interleave in parent tracks on delete cascade\n"
                         + "ttl interval '30 days' on recorded_at")
+                .add(
+                    "create table if not exists track_data (\n"
+                        + "    id           varchar not null primary key,\n"
+                        + "    track_id     varchar not null,\n"
+                        + "    track_number bigint not null,\n"
+                        + "    data         bytea not null,\n"
+                        + "    constraint fk_track_data_track\n"
+                        + "       foreign key (track_number, track_id)\n"
+                        + "       references tracks (track_number, id)\n"
+                        + ")")
                 .add(
                     "create table if not exists venues (\n"
                         + "    id          varchar not null primary key,\n"
@@ -1469,7 +1480,7 @@ public class ITPsqlTest implements IntegrationTest {
               .executeQuery(
                   "select count(1) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'")) {
         assertTrue(tableCount.next());
-        assertEquals(8, tableCount.getInt(1));
+        assertEquals(9, tableCount.getInt(1));
         assertFalse(tableCount.next());
       }
       try (ResultSet viewCount =
@@ -1491,14 +1502,43 @@ public class ITPsqlTest implements IntegrationTest {
       try (PreparedStatement preparedStatement =
           connection.prepareStatement(
               "insert into singers (id, first_name, last_name, full_name, active, created_at, updated_at) values (?, ?, ?, default, ?, current_timestamp, current_timestamp)")) {
-        preparedStatement.setLong(1, 1L);
+        long id = 0L;
+        preparedStatement.setLong(1, ++id);
         preparedStatement.setString(2, "Alice");
         preparedStatement.setString(3, "Wonderland");
         preparedStatement.setBoolean(4, true);
-        assertEquals(1, preparedStatement.executeUpdate());
+        preparedStatement.addBatch();
+
+        preparedStatement.setLong(1, ++id);
+        preparedStatement.setString(2, "\"Pete's");
+        preparedStatement.setString(3, "Strangename\n");
+        preparedStatement.setBoolean(4, true);
+        preparedStatement.addBatch();
+
+        preparedStatement.setLong(1, ++id);
+        preparedStatement.setNull(2, Types.VARCHAR);
+        preparedStatement.setString(3, "Nofirstname");
+        preparedStatement.setBoolean(4, true);
+        preparedStatement.addBatch();
+
+        assertArrayEquals(new int[] {1, 1, 1}, preparedStatement.executeBatch());
+      }
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement(
+              "insert into albums (id, title, marketing_budget, release_date, cover_picture, singer_id, created_at, updated_at)"
+                  + "values (?, ?, ?, ?, ?, ?, current_timestamp, current_timestamp)")) {
+        long id = 0L;
+        preparedStatement.setLong(1, ++id);
+        preparedStatement.setString(2, "Hot Potato");
+        preparedStatement.setBigDecimal(3, new BigDecimal("1000"));
+        preparedStatement.setObject(4, LocalDate.of(2024, 8, 15));
+        preparedStatement.setBytes(5, new byte[] {1, 2, 3});
+        preparedStatement.setLong(6, 1L);
+        preparedStatement.addBatch();
+
+        assertArrayEquals(new int[] {1}, preparedStatement.executeBatch());
       }
     }
-    // TODO: Add more test data.
   }
 
   private void verifyRestoredRows(String database) throws SQLException {
@@ -1514,7 +1554,43 @@ public class ITPsqlTest implements IntegrationTest {
         assertTrue(singers.getBoolean(++col));
         assertNotNull(singers.getTimestamp(++col));
         assertNotNull(singers.getTimestamp(++col));
+
+        assertTrue(singers.next());
+        col = 0;
+        assertEquals(2, singers.getLong(++col));
+        assertEquals("\"Pete's", singers.getString(++col));
+        assertEquals("Strangename\n", singers.getString(++col));
+        assertEquals("\"Pete's Strangename\n", singers.getString(++col));
+        assertTrue(singers.getBoolean(++col));
+        assertNotNull(singers.getTimestamp(++col));
+        assertNotNull(singers.getTimestamp(++col));
+
+        assertTrue(singers.next());
+        col = 0;
+        assertEquals(3, singers.getLong(++col));
+        assertNull(singers.getString(++col));
+        assertEquals("Nofirstname", singers.getString(++col));
+        assertEquals("Nofirstname", singers.getString(++col));
+        assertTrue(singers.getBoolean(++col));
+        assertNotNull(singers.getTimestamp(++col));
+        assertNotNull(singers.getTimestamp(++col));
+
         assertFalse(singers.next());
+      }
+      try (ResultSet albums =
+          connection.createStatement().executeQuery("select * from albums order by id")) {
+        assertTrue(albums.next());
+        int col = 0;
+        assertEquals(1, albums.getLong(++col));
+        assertEquals("Hot Potato", albums.getString(++col));
+        assertEquals(new BigDecimal("1000"), albums.getBigDecimal(++col));
+        assertEquals(LocalDate.of(2024, 8, 15), albums.getObject(++col, LocalDate.class));
+        assertArrayEquals(new byte[] {1, 2, 3}, albums.getBytes(++col));
+        assertEquals(1, albums.getLong(++col));
+        assertNotNull(albums.getTimestamp(++col));
+        assertNotNull(albums.getTimestamp(++col));
+
+        assertFalse(albums.next());
       }
     }
   }

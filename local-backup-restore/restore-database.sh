@@ -67,13 +67,23 @@ psql -v ON_ERROR_STOP=1 \
   -p "$PGADAPTER_PORT" \
   -d "$spanner_restore_database" \
   -qAtX \
-  -c "with constraint_columns as (
+  -c "with fk_constraint_columns as (
           select constraint_catalog, constraint_schema, constraint_name,
                  array_to_string(array_agg('\"' || kcu.column_name || '\"'), ',') as column_names
           from (
                    select constraint_catalog, constraint_schema, constraint_name, column_name
                    from information_schema.key_column_usage
                    order by ordinal_position
+               ) kcu
+          group by constraint_catalog, constraint_schema, constraint_name
+      ),
+      pk_constraint_columns as (
+          select constraint_catalog, constraint_schema, constraint_name,
+                 array_to_string(array_agg('\"' || kcu.column_name || '\"'), ',') as column_names
+          from (
+                   select constraint_catalog, constraint_schema, constraint_name, column_name
+                   from information_schema.key_column_usage
+                   order by position_in_unique_constraint
                ) kcu
           group by constraint_catalog, constraint_schema, constraint_name
       )
@@ -87,11 +97,11 @@ psql -v ON_ERROR_STOP=1 \
           on  fk.constraint_catalog=tc.constraint_catalog
           and fk.constraint_schema=tc.constraint_schema
           and fk.constraint_name=tc.constraint_name
-      inner join constraint_columns fk_cc
+      inner join fk_constraint_columns fk_cc
           on  fk.constraint_catalog=fk_cc.constraint_catalog
           and fk.constraint_schema=fk_cc.constraint_schema
           and fk.constraint_name=fk_cc.constraint_name
-      inner join constraint_columns pk_cc
+      inner join pk_constraint_columns pk_cc
           on  fk.unique_constraint_catalog=pk_cc.constraint_catalog
           and fk.unique_constraint_schema=pk_cc.constraint_schema
           and fk.unique_constraint_name=pk_cc.constraint_name
