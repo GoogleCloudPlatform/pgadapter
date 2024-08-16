@@ -64,7 +64,8 @@ psql -v ON_ERROR_STOP=1 -h "$PGADAPTER_HOST" -p "$PGADAPTER_PORT" -d "$SPANNER_D
 
   echo ""
   echo "Copying data for $table_name"
-  echo "COPY $table_name ($column_names) FROM stdin;" > $sql_file
+  echo "SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC';" > $sql_file
+  echo "COPY $table_name ($column_names) FROM stdin;" >> $sql_file
   # Set the read_only_staleness to use in PGOPTIONS. This will automatically be included by psql
   # when connecting to PGAdapter.
   PGOPTIONS="-c spanner.read_only_staleness='read_timestamp $READ_TIMESTAMP'" \
