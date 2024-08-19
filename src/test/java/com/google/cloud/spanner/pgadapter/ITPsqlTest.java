@@ -169,8 +169,8 @@ public class ITPsqlTest implements IntegrationTest {
                         + "    track_number bigint not null,\n"
                         + "    data         bytea not null,\n"
                         + "    constraint fk_track_data_track\n"
-                        + "       foreign key (track_number, track_id)\n"
-                        + "       references tracks (track_number, id)\n"
+                        + "       foreign key (track_id, track_number)\n"
+                        + "       references tracks (id, track_number)\n"
                         + ")")
                 .add(
                     "create table if not exists venues (\n"
