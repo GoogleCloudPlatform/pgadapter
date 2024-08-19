@@ -80,7 +80,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>3.4.0</version>
+        <version>3.4.1</version>
         <configuration>
           <mainClass>com.google.cloud.spanner.pgadapter.sample.SampleApplication</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>
