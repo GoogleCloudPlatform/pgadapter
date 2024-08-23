@@ -21,8 +21,8 @@
 
 require 'vendor/autoload.php';
 
-use Testcontainer\Container\Container;
-use Testcontainer\Wait\WaitForLog;
+use Testcontainers\Container\Container;
+use Testcontainers\Wait\WaitForLog;
 
 // Start PGAdapter+Emulator in a Docker container.
 [$pg_adapter, $port] = start_pg_adapter();
