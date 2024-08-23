@@ -172,6 +172,18 @@ public class ITLiquibaseTest {
         assertEquals(5L, resultSet.getLong(1));
         assertFalse(resultSet.next());
       }
+      // Manually add a tag to the database.
+      runLiquibaseCommand(
+          "liquibase:tag", "-Dliquibase.tag=tag-set-with-command", "-Dliquibase.verbose=true");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select tag from databasechangelog where id='23 - remove all addresses'")) {
+        assertTrue(resultSet.next());
+        assertEquals("tag-set-with-command", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
 
       // Rollback to v3.1.
       runLiquibaseCommand("liquibase:rollback", "-Dliquibase.rollbackTag=v3.1");
