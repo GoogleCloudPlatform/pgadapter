@@ -1063,7 +1063,8 @@ public class BackendConnection {
     AbstractStatementParser statementParser =
         AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
     if ("options".equalsIgnoreCase(name)) {
-      String[] commands = value.split("-c\\s+");
+      // Some drivers encode spaces as '+'.
+      String[] commands = value.split("-c[\\s+]+");
       for (String command : commands) {
         // Special case: If the setting is one that is handled by the Connection API, then we need
         // to execute the statement on the connection instead.
