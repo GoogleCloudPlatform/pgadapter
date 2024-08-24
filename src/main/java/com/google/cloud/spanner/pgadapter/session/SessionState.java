@@ -403,10 +403,10 @@ public class SessionState {
   /**
    * Returns whether COPY TO STDOUT operations should try to use PartitionQuery.
    *
-   * <p>COPY TO STDOUT tries to use PartitionQuery by default and then execute the partitions in
+   * <p>COPY TO STDOUT tries to use PartitionQuery by default and then executes the partitions in
    * parallel. This assumes that the COPY result is large and that it will benefit from the
    * additional parallelism. For smaller result sizes, the additional roundtrip for PartitionQuery
-   * adds latency, and it is better to execute the query directly. This is also the cse for queries
+   * adds latency, and it is better to execute the query directly. This is also the case for queries
    * that are known to be non-partitionable.
    */
   public boolean isCopyPartitionQuery() {
