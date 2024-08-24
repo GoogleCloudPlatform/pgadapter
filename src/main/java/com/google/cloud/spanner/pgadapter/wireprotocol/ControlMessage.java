@@ -343,6 +343,7 @@ public abstract class ControlMessage extends WireMessage {
                 mode,
                 partitionQueryResult.getBatchTransactionId(),
                 partitionQueryResult.getPartitions());
+        partitionQueryResult.cleanup();
       } else {
         hasData = describedResult.isHasMoreData();
         ResultSet resultSet = describedResult.getStatementResult().getResultSet();
