@@ -70,9 +70,7 @@ public class SessionState {
           "server_version_num",
           "TimeZone",
           "transaction_isolation",
-          "transaction_read_only",
-          "spanner.ddl_transaction_mode",
-          "spanner.replace_pg_catalog_tables");
+          "transaction_read_only");
 
   static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
@@ -138,10 +136,16 @@ public class SessionState {
    */
   public String generatePGSettingsCte() {
     return "pg_settings_inmem_ as (\n"
+        + PGSetting.getSelectJsonbSetting()
+        + "from unnest(array[\n"
         + getAll().stream()
-            .filter(setting -> SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getCasePreservingKey()))
-            .map(PGSetting::getSelectStatement)
-            .collect(Collectors.joining("\nunion all\n"))
+            .filter(
+                setting ->
+                    setting.getName().toLowerCase().startsWith("spanner.")
+                        || SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getCasePreservingKey()))
+            .map(PGSetting::getJsonbLiteral)
+            .collect(Collectors.joining(",\n"))
+        + "\n]) t"
         + "\n),\n"
         + "pg_settings_names_ as (\n"
         + "select name from pg_settings_inmem_\n"
