@@ -60,6 +60,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           python sample.py
+      - name: Run connectorx sample tests
+        working-directory: ./samples/python/connectorx
+        run: |
+          pip install -r requirements.txt
+          python connectorx_sample.py
   nodejs-samples:
     runs-on: ubuntu-latest
     steps:

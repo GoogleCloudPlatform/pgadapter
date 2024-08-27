@@ -17,6 +17,7 @@ PGAdapter can be used with the following drivers and clients:
 1. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 1. `psycopg2`: Version 2.9.3 and higher are supported. See [psycopg2](docs/psycopg2.md) for more details.
 1. `psycopg3`: Version 3.1.x and higher are supported. See [psycopg3 support](docs/psycopg3.md) for more details.
+1. `connectorx`: Version 0.3.3 and higher have experimental support. See [connectorx sample](samples/python/connectorx) for more details.
 1. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 1. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
 1. `PDO_PGSQL`: The PHP PDO driver has experimental support. See [PHP PDO](docs/pdo.md) for more details.
