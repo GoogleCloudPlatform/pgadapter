@@ -99,6 +99,7 @@ public class OptionsMetadata {
     private int port;
     private String unixDomainSocketDirectory;
     private boolean autoConfigEmulator;
+    private boolean logGrpcMessages;
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
@@ -359,6 +360,15 @@ public class OptionsMetadata {
       return this.setCredentials(NoCredentials.getInstance());
     }
 
+    /**
+     * Enables logging of all gRPC messages that are sent by PGAdapter to Spanner. Only enable this
+     * for debugging purposes.
+     */
+    public Builder setLogGrpcMessages(boolean logGrpcMessages) {
+      this.logGrpcMessages = logGrpcMessages;
+      return this;
+    }
+
     Builder enableDebugMode() {
       this.debugMode = true;
       return this;
@@ -472,6 +482,9 @@ public class OptionsMetadata {
               .append("=true;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
+      }
+      if (logGrpcMessages) {
+        addOption(args, OPTION_LOG_GRPC_MESSAGES);
       }
       if (debugMode) {
         addOption(args, OPTION_INTERNAL_DEBUG_MODE);
@@ -590,6 +603,7 @@ public class OptionsMetadata {
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
   private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
+  private static final String OPTION_LOG_GRPC_MESSAGES = "log_grpc_messages";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -620,6 +634,7 @@ public class OptionsMetadata {
   private final String serverVersion;
   private final boolean debugMode;
   private final Duration startupTimeout;
+  private final boolean logGrpcMessages;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -712,6 +727,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
+    this.logGrpcMessages = commandLine.hasOption(OPTION_LOG_GRPC_MESSAGES);
     this.startupTimeout = startupTimeout;
   }
 
@@ -785,6 +801,7 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
+    this.logGrpcMessages = false;
     this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
@@ -1269,6 +1286,13 @@ public class OptionsMetadata {
             + "the value of this option could cause a client or driver to alter its behavior and cause unexpected "
             + "errors when used with PGAdapter.");
     options.addOption(
+        OPTION_LOG_GRPC_MESSAGES,
+        "log-grpc-messages",
+        false,
+        "Logs all gRPC messages that are sent by PGAdapter to Spanner to the default log handler (stdout).\n"
+            + "This option should only be enabled to debug problems and/or to determine exactly which gRPC messages\n"
+            + "are being sent to Spanner. Enabling this in production will cause a large number of messages to be logged.");
+    options.addOption(
         OPTION_INTERNAL_DEBUG_MODE,
         "internal-debug-mode",
         false,
@@ -1362,6 +1386,10 @@ public class OptionsMetadata {
 
   public boolean isBinaryFormat() {
     return this.binaryFormat;
+  }
+
+  public boolean isLogGrpcMessages() {
+    return this.logGrpcMessages;
   }
 
   public boolean isDebugMode() {
