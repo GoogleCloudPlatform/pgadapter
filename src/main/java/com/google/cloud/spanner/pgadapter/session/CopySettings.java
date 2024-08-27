@@ -18,6 +18,7 @@ import com.google.cloud.spanner.Options.RpcPriority;
 import java.util.Locale;
 import java.util.Map;
 
+/** Settings for COPY FROM STDIN operations. */
 public class CopySettings {
   private static final int DEFAULT_PIPE_BUFFER_SIZE = 1 << 16;
   private static final int DEFAULT_MAX_MUTATION_LIMIT = 80_000; // 80k mutations limit
@@ -83,17 +84,17 @@ public class CopySettings {
     return this.sessionState;
   }
 
-  /** Returns the maximum number of parallel transactions for a single COPY operation. */
+  /** Returns the maximum number of parallel transactions for a single COPY FROM STDIN operation. */
   public int getMaxParallelism() {
     return sessionState.getIntegerSetting("spanner", "copy_max_parallelism", 128);
   }
 
-  /** Returns the commit timeout for COPY operations in seconds. */
+  /** Returns the commit timeout for COPY FROM STDIN operations in seconds. */
   public int getCommitTimeoutSeconds() {
     return sessionState.getIntegerSetting("spanner", "copy_commit_timeout", 300);
   }
 
-  /** Returns the request priority for commits executed by COPY operations. */
+  /** Returns the request priority for commits executed by COPY FROM STDIN operations. */
   public RpcPriority getCommitPriority() {
     String setting =
         sessionState
@@ -106,7 +107,7 @@ public class CopySettings {
     }
   }
 
-  /** Returns the batch size to use for non-atomic COPY operations. */
+  /** Returns the batch size to use for non-atomic COPY FROM STDIN operations. */
   public int getNonAtomicBatchSize() {
     return sessionState.getIntegerSetting("spanner", "copy_batch_size", 5000);
   }
@@ -144,12 +145,12 @@ public class CopySettings {
   }
 
   /**
-   * Returns whether COPY operations should use upsert instead of insert.
+   * Returns whether COPY FROM STDIN operations should use upsert instead of insert.
    *
-   * <p>COPY will INSERT records by default. This is consistent with how COPY on PostgreSQL works.
-   * This option allows PGAdapter to use InsertOrUpdate instead. This can be slightly more efficient
-   * for bulk uploading, and it makes it easier to retry a failed non-atomic batch that might have
-   * already uploaded some but not all data.
+   * <p>COPY FROM STDIN will INSERT records by default. This is consistent with how COPY on
+   * PostgreSQL works. This option allows PGAdapter to use InsertOrUpdate instead. This can be
+   * slightly more efficient for bulk uploading, and it makes it easier to retry a failed non-atomic
+   * batch that might have already uploaded some but not all data.
    */
   public boolean isCopyUpsert() {
     return sessionState.getBoolSetting("spanner", "copy_upsert", false);
