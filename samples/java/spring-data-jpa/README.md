@@ -5,9 +5,21 @@ The sample application starts PGAdapter as an in-process dependency, and uses th
 PostgreSQL JDBC driver and Hibernate dialect to connect through the in-process PGAdapter to Cloud
 Spanner.
 
-## Running
+## Running on the Emulator
+The sample by default also starts a Spanner Emulator instance in a Docker test container and runs
+the sample on the Emulator. The host machine must have Docker installed for this to work.
+No other prior setup is needed to run the sample application on the Spanner Emulator.
+
+Run the application from your favorite IDE or execute it from the command line with:
+
+```shell
+mvn spring-boot:run
+```
+
+## Running on a real Spanner Database
 Modify the `application.properties` file in the [src/main/resources](src/main/resources) directory
-to match your Cloud Spanner database. The database must exist and must use the PostgreSQL dialect.
+to match your Cloud Spanner database and set the property `spanner.use_emulator=false`.
+The database must exist and must use the PostgreSQL dialect.
 The application will automatically create the required tables when the application is starting.
 
 Run the application from your favorite IDE or execute it from the command line with:
