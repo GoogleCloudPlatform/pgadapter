@@ -139,16 +139,32 @@ FullName string `gorm:"->;type:GENERATED ALWAYS AS (coalesce(concat(first_name,'
 ```
 
 ### OnConflict Clauses
-`OnConflict` clauses are not supported by Cloud Spanner and should not be used. The following will
-therefore not work.
+`OnConflict` clauses require that all columns of the constraint that could potentially cause a conflict are included in
+the `OnConflict` clause. You should therefore specify `OnConflict` clauses with `DO NOTHING` like this:
 
 ```go
 user := User{
     ID:   1,
     Name: "User Name",
 }
-// OnConflict is not supported and this will return an error.
-db.Clauses(clause.OnConflict{DoNothing: true}).Create(&user)
+// OnConflict requires all columns to be specified.
+db.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "id"}}, DoNothing: true}).Create(&user)
+```
+
+`OnConflict` clauses that should update the existing row must include *ALL* columns as `my_col=excluded.my_col` clauses:
+
+```go
+singer := Singer{
+    BaseModel: BaseModel{ID: uuid.NewString()},
+    FirstName: sql.NullString{String: firstName, Valid: true},
+    LastName:  lastName,
+}
+// OnConflict clauses are supported on Spanner, but require that you specify all columns that should be checked for
+// potential conflicts, and *ALL* columns must be specified as AssignmentColumns (including the primary key).
+res := db.Clauses(clause.OnConflict{
+    Columns:   []clause.Column{{Name: "id"}},
+    DoUpdates: clause.AssignmentColumns([]string{"id", "first_name", "last_name", "active", "created_at", "updated_at"}),
+}).Create(&singer)
 ```
 
 ### Auto-save Associations
