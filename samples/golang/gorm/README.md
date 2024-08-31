@@ -163,7 +163,7 @@ singer := Singer{
 // potential conflicts, and *ALL* columns must be specified as AssignmentColumns (including the primary key).
 res := db.Clauses(clause.OnConflict{
     Columns:   []clause.Column{{Name: "id"}},
-    DoUpdates: clause.AssignmentColumns([]string{"id", "first_name", "last_name", "active", "created_at", "updated_at"}),
+    DoUpdates: clause.AssignmentColumns([]string{"id", "first_name", "last_name", "active", "updated_at"}),
 }).Create(&singer)
 ```
 
