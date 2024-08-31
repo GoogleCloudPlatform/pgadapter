@@ -2,8 +2,6 @@ module golang-snippets
 
 go 1.21
 
-toolchain go1.23.0
-
 require (
 	github.com/docker/docker v27.1.0+incompatible
 	github.com/jackc/pgx/v5 v5.6.0
