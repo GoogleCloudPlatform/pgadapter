@@ -31,7 +31,7 @@ def format_timestamp(timestamp: datetime) -> str:
  BaseMixin contains properties that are common to all models in this sample.
  
  The created_at and updated_at properties are automatically filled with the
- current client system time when a model is created or updated. 
+ current client system time when a model is created or updated.
 """
 class BaseMixin(object):
   __prepare_statements__ = None
