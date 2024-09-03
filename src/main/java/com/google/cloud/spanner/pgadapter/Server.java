@@ -21,7 +21,6 @@ import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
-import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
 import com.google.cloud.spanner.pgadapter.logging.DefaultLogConfiguration;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableMap;
@@ -41,13 +40,22 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.LambdaMetafactory;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
-import sun.misc.Signal;
+import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
+
+// import sun.misc.Signal;
 
 /** Effectively this is the main class */
 public class Server {
@@ -66,17 +74,61 @@ public class Server {
 
       // Create a shutdown handler and register signal handlers for the signals that should
       // terminate the server.
-      ShutdownHandler shutdownHandler = new ShutdownHandler(proxyServer);
-      try {
-        Signal.handle(new Signal("TERM"), signal -> shutdownHandler.shutdown(ShutdownMode.SMART));
-        Signal.handle(new Signal("INT"), signal -> shutdownHandler.shutdown(ShutdownMode.FAST));
-        Signal.handle(
-            new Signal("QUIT"), signal -> shutdownHandler.shutdown(ShutdownMode.IMMEDIATE));
-      } catch (IllegalArgumentException ignore) {
-      }
+      ShutdownHandler.createForServer(proxyServer);
+      registerSignalHandlers();
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }
+  }
+
+  static void registerSignalHandlers() {
+    try {
+      Class<?> signalClass = Class.forName("sun.misc.Signal");
+      Class<?> signalHandlerClass = Class.forName("sun.misc.SignalHandler");
+      Method handleMethod =
+          signalClass.getDeclaredMethod("handle", signalClass, signalHandlerClass);
+      Constructor<?> signalConstructor = signalClass.getConstructor(String.class);
+
+      Object termSignal = signalConstructor.newInstance("TERM");
+      Object intSignal = signalConstructor.newInstance("INT");
+      Object quitSignal = signalConstructor.newInstance("QUIT");
+
+      Object termHandler = createSignalHandler("handleTerm");
+      Object intHandler = createSignalHandler("handleInt");
+      Object quitHandler = createSignalHandler("handleQuit");
+
+      //noinspection JavaReflectionInvocation
+      handleMethod.invoke(null, termSignal, termHandler);
+      //noinspection JavaReflectionInvocation
+      handleMethod.invoke(null, intSignal, intHandler);
+      //noinspection JavaReflectionInvocation
+      handleMethod.invoke(null, quitSignal, quitHandler);
+    } catch (Throwable ignore) {
+    }
+  }
+
+  @IgnoreJRERequirement
+  private static Object createSignalHandler(String handleMethodName) throws Throwable {
+    Class<?> signalClass = Class.forName("sun.misc.Signal");
+    Class<?> signalHandlerClass = Class.forName("sun.misc.SignalHandler");
+
+    MethodHandles.Lookup caller = MethodHandles.lookup();
+    MethodType signalHandlerHandleMethodType = MethodType.methodType(void.class, signalClass);
+    MethodType invokedType = MethodType.methodType(signalHandlerClass);
+
+    CallSite handleTermSite =
+        LambdaMetafactory.metafactory(
+            caller,
+            "handle",
+            invokedType,
+            signalHandlerHandleMethodType,
+            caller.findStatic(
+                ShutdownHandler.class,
+                handleMethodName,
+                MethodType.methodType(void.class, Object.class)),
+            signalHandlerHandleMethodType);
+    MethodHandle factory = handleTermSite.getTarget();
+    return factory.invoke();
   }
 
   /** Creates an {@link OpenTelemetry} object from the given options. */

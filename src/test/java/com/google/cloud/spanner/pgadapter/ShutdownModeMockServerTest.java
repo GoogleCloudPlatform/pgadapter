@@ -69,7 +69,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
   public void testSmartShutdown() throws SQLException {
     String sql = "SELECT 1";
 
-    ShutdownHandler shutdownHandler = new ShutdownHandler(proxyServer);
+    ShutdownHandler shutdownHandler = ShutdownHandler.recreateForTesting(proxyServer);
     // Verify that the server is running.
     assertEquals(State.RUNNING, proxyServer.state());
 
@@ -118,7 +118,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
   public void testFastShutdown() throws SQLException {
     String sql = "SELECT 1";
 
-    ShutdownHandler shutdownHandler = new ShutdownHandler(proxyServer);
+    ShutdownHandler shutdownHandler = ShutdownHandler.recreateForTesting(proxyServer);
     // Verify that the server is running.
     assertEquals(State.RUNNING, proxyServer.state());
 
@@ -158,7 +158,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
   public void testSmartShutdownFollowedByFastShutdown() throws SQLException {
     String sql = "SELECT 1";
 
-    ShutdownHandler shutdownHandler = new ShutdownHandler(proxyServer);
+    ShutdownHandler shutdownHandler = ShutdownHandler.recreateForTesting(proxyServer);
     // Verify that the server is running.
     assertEquals(State.RUNNING, proxyServer.state());
 
