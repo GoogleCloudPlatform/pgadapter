@@ -201,6 +201,9 @@ public class ConnectionHandler implements Runnable {
     OptionsMetadata options = getServer().getOptions();
     String uri = buildConnectionURL(database, options, getServer().getProperties());
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
+    connectionOptionsBuilder =
+        ConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
+            connectionOptionsBuilder, options.isLogGrpcMessages());
     if (credentials != null) {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);

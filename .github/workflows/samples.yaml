@@ -21,6 +21,9 @@ jobs:
       - name: Run Hibernate Sample tests
         working-directory: ./samples/java/hibernate
         run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+      - name: Run Spring Data JPA Sample tests
+        working-directory: ./samples/java/spring-data-jpa
+        run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
   go-samples:
     runs-on: ubuntu-latest
     steps:
@@ -60,6 +63,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           python sample.py
+      - name: Run connectorx sample tests
+        working-directory: ./samples/python/connectorx
+        run: |
+          pip install -r requirements.txt
+          python connectorx_sample.py
   nodejs-samples:
     runs-on: ubuntu-latest
     steps:

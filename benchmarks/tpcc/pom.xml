@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.3.2</version>
+    <version>3.3.3</version>
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
   <groupId>com.google.cloud.spanner</groupId>
@@ -21,21 +21,21 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.43.0</version>
+        <version>26.45.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.40.0</version>
+        <version>1.41.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>org.testcontainers</groupId>
         <artifactId>testcontainers-bom</artifactId>
-        <version>1.20.0</version>
+        <version>1.20.1</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -50,7 +50,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.3</version>
+      <version>42.7.4</version>
     </dependency>
     <!-- Add the Cloud Spanner JDBC driver -->
     <dependency>
@@ -61,7 +61,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.36.1</version>
+      <version>0.37.0</version>
     </dependency>
     <dependency>
           <groupId>io.opentelemetry</groupId>
@@ -97,7 +97,7 @@
       <plugin>
         <groupId>com.spotify.fmt</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.23</version>
+        <version>2.24</version>
         <executions>
           <execution>
             <goals>

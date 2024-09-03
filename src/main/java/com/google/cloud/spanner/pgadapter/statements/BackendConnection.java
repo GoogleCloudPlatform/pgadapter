@@ -19,7 +19,6 @@ import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatemen
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replaceForUpdate;
-import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.ROLLBACK;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW;
 
 import com.google.api.core.InternalApi;
@@ -554,7 +553,7 @@ public class BackendConnection {
     void doExecute() {
       checkConnectionState();
       try {
-        if (transactionMode != TransactionMode.IMPLICIT) {
+        if (transactionMode != TransactionMode.IMPLICIT || !sessionState.isCopyPartitionQuery()) {
           result.set(spannerConnection.execute(statement));
         } else {
           Spanner spanner = spannerConnection.getSpanner();
@@ -575,9 +574,7 @@ public class BackendConnection {
                   spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
               result.set(
                   new PartitionQueryResult(
-                      batchReadOnlyTransaction.getBatchTransactionId(),
-                      partitions,
-                      metadataResultSet));
+                      batchReadOnlyTransaction, partitions, metadataResultSet));
             }
           } catch (SpannerException spannerException) {
             // The query might not be suitable for partitioning. Just try with a normal query.
@@ -1063,7 +1060,8 @@ public class BackendConnection {
     AbstractStatementParser statementParser =
         AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
     if ("options".equalsIgnoreCase(name)) {
-      String[] commands = value.split("-c\\s+");
+      // Some drivers encode spaces as '+'.
+      String[] commands = value.split("-c[\\s+]+");
       for (String command : commands) {
         // Special case: If the setting is one that is handled by the Connection API, then we need
         // to execute the statement on the connection instead.
@@ -1688,21 +1686,25 @@ public class BackendConnection {
 
   @InternalApi
   public static final class PartitionQueryResult implements StatementResult {
-    private final BatchTransactionId batchTransactionId;
+    private final BatchReadOnlyTransaction transaction;
     private final List<Partition> partitions;
     private final ResultSet metadataResultSet;
 
     public PartitionQueryResult(
-        BatchTransactionId batchTransactionId,
+        BatchReadOnlyTransaction transaction,
         List<Partition> partitions,
         ResultSet metadataResultSet) {
-      this.batchTransactionId = batchTransactionId;
+      this.transaction = Preconditions.checkNotNull(transaction);
       this.partitions = partitions;
       this.metadataResultSet = metadataResultSet;
     }
 
+    public void cleanup() {
+      this.transaction.cleanup();
+    }
+
     public BatchTransactionId getBatchTransactionId() {
-      return batchTransactionId;
+      return transaction.getBatchTransactionId();
     }
 
     public List<Partition> getPartitions() {

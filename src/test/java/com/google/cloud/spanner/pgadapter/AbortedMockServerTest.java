@@ -1128,7 +1128,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("show application_name ")) {
         assertTrue(resultSet.next());
-        assertNull(resultSet.getString(1));
+        assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -1421,7 +1421,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
       connection.createStatement().execute("reset all");
 
-      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
       verifySettingValue(connection, "search_path", "public");
     }
   }
@@ -1437,7 +1437,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
       connection.createStatement().execute("set application_name to default");
       connection.createStatement().execute("set search_path to default");
 
-      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
       verifySettingValue(connection, "search_path", "public");
     }
   }

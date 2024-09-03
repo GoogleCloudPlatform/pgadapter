@@ -399,7 +399,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   private String getExpectedInitialApplicationName() {
-    return pgVersion.equals("1.0") ? "jdbc" : "PostgreSQL JDBC Driver";
+    return "PostgreSQL JDBC Driver";
   }
 
   @Test
@@ -2077,14 +2077,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String pgInsertSql = "insert into my_table (id, value) values ($1, $2)";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(pgInsertSql),
-            com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(
-                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
-                .setStats(ResultSetStats.newBuilder().build())
-                .build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
             Statement.of(pgRewrittenInsertSql),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(
@@ -2184,8 +2176,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals(10, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
-    // We receive 21 ExecuteSql requests, because the update statement is described.
-    assertEquals(21, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(20, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -3856,7 +3847,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("show application_name ")) {
         assertTrue(resultSet.next());
-        assertNull(resultSet.getString(1));
+        assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -4155,7 +4146,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       connection.createStatement().execute("reset all");
 
-      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
       verifySettingValue(connection, "search_path", "public");
       verifySettingValue(connection, "spanner.autocommit_dml_mode", "TRANSACTIONAL");
     }
@@ -4172,7 +4163,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       connection.createStatement().execute("set application_name to default");
       connection.createStatement().execute("set search_path to default");
 
-      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
       verifySettingValue(connection, "search_path", "public");
     }
   }
@@ -5531,6 +5522,24 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     Session session = MockServerHelper.getSession(mockSpanner, sessionId);
     assertNotNull(session);
     assertFalse(session.getMultiplexed());
+  }
+
+  @Test
+  public void testMaxCommitDelay() throws SQLException {
+    String sql = "insert into foo (id) values (1)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      connection.createStatement().execute("set spanner.max_commit_delay='20ms'");
+      connection.createStatement().execute(sql);
+      connection.commit();
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest request = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertTrue(request.hasMaxCommitDelay());
+    assertEquals(TimeUnit.MILLISECONDS.toNanos(20), request.getMaxCommitDelay().getNanos());
   }
 
   @Ignore("Only used for manual performance testing")

@@ -39,7 +39,7 @@
       <dependency>
         <groupId>org.testcontainers</groupId>
         <artifactId>testcontainers-bom</artifactId>
-        <version>1.20.0</version>
+        <version>1.20.1</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -51,12 +51,12 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.3</version>
+      <version>42.7.4</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.36.1</version>
+      <version>0.37.0</version>
     </dependency>
     <!-- [END pgadapter_and_jdbc_dependency] -->
     <dependency>
@@ -80,7 +80,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>3.3.0</version>
+        <version>3.4.1</version>
         <configuration>
           <mainClass>com.google.cloud.spanner.pgadapter.sample.SampleApplication</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>
