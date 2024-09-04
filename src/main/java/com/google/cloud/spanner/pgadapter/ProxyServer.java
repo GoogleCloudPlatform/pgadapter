@@ -281,6 +281,13 @@ public class ProxyServer extends AbstractApiService {
       }
     } catch (Throwable ignore) {
     }
+    if (openTelemetry instanceof Closeable) {
+      try {
+        ((Closeable) openTelemetry).close();
+      } catch (IOException ioException) {
+        logger.log(Level.WARNING, "Failed to close OpenTelemetry", ioException);
+      }
+    }
     notifyStopped();
   }
 
@@ -386,18 +393,15 @@ public class ProxyServer extends AbstractApiService {
         createConnectionHandler(serverSocket.accept());
       }
     } catch (SocketException e) {
-      // This is a normal exception, as this will occur when Server#stopServer() is called.
+      // This is a normal and expected exception when the server is shutting down.
       logger.log(
-          Level.INFO,
+          shutdownMode.get() == null ? Level.WARNING : Level.FINEST,
           () ->
               String.format(
                   "Socket exception on socket %s: %s. This is normal when the server is stopped.",
                   serverSocket, e));
     } finally {
       logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocket));
-      if (openTelemetry instanceof Closeable) {
-        ((Closeable) openTelemetry).close();
-      }
       stoppedLatch.countDown();
     }
   }
