@@ -44,6 +44,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -267,7 +269,16 @@ public class ProxyServer extends AbstractApiService {
       terminateAllConnectionHandlers();
     }
     try {
-      SpannerPool.closeSpannerPool();
+      // Do a shoot-and-forget close of the underlying Spanner pool.
+      ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
+      service.submit(SpannerPool::closeSpannerPool);
+      service.shutdown();
+      if (shutdownMode.get() != ShutdownMode.IMMEDIATE) {
+        if (!service.awaitTermination(1L, TimeUnit.SECONDS)) {
+          service.shutdownNow();
+          logger.log(Level.INFO, "SpannerPool was not closed after waiting for 1 second");
+        }
+      }
     } catch (Throwable ignore) {
     }
     notifyStopped();
