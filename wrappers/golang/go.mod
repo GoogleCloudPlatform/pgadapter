@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/docker/docker v27.2.0+incompatible
 	github.com/testcontainers/testcontainers-go v0.33.0
-	golang.org/x/oauth2 v0.22.0
+	golang.org/x/oauth2 v0.23.0
 )
 
 require (
