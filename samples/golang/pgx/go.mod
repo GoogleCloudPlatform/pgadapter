@@ -3,7 +3,7 @@ module pgadapter-pgx-sample
 go 1.21
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240902070506-94e968467df8
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240904094108-5a517d5836d1
 	github.com/jackc/pgx/v5 v5.6.0
 )
 

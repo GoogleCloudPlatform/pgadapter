@@ -10,6 +10,8 @@ github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240618062230-6
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240618062230-6b6f887b294e/go.mod h1:5nH+pq7AqOTRwLuieSbrizP112ZvIht+1KdGIYZZfQ0=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240902070506-94e968467df8 h1:FhbURatSGxlqdsiSU8eOBc/oDAtPpBuxvH2XYsQDCAw=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240902070506-94e968467df8/go.mod h1:AePg/g/kQCpx2r82bOQyF4HN/ZOX5SUcEuJz09MYpjA=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240904094108-5a517d5836d1 h1:3szvzwpCxOTbWFlUQVLuU+F7eH1VxgA0GIIxmC7wtKQ=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240904094108-5a517d5836d1/go.mod h1:AePg/g/kQCpx2r82bOQyF4HN/ZOX5SUcEuJz09MYpjA=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
