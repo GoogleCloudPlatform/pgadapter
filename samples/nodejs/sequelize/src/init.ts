@@ -58,7 +58,7 @@ export async function createDataModel(sequelize: Sequelize) {
               title             varchar,
               "marketingBudget" numeric,
               "SingerId"        bigint,
-              "createdAt"       timestamptz,
+              "createdAt"       timestamptz default current_timestamp,
               "updatedAt"       timestamptz,
               constraint fk_albums_singers foreign key ("SingerId") references "Singers" (id)
             );
@@ -68,7 +68,7 @@ export async function createDataModel(sequelize: Sequelize) {
               "trackNumber" bigint not null,
               title         varchar not null,
               "sampleRate"  float8 not null,
-              "createdAt"   timestamptz,
+              "createdAt"   timestamptz default current_timestamp,
               "updatedAt"   timestamptz,
               primary key (id, "trackNumber")
             ) interleave in parent "Albums" on delete cascade;
@@ -78,7 +78,7 @@ export async function createDataModel(sequelize: Sequelize) {
               id          bigint not null primary key default nextval('venues_seq'),
               name        varchar not null,
               description varchar not null,
-              "createdAt" timestamptz,
+              "createdAt" timestamptz default current_timestamp,
               "updatedAt" timestamptz
             );
 
@@ -90,7 +90,7 @@ export async function createDataModel(sequelize: Sequelize) {
               name        varchar not null,
               "startTime" timestamptz not null,
               "endTime"   timestamptz not null,
-              "createdAt" timestamptz,
+              "createdAt" timestamptz default current_timestamp,
               "updatedAt" timestamptz,
               constraint fk_concerts_venues  foreign key ("VenueId")  references "Venues"  (id),
               constraint fk_concerts_singers foreign key ("SingerId") references "Singers" (id),
@@ -104,7 +104,7 @@ export async function createDataModel(sequelize: Sequelize) {
               "customerName" varchar not null,
               price          decimal not null,
               seats          text[],
-              "createdAt"    timestamptz,
+              "createdAt"    timestamptz default current_timestamp,
               "updatedAt"    timestamptz,
               constraint fk_ticket_sales_concerts foreign key ("ConcertId") references "Concerts" (id)
             );`,

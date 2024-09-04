@@ -112,13 +112,21 @@ export function initModels(sequelize: Sequelize) {
     active: {
       type: DataTypes.BOOLEAN,
     },
+    // createdAt is automatically set by Spanner using a DEFAULT constraint.
     createdAt: {
       type: DataTypes.DATE,
     },
+    // updatedAt is automatically managed by Sequelize client-side.
     updatedAt: {
       type: DataTypes.DATE,
     }
-  }, {sequelize});
+  }, {
+    sequelize,
+    // Disable the 'createdAt' handling of Sequelize and let Spanner handle that using a DEFAULT
+    // constraint. This allows us to use insert-or-update statements where the 'createdAt' is only
+    // set by Spanner when a new row is inserted.
+    createdAt: false
+  });
 
   Album.init({
     id: {
@@ -135,13 +143,21 @@ export function initModels(sequelize: Sequelize) {
     marketingBudget: {
       type: DataTypes.DECIMAL,
     },
+    // createdAt is automatically set by Spanner using a DEFAULT constraint.
     createdAt: {
       type: DataTypes.DATE,
     },
+    // updatedAt is automatically managed by Sequelize client-side.
     updatedAt: {
       type: DataTypes.DATE,
     }
-  }, {sequelize});
+  }, {
+    sequelize,
+    // Disable the 'createdAt' handling of Sequelize and let Spanner handle that using a DEFAULT
+    // constraint. This allows us to use insert-or-update statements where the 'createdAt' is only
+    // set by Spanner when a new row is inserted.
+    createdAt: false
+  });
 
   // Note: Track is interleaved in Album.
   Track.init({
@@ -163,13 +179,21 @@ export function initModels(sequelize: Sequelize) {
     sampleRate: {
       type: DataTypes.DOUBLE,
     },
+    // createdAt is automatically set by Spanner using a DEFAULT constraint.
     createdAt: {
       type: DataTypes.DATE,
     },
+    // updatedAt is automatically managed by Sequelize client-side.
     updatedAt: {
       type: DataTypes.DATE,
     }
-  }, {sequelize});
+  }, {
+    sequelize,
+    // Disable the 'createdAt' handling of Sequelize and let Spanner handle that using a DEFAULT
+    // constraint. This allows us to use insert-or-update statements where the 'createdAt' is only
+    // set by Spanner when a new row is inserted.
+    createdAt: false
+  });
 
   Venue.init({
     id: {
@@ -183,13 +207,21 @@ export function initModels(sequelize: Sequelize) {
     description: {
       type: DataTypes.STRING,
     },
+    // createdAt is automatically set by Spanner using a DEFAULT constraint.
     createdAt: {
       type: DataTypes.DATE,
     },
+    // updatedAt is automatically managed by Sequelize client-side.
     updatedAt: {
       type: DataTypes.DATE,
     }
-  }, {sequelize})
+  }, {
+    sequelize,
+    // Disable the 'createdAt' handling of Sequelize and let Spanner handle that using a DEFAULT
+    // constraint. This allows us to use insert-or-update statements where the 'createdAt' is only
+    // set by Spanner when a new row is inserted.
+    createdAt: false
+  });
 
   Concert.init({
     id: {
@@ -212,13 +244,21 @@ export function initModels(sequelize: Sequelize) {
     endTime: {
       type: DataTypes.DATE,
     },
+    // createdAt is automatically set by Spanner using a DEFAULT constraint.
     createdAt: {
       type: DataTypes.DATE,
     },
+    // updatedAt is automatically managed by Sequelize client-side.
     updatedAt: {
       type: DataTypes.DATE,
     }
-  }, {sequelize})
+  }, {
+    sequelize,
+    // Disable the 'createdAt' handling of Sequelize and let Spanner handle that using a DEFAULT
+    // constraint. This allows us to use insert-or-update statements where the 'createdAt' is only
+    // set by Spanner when a new row is inserted.
+    createdAt: false
+  });
 
   TicketSale.init({
     id: {
@@ -238,13 +278,21 @@ export function initModels(sequelize: Sequelize) {
     seats: {
       type: DataTypes.ARRAY(DataTypes.STRING),
     },
+    // createdAt is automatically set by Spanner using a DEFAULT constraint.
     createdAt: {
       type: DataTypes.DATE,
     },
+    // updatedAt is automatically managed by Sequelize client-side.
     updatedAt: {
       type: DataTypes.DATE,
     }
-  }, {sequelize})
+  }, {
+    sequelize,
+    // Disable the 'createdAt' handling of Sequelize and let Spanner handle that using a DEFAULT
+    // constraint. This allows us to use insert-or-update statements where the 'createdAt' is only
+    // set by Spanner when a new row is inserted.
+    createdAt: false
+  });
 
   Singer.hasMany(Album);
   Album.belongsTo(Singer);
