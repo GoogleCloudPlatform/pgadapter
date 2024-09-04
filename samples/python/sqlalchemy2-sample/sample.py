@@ -12,6 +12,7 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
+import uuid
 from random import random
 
 from connect import create_test_engine
@@ -20,9 +21,10 @@ from sqlalchemy import text, func, or_, Integer
 from model import Singer, Album, Track, Venue, Concert, TicketSale
 from util_random_names import random_first_name, random_last_name, \
   random_album_title, random_release_date, random_marketing_budget, \
-  random_cover_picture
+  random_cover_picture, random_boolean
 from uuid import uuid4
 from datetime import datetime, date, timezone
+from sqlalchemy.dialects.postgresql import insert
 
 # This is the default engine that is connected to PostgreSQL (PGAdapter).
 # This engine will by default use read/write transactions.
@@ -82,6 +84,14 @@ def run_sample():
     else:
       print("Album was found using a stale read, even though it has already "
             "been deleted.")
+
+  # Randomly either insert or update a new Singer record using an
+  # INSERT .. ON CONFLICT UPDATE .. statement.
+  if random_boolean():
+    singer_id = session.query(Singer).first().id
+  else:
+    singer_id = uuid.uuid4()
+  insert_or_update_singer(singer_id, random_first_name(), random_last_name())
 
   print()
   print("Finished running sample")
@@ -324,6 +334,39 @@ def update_singer(singer_id, first_name, last_name):
     session.flush()
     print("Updated singer {} with full name {}"
           .format(singer.id, singer.full_name))
+    session.commit()
+
+
+# Inserts-or-updates a singer record in the database. This generates an
+# INSERT ... ON CONFLICT (id) UPDATE ... statement.
+def insert_or_update_singer(singer_id, first_name, last_name):
+  with Session(engine) as session:
+    singer = Singer()
+    singer.id = singer_id
+    singer.first_name = first_name
+    singer.last_name = last_name
+    insert_stmt = insert(Singer).values(id=singer.id,
+                                        first_name=singer.first_name,
+                                        last_name=singer.last_name,
+                                        created_at=datetime.now(),
+                                        updated_at=datetime.now(),
+                                        version_id=1)
+    # Spanner requires that the ON CONFLICT clause specifies the conflict
+    # column(s), and that all columns that are included in the INSERT statement
+    # are also included in the UPDATE statement. The UPDATE statement may only
+    # contain 'my_col=excluded.my_col' assignments.
+    do_update_stmt = insert_stmt.on_conflict_do_update(
+      index_elements=['id'],
+      set_=dict(id=insert_stmt.excluded.id,
+                first_name=insert_stmt.excluded.first_name,
+                last_name=insert_stmt.excluded.last_name,
+                created_at=insert_stmt.excluded.created_at,
+                updated_at=insert_stmt.excluded.updated_at,
+                version_id=insert_stmt.excluded.version_id),
+    )
+    session.execute(do_update_stmt)
+    print("Inserted or updated singer {} with last name {}"
+          .format(singer.id, singer.last_name))
     session.commit()
 
 
