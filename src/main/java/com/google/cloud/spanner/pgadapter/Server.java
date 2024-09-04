@@ -21,6 +21,7 @@ import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
+import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
 import com.google.cloud.spanner.pgadapter.logging.DefaultLogConfiguration;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableMap;
@@ -51,6 +52,8 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
@@ -59,6 +62,9 @@ import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
 
 /** Effectively this is the main class */
 public class Server {
+  private static final Logger logger = Logger.getLogger(Server.class.getName());
+
+  private static ShutdownHandler shutdownHandler;
 
   /**
    * Main method for running a Spanner PostgreSQL Adapter {@link Server} as a stand-alone
@@ -74,17 +80,24 @@ public class Server {
 
       // Create a shutdown handler and register signal handlers for the signals that should
       // terminate the server.
-      ShutdownHandler.createForServer(proxyServer);
+      Server.shutdownHandler = ShutdownHandler.createForServer(proxyServer);
       registerSignalHandlers();
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }
   }
 
+  /**
+   * Registers signal handlers for TERM, INT, and QUIT. This method uses reflection and fails
+   * gracefully if signal handling is not available on this JVM.
+   */
   static void registerSignalHandlers() {
+    Class<?> signalClass = getSignalClass();
+    Class<?> signalHandlerClass = getSignalHandlerClass();
+    if (signalClass == null || signalHandlerClass == null) {
+      return;
+    }
     try {
-      Class<?> signalClass = Class.forName("sun.misc.Signal");
-      Class<?> signalHandlerClass = Class.forName("sun.misc.SignalHandler");
       Method handleMethod =
           signalClass.getDeclaredMethod("handle", signalClass, signalHandlerClass);
       Constructor<?> signalConstructor = signalClass.getConstructor(String.class);
@@ -93,25 +106,67 @@ public class Server {
       Object intSignal = signalConstructor.newInstance("INT");
       Object quitSignal = signalConstructor.newInstance("QUIT");
 
-      Object termHandler = createSignalHandler("handleTerm");
-      Object intHandler = createSignalHandler("handleInt");
-      Object quitHandler = createSignalHandler("handleQuit");
+      Object termHandler = createSignalHandler(signalClass, signalHandlerClass, "handleTerm");
+      Object intHandler = createSignalHandler(signalClass, signalHandlerClass, "handleInt");
+      Object quitHandler = createSignalHandler(signalClass, signalHandlerClass, "handleQuit");
 
-      //noinspection JavaReflectionInvocation
-      handleMethod.invoke(null, termSignal, termHandler);
-      //noinspection JavaReflectionInvocation
-      handleMethod.invoke(null, intSignal, intHandler);
-      //noinspection JavaReflectionInvocation
-      handleMethod.invoke(null, quitSignal, quitHandler);
-    } catch (Throwable ignore) {
+      // Register the actual signal handlers. This will fail if the JVM has already registered a
+      // signal handler for the given signal. Normally, TERM and INT can be registered. QUIT is
+      // normally registered by the JVM.
+      try {
+        handleMethod.invoke(null, termSignal, termHandler);
+      } catch (Throwable throwable) {
+        logger.log(Level.WARNING, "Failed to register signal handler for TERM", throwable);
+      }
+      try {
+        handleMethod.invoke(null, intSignal, intHandler);
+      } catch (Throwable throwable) {
+        logger.log(Level.WARNING, "Failed to register signal handler for INT", throwable);
+      }
+      try {
+        handleMethod.invoke(null, quitSignal, quitHandler);
+      } catch (Throwable throwable) {
+        // Log this at FINE level, as QUIT is normally already registered by the JVM. This means
+        // that registering QUIT will fail on most JVMs. This means that QUIT signals will still
+        // lead to the server stopping quickly, just that it is handled directly by the JVM instead
+        // of PGAdapter.
+        logger.log(Level.FINE, "Failed to register signal handler for QUIT", throwable);
+      }
+    } catch (Throwable exception) {
+      logger.log(Level.WARNING, "Failed to register signal handlers", exception);
     }
   }
 
-  @IgnoreJRERequirement
-  private static Object createSignalHandler(String handleMethodName) throws Throwable {
-    Class<?> signalClass = Class.forName("sun.misc.Signal");
-    Class<?> signalHandlerClass = Class.forName("sun.misc.SignalHandler");
+  private static Class<?> getSignalClass() {
+    try {
+      return Class.forName("sun.misc.Signal");
+    } catch (ClassNotFoundException exception) {
+      logger.log(
+          Level.INFO,
+          "Cannot register shutdown signal handlers as sun.misc.Signal is not available on this JVM");
+      return null;
+    }
+  }
 
+  private static Class<?> getSignalHandlerClass() {
+    try {
+      return Class.forName("sun.misc.SignalHandler");
+    } catch (ClassNotFoundException exception) {
+      logger.log(
+          Level.INFO,
+          "Cannot register shutdown signal handlers as sun.misc.SignalHandler is not available on this JVM");
+      return null;
+    }
+  }
+
+  /**
+   * This method dynamically creates the signal handler lambdas that call the handleTerm, handleInt,
+   * and handleQuit methods. We need to do this through reflection, because we cannot use the
+   * sun.misc.SignalHandler interface directly to create the lambda expressions.
+   */
+  @IgnoreJRERequirement
+  private static Object createSignalHandler(
+      Class<?> signalClass, Class<?> signalHandlerClass, String handleMethodName) throws Throwable {
     MethodHandles.Lookup caller = MethodHandles.lookup();
     MethodType signalHandlerHandleMethodType = MethodType.methodType(void.class, signalClass);
     MethodType invokedType = MethodType.methodType(signalHandlerClass);
@@ -123,12 +178,37 @@ public class Server {
             invokedType,
             signalHandlerHandleMethodType,
             caller.findStatic(
-                ShutdownHandler.class,
-                handleMethodName,
-                MethodType.methodType(void.class, Object.class)),
+                Server.class, handleMethodName, MethodType.methodType(void.class, Object.class)),
             signalHandlerHandleMethodType);
     MethodHandle factory = handleTermSite.getTarget();
     return factory.invoke();
+  }
+
+  /** This method is called by the signal handler that is registered for TERM. */
+  static void handleTerm(Object ignoredSignal) {
+    if (Server.shutdownHandler == null) {
+      return;
+    }
+    logger.log(Level.INFO, "Server received TERM");
+    Server.shutdownHandler.shutdown(ShutdownMode.SMART);
+  }
+
+  /** This method is called by the signal handler that is registered for INT. */
+  static void handleInt(Object ignoredSignal) {
+    if (Server.shutdownHandler == null) {
+      return;
+    }
+    logger.log(Level.INFO, "Server received INT");
+    Server.shutdownHandler.shutdown(ShutdownMode.FAST);
+  }
+
+  /** This method is called by the signal handler that is registered for QUIT. */
+  static void handleQuit(Object ignoredSignal) {
+    if (Server.shutdownHandler == null) {
+      return;
+    }
+    logger.log(Level.INFO, "Server received QUIT");
+    Server.shutdownHandler.shutdown(ShutdownMode.IMMEDIATE);
   }
 
   /** Creates an {@link OpenTelemetry} object from the given options. */

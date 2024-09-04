@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
@@ -25,25 +24,12 @@ import javax.annotation.Nonnull;
  * once.
  */
 public class ShutdownHandler {
-  private static ShutdownHandler instance;
-
   private final ProxyServer proxyServer;
   private final Thread shutdownThread;
   private final AtomicReference<ShutdownMode> shutdownMode = new AtomicReference<>();
 
-  @VisibleForTesting
-  static synchronized ShutdownHandler recreateForTesting(@Nonnull ProxyServer proxyServer) {
-    ShutdownHandler.instance = null;
-    return createForServer(proxyServer);
-  }
-
-  static synchronized ShutdownHandler createForServer(@Nonnull ProxyServer proxyServer) {
-    if (ShutdownHandler.instance != null) {
-      throw new IllegalStateException("A ShutdownHandler has already been created");
-    }
-
-    ShutdownHandler.instance = new ShutdownHandler(proxyServer);
-    return ShutdownHandler.instance;
+  static ShutdownHandler createForServer(@Nonnull ProxyServer proxyServer) {
+    return new ShutdownHandler(proxyServer);
   }
 
   /** Constructor for a {@link ShutdownHandler} for a given {@link ProxyServer}. */
@@ -56,27 +42,6 @@ public class ShutdownHandler {
             ShutdownHandler.this.proxyServer.stopServer(ShutdownHandler.this.shutdownMode.get());
           }
         };
-  }
-
-  static void handleTerm(Object signal) {
-    if (instance == null) {
-      return;
-    }
-    instance.shutdown(ShutdownMode.SMART);
-  }
-
-  static void handleInt(Object signal) {
-    if (instance == null) {
-      return;
-    }
-    instance.shutdown(ShutdownMode.FAST);
-  }
-
-  static void handleQuit(Object signal) {
-    if (instance == null) {
-      return;
-    }
-    instance.shutdown(ShutdownMode.IMMEDIATE);
   }
 
   /** Shuts down the proxy server using the given {@link ShutdownMode}. */
