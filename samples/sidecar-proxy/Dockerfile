@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.23.0 as builder
+FROM golang:1.23.1 as builder
 WORKDIR /app
 RUN go mod init example-app
 RUN go get github.com/jackc/pgx/v4
