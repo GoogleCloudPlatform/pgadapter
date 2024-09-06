@@ -457,13 +457,14 @@ public class ConnectionHandler implements Runnable {
                   () ->
                       String.format(
                           "Exception while closing connection handler with ID %s", getName())));
+        } finally {
+          this.server.deregister(this);
+          logger.log(
+              Level.INFO,
+              Logging.format(
+                  "RunConnection",
+                  () -> String.format("Connection handler with ID %s closed", getName())));
         }
-        this.server.deregister(this);
-        logger.log(
-            Level.INFO,
-            Logging.format(
-                "RunConnection",
-                () -> String.format("Connection handler with ID %s closed", getName())));
       }
     }
     return result;
