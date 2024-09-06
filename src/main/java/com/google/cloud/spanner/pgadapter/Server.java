@@ -58,8 +58,6 @@ import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
 
-// import sun.misc.Signal;
-
 /** Effectively this is the main class */
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
