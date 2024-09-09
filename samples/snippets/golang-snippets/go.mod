@@ -3,7 +3,7 @@ module golang-snippets
 go 1.21
 
 require (
-	github.com/docker/docker v27.2.0+incompatible
+	github.com/docker/docker v27.2.1+incompatible
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/testcontainers/testcontainers-go v0.33.0
 )
