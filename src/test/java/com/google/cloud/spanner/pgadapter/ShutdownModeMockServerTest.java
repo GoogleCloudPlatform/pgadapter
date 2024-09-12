@@ -124,6 +124,48 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSmartShutdownWithoutConnections() throws SQLException {
+    String sql = "SELECT 1";
+
+    ShutdownHandler shutdownHandler = ShutdownHandler.createForServer(proxyServer);
+    // Verify that the server is running.
+    assertEquals(State.RUNNING, proxyServer.state());
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Verify that the connection is valid.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+    // Initiate a smart shutdown.
+    shutdownHandler.shutdown(ShutdownMode.SMART);
+    // Wait until the server port is no longer open.
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    while (isPortListening(proxyServer.getLocalPort())
+        && stopwatch.elapsed(TimeUnit.MILLISECONDS) < 2000) {
+      Thread.yield();
+    }
+    // Verify that we cannot open a new connection.
+    SQLException exception =
+        assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl()));
+    assertEquals(
+        String.format(
+            "Connection to localhost:%d refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
+            proxyServer.getLocalPort()),
+        exception.getMessage());
+
+    Stopwatch.createStarted();
+    while (proxyServer.state() == State.STOPPING
+        && stopwatch.elapsed(TimeUnit.MILLISECONDS) < 2000) {
+      Thread.yield();
+    }
+    // Verify that the server terminates.
+    assertEquals(State.TERMINATED, proxyServer.state());
+  }
+
+  @Test
   public void testFastShutdown() throws SQLException {
     String sql = "SELECT 1";
 

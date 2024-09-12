@@ -438,7 +438,7 @@ public class ProxyServer extends AbstractApiService {
 
   private void createConnectionHandlersTerminatedLatch() {
     synchronized (this.handlers) {
-      this.allHandlersTerminatedLatch.set(new CountDownLatch(1));
+      this.allHandlersTerminatedLatch.set(new CountDownLatch(handlers.isEmpty() ? 0 : 1));
     }
   }
 
