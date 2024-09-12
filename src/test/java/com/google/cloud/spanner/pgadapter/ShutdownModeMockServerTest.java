@@ -190,6 +190,8 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
         assertEquals(1L, resultSet.getLong(1));
         assertFalse(resultSet.next());
       }
+      // Verify that the server is stopping, but not yet terminated.
+      assertEquals(State.STOPPING, proxyServer.state());
       // Verify that we cannot open a new connection.
       SQLException exception =
           assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl()));
@@ -198,7 +200,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
               "Connection to localhost:%d refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
               proxyServer.getLocalPort()),
           exception.getMessage());
-      // Verify that the server is stopping, but not yet terminated.
+      // Verify that the server is still stopping, but not yet terminated.
       assertEquals(State.STOPPING, proxyServer.state());
 
       // Now force the server to stop by initiating a fast shutdown.

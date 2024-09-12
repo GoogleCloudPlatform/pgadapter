@@ -263,6 +263,7 @@ public class ProxyServer extends AbstractApiService {
       try {
         waitForAllConnectionsToTerminate();
       } catch (InterruptedException interruptedException) {
+        logger.log(Level.WARNING, "Interrupted while waiting for all connections to be closed.");
         // The waiting thread will be interrupted if a new shutdown request with mode FAST or
         // IMMEDIATE comes in. In that case, we actively terminate all connection handlers.
         terminateAllConnectionHandlers();
