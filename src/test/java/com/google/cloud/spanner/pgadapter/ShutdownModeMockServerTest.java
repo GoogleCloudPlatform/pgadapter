@@ -58,7 +58,9 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
 
   @After
   public void stopProxyServer() {
-    proxyServer.stopServer();
+    if (proxyServer.state() != State.TERMINATED) {
+      proxyServer.stopServer();
+    }
   }
 
   private String createUrl() {

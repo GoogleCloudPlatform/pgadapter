@@ -323,6 +323,7 @@ public class ProxyServer extends AbstractApiService {
   }
 
   void setShutdownMode(ShutdownMode shutdownMode) {
+    logger.log(Level.INFO, "Setting shutdown mode to {0}", shutdownMode);
     this.shutdownMode.set(shutdownMode);
   }
 
@@ -437,7 +438,7 @@ public class ProxyServer extends AbstractApiService {
 
   private void createConnectionHandlersTerminatedLatch() {
     synchronized (this.handlers) {
-      this.allHandlersTerminatedLatch.set(new CountDownLatch(this.handlers.size()));
+      this.allHandlersTerminatedLatch.set(new CountDownLatch(1));
     }
   }
 
@@ -460,7 +461,7 @@ public class ProxyServer extends AbstractApiService {
   void deregister(ConnectionHandler handler) {
     synchronized (this.handlers) {
       this.handlers.remove(handler);
-      if (this.allHandlersTerminatedLatch.get() != null) {
+      if (this.handlers.isEmpty() && this.allHandlersTerminatedLatch.get() != null) {
         this.allHandlersTerminatedLatch.get().countDown();
       }
     }
