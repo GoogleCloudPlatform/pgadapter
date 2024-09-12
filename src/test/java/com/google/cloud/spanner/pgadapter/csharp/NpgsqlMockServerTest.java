@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.csharp;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -243,7 +242,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p2")
                 .to(ByteArray.copyFrom("test_bytes"))
                 .bind("p3")
-                .to(useFloat4InTests() ? 3.14f : 3.14d)
+                .to(3.14f)
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
@@ -293,7 +292,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test_bytes"))
                 .bind("p4")
-                .to(useFloat4InTests() ? 3.14f : 3.14d)
+                .to(3.14f)
                 .bind("p5")
                 .to(3.14d)
                 .bind("p6")
@@ -384,7 +383,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test"))
                 .bind("p4")
-                .to(useFloat4InTests() ? 3.14f : 3.14d)
+                .to(3.14f)
                 .bind("p5")
                 .to(3.14d)
                 .bind("p6")
@@ -410,7 +409,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.BOOL,
                                         TypeCode.BYTES,
-                                        useFloat4InTests() ? TypeCode.FLOAT32 : TypeCode.FLOAT64,
+                                        TypeCode.FLOAT32,
                                         TypeCode.FLOAT64,
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
@@ -711,7 +710,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
-                            useFloat4InTests() ? TypeCode.FLOAT32 : TypeCode.FLOAT64,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -732,10 +731,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                   .bind("p3")
                   .to(ByteArray.copyFrom("test_bytes"))
                   .bind("p4")
-                  .to(
-                      useFloat4InTests()
-                          ? com.google.cloud.spanner.Value.float32(3.14f)
-                          : com.google.cloud.spanner.Value.float64(3.14d))
+                  .to(com.google.cloud.spanner.Value.float32(3.14f))
                   .bind("p5")
                   .to(3.14d)
                   .bind("p6")
@@ -822,7 +818,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                   .bind("p3")
                   .to(ByteArray.copyFrom("test_bytes"))
                   .bind("p4")
-                  .to(useFloat4InTests() ? 3.14f : 3.14d)
+                  .to(3.14f)
                   .bind("p5")
                   .to(3.14d)
                   .bind("p6")
@@ -910,10 +906,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
         .bind("p3")
         .to(ByteArray.copyFrom(index + "test_bytes"))
         .bind("p4")
-        .to(
-            useFloat4InTests()
-                ? com.google.cloud.spanner.Value.float32(3.14f + index)
-                : com.google.cloud.spanner.Value.float64((double) 3.14f + index))
+        .to(com.google.cloud.spanner.Value.float32(3.14f + index))
         .bind("p5")
         .to(3.14d + index)
         .bind("p6")

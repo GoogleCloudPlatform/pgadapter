@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -402,10 +401,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
               assertTrue(columns.next());
               assertEquals("col_float4", columns.getString("COLUMN_NAME"));
-              assertEquals(
-                  useFloat4InTests() ? Types.REAL : Types.DOUBLE, columns.getInt("DATA_TYPE"));
-              assertEquals(
-                  useFloat4InTests() ? "float4" : "float8", columns.getString("TYPE_NAME"));
+              assertEquals(Types.REAL, columns.getInt("DATA_TYPE"));
+              assertEquals("float4", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_float8", columns.getString("COLUMN_NAME"));
@@ -461,8 +458,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertTrue(columns.next());
               assertEquals("col_array_float4", columns.getString("COLUMN_NAME"));
               assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals(
-                  useFloat4InTests() ? "_float4" : "_float8", columns.getString("TYPE_NAME"));
+              assertEquals("_float4", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
@@ -522,10 +518,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
               assertTrue(columns.next());
               assertEquals("col_float4", columns.getString("COLUMN_NAME"));
-              assertEquals(
-                  useFloat4InTests() ? Types.REAL : Types.DOUBLE, columns.getInt("DATA_TYPE"));
-              assertEquals(
-                  useFloat4InTests() ? "float4" : "float8", columns.getString("TYPE_NAME"));
+              assertEquals(Types.REAL, columns.getInt("DATA_TYPE"));
+              assertEquals("float4", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_float8", columns.getString("COLUMN_NAME"));
@@ -566,8 +560,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertTrue(columns.next());
               assertEquals("col_array_float4", columns.getString("COLUMN_NAME"));
               assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals(
-                  useFloat4InTests() ? "_float4" : "_float8", columns.getString("TYPE_NAME"));
+              assertEquals("_float4", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
