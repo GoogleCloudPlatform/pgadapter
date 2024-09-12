@@ -1,5 +1,5 @@
 psycopg-binary==3.2.1
-pytz==2024.1
+pytz==2024.2
 Django==5.1.1
 google==3.0.0
 google.auth==2.34.0
