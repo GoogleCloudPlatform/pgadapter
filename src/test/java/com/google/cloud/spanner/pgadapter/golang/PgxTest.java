@@ -29,7 +29,7 @@ public interface PgxTest extends Library {
 
   String TestQueryAllDataTypes(GoString connString, int oid, int format);
 
-  String TestInsertAllDataTypes(GoString connString, int float4Oid);
+  String TestInsertAllDataTypes(GoString connString);
 
   String TestInsertNullsAllDataTypes(GoString connString);
 
@@ -37,7 +37,7 @@ public interface PgxTest extends Library {
 
   String TestUpdateAllDataTypes(GoString connString);
 
-  String TestPrepareStatement(GoString connString, int float4Oid);
+  String TestPrepareStatement(GoString connString);
 
   String TestPrepareSelectStatement(GoString connString);
 
