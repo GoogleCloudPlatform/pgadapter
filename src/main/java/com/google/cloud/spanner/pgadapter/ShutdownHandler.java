@@ -46,6 +46,7 @@ public class ShutdownHandler {
 
   /** Shuts down the proxy server using the given {@link ShutdownMode}. */
   public synchronized void shutdown(@Nonnull ShutdownMode shutdownMode) {
+    Preconditions.checkNotNull(shutdownMode);
     if (this.shutdownMode.get() != null) {
       if (this.shutdownMode.get() == ShutdownMode.SMART
           && (shutdownMode == ShutdownMode.FAST || shutdownMode == ShutdownMode.IMMEDIATE)) {
@@ -55,7 +56,7 @@ public class ShutdownHandler {
       }
       return;
     }
-    this.shutdownMode.set(Preconditions.checkNotNull(shutdownMode));
+    this.shutdownMode.set(shutdownMode);
     this.shutdownThread.start();
   }
 }
