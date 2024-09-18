@@ -27,14 +27,21 @@ import com.google.spanner.v1.ResultSetStats;
 @InternalApi
 public class ClientSideResultSet extends ForwardingResultSet {
   public static ResultSet forRows(Type type, Iterable<Struct> rows) {
-    return new ClientSideResultSet(ResultSets.forRows(type, rows), type);
+    return forRows(type, rows, ResultSetMetadata.getDefaultInstance());
+  }
+
+  public static ResultSet forRows(Type type, Iterable<Struct> rows, ResultSetMetadata metadata) {
+    return new ClientSideResultSet(ResultSets.forRows(type, rows), type, metadata);
   }
 
   private final Type type;
 
-  private ClientSideResultSet(ResultSet delegate, Type type) {
+  private final ResultSetMetadata metadata;
+
+  private ClientSideResultSet(ResultSet delegate, Type type, ResultSetMetadata metadata) {
     super(delegate);
     this.type = type;
+    this.metadata = metadata;
   }
 
   @Override
@@ -49,6 +56,6 @@ public class ClientSideResultSet extends ForwardingResultSet {
 
   @Override
   public ResultSetMetadata getMetadata() {
-    return ResultSetMetadata.getDefaultInstance();
+    return this.metadata;
   }
 }
