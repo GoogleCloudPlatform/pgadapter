@@ -1047,13 +1047,22 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testSelectCurrentSchema() throws SQLException {
-    String sql = "SELECT current_schema";
+    for (String sql :
+        new String[] {
+          "select current_schema",
+          "select current_schema()",
+          "SELECT current_schema",
+          "SELECT current_schema()",
+          "SELECT CURRENT_SCHEMA",
+          "SELECT CURRENT_SCHEMA()",
+        }) {
 
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        assertTrue(resultSet.next());
-        assertEquals("public", resultSet.getString("current_schema"));
-        assertFalse(resultSet.next());
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("public", resultSet.getString("current_schema"));
+          assertFalse(resultSet.next());
+        }
       }
     }
 

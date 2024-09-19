@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,29 +24,22 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
 import com.google.cloud.spanner.pgadapter.statements.ClientSideResultSet;
 import com.google.common.collect.ImmutableList;
+import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.StructType;
+import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.TypeCode;
 
 @InternalApi
-public class SelectCurrentSchemaStatement implements LocalStatement {
-  public static final SelectCurrentSchemaStatement INSTANCE = new SelectCurrentSchemaStatement();
+public class SelectGolangMigrateAdvisoryUnlockStatement implements LocalStatement {
+  public static final SelectGolangMigrateAdvisoryUnlockStatement INSTANCE =
+      new SelectGolangMigrateAdvisoryUnlockStatement();
 
-  private SelectCurrentSchemaStatement() {}
+  private SelectGolangMigrateAdvisoryUnlockStatement() {}
 
   @Override
   public String[] getSql() {
     return new String[] {
-      "select current_schema()",
-      "SELECT current_schema()",
-      "SELECT CURRENT_SCHEMA()",
-      "Select current_schema()",
-      "select current_schema",
-      "SELECT current_schema",
-      "SELECT CURRENT_SCHEMA",
-      "Select current_schema",
-      "select * from current_schema()",
-      "SELECT * FROM current_schema()",
-      "SELECT * FROM CURRENT_SCHEMA()",
-      "select * from current_schema",
-      "SELECT * FROM current_schema"
+      "SELECT pg_advisory_unlock($1)",
     };
   }
 
@@ -54,12 +47,21 @@ public class SelectCurrentSchemaStatement implements LocalStatement {
   public StatementResult execute(BackendConnection backendConnection) {
     ResultSet resultSet =
         ClientSideResultSet.forRows(
-            Type.struct(StructField.of("current_schema", Type.string())),
-            ImmutableList.of(
-                Struct.newBuilder()
-                    .set("current_schema")
-                    .to(backendConnection.getCurrentSchema())
-                    .build()));
+            Type.struct(StructField.of("pg_advisory_unlock", Type.bool())),
+            ImmutableList.of(Struct.newBuilder().set("pg_advisory_unlock").to(true).build()),
+            ResultSetMetadata.newBuilder()
+                .setUndeclaredParameters(
+                    StructType.newBuilder()
+                        .addFields(
+                            Field.newBuilder()
+                                .setName("p1")
+                                .setType(
+                                    com.google.spanner.v1.Type.newBuilder()
+                                        .setCode(TypeCode.INT64)
+                                        .build())
+                                .build())
+                        .build())
+                .build());
     return new QueryResult(resultSet);
   }
 }
