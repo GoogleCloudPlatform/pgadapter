@@ -325,7 +325,7 @@ func Start(ctx context.Context, config Config) (pgadapter *PGAdapter, err error)
 		if isDockerAvailable() {
 			_, ok := config.ExecutionEnvironment.(*Docker)
 			if !ok {
-				config.ExecutionEnvironment = &Docker{}
+				config.ExecutionEnvironment = &Docker{AlwaysPullImage: true}
 			}
 		} else {
 			return nil, fmt.Errorf("PGAdapter with the Emulator requires Docker to be installed on the local system")
@@ -335,7 +335,7 @@ func Start(ctx context.Context, config Config) (pgadapter *PGAdapter, err error)
 		if isJavaAvailable() {
 			config.ExecutionEnvironment = &Java{}
 		} else if isDockerAvailable() {
-			config.ExecutionEnvironment = &Docker{}
+			config.ExecutionEnvironment = &Docker{AlwaysPullImage: true}
 		} else {
 			return nil, fmt.Errorf("PGAdapter requires either Java or Docker to be installed on the local system")
 		}
