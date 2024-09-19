@@ -38,6 +38,9 @@ jobs:
       - name: Run pgx Sample tests
         working-directory: ./samples/golang/pgx
         run: go test
+      - name: Run migrate Sample tests
+        working-directory: ./samples/golang/migrate
+        run: go test
   python-samples:
     runs-on: ubuntu-latest
     steps:
