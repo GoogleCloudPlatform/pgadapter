@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	cloud.google.com/go/spanner v1.67.0
-	github.com/docker/docker v27.2.1+incompatible
+	github.com/docker/docker v27.3.1+incompatible
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/montanaflynn/stats v0.7.0
