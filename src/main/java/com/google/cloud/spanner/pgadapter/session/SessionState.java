@@ -525,6 +525,26 @@ public class SessionState {
     return getIntegerSetting("spanner", "string_conversion_buffer_size", 0);
   }
 
+  /**
+   * Returns the update count that PGAdapter should return for DML statements that are executed
+   * during a DML batch. The default is 0.
+   *
+   * <p>Example:
+   *
+   * <pre>{@code
+   * begin;
+   * set local spanner.dml_batch_update_count=1;
+   * start batch dml;
+   * insert into my_table (id, value) values (1, 'one'); -- This returns update count 1
+   * insert into my_table (id, value) values (2, 'two'); -- This returns update count 1
+   * run batch; -- This actually executes the DML statements.
+   * commit;
+   * }</pre>
+   */
+  public int getDmlBatchUpdateCount() {
+    return getIntegerSetting("spanner", "dml_batch_update_count", 0);
+  }
+
   private ZoneId cachedZoneId;
 
   /** Returns the {@link ZoneId} of the current timezone for this session. */
