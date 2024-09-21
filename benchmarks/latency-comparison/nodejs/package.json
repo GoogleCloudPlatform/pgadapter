@@ -4,7 +4,7 @@
   "description": "Node.js Latency Comparison for PGAdapter and the Spanner client library",
   "type": "commonjs",
   "devDependencies": {
-    "@types/node": "^20.1.4",
+    "@types/node": "^22.0.0",
     "@types/yargs": "^17.0.32",
     "typescript": "^5.4.5"
   },
