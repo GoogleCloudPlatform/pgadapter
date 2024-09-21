@@ -5551,6 +5551,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(TimeUnit.MILLISECONDS.toNanos(20), request.getMaxCommitDelay().getNanos());
   }
 
+  @Test
+  public void testDmlBatchUpdateCount() throws SQLException {
+    String sql = "insert into foo (id) values (1)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        java.sql.Statement statement = connection.createStatement()) {
+      connection.setAutoCommit(false);
+
+      for (Integer updateCount : new Integer[] {null, 1, 2, 10}) {
+        if (updateCount != null) {
+          // 'set local' means that the effect of the statement will be undone by the end of the
+          // transaction.
+          statement.execute("set local spanner.dml_batch_update_count=" + updateCount);
+        }
+        statement.execute("start batch dml");
+        assertEquals(updateCount == null ? 0 : updateCount, statement.executeUpdate(sql));
+        assertEquals(updateCount == null ? 0 : updateCount, statement.executeUpdate(sql));
+        statement.execute("run batch");
+        connection.commit();
+      }
+    }
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+  }
+
   @Ignore("Only used for manual performance testing")
   @Test
   public void testBasePerformance() throws SQLException {
