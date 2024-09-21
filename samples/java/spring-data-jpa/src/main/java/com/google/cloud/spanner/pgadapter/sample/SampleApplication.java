@@ -146,7 +146,9 @@ public class SampleApplication implements CommandLineRunner {
     // Show how to execute queries with directed read options.
     directedRead();
 
-    batchService.generateRandomDataInOneBatch(1);
+    // Show how to execute multiple DML statements in one Batch DML request. This reduces the number
+    // of round-trips between PGAdapter and Spanner.
+    batchService.generateRandomDataInOneBatch(5);
   }
 
   void printData() {

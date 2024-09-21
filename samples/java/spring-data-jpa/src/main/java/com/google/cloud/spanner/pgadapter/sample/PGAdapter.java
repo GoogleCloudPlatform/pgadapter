@@ -60,7 +60,6 @@ class PGAdapter {
     if (emulatorHost != null) {
       properties.put("endpoint", emulatorHost);
     }
-    builder.setLogGrpcMessages(true);
     OptionsMetadata options = builder.build();
     ProxyServer server = new ProxyServer(options, OpenTelemetry.noop(), properties);
     server.startServer();
