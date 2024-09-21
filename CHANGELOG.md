@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.39.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.38.0...v0.39.0) (2024-09-21)
+
+
+### Features
+
+* add session variable for batch_dml_update_count ([#2356](https://github.com/GoogleCloudPlatform/pgadapter/issues/2356)) ([345bd4d](https://github.com/GoogleCloudPlatform/pgadapter/commit/345bd4d15478acb27d80003bfb65028a4dd719d5))
+
+
+### Dependencies
+
+* update dependency @types/node to v22 ([#2221](https://github.com/GoogleCloudPlatform/pgadapter/issues/2221)) ([4a8e167](https://github.com/GoogleCloudPlatform/pgadapter/commit/4a8e167c851d290d3028a3880d03da14058224f5))
+* update dependency google.auth to v2.35.0 ([#2347](https://github.com/GoogleCloudPlatform/pgadapter/issues/2347)) ([abe4e24](https://github.com/GoogleCloudPlatform/pgadapter/commit/abe4e242a7ae5b00209056d650eb934f6eab9546))
+* update dependency org.springframework.boot:spring-boot-dependencies to v3.3.4 ([#2334](https://github.com/GoogleCloudPlatform/pgadapter/issues/2334)) ([5632ffa](https://github.com/GoogleCloudPlatform/pgadapter/commit/5632ffad810cc36647376e35c8d477dc98b68acb))
+* update dependency org.springframework.boot:spring-boot-starter-parent to v3.3.4 ([#2335](https://github.com/GoogleCloudPlatform/pgadapter/issues/2335)) ([f28b88f](https://github.com/GoogleCloudPlatform/pgadapter/commit/f28b88f8d9fc33d874bd3dab12a4f8904f4b49d2))
+* update dependency pandas to v2.2.3 ([#2360](https://github.com/GoogleCloudPlatform/pgadapter/issues/2360)) ([b334628](https://github.com/GoogleCloudPlatform/pgadapter/commit/b334628f548c77ea09e59fa0ce2ccabe7c7c6978))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to c310ce8 ([#2307](https://github.com/GoogleCloudPlatform/pgadapter/issues/2307)) ([d5c5051](https://github.com/GoogleCloudPlatform/pgadapter/commit/d5c5051ec68be5a0a94995bbcb6c8a304201e0f4))
+* update module github.com/docker/docker to v27.3.1+incompatible ([#2349](https://github.com/GoogleCloudPlatform/pgadapter/issues/2349)) ([9abe8d1](https://github.com/GoogleCloudPlatform/pgadapter/commit/9abe8d16dc3d84ef568bb907a30c624d7661234f))
+* update module google.golang.org/api to v0.198.0 ([#2346](https://github.com/GoogleCloudPlatform/pgadapter/issues/2346)) ([d421108](https://github.com/GoogleCloudPlatform/pgadapter/commit/d4211082a3551f96365296458ece8a550eddac52))
+* update spring-boot.version to v3.3.4 ([#2337](https://github.com/GoogleCloudPlatform/pgadapter/issues/2337)) ([6f1a517](https://github.com/GoogleCloudPlatform/pgadapter/commit/6f1a517454f78b416f1b9306e4c555789df03488))
+
 ## [0.38.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.37.0...v0.38.0) (2024-09-19)
 
 

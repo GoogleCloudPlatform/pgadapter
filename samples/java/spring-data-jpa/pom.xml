@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.3.3</version>
+    <version>3.3.4</version>
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
   <groupId>com.google.cloud.spanner</groupId>
@@ -55,7 +55,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.37.0</version>
+      <version>0.38.0</version>
     </dependency>
     <!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
     <dependency>
