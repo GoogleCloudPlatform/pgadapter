@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.sample;
 import com.google.cloud.spanner.pgadapter.sample.model.Concert;
 import com.google.cloud.spanner.pgadapter.sample.repository.ConcertRepository;
 import com.google.cloud.spanner.pgadapter.sample.service.AlbumService;
+import com.google.cloud.spanner.pgadapter.sample.service.BatchService;
 import com.google.cloud.spanner.pgadapter.sample.service.ConcertService;
 import com.google.cloud.spanner.pgadapter.sample.service.DirectedReadService;
 import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
@@ -90,6 +91,8 @@ public class SampleApplication implements CommandLineRunner {
 
   private final TicketSaleService ticketSaleService;
 
+  private final BatchService batchService;
+
   public SampleApplication(
       SingerService singerService,
       AlbumService albumService,
@@ -99,7 +102,8 @@ public class SampleApplication implements CommandLineRunner {
       StaleReadService staleReadService,
       DirectedReadService directedReadService,
       ConcertRepository concertRepository,
-      TicketSaleService ticketSaleService) {
+      TicketSaleService ticketSaleService,
+      BatchService batchService) {
     this.singerService = singerService;
     this.albumService = albumService;
     this.trackService = trackService;
@@ -109,6 +113,7 @@ public class SampleApplication implements CommandLineRunner {
     this.directedReadService = directedReadService;
     this.concertRepository = concertRepository;
     this.ticketSaleService = ticketSaleService;
+    this.batchService = batchService;
   }
 
   @Override
@@ -140,6 +145,8 @@ public class SampleApplication implements CommandLineRunner {
     staleRead();
     // Show how to execute queries with directed read options.
     directedRead();
+
+    batchService.generateRandomDataInOneBatch(1);
   }
 
   void printData() {
