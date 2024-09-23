@@ -19,6 +19,7 @@ import com.google.cloud.spanner.pgadapter.sample.model.Singer;
 import com.google.cloud.spanner.pgadapter.sample.repository.AlbumRepository;
 import com.google.cloud.spanner.pgadapter.sample.repository.SingerRepository;
 import jakarta.transaction.Transactional;
+import jakarta.transaction.Transactional.TxType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -51,10 +52,18 @@ public class AlbumService {
 
   @Transactional
   public List<Album> generateRandomAlbums(int count) {
-    Random random = new Random();
-
     // Get the first 20 singers and link the albums to those.
     List<Singer> singers = singerRepository.findAll(Pageable.ofSize(20)).toList();
+    return albumRepository.saveAll(generateRandomAlbums(count, singers));
+  }
+
+  /**
+   * Generates a batch of random albums. This method may only be called when a transaction is
+   * already active.
+   */
+  @Transactional(TxType.MANDATORY)
+  public List<Album> generateRandomAlbums(int count, List<Singer> singers) {
+    Random random = new Random();
     List<Album> albums = new ArrayList<>(count);
     for (int i = 0; i < count; i++) {
       Album album = new Album();

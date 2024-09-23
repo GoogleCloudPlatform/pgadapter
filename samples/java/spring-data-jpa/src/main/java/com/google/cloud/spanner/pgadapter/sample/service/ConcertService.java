@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.sample.repository.ConcertRepository;
 import com.google.cloud.spanner.pgadapter.sample.repository.SingerRepository;
 import com.google.cloud.spanner.pgadapter.sample.repository.VenueRepository;
 import jakarta.transaction.Transactional;
+import jakarta.transaction.Transactional.TxType;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -58,10 +59,19 @@ public class ConcertService {
 
   @Transactional
   public List<Concert> generateRandomConcerts(int count) {
-    Random random = new Random();
-
     List<Singer> singers = singerRepository.findAll(Pageable.ofSize(20)).toList();
     List<Venue> venues = venueRepository.findAll();
+    return generateRandomConcerts(count, singers, venues);
+  }
+
+  /**
+   * Generates a batch of random albums. This method may only be called when a transaction is
+   * already active.
+   */
+  @Transactional(TxType.MANDATORY)
+  public List<Concert> generateRandomConcerts(int count, List<Singer> singers, List<Venue> venues) {
+    Random random = new Random();
+
     List<Concert> concerts = new ArrayList<>(count);
     for (int i = 0; i < count; i++) {
       Concert concert = new Concert();
