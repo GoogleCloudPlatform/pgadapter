@@ -37,7 +37,7 @@
     </excludedTests>
     <excludedIntegrationTests/>
 
-    <junixsocket.version>2.10.0</junixsocket.version>
+    <junixsocket.version>2.10.1</junixsocket.version>
     <opentelemetry.exporter.version>0.31.0</opentelemetry.exporter.version>
   </properties>
 
