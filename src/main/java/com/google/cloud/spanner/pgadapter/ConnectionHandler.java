@@ -75,6 +75,7 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
@@ -504,20 +505,44 @@ public class ConnectionHandler implements Runnable {
     try {
       message.nextHandler();
       message.send();
-    } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-      this.handleError(
-          PGException.newBuilder(fatalException)
-              .setSeverity(Severity.FATAL)
-              .setSQLState(SQLState.InternalError)
-              .build());
+    } catch (IllegalArgumentException | IllegalStateException fatalException) {
+      handleFatalException(fatalException);
       // Only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode the mode will
       // switch to normal mode in these cases.
       if (this.status != ConnectionStatus.COPY_IN) {
         terminate();
       }
+    } catch (EOFException eofException) {
+      // Handle an EOFException as a normal connection termination. The TCP connection can break
+      // without the server receiving a Terminate (X) message if for example the application does
+      // not try-catch all exceptions.
+      // We only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode, this
+      // exception will cause the connection to leave COPY_IN mode, and return to normal operation.
+      if (this.status != ConnectionStatus.COPY_IN) {
+        terminate();
+      } else {
+        handleFatalException(eofException);
+      }
+    } catch (SocketException socketException) {
+      // Handle a SocketException when the socket has been closed as a normal connection
+      // termination. The TCP connection can break without the server receiving a Terminate (X)
+      // message if for example the application does not try-catch all exceptions.
+      if (socket.isClosed()) {
+        terminate();
+      } else {
+        this.handleError(PGExceptionFactory.toPGException(socketException));
+      }
     } catch (Exception exception) {
       this.handleError(PGExceptionFactory.toPGException(exception));
     }
+  }
+
+  private void handleFatalException(Exception fatalException) throws Exception {
+    this.handleError(
+        PGException.newBuilder(fatalException)
+            .setSeverity(Severity.FATAL)
+            .setSQLState(SQLState.InternalError)
+            .build());
   }
 
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */

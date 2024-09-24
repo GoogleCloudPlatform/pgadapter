@@ -16,8 +16,10 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
@@ -28,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -51,6 +54,13 @@ public final class ITQueryTest implements IntegrationTest {
 
   @AfterClass
   public static void teardown() {
+    // Wait a bit until all connections have been terminated (or fail if they fail to terminate).
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    while (testEnv.getServer().getNumberOfConnections() > 0
+        && stopwatch.elapsed(TimeUnit.MILLISECONDS) < 1000) {
+      Thread.yield();
+    }
+    assertTrue(testEnv.getServer().getConnectionHandlers().isEmpty());
     testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
   }
@@ -109,6 +119,8 @@ public final class ITQueryTest implements IntegrationTest {
     // Value of the column: '42'
     assertEquals('4', dataRowIn.readByte());
     assertEquals('2', dataRowIn.readByte());
+
+    clientSocket.close();
   }
 
   @Test
@@ -183,5 +195,7 @@ public final class ITQueryTest implements IntegrationTest {
     assertArrayEquals(dataRow2, dataRows[2].getPayload());
     assertArrayEquals(commandCompleteData, commandComplete.getPayload());
     assertArrayEquals(readyForQueryData, readyForQuery.getPayload());
+
+    clientSocket.close();
   }
 }
