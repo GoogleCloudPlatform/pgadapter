@@ -5576,6 +5576,32 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(4, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
   }
 
+  @Test
+  public void testGSSAPI() throws SQLException {
+    for (String gss : new String[] {"disable", "allow", "prefer"}) {
+      try (Connection connection =
+              DriverManager.getConnection(createUrl() + String.format("&gssEncMode=%s", gss));
+          java.sql.Statement statement = connection.createStatement()) {
+        verifySelect1(statement);
+      }
+    }
+    SQLException exception =
+        assertThrows(
+            SQLException.class,
+            () -> DriverManager.getConnection(createUrl() + "&gssEncMode=require"));
+    assertEquals(
+        SQLState.SQLServerRejectedEstablishmentOfSQLConnection.toString(), exception.getSQLState());
+    assertTrue(
+        exception.getMessage(),
+        exception.getMessage().contains("The server does not support GSS Encryption"));
+  }
+
+  private void verifySelect1(java.sql.Statement statement) throws SQLException {
+    try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
+      assertTrue(resultSet.next());
+    }
+  }
+
   @Ignore("Only used for manual performance testing")
   @Test
   public void testBasePerformance() throws SQLException {
