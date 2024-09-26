@@ -123,7 +123,7 @@
       "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the seventh. The Spanner fetch does not require a similar step so we just hardcode it."
     },
     {
-      "input_pattern": "(?s)^SELECT pubname\\s+FROM pg_catalog\\.pg_publication p\\s+JOIN pg_catalog\\.pg_publication_rel pr ON p.oid = pr\\.prpubid\\s+WHERE pr\\.prrelid = '.*'\\s+UNION ALL\\s+SELECT pubname\\s+FROM pg_catalog\\.pg_publication p\\s+WHERE p\\.puballtables AND pg_catalog\\.pg_relation_is_publishable\\('.*'\\)\\s+ORDER BY 1;?$",
+      "input_pattern": "(?s)^SELECT pubname.*\\s+FROM pg_catalog\\.pg_publication p\\s+JOIN pg_catalog\\.pg_publication_rel pr ON p.oid = pr\\.prpubid\\s+WHERE pr\\.prrelid = '.*'\\s+UNION ALL\\s+SELECT pubname.*\\s+FROM pg_catalog\\.pg_publication p\\s+WHERE p\\.puballtables AND pg_catalog\\.pg_relation_is_publishable\\('.*'\\)\\s+ORDER BY 1;?$",
       "output_pattern": "SELECT 1 LIMIT 0;",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the eighth. The Spanner fetch does not require a similar step so we just hardcode it."
