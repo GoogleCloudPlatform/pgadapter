@@ -29,6 +29,7 @@ public class ListCommand extends Command {
               + "       pg_catalog\\.pg_encoding_to_char\\(d\\.encoding\\) as \"Encoding\",\n"
               + "(?:\\s*d\\.datcollate as \"Collate\",\n)?"
               + "(?:\\s*d\\.datctype as \"Ctype\",\n)?"
+              + "(?:\\s*\"ICU Locale\",\n)?"
               + "       pg_catalog\\.array_to_string\\(d\\.datacl, .*\\) AS \"Access privileges\"\n"
               + "FROM pg_catalog\\.pg_database d\n.*\n?"
               + "ORDER BY 1;?$");
