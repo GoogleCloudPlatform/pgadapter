@@ -27,7 +27,7 @@ public class ListCommand extends Command {
           "^SELECT\\s+d\\.datname as \"Name\",\n"
               + "\\s*pg_catalog\\.pg_get_userbyid\\(d.datdba\\) as \"Owner\",\n"
               + ".*"
-              + "\\s*pg_catalog\\.array_to_string\\(d\\.datacl, .*\\) AS \"Access privileges\"\n"
+              + "\\s*pg_catalog\\.array_to_string\\(d\\.datacl, .*\\)(:? END)? AS \"Access privileges\"\n"
               + "FROM (?:pg_catalog\\.)?pg_database d\n.*\n?"
               + "ORDER BY 1;?$",
           Pattern.DOTALL);
