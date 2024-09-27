@@ -66,9 +66,7 @@ public class ExtendedQueryProtocolHandler {
                 .getServer()
                 .getTracer(ConnectionHandler.class.getName(), getVersion()),
             connectionHandler.getServer().getMetrics(),
-            createMetricAttributes(
-                connectionHandler.getDatabaseId(),
-                connectionHandler.getTraceConnectionId().toString()),
+            createMetricAttributes(connectionHandler.getDatabaseId()),
             connectionHandler.getTraceConnectionId().toString(),
             connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
@@ -97,9 +95,8 @@ public class ExtendedQueryProtocolHandler {
   }
 
   @VisibleForTesting
-  static Attributes createMetricAttributes(DatabaseId databaseId, String connectionId) {
+  static Attributes createMetricAttributes(DatabaseId databaseId) {
     AttributesBuilder attributesBuilder = Attributes.builder();
-    attributesBuilder.put("pgadapter.connection_id", connectionId);
     attributesBuilder.put("database", databaseId.getDatabase());
     attributesBuilder.put("instance_id", databaseId.getInstanceId().getInstance());
     attributesBuilder.put("project_id", databaseId.getInstanceId().getProject());
