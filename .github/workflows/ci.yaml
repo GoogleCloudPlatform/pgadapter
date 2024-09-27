@@ -148,3 +148,61 @@ jobs:
         run: gcloud components install alpha
       - run: .ci/run-with-credentials.sh uber-jar-build
       - run: .ci/run-with-credentials.sh e2e-psql 15 14.1
+  e2e-psql-v16-v14:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 11
+          distribution: 'zulu'
+      - run: java -version
+      - name: "Install postgresql-client-16"
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install postgresql-client-16
+      - id: 'auth'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
+      - id: 'setup-gcloud'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
+      - name: "Install gcloud alpha component"
+        run: gcloud components install alpha
+      - run: .ci/run-with-credentials.sh uber-jar-build
+      - run: .ci/run-with-credentials.sh e2e-psql 16 14.1
+  e2e-psql-v17-v14:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 11
+          distribution: 'zulu'
+      - run: java -version
+      - name: "Install postgresql-client-17"
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install postgresql-client-17
+      - id: 'auth'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
+      - id: 'setup-gcloud'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
+      - name: "Install gcloud alpha component"
+        run: gcloud components install alpha
+      - run: .ci/run-with-credentials.sh uber-jar-build
+      - run: .ci/run-with-credentials.sh e2e-psql 17 14.1

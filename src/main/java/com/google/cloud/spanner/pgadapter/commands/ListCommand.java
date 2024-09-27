@@ -24,16 +24,13 @@ public class ListCommand extends Command {
 
   private static final Pattern INPUT_REGEX =
       Pattern.compile(
-          "^SELECT d\\.datname as \"Name\",\n"
-              + "       pg_catalog\\.pg_get_userbyid\\(d.datdba\\) as \"Owner\",\n"
-              + "       pg_catalog\\.pg_encoding_to_char\\(d\\.encoding\\) as \"Encoding\",\n"
-              + "(?:\\s*d\\.datcollate as \"Collate\",\n)?"
-              + "(?:\\s*d\\.datctype as \"Ctype\",\n)?"
-              + "(?:\\s*.+ as \"ICU Locale\",\n)?"
-              + "(?:\\s*.+ AS \"Locale Provider\",\n)?"
-              + "       pg_catalog\\.array_to_string\\(d\\.datacl, .*\\) AS \"Access privileges\"\n"
-              + "FROM pg_catalog\\.pg_database d\n.*\n?"
-              + "ORDER BY 1;?$");
+          "^SELECT\\s+d\\.datname as \"Name\",\n"
+              + "\\s*pg_catalog\\.pg_get_userbyid\\(d.datdba\\) as \"Owner\",\n"
+              + ".*"
+              + "\\s*pg_catalog\\.array_to_string\\(d\\.datacl, .*\\)(:? END)? AS \"Access privileges\"\n"
+              + "FROM (?:pg_catalog\\.)?pg_database d\n.*\n?"
+              + "ORDER BY 1;?$",
+          Pattern.DOTALL);
 
   ListCommand(String sql) {
     super(sql);
