@@ -26,11 +26,11 @@ public class ListCommand extends Command {
       Pattern.compile(
           "^SELECT\\s+d\\.datname as \"Name\",\n"
               + "\\s*pg_catalog\\.pg_get_userbyid\\(d.datdba\\) as \"Owner\",\n"
-              + "\\s*pg_catalog\\.pg_encoding_to_char\\(d\\.encoding\\) as \"Encoding\",\n"
               + ".*"
               + "\\s*pg_catalog\\.array_to_string\\(d\\.datacl, .*\\) AS \"Access privileges\"\n"
-              + "FROM (?:pg_catalog\\.)?pg_database d\n"
-              + "ORDER BY 1;?$", Pattern.DOTALL);
+              + "FROM (?:pg_catalog\\.)?pg_database d\n.*\n?"
+              + "ORDER BY 1;?$",
+          Pattern.DOTALL);
 
   ListCommand(String sql) {
     super(sql);
