@@ -32,15 +32,26 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class ShutdownModeMockServerTest extends AbstractMockServerTest {
+
+  @Parameter public boolean useSqlStatement;
+
+  @Parameters(name = "useSqlStatement = {0}")
+  public static Object[] data() {
+    return new Object[] {false, true};
+  }
+
   private ProxyServer proxyServer;
 
   @Before
@@ -51,7 +62,8 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
         .enableDebugMode()
         .setUsePlainText()
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
-        .setCredentials(NoCredentials.getInstance());
+        .setCredentials(NoCredentials.getInstance())
+        .setAllowShutdownStatement(true);
     proxyServer = new ProxyServer(builder.build(), OpenTelemetry.noop());
     proxyServer.startServer();
   }
@@ -71,7 +83,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
   public void testSmartShutdown() throws SQLException {
     String sql = "SELECT 1";
 
-    ShutdownHandler shutdownHandler = ShutdownHandler.createForServer(proxyServer);
+    ShutdownHandler shutdownHandler = createShutdownHandler();
     // Verify that the server is running.
     assertEquals(State.RUNNING, proxyServer.state());
 
@@ -83,7 +95,11 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
         assertFalse(resultSet.next());
       }
       // Initiate a smart shutdown.
-      shutdownHandler.shutdown(ShutdownMode.SMART);
+      if (useSqlStatement) {
+        connection.createStatement().execute("shutdown smart");
+      } else {
+        shutdownHandler.shutdown(ShutdownMode.SMART);
+      }
       // Wait until the server port is no longer open.
       Stopwatch stopwatch = Stopwatch.createStarted();
       while (isPortListening(proxyServer.getLocalPort())
@@ -127,7 +143,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
   public void testSmartShutdownWithoutConnections() throws SQLException {
     String sql = "SELECT 1";
 
-    ShutdownHandler shutdownHandler = ShutdownHandler.createForServer(proxyServer);
+    ShutdownHandler shutdownHandler = createShutdownHandler();
     // Verify that the server is running.
     assertEquals(State.RUNNING, proxyServer.state());
 
@@ -140,7 +156,14 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
       }
     }
     // Initiate a smart shutdown.
-    shutdownHandler.shutdown(ShutdownMode.SMART);
+    if (useSqlStatement) {
+      try (Connection connection = DriverManager.getConnection(createUrl());
+          Statement statement = connection.createStatement()) {
+        statement.execute("shutdown smart");
+      }
+    } else {
+      shutdownHandler.shutdown(ShutdownMode.SMART);
+    }
     // Wait until the server port is no longer open.
     Stopwatch stopwatch = Stopwatch.createStarted();
     while (isPortListening(proxyServer.getLocalPort())
@@ -169,7 +192,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
   public void testFastShutdown() throws SQLException {
     String sql = "SELECT 1";
 
-    ShutdownHandler shutdownHandler = ShutdownHandler.createForServer(proxyServer);
+    ShutdownHandler shutdownHandler = createShutdownHandler();
     // Verify that the server is running.
     assertEquals(State.RUNNING, proxyServer.state());
 
@@ -181,7 +204,11 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
         assertFalse(resultSet.next());
       }
       // Initiate a fast shutdown.
-      shutdownHandler.shutdown(ShutdownMode.FAST);
+      if (useSqlStatement) {
+        connection.createStatement().execute("shutdown fast");
+      } else {
+        shutdownHandler.shutdown(ShutdownMode.FAST);
+      }
       // Verify that the server stops.
       Stopwatch stopwatch = Stopwatch.createStarted();
       while (proxyServer.state() != State.TERMINATED
@@ -209,7 +236,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
   public void testSmartShutdownFollowedByFastShutdown() throws SQLException {
     String sql = "SELECT 1";
 
-    ShutdownHandler shutdownHandler = ShutdownHandler.createForServer(proxyServer);
+    ShutdownHandler shutdownHandler = createShutdownHandler();
     // Verify that the server is running.
     assertEquals(State.RUNNING, proxyServer.state());
 
@@ -221,7 +248,11 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
         assertFalse(resultSet.next());
       }
       // Initiate a smart shutdown.
-      shutdownHandler.shutdown(ShutdownMode.SMART);
+      if (useSqlStatement) {
+        connection.createStatement().execute("shutdown smart");
+      } else {
+        shutdownHandler.shutdown(ShutdownMode.SMART);
+      }
       // Wait until the server port is no longer open.
       Stopwatch stopwatch = Stopwatch.createStarted();
       while (isPortListening(proxyServer.getLocalPort())
@@ -248,7 +279,11 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
       assertEquals(State.STOPPING, proxyServer.state());
 
       // Now force the server to stop by initiating a fast shutdown.
-      shutdownHandler.shutdown(ShutdownMode.FAST);
+      if (useSqlStatement) {
+        connection.createStatement().execute("shutdown fast");
+      } else {
+        shutdownHandler.shutdown(ShutdownMode.FAST);
+      }
       stopwatch = Stopwatch.createStarted();
       while (proxyServer.state() != State.TERMINATED
           && stopwatch.elapsed(TimeUnit.MILLISECONDS) < 2000) {
@@ -261,6 +296,10 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
           assertThrows(SQLException.class, () -> connection.createStatement().executeQuery(sql));
       assertEquals("An I/O error occurred while sending to the backend.", exception.getMessage());
     }
+  }
+
+  ShutdownHandler createShutdownHandler() {
+    return useSqlStatement ? null : ShutdownHandler.createForServer(this.proxyServer);
   }
 
   boolean isPortListening(int port) {

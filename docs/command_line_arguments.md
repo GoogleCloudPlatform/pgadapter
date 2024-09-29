@@ -70,6 +70,17 @@
     Docker container, as the connections from the host machine will not be seen as a connection from
     localhost in the container.
 
+--allow_shutdown_command
+  * Enables the use of the custom SQL command `SHUTDOWN [SMART | FAST | IMMEDIATE]`. This command can
+    be used to shut down PGAdapter by just sending it a SQL statement. This option should only be enabled
+    when PGAdapter runs in a trusted environment, for example as a side-car container. The default
+    shutdown mode is `FAST`, which terminates all existing connections and then shuts down PGAdapter.
+    Use shutdown mode `SMART` to instruct PGAdapter to wait until all existing connections have been
+    terminated by the client before shutting down. See also https://www.postgresql.org/docs/current/server-shutdown.html
+    for more information about shutdown modes.
+  * Note that `SHUTDOWN [SMART | FAST | IMMEDIATE]` only works on PGAdapter. This command is not
+    supported by PostgreSQL.
+
 -r
   * PGAdapter internally uses the core engine of the Cloud Spanner JDBC driver. This option specifies
     additional properties that will be used with that internal JDBC connection. All connection properties
