@@ -62,7 +62,7 @@ import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
 
-  private static ShutdownHandler shutdownHandler;
+  private static volatile ShutdownHandler shutdownHandler;
 
   /**
    * Main method for running a Spanner PostgreSQL Adapter {@link Server} as a stand-alone
@@ -78,7 +78,7 @@ public class Server {
 
       // Create a shutdown handler and register signal handlers for the signals that should
       // terminate the server.
-      Server.shutdownHandler = ShutdownHandler.createForServer(proxyServer);
+      Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
       registerSignalHandlers();
     } catch (Exception e) {
       printError(e, System.err, System.out);

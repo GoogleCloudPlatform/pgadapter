@@ -30,7 +30,7 @@ public class ShutdownHandler {
   private final AtomicReference<ShutdownMode> shutdownMode = new AtomicReference<>();
 
   @InternalApi
-  public static ShutdownHandler createForServer(@Nonnull ProxyServer proxyServer) {
+  static ShutdownHandler createForServer(@Nonnull ProxyServer proxyServer) {
     return new ShutdownHandler(proxyServer);
   }
 

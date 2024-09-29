@@ -114,6 +114,8 @@ public class ProxyServer extends AbstractApiService {
     IMMEDIATE,
   }
 
+  private final AtomicReference<ShutdownHandler> shutdownHandler = new AtomicReference<>();
+
   private final AtomicReference<ShutdownMode> shutdownMode = new AtomicReference<>();
 
   private final AtomicReference<CountDownLatch> allHandlersTerminatedLatch =
@@ -320,6 +322,13 @@ public class ProxyServer extends AbstractApiService {
     setShutdownMode(shutdownMode);
     stopAsync();
     awaitTerminated();
+  }
+
+  public synchronized ShutdownHandler getOrCreateShutdownHandler() {
+    if (this.shutdownHandler.get() == null) {
+      this.shutdownHandler.set(ShutdownHandler.createForServer(this));
+    }
+    return this.shutdownHandler.get();
   }
 
   void setShutdownMode(ShutdownMode shutdownMode) {

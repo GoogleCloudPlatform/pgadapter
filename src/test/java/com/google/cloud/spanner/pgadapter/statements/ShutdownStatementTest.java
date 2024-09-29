@@ -32,6 +32,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
+import com.google.cloud.spanner.pgadapter.ShutdownHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -80,6 +81,8 @@ public class ShutdownStatementTest {
     ProxyServer server = mock(ProxyServer.class);
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getConnectionMetadata()).thenReturn(mock(ConnectionMetadata.class));
+    ShutdownHandler shutdownHandler = mock(ShutdownHandler.class);
+    when(server.getOrCreateShutdownHandler()).thenReturn(shutdownHandler);
 
     String sql = "shutdown";
     Statement originalStatement = Statement.of(sql);
@@ -95,7 +98,7 @@ public class ShutdownStatementTest {
     // PGAdapter uses FAST shutdown mode by default.
     // We need to use a timeout, as the shutdown handler runs async. The wait time is normally much
     // less than the 1000 milliseconds that is used as the timeout value.
-    verify(server, timeout(1000L)).stopServer(ShutdownMode.FAST);
+    verify(shutdownHandler, timeout(1000L)).shutdown(ShutdownMode.FAST);
   }
 
   @Test
@@ -106,6 +109,8 @@ public class ShutdownStatementTest {
     ProxyServer server = mock(ProxyServer.class);
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getConnectionMetadata()).thenReturn(mock(ConnectionMetadata.class));
+    ShutdownHandler shutdownHandler = mock(ShutdownHandler.class);
+    when(server.getOrCreateShutdownHandler()).thenReturn(shutdownHandler);
 
     String sql = "shutdown smart";
     Statement originalStatement = Statement.of(sql);
@@ -121,7 +126,7 @@ public class ShutdownStatementTest {
     // The shutdown mode from the SQL statement should be used.
     // We need to use a timeout, as the shutdown handler runs async. The wait time is normally much
     // less than the 1000 milliseconds that is used as the timeout value.
-    verify(server, timeout(1000L)).stopServer(ShutdownMode.SMART);
+    verify(shutdownHandler, timeout(1000L)).shutdown(ShutdownMode.SMART);
   }
 
   @Test

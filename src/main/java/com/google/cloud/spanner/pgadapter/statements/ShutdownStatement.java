@@ -104,7 +104,7 @@ public class ShutdownStatement extends IntermediatePortalStatement {
     if (!this.executed) {
       this.executed = true;
       if (options.isAllowShutdownStatement()) {
-        this.shutdownHandler = ShutdownHandler.createForServer(this.parsedShutdownStatement.server);
+        this.shutdownHandler = this.parsedShutdownStatement.server.getOrCreateShutdownHandler();
         setFutureStatementResult(Futures.immediateFuture(new NoResult(getCommandTag())));
       } else {
         setFutureStatementResult(
