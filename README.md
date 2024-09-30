@@ -271,6 +271,17 @@ The following list contains the most frequently used startup options for PGAdapt
     Use the -x switch to turn off the localhost check. This is required when running PGAdapter in a
     Docker container, as the connections from the host machine will not be seen as a connection from
     localhost in the container.
+
+--allow_shutdown_command
+  * Enables the use of the custom SQL command `SHUTDOWN [SMART | FAST | IMMEDIATE]`. This command can
+    be used to shut down PGAdapter by just sending it a SQL statement. This option should only be enabled
+    when PGAdapter runs in a trusted environment, for example as a side-car container. The default
+    shutdown mode is `FAST`, which terminates all existing connections and then shuts down PGAdapter.
+    Use shutdown mode `SMART` to instruct PGAdapter to wait until all existing connections have been
+    terminated by the client before shutting down. See also https://www.postgresql.org/docs/current/server-shutdown.html
+    for more information about shutdown modes.
+  * Note that `SHUTDOWN [SMART | FAST | IMMEDIATE]` only works on PGAdapter. This command is not
+    supported by PostgreSQL.
 ```
 
 * See [command line arguments](docs/command_line_arguments.md) for a list of all supported arguments.

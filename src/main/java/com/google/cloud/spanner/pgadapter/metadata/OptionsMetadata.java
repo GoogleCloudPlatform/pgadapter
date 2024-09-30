@@ -100,6 +100,7 @@ public class OptionsMetadata {
     private String unixDomainSocketDirectory;
     private boolean autoConfigEmulator;
     private boolean logGrpcMessages;
+    private boolean allowShutdownStatement;
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
@@ -369,6 +370,15 @@ public class OptionsMetadata {
       return this;
     }
 
+    /**
+     * Enables the use of the SHUTDOWN [SMART | FAST | IMMEDIATE] statement to shutdown the proxy
+     * server.
+     */
+    public Builder setAllowShutdownStatement(boolean allowShutdownStatement) {
+      this.allowShutdownStatement = allowShutdownStatement;
+      return this;
+    }
+
     Builder enableDebugMode() {
       this.debugMode = true;
       return this;
@@ -485,6 +495,9 @@ public class OptionsMetadata {
       }
       if (logGrpcMessages) {
         addOption(args, OPTION_LOG_GRPC_MESSAGES);
+      }
+      if (allowShutdownStatement) {
+        addOption(args, OPTION_ALLOW_SHUTDOWN_STATEMENT);
       }
       if (debugMode) {
         addOption(args, OPTION_INTERNAL_DEBUG_MODE);
@@ -604,6 +617,7 @@ public class OptionsMetadata {
   private static final String OPTION_DEBUG_MODE = "debug";
   private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
   private static final String OPTION_LOG_GRPC_MESSAGES = "log_grpc_messages";
+  private static final String OPTION_ALLOW_SHUTDOWN_STATEMENT = "allow_shutdown_statement";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -635,6 +649,7 @@ public class OptionsMetadata {
   private final boolean debugMode;
   private final Duration startupTimeout;
   private final boolean logGrpcMessages;
+  private final boolean allowShutdownStatement;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -728,6 +743,7 @@ public class OptionsMetadata {
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
     this.logGrpcMessages = commandLine.hasOption(OPTION_LOG_GRPC_MESSAGES);
+    this.allowShutdownStatement = commandLine.hasOption(OPTION_ALLOW_SHUTDOWN_STATEMENT);
     this.startupTimeout = startupTimeout;
   }
 
@@ -802,6 +818,7 @@ public class OptionsMetadata {
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
     this.logGrpcMessages = false;
+    this.allowShutdownStatement = false;
     this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
@@ -1293,6 +1310,11 @@ public class OptionsMetadata {
             + "This option should only be enabled to debug problems and/or to determine exactly which gRPC messages\n"
             + "are being sent to Spanner. Enabling this in production will cause a large number of messages to be logged.");
     options.addOption(
+        OPTION_ALLOW_SHUTDOWN_STATEMENT,
+        "allow-shutdown-statement",
+        false,
+        "Allows the proxy server to be shutdown by executing the SHUTDOWN [SMART | FAST | IMMEDIATE] statement.");
+    options.addOption(
         OPTION_INTERNAL_DEBUG_MODE,
         "internal-debug-mode",
         false,
@@ -1390,6 +1412,10 @@ public class OptionsMetadata {
 
   public boolean isLogGrpcMessages() {
     return this.logGrpcMessages;
+  }
+
+  public boolean isAllowShutdownStatement() {
+    return this.allowShutdownStatement;
   }
 
   public boolean isDebugMode() {

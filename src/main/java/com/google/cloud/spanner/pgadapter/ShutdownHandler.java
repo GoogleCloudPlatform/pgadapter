@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,6 +29,7 @@ public class ShutdownHandler {
   private final Thread shutdownThread;
   private final AtomicReference<ShutdownMode> shutdownMode = new AtomicReference<>();
 
+  @InternalApi
   static ShutdownHandler createForServer(@Nonnull ProxyServer proxyServer) {
     return new ShutdownHandler(proxyServer);
   }

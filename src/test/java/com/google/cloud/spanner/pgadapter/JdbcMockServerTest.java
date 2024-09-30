@@ -5596,6 +5596,19 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         exception.getMessage().contains("The server does not support GSS Encryption"));
   }
 
+  @Test
+  public void testShutdown_failsByDefault() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        java.sql.Statement statement = connection.createStatement()) {
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> statement.execute("shutdown"));
+      assertEquals(
+          "ERROR: SHUTDOWN [SMART | FAST | IMMEDIATE] statement is not enabled for this server. "
+              + "Start PGAdapter with --allow_shutdown_statement to enable the use of the SHUTDOWN statement.",
+          exception.getMessage());
+    }
+  }
+
   private void verifySelect1(java.sql.Statement statement) throws SQLException {
     try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
       assertTrue(resultSet.next());
