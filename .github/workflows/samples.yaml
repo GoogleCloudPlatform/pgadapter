@@ -18,6 +18,9 @@ jobs:
       - name: Run JDBC Sample tests
         working-directory: ./samples/java/jdbc
         run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+      - name: Run R2DBC Sample tests
+        working-directory: ./samples/java/r2dbc
+        run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
       - name: Run Hibernate Sample tests
         working-directory: ./samples/java/hibernate
         run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
