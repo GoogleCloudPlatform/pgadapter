@@ -115,4 +115,23 @@ public class BatchService {
           }
         });
   }
+  
+  @Transactional
+  public void generateRandomDataInAutoBatch(int count) {
+    log.info("Generating {} singers and other random data in one auto-batch", count);
+
+    // Generate some random data.
+    List<Singer> singers = singerService.generateRandomSingers(count);
+    List<Album> albums = albumService.generateRandomAlbums(count, singers);
+    List<Venue> venues = venueService.generateRandomVenues(count);
+    List<Concert> concerts = concertService.generateRandomConcerts(count, singers, venues);
+
+    log.info(
+        "Generated {} singers, {} albums, {} venues, and {} concerts in one auto-batch",
+        singers.size(),
+        albums.size(),
+        venues.size(),
+        concerts.size());
+    
+  }
 }

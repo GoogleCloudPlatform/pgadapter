@@ -285,7 +285,7 @@ public class BackendConnection {
 
     @Override
     boolean isBatchingPossible() {
-      return !analyze;
+      return !analyze && !this.parsedStatement.hasReturningClause();
     }
 
     @Override
@@ -1155,8 +1155,11 @@ public class BackendConnection {
             && bufferedStatement.isBatchingPossible()
             && index < (getStatementCount() - 1)) {
           StatementType statementType = getStatementType(index);
-          StatementType nextStatementType = getStatementType(index + 1);
-          canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
+          // Do not start an explicit batch if the connection is already in auto-DML-batch mode.
+          if (!(statementType == StatementType.UPDATE && spannerConnection.isAutoBatchDml())) {
+            StatementType nextStatementType = getStatementType(index + 1);
+            canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
+          }
         }
 
         if (canUseBatch) {

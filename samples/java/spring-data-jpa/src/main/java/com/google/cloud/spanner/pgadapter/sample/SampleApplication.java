@@ -149,6 +149,11 @@ public class SampleApplication implements CommandLineRunner {
     // Show how to execute multiple DML statements in one Batch DML request. This reduces the number
     // of round-trips between PGAdapter and Spanner.
     batchService.generateRandomDataInOneBatch(5);
+    
+    // TODO: Replace with setting a connection variable.
+    System.setProperty("spanner.auto_batch_dml", "true");
+    batchService.generateRandomDataInAutoBatch(5);
+    System.clearProperty("spanner.auto_batch_dml");
   }
 
   void printData() {
