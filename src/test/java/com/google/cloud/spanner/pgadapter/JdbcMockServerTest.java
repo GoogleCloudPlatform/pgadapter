@@ -5609,6 +5609,26 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  @Test
+  public void testFullyQualifiedDatabaseName() throws SQLException {
+    try (Connection connection =
+            DriverManager.getConnection(
+                createUrl(
+                    "projects%2Fmy-project%2Finstances%2Fmy-instance%2Fdatabases%2Fmy-database"));
+        java.sql.Statement statement = connection.createStatement()) {
+      verifySelect1(statement);
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertTrue(
+        request.getSession(),
+        request
+            .getSession()
+            .startsWith(
+                "projects/my-project/instances/my-instance/databases/my-database/sessions/"));
+  }
+
   private void verifySelect1(java.sql.Statement statement) throws SQLException {
     try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
       assertTrue(resultSet.next());
