@@ -3,7 +3,7 @@ module cloud.google.com/pgadapter-latency-benchmark
 go 1.21
 
 require (
-	cloud.google.com/go/spanner v1.69.0
+	cloud.google.com/go/spanner v1.70.0
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.1
