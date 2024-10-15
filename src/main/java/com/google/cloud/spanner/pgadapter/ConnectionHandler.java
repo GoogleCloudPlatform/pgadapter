@@ -69,6 +69,7 @@ import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -148,6 +149,8 @@ public class ConnectionHandler implements Runnable {
    * done.
    */
   private final LinkedList<ParseMessage> skippedAutoDetectParseMessages = new LinkedList<>();
+
+  private Map<String, List<String>> extraHeaders = ImmutableMap.of();
 
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   private CopyStatement activeCopyStatement;
@@ -826,6 +829,14 @@ public class ConnectionHandler implements Runnable {
     this.status = status;
   }
 
+  boolean hasExtraHeaders() {
+    return !this.extraHeaders.isEmpty();
+  }
+
+  Map<String, List<String>> getExtraHeaders() {
+    return this.extraHeaders;
+  }
+
   public WellKnownClient getWellKnownClient() {
     return wellKnownClient;
   }
@@ -833,6 +844,9 @@ public class ConnectionHandler implements Runnable {
   public void setWellKnownClient(WellKnownClient wellKnownClient) {
     this.wellKnownClient = wellKnownClient;
     if (this.wellKnownClient != WellKnownClient.UNSPECIFIED) {
+      // Include the well-known client in a header that we send to Spanner.
+      this.extraHeaders =
+          ImmutableMap.of("pgadapter-well-known-client", ImmutableList.of(wellKnownClient.name()));
       logger.log(
           Level.INFO,
           Logging.format(

@@ -75,7 +75,10 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -1040,6 +1043,8 @@ public abstract class AbstractMockServerTest {
   protected static MockInstanceAdminImpl mockInstanceAdmin;
   protected static Server spannerServer;
   protected static ProxyServer pgServer;
+  protected static Set<String> WELL_KNOWN_CLIENT_HEADERS =
+      Collections.synchronizedSet(new HashSet<>());
 
   protected List<WireMessage> getWireMessages() {
     return new ArrayList<>(pgServer.getDebugMessages());
@@ -1280,6 +1285,14 @@ public abstract class AbstractMockServerTest {
                       assertTrue(userAgent.contains("pg-adapter"));
                       assertTrue(
                           userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
+
+                      String pgAdapterWellKnownClient =
+                          metadata.get(
+                              Metadata.Key.of(
+                                  "pgadapter-well-known-client", Metadata.ASCII_STRING_MARSHALLER));
+                      if (pgAdapterWellKnownClient != null) {
+                        WELL_KNOWN_CLIENT_HEADERS.add(pgAdapterWellKnownClient);
+                      }
                     }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
@@ -1374,6 +1387,7 @@ public abstract class AbstractMockServerTest {
     if (pgServer != null) {
       pgServer.clearDebugMessages();
     }
+    WELL_KNOWN_CLIENT_HEADERS.clear();
   }
 
   protected void addDdlResponseToSpannerAdmin() {
