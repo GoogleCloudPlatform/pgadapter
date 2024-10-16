@@ -115,4 +115,37 @@ public class BatchService {
           }
         });
   }
+
+  @Transactional
+  public void generateRandomDataInAutoBatch(int count) {
+    log.info("Generating {} singers and other random data in one auto-batch", count);
+    try {
+      entityManager
+          .unwrap(Session.class)
+          .doWork(
+              connection ->
+                  connection.createStatement().execute("set spanner.auto_batch_dml = true"));
+
+      // Generate some random data.
+      List<Singer> singers = singerService.generateRandomSingers(count);
+      List<Album> albums = albumService.generateRandomAlbums(count, singers);
+      List<Venue> venues = venueService.generateRandomVenues(count);
+      List<Concert> concerts = concertService.generateRandomConcerts(count, singers, venues);
+
+      log.info(
+          "Generated {} singers, {} albums, {} venues, and {} concerts in one auto-batch",
+          singers.size(),
+          albums.size(),
+          venues.size(),
+          concerts.size());
+    } finally {
+      // Flush the current session and reset the auto_batch_dml property.
+      entityManager.unwrap(Session.class).flush();
+      entityManager
+          .unwrap(Session.class)
+          .doWork(
+              connection ->
+                  connection.createStatement().execute("set spanner.auto_batch_dml = false"));
+    }
+  }
 }
