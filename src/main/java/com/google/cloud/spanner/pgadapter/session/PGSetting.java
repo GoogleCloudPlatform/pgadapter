@@ -95,7 +95,7 @@ public class PGSetting {
   private final String minVal;
   private final String maxVal;
   private final String[] enumVals;
-  private final ImmutableList upperCaseEnumVals;
+  private final ImmutableList<String> upperCaseEnumVals;
 
   private String setting;
   private String unit;
@@ -258,43 +258,68 @@ public class PGSetting {
     }
   }
 
-  /** Returns this setting as a SELECT statement that can be used in a query or CTE. */
-  String getSelectStatement() {
+  /**
+   * Returns a SELECT statement that can be used in a query or CTE to select jsonb-generated
+   * settings.
+   */
+  static String getSelectJsonbSetting() {
     return "select "
-        + toSelectExpression(getCasePreservingKey())
-        + " as name, "
-        + toSelectExpression(setting)
-        + " as setting, "
-        + toSelectExpression(unit)
-        + " as unit, "
-        + toSelectExpression(category)
-        + " as category, "
-        + toSelectExpression((String) null)
-        + " as short_desc, "
-        + toSelectExpression((String) null)
-        + " as extra_desc, "
-        + toSelectExpression(context.getSqlValue())
-        + " as context, "
-        + toSelectExpression(vartype)
-        + " as vartype, "
-        + toSelectExpression(minVal)
-        + " as min_val, "
-        + toSelectExpression(maxVal)
-        + " as max_val, "
-        + toSelectExpression(enumVals)
-        + " as enumvals, "
-        + toSelectExpression(bootVal)
-        + " as boot_val, "
-        + toSelectExpression(resetVal)
-        + " as reset_val, "
-        + toSelectExpression(source)
-        + " as source, "
-        + toSelectExpression((String) null)
-        + " as sourcefile, "
-        + toSelectExpression((Integer) null)
-        + "::bigint as sourceline, "
-        + toSelectExpression(pendingRestart)
-        + "::boolean as pending_restart";
+        + "t->>'name' as name, "
+        + "t->>'setting' as setting, "
+        + "t->>'unit' as unit, "
+        + "t->>'category' as category, "
+        + "t->>'short_desc' as short_desc, "
+        + "t->>'extra_desc' as extra_desc, "
+        + "t->>'context' as context, "
+        + "t->>'vartype' as vartype, "
+        + "t->>'min_val' as min_val, "
+        + "t->>'max_val' as max_val, "
+        + "case when t->>'enumvals' is null then null::text[] else spanner.string_array((t->>'enumvals')::jsonb) end as enumvals, "
+        + "t->>'boot_val' as boot_val, "
+        + "t->>'reset_val' as reset_val, "
+        + "t->>'source' as source, "
+        + "(t->>'sourcefile')::varchar as sourcefile, "
+        + "(t->>'sourceline')::bigint as sourceline, "
+        + "(t->>'pending_restart')::boolean as pending_restart\n";
+  }
+
+  /** Returns this setting as a jsonb literal expression that can be used in a query or CTE. */
+  String getJsonbLiteral() {
+    return "'{"
+        + toJsonbElement("name", getCasePreservingKey())
+        + ","
+        + toJsonbElement("setting", setting)
+        + ","
+        + toJsonbElement("unit", unit)
+        + ","
+        + toJsonbElement("category", category)
+        + ","
+        + toJsonbElement("short_desc", (String) null)
+        + ","
+        + toJsonbElement("extra_desc", (String) null)
+        + ","
+        + toJsonbElement("context", context.getSqlValue())
+        + ","
+        + toJsonbElement("vartype", vartype)
+        + ","
+        + toJsonbElement("min_val", minVal)
+        + ","
+        + toJsonbElement("max_val", maxVal)
+        + ","
+        + toJsonbElement("enum_vals", enumVals)
+        + ","
+        + toJsonbElement("boot_val", bootVal)
+        + ","
+        + toJsonbElement("reset_val", resetVal)
+        + ","
+        + toJsonbElement("source", source)
+        + ","
+        + toJsonbElement("sourcefile", (String) null)
+        + ","
+        + toJsonbElement("sourceline", (Integer) null)
+        + ","
+        + toJsonbElement("pending_restart", pendingRestart)
+        + "}'::jsonb";
   }
 
   /** Returns the column names of the pg_settings table. */
@@ -302,33 +327,42 @@ public class PGSetting {
     return COLUMN_NAMES;
   }
 
-  /** Converts a string to a SQL literal expression that can be used in a select statement. */
-  String toSelectExpression(String value) {
-    return value == null ? "null" : "'" + value + "'";
+  String toJsonbElement(String name, String value) {
+    return "\"" + name + "\":" + toJsonbExpression(value);
   }
 
-  /**
-   * Converts a string array to a SQL literal expression that can be used in a select statement. The
-   * expression is cast to text[].
-   */
-  String toSelectExpression(String[] value) {
-    return value == null
-        ? "null::text[]"
-        : "'{"
-            + Arrays.stream(value)
-                .map(s -> s.startsWith("\"") ? s : "\"" + s + "\"")
-                .collect(Collectors.joining(", "))
-            + "}'::text[]";
+  String toJsonbElement(String name, Integer value) {
+    return "\"" + name + "\":" + toJsonbExpression(value);
   }
 
-  /** Converts an Integer to a SQL literal expression that can be used in a select statement. */
-  String toSelectExpression(Integer value) {
+  String toJsonbElement(String name, Boolean value) {
+    return "\"" + name + "\":" + toJsonbExpression(value);
+  }
+
+  String toJsonbElement(String name, String[] value) {
+    return "\"" + name + "\":" + toJsonbExpression(value);
+  }
+
+  String toJsonbExpression(String value) {
+    return value == null ? "null" : "\"" + value + "\"";
+  }
+
+  String toJsonbExpression(Integer value) {
     return value == null ? "null" : value.toString();
   }
 
-  /** Converts a Boolean to a SQL literal expression that can be used in a select statement. */
-  String toSelectExpression(Boolean value) {
-    return value == null ? "null" : (value ? "'t'" : "'f'");
+  String toJsonbExpression(Boolean value) {
+    return value == null ? "null" : value.toString();
+  }
+
+  String toJsonbExpression(String[] value) {
+    return value == null
+        ? "null"
+        : "["
+            + Arrays.stream(value)
+                .map(s -> s.startsWith("\"") ? s : "\"" + s + "\"")
+                .collect(Collectors.joining(", "))
+            + "]";
   }
 
   /**
