@@ -24,7 +24,7 @@ COPY src ./src
 RUN mvn package -DskipTests
 
 # Use AdoptOpenJDK for base image.
-FROM eclipse-temurin:22-jre-alpine
+FROM eclipse-temurin:23-jre-alpine
 
 # Copy the jar to the production image from the builder stage.
 COPY --from=builder /app/target/google-cloud-spanner-pgadapter-samples-cloud-run-*.jar /google-cloud-spanner-pgadapter-samples-cloud-run.jar
