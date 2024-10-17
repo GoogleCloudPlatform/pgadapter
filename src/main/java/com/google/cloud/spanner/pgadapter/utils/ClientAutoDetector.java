@@ -542,6 +542,15 @@ public class ClientAutoDetector {
             RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+DELETE\\s+RESTRICT"), ""),
             RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+UPDATE\\s+CASCADE"), ""));
       }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        // This ensures that Prisma sees the 'prisma_migrations" table as '_prisma_migrations'.
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("SELECT\\s+" + "tbl\\.relname\\s+AS\\s+table_name"),
+                "SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name"));
+      }
     },
     GOLANG_MIGRATE {
       @Override
