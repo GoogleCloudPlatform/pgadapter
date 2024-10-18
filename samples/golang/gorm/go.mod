@@ -3,7 +3,7 @@ module gorm
 go 1.21
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20240919150510-c310ce84d0c9
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20241018164129-7f7934d80d5f
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgtype v1.14.3
 	github.com/shopspring/decimal v1.4.0
@@ -25,7 +25,7 @@ require (
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/docker v27.2.1+incompatible // indirect
+	github.com/docker/docker v27.3.1+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
