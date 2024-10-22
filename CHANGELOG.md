@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.40.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.40.0...v0.40.1) (2024-10-22)
+
+
+### Dependencies
+
+* update dependency com.google.cloud.tools:jib-maven-plugin to v3.4.4 ([#2463](https://github.com/GoogleCloudPlatform/pgadapter/issues/2463)) ([4e3f0c9](https://github.com/GoogleCloudPlatform/pgadapter/commit/4e3f0c9569ff0eee19a56ce9a9ae51e77428cfb4))
+* update dependency org.postgresql:r2dbc-postgresql to v1.0.7.release ([#2453](https://github.com/GoogleCloudPlatform/pgadapter/issues/2453)) ([5b093c0](https://github.com/GoogleCloudPlatform/pgadapter/commit/5b093c09365a12ac2c1d8a5efcf12b7ae68cb02e))
+* update module github.com/jackc/pgtype to v1.14.4 ([#2464](https://github.com/GoogleCloudPlatform/pgadapter/issues/2464)) ([7fb1078](https://github.com/GoogleCloudPlatform/pgadapter/commit/7fb107805285f8a4e140fbd6a89298639d8b3620))
+* update module github.com/testcontainers/testcontainers-go to v0.34.0 ([#2468](https://github.com/GoogleCloudPlatform/pgadapter/issues/2468)) ([d9a1eba](https://github.com/GoogleCloudPlatform/pgadapter/commit/d9a1eba259f8e0a85b1deb8d3ea34423dacd3f58))
+* update module github.com/testcontainers/testcontainers-go/modules/postgres to v0.34.0 ([#2469](https://github.com/GoogleCloudPlatform/pgadapter/issues/2469)) ([92bc36f](https://github.com/GoogleCloudPlatform/pgadapter/commit/92bc36f15266953f9cef5a72cebe1a262e8c4fa0))
+
 ## [0.40.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.39.0...v0.40.0) (2024-10-16)
 
 
