@@ -16,9 +16,11 @@ package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.AbstractApiService;
 import com.google.api.core.InternalApi;
+import com.google.api.gax.rpc.ApiCallContext;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.ThreadFactoryUtil;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -28,6 +30,10 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
+import io.grpc.CallOptions;
+import io.grpc.Context;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Tracer;
 import java.io.Closeable;
@@ -62,6 +68,11 @@ import org.newsclub.net.unix.AFUNIXSocketAddress;
 public class ProxyServer extends AbstractApiService {
 
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
+  private static final CallOptions.Key<Map<Metadata.Key<String>, String>>
+      DYNAMIC_HEADERS_CALL_OPTION_KEY =
+          CallOptions.Key.createWithDefault(
+              "gax_dynamic_headers", Collections.<Metadata.Key<String>, String>emptyMap());
+
   private final OptionsMetadata options;
   private final OpenTelemetry openTelemetry;
   private final Metrics metrics;
@@ -433,7 +444,24 @@ public class ProxyServer extends AbstractApiService {
     socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
-    Thread thread = threadFactory.newThread(handler);
+    // Create a gRPC context for the connection, so we can assign custom headers specifically for
+    // that connection. This allows us to for example include the name of the client that is
+    // connected in the user-agent header.
+    Context context =
+        Context.current()
+            .withValue(
+                SpannerOptions.CALL_CONTEXT_CONFIGURATOR_KEY,
+                new SpannerOptions.CallContextConfigurator() {
+                  @Override
+                  public <ReqT, RespT> ApiCallContext configure(
+                      ApiCallContext context, ReqT request, MethodDescriptor<ReqT, RespT> method) {
+                    if (handler.hasExtraHeaders()) {
+                      return context.withExtraHeaders(handler.getExtraHeaders());
+                    }
+                    return context;
+                  }
+                });
+    Thread thread = threadFactory.newThread(context.wrap(handler));
     handler.setThread(thread);
     handler.start();
   }

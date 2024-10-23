@@ -31,6 +31,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ByteString;
@@ -158,6 +159,11 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+
+    // Verify that a header was sent to Spanner to indicate which client was connected to PGAdapter.
+    assertTrue(
+        WELL_KNOWN_CLIENT_HEADERS.toString(),
+        WELL_KNOWN_CLIENT_HEADERS.contains(WellKnownClient.PGX.name()));
   }
 
   @Test

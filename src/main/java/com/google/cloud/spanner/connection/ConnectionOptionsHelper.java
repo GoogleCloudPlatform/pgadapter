@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.connection;
 
 import com.google.api.core.InternalApi;
+import com.google.api.gax.grpc.GrpcInterceptorProvider;
 import com.google.auth.Credentials;
 import com.google.cloud.spanner.connection.ConnectionOptions.Builder;
 import com.google.cloud.spanner.pgadapter.logging.GrpcLogInterceptor;
@@ -47,6 +48,12 @@ public class ConnectionOptionsHelper {
               options.setInterceptorProvider(
                   () -> ImmutableList.of(new GrpcLogInterceptor(Level.INFO))));
     }
+    return connectionOptionsBuilder;
+  }
+
+  public static Builder setInterceptorProvider(
+      Builder connectionOptionsBuilder, GrpcInterceptorProvider provider) {
+    connectionOptionsBuilder.setConfigurator(options -> options.setInterceptorProvider(provider));
     return connectionOptionsBuilder;
   }
 }
