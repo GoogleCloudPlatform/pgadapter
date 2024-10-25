@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -103,7 +104,13 @@ func TestStart(t *testing.T) {
 		}
 		err = pgadapter.Stop(context.Background())
 		if err != nil {
-			t.Fatalf("failed to stop PGAdapter: %v", err)
+			msg := err.Error()
+			if strings.Contains(msg, "removal of container") && strings.Contains(msg, "is already in progress") {
+				// warn and ignore
+				t.Logf("container already being removed: %v", err)
+			} else {
+				t.Fatalf("failed to stop PGAdapter: %v", err)
+			}
 		}
 	}
 }
