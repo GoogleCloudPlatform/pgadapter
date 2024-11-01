@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import static com.google.cloud.spanner.connection.ConnectionOptions.ENABLE_END_TO_END_TRACING_PROPERTY_NAME;
+
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
@@ -92,6 +94,7 @@ public class OptionsMetadata {
     private boolean enableOpenTelemetry;
     private boolean enableOpenTelemetryMetrics;
     private Double openTelemetryTraceRatio;
+    private boolean enableEndToEndTracing;
     private boolean skipLocalhostCheck;
     private boolean useVirtualThreads;
     private boolean useVirtualGrpcTransportThreads;
@@ -263,6 +266,17 @@ public class OptionsMetadata {
       Preconditions.checkArgument(
           ratio >= 0.0d && ratio <= 1.0d, "ration must be in the range [0.0, 1.0]");
       this.openTelemetryTraceRatio = ratio;
+      return this;
+    }
+
+    /**
+     * Enables end-to-end tracing for RPCs on Spanner. This generates traces for both the time +
+     * that is spent in the client and time that is spent in the Spanner server. + Server side
+     * traces can only go to Google Cloud Trace, so to see end-to-end traces, + the application
+     * should configure an exporter that exports the traces to Google Cloud Trace.
+     */
+    public Builder setEnableEndToEndTracing(boolean enableEndToEndTracing) {
+      this.enableEndToEndTracing = enableEndToEndTracing;
       return this;
     }
 
@@ -447,6 +461,9 @@ public class OptionsMetadata {
         addLongOption(
             args, OPTION_OPEN_TELEMETRY_TRACE_RATIO, String.valueOf(openTelemetryTraceRatio));
       }
+      if (enableEndToEndTracing) {
+        addOption(args, OPTION_ENABLE_END_TO_END_TRACING);
+      }
       if (skipLocalhostCheck) {
         addOption(args, OPTION_DISABLE_LOCALHOST_CHECK);
       }
@@ -467,7 +484,8 @@ public class OptionsMetadata {
           || databaseRole != null
           || autoConfigEmulator
           || useVirtualThreads
-          || useVirtualGrpcTransportThreads) {
+          || useVirtualGrpcTransportThreads
+          || enableEndToEndTracing) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -490,6 +508,9 @@ public class OptionsMetadata {
           jdbcOptionBuilder
               .append(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME)
               .append("=true;");
+        }
+        if (enableEndToEndTracing) {
+          jdbcOptionBuilder.append(ENABLE_END_TO_END_TRACING_PROPERTY_NAME).append("=true;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
@@ -588,6 +609,7 @@ public class OptionsMetadata {
   private static final String OPTION_ENABLE_OPEN_TELEMETRY = "enable_otel";
   private static final String OPTION_ENABLE_OPEN_TELEMETRY_METRICS = "enable_otel_metrics";
   private static final String OPTION_OPEN_TELEMETRY_TRACE_RATIO = "otel_trace_ratio";
+  private static final String OPTION_ENABLE_END_TO_END_TRACING = "enable_end_to_end_tracing";
   private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
@@ -635,6 +657,7 @@ public class OptionsMetadata {
   private final boolean enableOpenTelemetry;
   private final boolean enableOpenTelemetryMetrics;
   private final Double openTelemetryTraceRatio;
+  private final boolean enableEndToEndTracing;
   private final SslMode sslMode;
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
@@ -725,6 +748,7 @@ public class OptionsMetadata {
     this.enableOpenTelemetryMetrics = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
     this.openTelemetryTraceRatio =
         parseOpenTelemetryTraceRatio(commandLine.getOptionValue(OPTION_OPEN_TELEMETRY_TRACE_RATIO));
+    this.enableEndToEndTracing = commandLine.hasOption(OPTION_ENABLE_END_TO_END_TRACING);
     this.sslMode = parseSslMode(commandLine.getOptionValue(OPTION_SSL));
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.disableDefaultLocalStatements =
@@ -805,6 +829,7 @@ public class OptionsMetadata {
     this.enableOpenTelemetry = false;
     this.enableOpenTelemetryMetrics = false;
     this.openTelemetryTraceRatio = null;
+    this.enableEndToEndTracing = false;
     this.sslMode = SslMode.Disable;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
@@ -1181,6 +1206,14 @@ public class OptionsMetadata {
         true,
         "OpenTelemetry trace sampling ration. Value must be in the range [0.0, 1.0].");
     options.addOption(
+        null,
+        OPTION_ENABLE_END_TO_END_TRACING,
+        false,
+        "Enable end-to-end tracing (true/false) to generate traces for both the time "
+            + "that is spent in the client, as well as time that is spent in the Spanner server. "
+            + "Server side traces can only go to Google Cloud Trace, so to see end to end traces, "
+            + "the application should configure an exporter that exports the traces to Google Cloud Trace.");
+    options.addOption(
         OPTION_SSL,
         "sslmode",
         true,
@@ -1547,6 +1580,10 @@ public class OptionsMetadata {
 
   public Double getOpenTelemetryTraceRatio() {
     return this.openTelemetryTraceRatio;
+  }
+
+  public boolean isEnableEndToEndTracing() {
+    return this.enableEndToEndTracing;
   }
 
   public SslMode getSslMode() {

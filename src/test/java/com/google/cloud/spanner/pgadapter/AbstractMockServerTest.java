@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PG_TYPE_CTE_EMULATED;
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -1280,6 +1281,13 @@ public abstract class AbstractMockServerTest {
                       assertTrue(userAgent.contains("pg-adapter"));
                       assertTrue(
                           userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
+
+                      String endToEndTracing =
+                          metadata.get(
+                              Metadata.Key.of(
+                                  "x-goog-spanner-end-to-end-tracing",
+                                  Metadata.ASCII_STRING_MARSHALLER));
+                      assertEquals("true", endToEndTracing);
                     }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
@@ -1297,7 +1305,8 @@ public abstract class AbstractMockServerTest {
         .enableDebugMode()
         .setUsePlainText()
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
-        .setCredentials(NoCredentials.getInstance());
+        .setCredentials(NoCredentials.getInstance())
+        .setEnableEndToEndTracing(true);
     optionsConfigurator.accept(builder);
     pgServer = new ProxyServer(builder.build(), openTelemetry);
     pgServer.startServer();

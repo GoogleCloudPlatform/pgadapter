@@ -457,6 +457,31 @@ public class OptionsMetadataTest {
             .useVirtualGrpcTransportThreads()
             .build()
             .isUseGrpcTransportVirtualThreads());
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("enableEndToEndTracing"));
+    assertEquals(
+        "true",
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(true)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("enableEndToEndTracing"));
+    assertFalse(OptionsMetadata.newBuilder().build().isEnableEndToEndTracing());
+    assertTrue(
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(true)
+            .build()
+            .isEnableEndToEndTracing());
+    assertFalse(
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(false)
+            .build()
+            .isEnableEndToEndTracing());
 
     assertEquals(
         DdlTransactionMode.Batch,

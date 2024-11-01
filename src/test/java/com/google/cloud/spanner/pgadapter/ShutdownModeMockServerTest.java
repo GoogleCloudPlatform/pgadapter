@@ -63,7 +63,8 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
         .setUsePlainText()
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
         .setCredentials(NoCredentials.getInstance())
-        .setAllowShutdownStatement(true);
+        .setAllowShutdownStatement(true)
+        .setEnableEndToEndTracing(true);
     proxyServer = new ProxyServer(builder.build(), OpenTelemetry.noop());
     proxyServer.startServer();
   }
