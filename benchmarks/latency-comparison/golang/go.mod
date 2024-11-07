@@ -2,7 +2,7 @@ module cloud.google.com/pgadapter-latency-benchmark
 
 go 1.22
 
-toolchain go1.23.2
+toolchain go1.23.3
 
 require (
 	cloud.google.com/go/spanner v1.71.0
