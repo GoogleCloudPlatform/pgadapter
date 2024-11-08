@@ -16,12 +16,15 @@ package com.google.cloud.pgadapter.tpcc;
 import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
+import com.google.cloud.spanner.AbortedException;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.jdbc.JdbcSqlExceptionFactory.JdbcAbortedException;
+import com.google.common.base.Stopwatch;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -91,20 +94,31 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     while (!Thread.interrupted()) {
       try {
         int transaction = random.nextInt(23);
+        Stopwatch stopwatch = Stopwatch.createStarted();
         if (transaction < 10) {
           newOrder();
+          Duration executionDuration = stopwatch.elapsed();
+          metrics.recordNewOrderLatency(executionDuration.toMillis());
           statistics.incNewOrder();
         } else if (transaction < 20) {
           payment();
+          Duration executionDuration = stopwatch.elapsed();
+          metrics.recordPaymentLatency(executionDuration.toMillis());
           statistics.incPayment();
         } else if (transaction < 21) {
           orderStatus();
+          Duration executionDuration = stopwatch.elapsed();
+          metrics.recordOrderStatusLatency(executionDuration.toMillis());
           statistics.incOrderStatus();
         } else if (transaction < 22) {
           delivery();
+          Duration executionDuration = stopwatch.elapsed();
+          metrics.recordDeliveryLatency(executionDuration.toMillis());
           statistics.incDelivery();
         } else if (transaction < 23) {
           stockLevel();
+          Duration executionDuration = stopwatch.elapsed();
+          metrics.recordStockLevelLatency(executionDuration.toMillis());
           statistics.incStockLevel();
         } else {
           LOG.info("No transaction");
@@ -121,6 +135,9 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           statistics.incAborted();
         } else if (exception instanceof JdbcAbortedException) {
           LOG.debug("Transaction aborted by Cloud Spanner via Spanner JDBC");
+          statistics.incAborted();
+        } else if (exception instanceof AbortedException) {
+          LOG.debug("Transaction aborted by Cloud Spanner via Spanner client");
           statistics.incAborted();
         } else {
           LOG.warn("Transaction failed", exception);
@@ -147,7 +164,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
   }
 
-  private void newOrder() throws SQLException {
+  public void newOrder() throws SQLException {
     LOG.debug("Executing new_order");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
@@ -283,7 +300,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     executeStatement("commit");
   }
 
-  private void payment() throws SQLException {
+  public void payment() throws SQLException {
     LOG.debug("Executing payment");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
@@ -449,7 +466,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     executeStatement("commit");
   }
 
-  private void orderStatus() throws SQLException {
+  public void orderStatus() throws SQLException {
     LOG.debug("Executing order_status");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
@@ -538,7 +555,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     executeStatement("commit");
   }
 
-  private void delivery() throws SQLException {
+  public void delivery() throws SQLException {
     LOG.debug("Executing delivery");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
@@ -597,7 +614,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     executeStatement("commit");
   }
 
-  private void stockLevel() throws SQLException {
+  public void stockLevel() throws SQLException {
     LOG.debug("Executing stock_level");
 
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));

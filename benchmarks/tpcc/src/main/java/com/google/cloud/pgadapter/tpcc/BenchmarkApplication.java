@@ -41,6 +41,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.hibernate.SessionFactory;
+import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.StandardServiceRegistry;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -95,6 +99,8 @@ public class BenchmarkApplication implements CommandLineRunner {
                 pgAdapterConfiguration.getMinSessions(), tpccConfiguration.getBenchmarkThreads()),
             Math.max(
                 pgAdapterConfiguration.getMaxSessions(), tpccConfiguration.getBenchmarkThreads()));
+    StandardServiceRegistry registry = null;
+    SessionFactory sessionFactory = null;
     try {
       if (tpccConfiguration.isLoadData()) {
         boolean isClientLibGSQLRunner =
@@ -133,6 +139,11 @@ public class BenchmarkApplication implements CommandLineRunner {
         Statistics statistics = new Statistics(tpccConfiguration);
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
+
+        if (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.HIBERNATE_RUNNER)) {
+          registry = new StandardServiceRegistryBuilder().configure().build();
+          sessionFactory = new MetadataSources(registry).buildMetadata().buildSessionFactory();
+        }
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
           if (tpccConfiguration
               .getBenchmarkRunner()
@@ -186,6 +197,19 @@ public class BenchmarkApplication implements CommandLineRunner {
                     spannerConfiguration,
                     metrics,
                     Dialect.GOOGLE_STANDARD_SQL));
+          } else if (tpccConfiguration
+              .getBenchmarkRunner()
+              .equals(TpccConfiguration.HIBERNATE_RUNNER)) {
+            statistics.setRunnerName("Hibernate benchmark");
+            executor.submit(
+                new HibernateBenchmarkRunner(
+                    statistics,
+                    sessionFactory,
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    metrics,
+                    Dialect.GOOGLE_STANDARD_SQL));
           }
         }
 
@@ -209,6 +233,10 @@ public class BenchmarkApplication implements CommandLineRunner {
       if (server != null) {
         server.stopServer();
         server.awaitTerminated();
+      }
+      if (sessionFactory != null) {
+        sessionFactory.close();
+        registry.close();
       }
     }
   }

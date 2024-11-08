@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+    "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+
+<hibernate-configuration>
+  <session-factory>
+
+    <!-- Connection settings -->
+    <property name="hibernate.connection.driver_class">com.google.cloud.spanner.jdbc.JdbcDriver</property>
+
+    <!-- Uncomment this property and set the URL for the database,
+    unless you're setting it via a system property or hibernate.properties file. -->
+
+    <property name="hibernate.connection.url">jdbc:cloudspanner:/projects/google.com:span-test-1/instances/bench-1/databases/tpcc</property>
+
+
+    <!-- SQL dialect -->
+    <property name="hibernate.dialect">com.google.cloud.spanner.hibernate.SpannerDialect</property>
+
+    <!-- Print executed SQL to stdout -->
+    <property name="show_sql">true</property>
+
+    <!-- Update database on startup -->
+    <property name="hibernate.hbm2ddl.auto">none</property>
+
+    <!-- Annotated entity classes -->
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Warehouse"/>
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.District"/>
+<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Customer"/>-->
+<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.History"/>-->
+<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Order"/>-->
+<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.NewOrder"/>-->
+<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.OrderLine"/>-->
+<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Stock"/>-->
+<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Item"/>-->
+
+  </session-factory>
+</hibernate-configuration>
