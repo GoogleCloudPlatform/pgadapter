@@ -16,7 +16,12 @@ import {createDataModel, startPGAdapter} from './init'
 import {Album, Concert, initModels, Singer, TicketSale, Track, Venue} from '../models/models';
 import {literal, Op, QueryTypes, Sequelize} from "sequelize";
 import {randomInt} from "crypto";
-import {randomAlbumTitle, randomFirstName, randomLastName, randomTrackTitle} from "./random";
+import {
+  randomAlbumTitle,
+  randomFirstName,
+  randomLastName,
+  randomTrackTitle
+} from "./random";
 
 async function main() {
   // Start PGAdapter in a Docker test container.
@@ -69,6 +74,9 @@ async function main() {
   await createVenuesAndConcerts(sequelize);
   
   await staleRead(sequelize);
+  
+  // Insert-or-update a random singer.
+  await insertOrUpdateSinger(sequelize);
 
   // Close the sequelize connection pool and shut down PGAdapter.
   await sequelize.close();
@@ -259,6 +267,39 @@ async function createVenuesAndConcerts(sequelize: Sequelize) {
     }, {transaction: tx});
   });
   console.log("Finished creating venues and concerts");
+}
+
+// Randomly insert a new singer or update an existing singer using an insert-or-update statement.
+async function insertOrUpdateSinger(sequelize: Sequelize) {
+  console.log("Executing an insert-or-update statement for a Singer record...");
+  // Randomly select an existing Singer ID or generate a random new one.
+  // This will make this function insert a new Singer row or update
+  // an existing one at random.
+  const update = randomInt(10) < 5;
+  const id = update
+    ? (await Singer.findOne({limit: 1})).id
+    : randomInt(100);
+  // 'Upsert' (insert-or-update) a Singer by setting a value for the 'id' column and then
+  // calling the 'upsert' method. This will generate an INSERT ... ON CONFLICT (id) UPDATE ...
+  // statement. Note that Spanner requires that ALL columns that are part of the INSERT statement
+  // are also part of the UPDATE clause. This means that you cannot use 'upsert' in combination
+  // with 'createdAt' columns that are managed by Sequelize. Instead, you should let Spanner
+  // automatically set the 'createdAt' column by adding a DEFAULT constraint for the 'createdAt'
+  // column, and disabling the auto-management of 'createdAt' in Sequelize. You can do this by
+  // 1. Defining the column like this: "createdAt" timestamptz default current_timestamp
+  // 2. Add 'createdAt: false' to the options that are used to initalize the model.
+  //
+  // See also the init.ts and model.ts files in this folder.
+  const [singer] = await Singer.upsert({
+    id: id,
+    firstName: randomFirstName(),
+    lastName: randomLastName()},
+  );
+  if (update) {
+    console.log(`Updated singer ${singer.id}`);
+  } else {
+    console.log(`Inserted singer ${singer.id}`);
+  }
 }
 
 (async () => {

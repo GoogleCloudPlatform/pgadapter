@@ -411,8 +411,7 @@ def binary_copy_out(conn_string: str):
                     "TO STDOUT (FORMAT BINARY)") as copy:
         # We must instruct psycopg3 exactly which types we are using when using
         # binary copy.
-        float4_type = "float4" if use_float4_in_tests() else "float8"
-        copy.set_types(["bigint", "boolean", "bytea", float4_type, "float8",
+        copy.set_types(["bigint", "boolean", "bytea", "float4", "float8",
                         "bigint", "numeric", "timestamptz", "date", "varchar",
                         "jsonb", "bigint[]", "boolean[]", "bytea[]", "float4[]",
                         "float8[]", "bigint[]", "numeric[]", "timestamptz[]",
@@ -569,10 +568,6 @@ def print_all_types(row):
   print("col_array_date:",        row[19])
   print("col_array_string:",      row[20])
   print("col_array_jsonb:",       row[21])
-
-
-def use_float4_in_tests() -> bool:
-  return os.getenv("PGADAPTER_FLOAT4_OID") == "700"
 
 
 parser = argparse.ArgumentParser(description='Run psycopg3 test.')

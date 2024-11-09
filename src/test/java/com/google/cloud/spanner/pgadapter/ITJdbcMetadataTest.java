@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -47,33 +46,24 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameter;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
 @Category({IntegrationTest.class, SlowTest.class})
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
-        "42.7.2", "42.7.1", "42.7.0", "42.6.0", "42.5.4", "42.5.3", "42.5.2", "42.5.1", "42.5.0",
-        "42.4.2", "42.4.1", "42.4.0", "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2", "42.3.1",
-        "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22", "42.2.21", "42.2.20", "42.2.19",
-        "42.2.18", "42.2.17", "42.2.16", "42.2.15", "42.2.14", "42.2.13", "42.2.12", "42.2.11",
-        "42.2.10", "42.2.9", "42.2.8", "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3", "42.2.2",
-        "42.2.1", "42.2.0", "42.1.4",
+        "42.7.4", "42.7.3", "42.7.2", "42.7.1", "42.7.0", "42.6.0", "42.5.4", "42.5.3", "42.5.2",
+        "42.5.1", "42.5.0", "42.4.2", "42.4.1", "42.4.0", "42.3.6", "42.3.5", "42.3.4", "42.3.3",
+        "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22", "42.2.21",
+        "42.2.20", "42.2.19", "42.2.18", "42.2.17", "42.2.16", "42.2.15", "42.2.14", "42.2.13",
+        "42.2.12", "42.2.11", "42.2.10", "42.2.9", "42.2.8", "42.2.7", "42.2.6", "42.2.5", "42.2.4",
+        "42.2.3", "42.2.2", "42.2.1", "42.2.0", "42.1.4",
         /* "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0" */
       };
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
-
-  @Parameter public String pgVersion;
-
-  @Parameters(name = "pgVersion = {0}")
-  public static Object[] data() {
-    return new Object[] {"1.0", "14.1"};
-  }
 
   @BeforeClass
   public static void setup() {
@@ -120,9 +110,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   private String createUrl() {
-    return String.format(
-        "jdbc:postgresql://%s/?options=-c%%20server_version=%s",
-        testEnv.getPGAdapterHostAndPort(), pgVersion);
+    return String.format("jdbc:postgresql://%s/", testEnv.getPGAdapterHostAndPort());
   }
 
   private void runForAllVersions(BiConsumer<Connection, String> runnable) throws Exception {
@@ -202,10 +190,10 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             // Options in the connection string are only supported from version 42.2.6.
             if (comparableVersion.compareTo("42.2.006") >= 0) {
-              assertEquals(pgVersion, metadata.getDatabaseProductVersion());
+              assertEquals("14.1", metadata.getDatabaseProductVersion());
             } else if (testEnv.getServer() != null) {
               assertEquals(
-                  pgVersion,
+                  "14.1",
                   testEnv.getServer().getOptions().getServerVersion(),
                   metadata.getDatabaseProductVersion());
             }
@@ -402,10 +390,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
               assertTrue(columns.next());
               assertEquals("col_float4", columns.getString("COLUMN_NAME"));
-              assertEquals(
-                  useFloat4InTests() ? Types.REAL : Types.DOUBLE, columns.getInt("DATA_TYPE"));
-              assertEquals(
-                  useFloat4InTests() ? "float4" : "float8", columns.getString("TYPE_NAME"));
+              assertEquals(Types.REAL, columns.getInt("DATA_TYPE"));
+              assertEquals("float4", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_float8", columns.getString("COLUMN_NAME"));
@@ -461,8 +447,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertTrue(columns.next());
               assertEquals("col_array_float4", columns.getString("COLUMN_NAME"));
               assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals(
-                  useFloat4InTests() ? "_float4" : "_float8", columns.getString("TYPE_NAME"));
+              assertEquals("_float4", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
@@ -522,10 +507,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
               assertTrue(columns.next());
               assertEquals("col_float4", columns.getString("COLUMN_NAME"));
-              assertEquals(
-                  useFloat4InTests() ? Types.REAL : Types.DOUBLE, columns.getInt("DATA_TYPE"));
-              assertEquals(
-                  useFloat4InTests() ? "float4" : "float8", columns.getString("TYPE_NAME"));
+              assertEquals(Types.REAL, columns.getInt("DATA_TYPE"));
+              assertEquals("float4", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_float8", columns.getString("COLUMN_NAME"));
@@ -566,8 +549,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertTrue(columns.next());
               assertEquals("col_array_float4", columns.getString("COLUMN_NAME"));
               assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals(
-                  useFloat4InTests() ? "_float4" : "_float8", columns.getString("TYPE_NAME"));
+              assertEquals("_float4", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
@@ -1053,9 +1035,6 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataCatalogs() throws Exception {
-    IntegrationTest.skipOnEmulator(
-        "information_schema.information_schema_catalog_name is not supported on the emulator");
-
     runForAllVersions(
         (connection, version) -> {
           try {

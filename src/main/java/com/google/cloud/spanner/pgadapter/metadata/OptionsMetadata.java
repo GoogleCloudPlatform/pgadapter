@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import static com.google.cloud.spanner.connection.ConnectionOptions.ENABLE_END_TO_END_TRACING_PROPERTY_NAME;
+
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
@@ -92,6 +94,7 @@ public class OptionsMetadata {
     private boolean enableOpenTelemetry;
     private boolean enableOpenTelemetryMetrics;
     private Double openTelemetryTraceRatio;
+    private boolean enableEndToEndTracing;
     private boolean skipLocalhostCheck;
     private boolean useVirtualThreads;
     private boolean useVirtualGrpcTransportThreads;
@@ -99,6 +102,8 @@ public class OptionsMetadata {
     private int port;
     private String unixDomainSocketDirectory;
     private boolean autoConfigEmulator;
+    private boolean logGrpcMessages;
+    private boolean allowShutdownStatement;
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
@@ -265,6 +270,17 @@ public class OptionsMetadata {
     }
 
     /**
+     * Enables end-to-end tracing for RPCs on Spanner. This generates traces for both the time that
+     * is spent in the client and time that is spent in the Spanner server. Server side traces can
+     * only be exported to Google Cloud Trace, so to see end-to-end traces, the application should
+     * configure an exporter that exports the traces to Google Cloud Trace.
+     */
+    public Builder setEnableEndToEndTracing(boolean enableEndToEndTracing) {
+      this.enableEndToEndTracing = enableEndToEndTracing;
+      return this;
+    }
+
+    /**
      * PGAdapter by default only allows connections from localhost. Call this method to disable this
      * check. You should only allow connections from private networks, unless you are also using SSL
      * and require clients to authenticate.
@@ -359,6 +375,24 @@ public class OptionsMetadata {
       return this.setCredentials(NoCredentials.getInstance());
     }
 
+    /**
+     * Enables logging of all gRPC messages that are sent by PGAdapter to Spanner. Only enable this
+     * for debugging purposes.
+     */
+    public Builder setLogGrpcMessages(boolean logGrpcMessages) {
+      this.logGrpcMessages = logGrpcMessages;
+      return this;
+    }
+
+    /**
+     * Enables the use of the SHUTDOWN [SMART | FAST | IMMEDIATE] statement to shutdown the proxy
+     * server.
+     */
+    public Builder setAllowShutdownStatement(boolean allowShutdownStatement) {
+      this.allowShutdownStatement = allowShutdownStatement;
+      return this;
+    }
+
     Builder enableDebugMode() {
       this.debugMode = true;
       return this;
@@ -427,6 +461,9 @@ public class OptionsMetadata {
         addLongOption(
             args, OPTION_OPEN_TELEMETRY_TRACE_RATIO, String.valueOf(openTelemetryTraceRatio));
       }
+      if (enableEndToEndTracing) {
+        addOption(args, OPTION_ENABLE_END_TO_END_TRACING);
+      }
       if (skipLocalhostCheck) {
         addOption(args, OPTION_DISABLE_LOCALHOST_CHECK);
       }
@@ -447,7 +484,8 @@ public class OptionsMetadata {
           || databaseRole != null
           || autoConfigEmulator
           || useVirtualThreads
-          || useVirtualGrpcTransportThreads) {
+          || useVirtualGrpcTransportThreads
+          || enableEndToEndTracing) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -471,7 +509,16 @@ public class OptionsMetadata {
               .append(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME)
               .append("=true;");
         }
+        if (enableEndToEndTracing) {
+          jdbcOptionBuilder.append(ENABLE_END_TO_END_TRACING_PROPERTY_NAME).append("=true;");
+        }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
+      }
+      if (logGrpcMessages) {
+        addOption(args, OPTION_LOG_GRPC_MESSAGES);
+      }
+      if (allowShutdownStatement) {
+        addOption(args, OPTION_ALLOW_SHUTDOWN_STATEMENT);
       }
       if (debugMode) {
         addOption(args, OPTION_INTERNAL_DEBUG_MODE);
@@ -562,6 +609,7 @@ public class OptionsMetadata {
   private static final String OPTION_ENABLE_OPEN_TELEMETRY = "enable_otel";
   private static final String OPTION_ENABLE_OPEN_TELEMETRY_METRICS = "enable_otel_metrics";
   private static final String OPTION_OPEN_TELEMETRY_TRACE_RATIO = "otel_trace_ratio";
+  private static final String OPTION_ENABLE_END_TO_END_TRACING = "enable_end_to_end_tracing";
   private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
@@ -590,6 +638,8 @@ public class OptionsMetadata {
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
   private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
+  private static final String OPTION_LOG_GRPC_MESSAGES = "log_grpc_messages";
+  private static final String OPTION_ALLOW_SHUTDOWN_STATEMENT = "allow_shutdown_statement";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -607,6 +657,7 @@ public class OptionsMetadata {
   private final boolean enableOpenTelemetry;
   private final boolean enableOpenTelemetryMetrics;
   private final Double openTelemetryTraceRatio;
+  private final boolean enableEndToEndTracing;
   private final SslMode sslMode;
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
@@ -620,6 +671,8 @@ public class OptionsMetadata {
   private final String serverVersion;
   private final boolean debugMode;
   private final Duration startupTimeout;
+  private final boolean logGrpcMessages;
+  private final boolean allowShutdownStatement;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -695,6 +748,7 @@ public class OptionsMetadata {
     this.enableOpenTelemetryMetrics = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
     this.openTelemetryTraceRatio =
         parseOpenTelemetryTraceRatio(commandLine.getOptionValue(OPTION_OPEN_TELEMETRY_TRACE_RATIO));
+    this.enableEndToEndTracing = commandLine.hasOption(OPTION_ENABLE_END_TO_END_TRACING);
     this.sslMode = parseSslMode(commandLine.getOptionValue(OPTION_SSL));
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.disableDefaultLocalStatements =
@@ -712,6 +766,8 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
+    this.logGrpcMessages = commandLine.hasOption(OPTION_LOG_GRPC_MESSAGES);
+    this.allowShutdownStatement = commandLine.hasOption(OPTION_ALLOW_SHUTDOWN_STATEMENT);
     this.startupTimeout = startupTimeout;
   }
 
@@ -773,6 +829,7 @@ public class OptionsMetadata {
     this.enableOpenTelemetry = false;
     this.enableOpenTelemetryMetrics = false;
     this.openTelemetryTraceRatio = null;
+    this.enableEndToEndTracing = false;
     this.sslMode = SslMode.Disable;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
@@ -785,6 +842,8 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
+    this.logGrpcMessages = false;
+    this.allowShutdownStatement = false;
     this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
@@ -1147,6 +1206,14 @@ public class OptionsMetadata {
         true,
         "OpenTelemetry trace sampling ration. Value must be in the range [0.0, 1.0].");
     options.addOption(
+        null,
+        OPTION_ENABLE_END_TO_END_TRACING,
+        false,
+        "Enable end-to-end tracing (true/false) to generate traces for both the time "
+            + "that is spent in the client, as well as time that is spent in the Spanner server. "
+            + "Server side traces can only be exported to Google Cloud Trace, so to see end to end traces, "
+            + "the application should configure an exporter that exports the traces to Google Cloud Trace.");
+    options.addOption(
         OPTION_SSL,
         "sslmode",
         true,
@@ -1269,6 +1336,18 @@ public class OptionsMetadata {
             + "the value of this option could cause a client or driver to alter its behavior and cause unexpected "
             + "errors when used with PGAdapter.");
     options.addOption(
+        OPTION_LOG_GRPC_MESSAGES,
+        "log-grpc-messages",
+        false,
+        "Logs all gRPC messages that are sent by PGAdapter to Spanner to the default log handler (stdout).\n"
+            + "This option should only be enabled to debug problems and/or to determine exactly which gRPC messages\n"
+            + "are being sent to Spanner. Enabling this in production will cause a large number of messages to be logged.");
+    options.addOption(
+        OPTION_ALLOW_SHUTDOWN_STATEMENT,
+        "allow-shutdown-statement",
+        false,
+        "Allows the proxy server to be shutdown by executing the SHUTDOWN [SMART | FAST | IMMEDIATE] statement.");
+    options.addOption(
         OPTION_INTERNAL_DEBUG_MODE,
         "internal-debug-mode",
         false,
@@ -1362,6 +1441,14 @@ public class OptionsMetadata {
 
   public boolean isBinaryFormat() {
     return this.binaryFormat;
+  }
+
+  public boolean isLogGrpcMessages() {
+    return this.logGrpcMessages;
+  }
+
+  public boolean isAllowShutdownStatement() {
+    return this.allowShutdownStatement;
   }
 
   public boolean isDebugMode() {
@@ -1493,6 +1580,10 @@ public class OptionsMetadata {
 
   public Double getOpenTelemetryTraceRatio() {
     return this.openTelemetryTraceRatio;
+  }
+
+  public boolean isEnableEndToEndTracing() {
+    return this.enableEndToEndTracing;
   }
 
   public SslMode getSslMode() {

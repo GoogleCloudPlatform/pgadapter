@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -374,7 +373,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
-                            useFloat4InTests() ? TypeCode.FLOAT32 : TypeCode.FLOAT64,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -395,10 +394,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test_bytes"))
                 .bind("p4")
-                .to(
-                    useFloat4InTests()
-                        ? com.google.cloud.spanner.Value.float32(3.14f)
-                        : com.google.cloud.spanner.Value.float64(3.14d))
+                .to(com.google.cloud.spanner.Value.float32(3.14f))
                 .bind("p5")
                 .to(3.14d)
                 .bind("p6")
@@ -445,9 +441,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .build(),
             1L));
 
-    String res =
-        pgxTest.TestInsertAllDataTypes(
-            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8);
+    String res = pgxTest.TestInsertAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);

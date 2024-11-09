@@ -231,6 +231,7 @@ public enum SQLState {
     return code.equals(otherCode);
   }
 
+  @Override
   public String toString() {
     return this.code;
   }

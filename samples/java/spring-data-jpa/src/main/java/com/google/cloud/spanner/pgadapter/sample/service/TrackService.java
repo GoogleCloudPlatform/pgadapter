@@ -19,6 +19,7 @@ import com.google.cloud.spanner.pgadapter.sample.model.Track;
 import com.google.cloud.spanner.pgadapter.sample.repository.AlbumRepository;
 import com.google.cloud.spanner.pgadapter.sample.repository.TrackRepository;
 import jakarta.transaction.Transactional;
+import jakarta.transaction.Transactional.TxType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -44,9 +45,14 @@ public class TrackService {
 
   @Transactional
   public void generateRandomTracks(int numAlbums, int numTracksPerAlbum) {
+    List<Album> albums = albumRepository.findAll(Pageable.ofSize(numAlbums)).toList();
+    generateRandomTracks(numAlbums, numTracksPerAlbum, albums);
+  }
+
+  @Transactional(TxType.MANDATORY)
+  public void generateRandomTracks(int numAlbums, int numTracksPerAlbum, List<Album> albums) {
     Random random = new Random();
 
-    List<Album> albums = albumRepository.findAll(Pageable.ofSize(numAlbums)).toList();
     for (Album album : albums) {
       List<Track> tracks = new ArrayList<>(numTracksPerAlbum);
       for (int trackNumber = 1; trackNumber <= numTracksPerAlbum; trackNumber++) {

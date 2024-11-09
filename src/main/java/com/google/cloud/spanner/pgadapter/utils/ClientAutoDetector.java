@@ -28,6 +28,8 @@ import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectGolangMigrateAdvisoryLockStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectGolangMigrateAdvisoryUnlockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryLockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryUnlockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
@@ -539,6 +541,26 @@ public class ClientAutoDetector {
                 "PRIMARY KEY ("),
             RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+DELETE\\s+RESTRICT"), ""),
             RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+UPDATE\\s+CASCADE"), ""));
+      }
+    },
+    GOLANG_MIGRATE {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // Golang migrate can only be recognized if the name is set correctly.
+        return parameters.containsKey("application_name")
+            && parameters.get("application_name").equals("golang-migrate");
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(SelectGolangMigrateAdvisoryLockStatement.INSTANCE)
+              .add(SelectGolangMigrateAdvisoryUnlockStatement.INSTANCE)
+              .build();
+        }
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
       }
     },
     UNSPECIFIED {

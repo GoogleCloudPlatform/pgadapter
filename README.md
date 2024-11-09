@@ -17,6 +17,7 @@ PGAdapter can be used with the following drivers and clients:
 1. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 1. `psycopg2`: Version 2.9.3 and higher are supported. See [psycopg2](docs/psycopg2.md) for more details.
 1. `psycopg3`: Version 3.1.x and higher are supported. See [psycopg3 support](docs/psycopg3.md) for more details.
+1. `connectorx`: Version 0.3.3 and higher have experimental support. See [connectorx sample](samples/python/connectorx) for more details.
 1. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 1. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
 1. `PDO_PGSQL`: The PHP PDO driver has experimental support. See [PHP PDO](docs/pdo.md) for more details.
@@ -114,9 +115,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.36.1` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.41.0` with the version you want to download):
 ```shell
-VERSION=v0.36.1
+VERSION=v0.41.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -151,7 +152,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.36.1</version>
+  <version>0.41.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -270,6 +271,17 @@ The following list contains the most frequently used startup options for PGAdapt
     Use the -x switch to turn off the localhost check. This is required when running PGAdapter in a
     Docker container, as the connections from the host machine will not be seen as a connection from
     localhost in the container.
+
+--allow_shutdown_command
+  * Enables the use of the custom SQL command `SHUTDOWN [SMART | FAST | IMMEDIATE]`. This command can
+    be used to shut down PGAdapter by just sending it a SQL statement. This option should only be enabled
+    when PGAdapter runs in a trusted environment, for example as a side-car container. The default
+    shutdown mode is `FAST`, which terminates all existing connections and then shuts down PGAdapter.
+    Use shutdown mode `SMART` to instruct PGAdapter to wait until all existing connections have been
+    terminated by the client before shutting down. See also https://www.postgresql.org/docs/current/server-shutdown.html
+    for more information about shutdown modes.
+  * Note that `SHUTDOWN [SMART | FAST | IMMEDIATE]` only works on PGAdapter. This command is not
+    supported by PostgreSQL.
 ```
 
 * See [command line arguments](docs/command_line_arguments.md) for a list of all supported arguments.

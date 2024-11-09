@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.csharp;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
@@ -546,9 +545,6 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     String[] runCommand = new String[] {"dotnet", "run", test, connectionString};
     builder.command(runCommand);
     builder.directory(new File("./src/test/csharp/pgadapter_npgsql_tests/npgsql_tests"));
-    builder
-        .environment()
-        .put("PGADAPTER_FLOAT4_OID", String.valueOf(useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8));
     Process process = builder.start();
     String output = readAll(process.getInputStream());
     String errors = readAll(process.getErrorStream());

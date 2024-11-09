@@ -245,7 +245,6 @@ public class BenchmarkApplication implements CommandLineRunner {
 
   static Attributes createMetricAttributes(SpannerConfiguration spannerConfiguration) {
     AttributesBuilder attributesBuilder = Attributes.builder();
-    attributesBuilder.put("connection_id", UUID.randomUUID().toString());
     attributesBuilder.put("database", spannerConfiguration.getDatabase());
     attributesBuilder.put("instance_id", spannerConfiguration.getInstance());
     attributesBuilder.put("project_id", spannerConfiguration.getProject());

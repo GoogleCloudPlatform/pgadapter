@@ -321,7 +321,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 }
 
 //export TestInsertAllDataTypes
-func TestInsertAllDataTypes(connString string, float4Oid int) *C.char {
+func TestInsertAllDataTypes(connString string) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -346,21 +346,11 @@ func TestInsertAllDataTypes(connString string, float4Oid int) *C.char {
 	date2 := pgtype.Date{}
 	_ = date2.Set("1970-01-01")
 
-	var float4Value interface{}
-	var float4Array interface{}
-	if float4Oid == pgtype.Float4OID {
-		float4Value = float32(3.14)
-		float4Array = pgtype.Float4Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float4{{Float: float32(3.14), Status: pgtype.Present}, {Status: pgtype.Null}, {Float: float32(6.626), Status: pgtype.Present}}}
-	} else {
-		float4Value = float64(float32(3.14))
-		float4Array = pgtype.Float8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float8{{Float: float64(float32(3.14)), Status: pgtype.Present}, {Status: pgtype.Null}, {Float: float64(float32(6.626)), Status: pgtype.Present}}}
-	}
-
-	tag, err = conn.Exec(ctx, insertSql, 100, true, []byte("test_bytes"), float4Value, 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}",
+	tag, err = conn.Exec(ctx, insertSql, 100, true, []byte("test_bytes"), float32(3.14), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}",
 		pgtype.Int8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Int8{{Int: 100, Status: pgtype.Present}, {Status: pgtype.Null}, {Int: 200, Status: pgtype.Present}}},
 		pgtype.BoolArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Bool{{Bool: true, Status: pgtype.Present}, {Status: pgtype.Null}, {Bool: false, Status: pgtype.Present}}},
 		[][]byte{[]byte("bytes1"), nil, []byte("bytes2")},
-		float4Array,
+		pgtype.Float4Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float4{{Float: float32(3.14), Status: pgtype.Present}, {Status: pgtype.Null}, {Float: float32(6.626), Status: pgtype.Present}}},
 		pgtype.Float8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float8{{Float: 3.14, Status: pgtype.Present}, {Status: pgtype.Null}, {Float: 6.626, Status: pgtype.Present}}},
 		pgtype.Int8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Int8{{Int: -1, Status: pgtype.Present}, {Status: pgtype.Null}, {Int: -2, Status: pgtype.Present}}},
 		pgtype.NumericArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Numeric{numeric1, {Status: pgtype.Null}, numeric2}},
@@ -550,7 +540,7 @@ func TestUpdateAllDataTypes(connString string) *C.char {
 }
 
 //export TestPrepareStatement
-func TestPrepareStatement(connString string, float4Oid int) *C.char {
+func TestPrepareStatement(connString string) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -571,7 +561,7 @@ func TestPrepareStatement(connString string, float4Oid int) *C.char {
 		pgtype.Int8OID,
 		pgtype.BoolOID,
 		pgtype.ByteaOID,
-		float4Oid,
+		pgtype.Float4OID,
 		pgtype.Float8OID,
 		pgtype.NumericOID,
 		pgtype.TimestamptzOID,

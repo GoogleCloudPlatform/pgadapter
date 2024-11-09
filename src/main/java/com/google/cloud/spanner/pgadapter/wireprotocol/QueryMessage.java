@@ -41,6 +41,7 @@ public class QueryMessage extends ControlMessage {
   public static final String FETCH = "FETCH";
   public static final String MOVE = "MOVE";
   public static final String CLOSE = "CLOSE";
+  public static final String SHUTDOWN = "SHUTDOWN";
   public static final ImmutableList<String> SHOW_DATABASE_DDL =
       ImmutableList.of("SHOW", "DATABASE", "DDL");
   public static final ImmutableList<String> SELECT_CURRENT_SETTING =

@@ -514,7 +514,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                     + "         null as daticulocale,\n"
                     + "         null as daticurules,\n"
                     + "         null as datcollversion,\n"
-                    + "         null as datacl  from information_schema.information_schema_catalog_name\n"
+                    + "         null as datacl\n"
+                    + "  /* Preferably, this should use information_schema.information_schema_catalog_name, but that does not exist on the emulator. */\n"
+                    + "  from (select distinct catalog_name from information_schema.schemata) catalogs\n"
                     + ")\n"
                     + "SELECT datname AS TABLE_CAT FROM pg_database WHERE datallowconn = true ORDER BY datname"),
             com.google.spanner.v1.ResultSet.newBuilder()
@@ -1047,13 +1049,22 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testSelectCurrentSchema() throws SQLException {
-    String sql = "SELECT current_schema";
+    for (String sql :
+        new String[] {
+          "select current_schema",
+          "select current_schema()",
+          "SELECT current_schema",
+          "SELECT current_schema()",
+          "SELECT CURRENT_SCHEMA",
+          "SELECT CURRENT_SCHEMA()",
+        }) {
 
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        assertTrue(resultSet.next());
-        assertEquals("public", resultSet.getString("current_schema"));
-        assertFalse(resultSet.next());
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("public", resultSet.getString("current_schema"));
+          assertFalse(resultSet.next());
+        }
       }
     }
 
@@ -3240,6 +3251,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .setCredentials(NoCredentials.getInstance())
                 .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
                 .setClientLibToken("pg-adapter")
+                .setEnableEndToEndTracing(true)
                 .build()
                 .getService();
         DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));
@@ -5540,6 +5552,70 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     CommitRequest request = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
     assertTrue(request.hasMaxCommitDelay());
     assertEquals(TimeUnit.MILLISECONDS.toNanos(20), request.getMaxCommitDelay().getNanos());
+  }
+
+  @Test
+  public void testDmlBatchUpdateCount() throws SQLException {
+    String sql = "insert into foo (id) values (1)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        java.sql.Statement statement = connection.createStatement()) {
+      connection.setAutoCommit(false);
+
+      for (Integer updateCount : new Integer[] {null, 1, 2, 10}) {
+        if (updateCount != null) {
+          // 'set local' means that the effect of the statement will be undone by the end of the
+          // transaction.
+          statement.execute("set local spanner.dml_batch_update_count=" + updateCount);
+        }
+        statement.execute("start batch dml");
+        assertEquals(updateCount == null ? 0 : updateCount, statement.executeUpdate(sql));
+        assertEquals(updateCount == null ? 0 : updateCount, statement.executeUpdate(sql));
+        statement.execute("run batch");
+        connection.commit();
+      }
+    }
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+  }
+
+  @Test
+  public void testGSSAPI() throws SQLException {
+    for (String gss : new String[] {"disable", "allow", "prefer"}) {
+      try (Connection connection =
+              DriverManager.getConnection(createUrl() + String.format("&gssEncMode=%s", gss));
+          java.sql.Statement statement = connection.createStatement()) {
+        verifySelect1(statement);
+      }
+    }
+    SQLException exception =
+        assertThrows(
+            SQLException.class,
+            () -> DriverManager.getConnection(createUrl() + "&gssEncMode=require"));
+    assertEquals(
+        SQLState.SQLServerRejectedEstablishmentOfSQLConnection.toString(), exception.getSQLState());
+    assertTrue(
+        exception.getMessage(),
+        exception.getMessage().contains("The server does not support GSS Encryption"));
+  }
+
+  @Test
+  public void testShutdown_failsByDefault() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        java.sql.Statement statement = connection.createStatement()) {
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> statement.execute("shutdown"));
+      assertEquals(
+          "ERROR: SHUTDOWN [SMART | FAST | IMMEDIATE] statement is not enabled for this server. "
+              + "Start PGAdapter with --allow_shutdown_statement to enable the use of the SHUTDOWN statement.",
+          exception.getMessage());
+    }
+  }
+
+  private void verifySelect1(java.sql.Statement statement) throws SQLException {
+    try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
+      assertTrue(resultSet.next());
+    }
   }
 
   @Ignore("Only used for manual performance testing")

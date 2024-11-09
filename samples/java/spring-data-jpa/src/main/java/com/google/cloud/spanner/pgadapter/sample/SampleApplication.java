@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.sample;
 import com.google.cloud.spanner.pgadapter.sample.model.Concert;
 import com.google.cloud.spanner.pgadapter.sample.repository.ConcertRepository;
 import com.google.cloud.spanner.pgadapter.sample.service.AlbumService;
+import com.google.cloud.spanner.pgadapter.sample.service.BatchService;
 import com.google.cloud.spanner.pgadapter.sample.service.ConcertService;
 import com.google.cloud.spanner.pgadapter.sample.service.DirectedReadService;
 import com.google.cloud.spanner.pgadapter.sample.service.SingerService;
@@ -31,7 +32,6 @@ import com.google.spanner.v1.DirectedReadOptions.ReplicaSelection.Type;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Random;
-import javax.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -61,11 +61,15 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class SampleApplication implements CommandLineRunner {
   private static final Logger log = LoggerFactory.getLogger(SampleApplication.class);
 
-  /**
-   * {@link PGAdapter} is a small utility class for starting and stopping PGAdapter in-process with
-   * the application.
-   */
-  private static final PGAdapter pgAdapter = new PGAdapter();
+  public static void main(String[] args) {
+    SpringApplication application = new SpringApplication(SampleApplication.class);
+    // Add an application listener that initializes PGAdapter BEFORE any data source is created
+    // by Spring.
+    PGAdapterInitializer pgAdapterInitializer = new PGAdapterInitializer();
+    application.addListeners(pgAdapterInitializer);
+    application.run(args).close();
+    pgAdapterInitializer.getPGAdapter().shutdown();
+  }
 
   private final SingerService singerService;
   private final AlbumService albumService;
@@ -87,6 +91,8 @@ public class SampleApplication implements CommandLineRunner {
 
   private final TicketSaleService ticketSaleService;
 
+  private final BatchService batchService;
+
   public SampleApplication(
       SingerService singerService,
       AlbumService albumService,
@@ -96,7 +102,8 @@ public class SampleApplication implements CommandLineRunner {
       StaleReadService staleReadService,
       DirectedReadService directedReadService,
       ConcertRepository concertRepository,
-      TicketSaleService ticketSaleService) {
+      TicketSaleService ticketSaleService,
+      BatchService batchService) {
     this.singerService = singerService;
     this.albumService = albumService;
     this.trackService = trackService;
@@ -106,10 +113,7 @@ public class SampleApplication implements CommandLineRunner {
     this.directedReadService = directedReadService;
     this.concertRepository = concertRepository;
     this.ticketSaleService = ticketSaleService;
-  }
-
-  public static void main(String[] args) {
-    SpringApplication.run(SampleApplication.class, args).close();
+    this.batchService = batchService;
   }
 
   @Override
@@ -141,6 +145,15 @@ public class SampleApplication implements CommandLineRunner {
     staleRead();
     // Show how to execute queries with directed read options.
     directedRead();
+
+    // Show how to execute multiple DML statements in one Batch DML request. This reduces the number
+    // of round-trips between PGAdapter and Spanner.
+    batchService.generateRandomDataInOneBatch(5);
+
+    // Show how to execute multiple DML statements in an automatic DML batch. This reduces the
+    // number of round-trips between PGAdapter and Spanner, and allows even more DML statements to
+    // be combined into one batch than standard batching.
+    batchService.generateRandomDataInAutoBatch(5);
   }
 
   void printData() {
@@ -179,13 +192,8 @@ public class SampleApplication implements CommandLineRunner {
                     .build())
             .build();
     List<Concert> concerts =
-        directedReadService.executeReadOnlyTransactionWithDirectedRead(options, concertRepository::findAll);
+        directedReadService.executeReadOnlyTransactionWithDirectedRead(
+            options, concertRepository::findAll);
     log.info("Found {} concerts using a query with directed read options", concerts.size());
-  }
-
-  @PreDestroy
-  public void onExit() {
-    // Stop PGAdapter when the application is shut down.
-    pgAdapter.stopPGAdapter();
   }
 }

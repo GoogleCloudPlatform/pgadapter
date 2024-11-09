@@ -879,6 +879,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
               .setCredentials(NoCredentials.getInstance())
               .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
               .setClientLibToken("pg-adapter")
+              .setEnableEndToEndTracing(true)
               .build()
               .getService();
       DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));

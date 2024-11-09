@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.csharp;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static com.google.cloud.spanner.pgadapter.csharp.AbstractNpgsqlMockServerTest.execute;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -345,11 +344,7 @@ public class ITNpgsqlTest implements IntegrationTest {
       assertEquals(1L, resultSet.getLong(col++));
       assertTrue(resultSet.getBoolean(col++));
       assertArrayEquals(new byte[] {1, 2, 3}, resultSet.getBytes(col++).toByteArray());
-      if (useFloat4InTests()) {
-        assertEquals(3.14f, resultSet.getFloat(col++), 0.0f);
-      } else {
-        assertEquals(3.14f, (float) resultSet.getDouble(col++), 0.0f);
-      }
+      assertEquals(3.14f, resultSet.getFloat(col++), 0.0f);
       assertEquals(3.14d, resultSet.getDouble(col++), 0.0d);
       assertEquals(10L, resultSet.getLong(col++));
       assertEquals("6.626", resultSet.getString(col++));
@@ -389,12 +384,8 @@ public class ITNpgsqlTest implements IntegrationTest {
     // Add an extra NULL-row to the table.
     addNullRow();
     String result = execute("TestTextCopyOut", createConnectionString());
-    String floatValue = useFloat4InTests() ? "3.14" : "3.140000104904175";
-    String negativeFloatValue = useFloat4InTests() ? "-99.99" : "-99.98999786376953";
     assertEquals(
-        String.format(
-                "1\tt\t\\\\x74657374\t%s\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{%s,NULL,%s}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n",
-                floatValue, floatValue, negativeFloatValue)
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
             + "2\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
             + "Success\n",
         result);

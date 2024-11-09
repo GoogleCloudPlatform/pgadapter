@@ -21,7 +21,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <junixsocket.version>2.10.0</junixsocket.version>
+    <junixsocket.version>2.10.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -35,7 +35,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.11.0</version>
+    <version>1.11.3</version>
   </parent>
 
   <dependencyManagement>
@@ -43,14 +43,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.44.0</version>
+        <version>26.50.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.41.0</version>
+        <version>1.44.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -76,7 +76,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.36.1</version>
+      <version>0.40.0</version>
       <exclusions>
         <exclusion>
           <groupId>io.opentelemetry</groupId>
@@ -109,7 +109,7 @@
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.46.0</version>
+      <version>3.48.2</version>
     </dependency>
 
     <dependency>
@@ -124,7 +124,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>3.4.1</version>
+        <version>3.5.0</version>
         <configuration>
           <mainClass>com.google.cloud.spanner.pgadapter.latency.LatencyBenchmark</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>
