@@ -514,7 +514,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                     + "         null as daticulocale,\n"
                     + "         null as daticurules,\n"
                     + "         null as datcollversion,\n"
-                    + "         null as datacl  from information_schema.information_schema_catalog_name\n"
+                    + "         null as datacl\n"
+                    + "  /* Preferably, this should use information_schema.information_schema_catalog_name, but that does not exist on the emulator. */\n"
+                    + "  from (select distinct catalog_name from information_schema.schemata) catalogs\n"
                     + ")\n"
                     + "SELECT datname AS TABLE_CAT FROM pg_database WHERE datallowconn = true ORDER BY datname"),
             com.google.spanner.v1.ResultSet.newBuilder()
