@@ -80,7 +80,9 @@ public class ITLiquibaseTest {
           String.format(
               "changeLogFile: dbchangelog.xml\n"
                   + "url: jdbc:postgresql://localhost:%d/%s"
-                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
+                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n"
+                  + "username: ignored\n"
+                  + "password: ignored\n",
               testEnv.getPGAdapterPort(), database.getId().getDatabase());
       LOGGER.info("Using Liquibase properties:\n" + properties);
       writer.write(properties);
