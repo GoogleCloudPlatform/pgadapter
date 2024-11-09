@@ -270,10 +270,10 @@ public class OptionsMetadata {
     }
 
     /**
-     * Enables end-to-end tracing for RPCs on Spanner. This generates traces for both the time +
-     * that is spent in the client and time that is spent in the Spanner server. + Server side
-     * traces can only go to Google Cloud Trace, so to see end-to-end traces, + the application
-     * should configure an exporter that exports the traces to Google Cloud Trace.
+     * Enables end-to-end tracing for RPCs on Spanner. This generates traces for both the time that
+     * is spent in the client and time that is spent in the Spanner server. Server side traces can
+     * only be exported to Google Cloud Trace, so to see end-to-end traces, the application should
+     * configure an exporter that exports the traces to Google Cloud Trace.
      */
     public Builder setEnableEndToEndTracing(boolean enableEndToEndTracing) {
       this.enableEndToEndTracing = enableEndToEndTracing;
@@ -1211,7 +1211,7 @@ public class OptionsMetadata {
         false,
         "Enable end-to-end tracing (true/false) to generate traces for both the time "
             + "that is spent in the client, as well as time that is spent in the Spanner server. "
-            + "Server side traces can only go to Google Cloud Trace, so to see end to end traces, "
+            + "Server side traces can only be exported to Google Cloud Trace, so to see end to end traces, "
             + "the application should configure an exporter that exports the traces to Google Cloud Trace.");
     options.addOption(
         OPTION_SSL,
