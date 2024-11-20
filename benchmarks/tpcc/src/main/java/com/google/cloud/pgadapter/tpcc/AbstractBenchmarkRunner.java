@@ -106,12 +106,12 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           metrics.recordPaymentLatency(executionDuration.toMillis());
           statistics.incPayment();
         } else if (transaction < 21) {
-          delivery();
+          orderStatus();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordOrderStatusLatency(executionDuration.toMillis());
           statistics.incOrderStatus();
         } else if (transaction < 22) {
-          stockLevel();
+          delivery();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordDeliveryLatency(executionDuration.toMillis());
           statistics.incDelivery();
