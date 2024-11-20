@@ -41,7 +41,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
 
   private final Statistics statistics;
 
-  private final TpccConfiguration tpccConfiguration;
+  final TpccConfiguration tpccConfiguration;
 
   // We have to define the following configuration in the abstract class.
   // If we define them in inherited classes, they will be null in threads.
@@ -96,22 +96,22 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         int transaction = random.nextInt(23);
         Stopwatch stopwatch = Stopwatch.createStarted();
         if (transaction < 10) {
-          newOrder();
+          stockLevel();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordNewOrderLatency(executionDuration.toMillis());
           statistics.incNewOrder();
         } else if (transaction < 20) {
-          payment();
+          stockLevel();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordPaymentLatency(executionDuration.toMillis());
           statistics.incPayment();
         } else if (transaction < 21) {
-          orderStatus();
+          stockLevel();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordOrderStatusLatency(executionDuration.toMillis());
           statistics.incOrderStatus();
         } else if (transaction < 22) {
-          delivery();
+          stockLevel();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordDeliveryLatency(executionDuration.toMillis());
           statistics.incDelivery();
@@ -152,7 +152,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
     }
   }
 
-  private long getOtherWarehouseId(long currentId) {
+  long getOtherWarehouseId(long currentId) {
     if (tpccConfiguration.getWarehouses() == 1) {
       return currentId;
     }

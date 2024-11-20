@@ -1,10 +1,13 @@
 package com.google.cloud.pgadapter.tpcc.entities;
 
+import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
+import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinColumns;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
@@ -14,77 +17,78 @@ import java.sql.Timestamp;
 @Table(name = "customer")
 public class Customer {
 
-  @Id
-  @Column(name = "c_id")
-  private Long cId;
+  @EmbeddedId
+  private CustomerId id;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
-    @JoinColumn(name = "w_id", referencedColumnName = "w_id"),
-    @JoinColumn(name = "d_id", referencedColumnName = "d_id")
+      @JoinColumn(name = "w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
+      @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable = false, updatable = false)
   })
   private District district;
 
-  @Column(name = "c_first", length = 16)
-  private String cFirst;
+  @Column(name = "c_first")
+  private String first;
 
-  @Column(name = "c_middle", length = 2)
-  private String cMiddle;
+  @Column(name = "c_middle")
+  private String middle;
 
-  @Column(name = "c_last", length = 16)
-  private String cLast;
+  @Column(name = "c_last")
+  private String last;
 
-  @Column(name = "c_street_1", length = 20)
-  private String cStreet1;
+  @Column(name = "c_street_1")
+  private String street1;
 
-  @Column(name = "c_street_2", length = 20)
-  private String cStreet2;
+  @Column(name = "c_street_2")
+  private String street2;
 
-  @Column(name = "c_city", length = 20)
-  private String cCity;
+  @Column(name = "c_city")
+  private String city;
 
-  @Column(name = "c_state", length = 2)
-  private String cState;
+  @Column(name = "c_state")
+  private String state;
 
-  @Column(name = "c_zip", length = 9)
-  private String cZip;
+  @Column(name = "c_zip")
+  private String zip;
 
-  @Column(name = "c_phone", length = 16)
-  private String cPhone;
+  @Column(name = "c_phone")
+  private String phone;
 
   @Column(name = "c_since")
-  private Timestamp cSince;
+  private Timestamp since;
 
-  @Column(name = "c_credit", length = 2)
-  private String cCredit;
+  @Column(name = "c_credit")
+  private String credit;
 
   @Column(name = "c_credit_lim")
-  private Long cCreditLim;
+  private Long creditLim;
 
-  @Column(name = "c_discount", precision = 12, scale = 4)
-  private BigDecimal cDiscount;
+  @Column(name = "c_discount")
+  private BigDecimal discount;
 
-  @Column(name = "c_balance", precision = 12, scale = 4)
-  private BigDecimal cBalance;
+  @Column(name = "c_balance")
+  private BigDecimal balance;
 
-  @Column(name = "c_ytd_payment", precision = 12, scale = 4)
-  private BigDecimal cYtdPayment;
+  @Column(name = "c_ytd_payment")
+  private BigDecimal ytdPayment;
 
   @Column(name = "c_payment_cnt")
-  private Long cPaymentCnt;
+  private Long paymentCnt;
 
   @Column(name = "c_delivery_cnt")
-  private Long cDeliveryCnt;
+  private Long deliveryCnt;
 
-  @Column(name = "c_data", columnDefinition = "TEXT")
-  private String cData;
+  @Lob
+  @Basic(fetch = FetchType.LAZY)
+  @Column(name = "c_data")
+  private String data;
 
-  public Long getcId() {
-    return cId;
+  public CustomerId getId() {
+    return id;
   }
 
-  public void setcId(Long cId) {
-    this.cId = cId;
+  public void setId(CustomerId id) {
+    this.id = id;
   }
 
   public District getDistrict() {
@@ -95,147 +99,148 @@ public class Customer {
     this.district = district;
   }
 
-  public String getcFirst() {
-    return cFirst;
+  public String getFirst() {
+    return first;
   }
 
-  public void setcFirst(String cFirst) {
-    this.cFirst = cFirst;
+  public void setFirst(String first) {
+    this.first = first;
   }
 
-  public String getcMiddle() {
-    return cMiddle;
+  public String getMiddle() {
+    return middle;
   }
 
-  public void setcMiddle(String cMiddle) {
-    this.cMiddle = cMiddle;
+  public void setMiddle(String middle) {
+    this.middle = middle;
   }
 
-  public String getcLast() {
-    return cLast;
+  public String getLast() {
+    return last;
   }
 
-  public void setcLast(String cLast) {
-    this.cLast = cLast;
+  public void setLast(String last) {
+    this.last = last;
   }
 
-  public String getcStreet1() {
-    return cStreet1;
+  public String getStreet1() {
+    return street1;
   }
 
-  public void setcStreet1(String cStreet1) {
-    this.cStreet1 = cStreet1;
+  public void setStreet1(String street1) {
+    this.street1 = street1;
   }
 
-  public String getcStreet2() {
-    return cStreet2;
+  public String getStreet2() {
+    return street2;
   }
 
-  public void setcStreet2(String cStreet2) {
-    this.cStreet2 = cStreet2;
+  public void setStreet2(String street2) {
+    this.street2 = street2;
   }
 
-  public String getcCity() {
-    return cCity;
+  public String getCity() {
+    return city;
   }
 
-  public void setcCity(String cCity) {
-    this.cCity = cCity;
+  public void setCity(String city) {
+    this.city = city;
   }
 
-  public String getcState() {
-    return cState;
+  public String getState() {
+    return state;
   }
 
-  public void setcState(String cState) {
-    this.cState = cState;
+  public void setState(String state) {
+    this.state = state;
   }
 
-  public String getcZip() {
-    return cZip;
+  public String getZip() {
+    return zip;
   }
 
-  public void setcZip(String cZip) {
-    this.cZip = cZip;
+  public void setZip(String zip) {
+    this.zip = zip;
   }
 
-  public String getcPhone() {
-    return cPhone;
+  public String getPhone() {
+    return phone;
   }
 
-  public void setcPhone(String cPhone) {
-    this.cPhone = cPhone;
+  public void setPhone(String phone) {
+    this.phone = phone;
   }
 
-  public Timestamp getcSince() {
-    return cSince;
+  public Timestamp getSince() {
+    return since;
   }
 
-  public void setcSince(Timestamp cSince) {
-    this.cSince = cSince;
+  public void setSince(Timestamp since) {
+    this.since = since;
   }
 
-  public String getcCredit() {
-    return cCredit;
+  public String getCredit() {
+    return credit;
   }
 
-  public void setcCredit(String cCredit) {
-    this.cCredit = cCredit;
+  public void setCredit(String credit) {
+    this.credit = credit;
   }
 
-  public Long getcCreditLim() {
-    return cCreditLim;
+  public Long getCreditLim() {
+    return creditLim;
   }
 
-  public void setcCreditLim(Long cCreditLim) {
-    this.cCreditLim = cCreditLim;
+  public void setCreditLim(Long creditLim) {
+    this.creditLim = creditLim;
   }
 
-  public BigDecimal getcDiscount() {
-    return cDiscount;
+  public BigDecimal getDiscount() {
+    return discount;
   }
 
-  public void setcDiscount(BigDecimal cDiscount) {
-    this.cDiscount = cDiscount;
+  public void setDiscount(BigDecimal discount) {
+    this.discount = discount;
   }
 
-  public BigDecimal getcBalance() {
-    return cBalance;
+  public BigDecimal getBalance() {
+    return balance;
   }
 
-  public void setcBalance(BigDecimal cBalance) {
-    this.cBalance = cBalance;
+  public void setBalance(BigDecimal balance) {
+    this.balance = balance;
   }
 
-  public BigDecimal getcYtdPayment() {
-    return cYtdPayment;
+  public BigDecimal getYtdPayment() {
+    return ytdPayment;
   }
 
-  public void setcYtdPayment(BigDecimal cYtdPayment) {
-    this.cYtdPayment = cYtdPayment;
+  public void setYtdPayment(BigDecimal ytdPayment) {
+    this.ytdPayment = ytdPayment;
   }
 
-  public Long getcPaymentCnt() {
-    return cPaymentCnt;
+  public Long getPaymentCnt() {
+    return paymentCnt;
   }
 
-  public void setcPaymentCnt(Long cPaymentCnt) {
-    this.cPaymentCnt = cPaymentCnt;
+  public void setPaymentCnt(Long paymentCnt) {
+    this.paymentCnt = paymentCnt;
   }
 
-  public Long getcDeliveryCnt() {
-    return cDeliveryCnt;
+  public Long getDeliveryCnt() {
+    return deliveryCnt;
   }
 
-  public void setcDeliveryCnt(Long cDeliveryCnt) {
-    this.cDeliveryCnt = cDeliveryCnt;
+  public void setDeliveryCnt(Long deliveryCnt) {
+    this.deliveryCnt = deliveryCnt;
   }
 
-  public String getcData() {
-    return cData;
+  public String getData() {
+    return data;
   }
 
-  public void setcData(String cData) {
-    this.cData = cData;
+  public void setData(String data) {
+    this.data = data;
   }
+
 }

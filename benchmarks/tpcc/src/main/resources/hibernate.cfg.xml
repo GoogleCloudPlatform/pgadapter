@@ -12,28 +12,30 @@
     <!-- Uncomment this property and set the URL for the database,
     unless you're setting it via a system property or hibernate.properties file. -->
 
-    <property name="hibernate.connection.url">jdbc:cloudspanner:/projects/google.com:span-test-1/instances/bench-1/databases/tpcc</property>
+    <property name="hibernate.connection.url">jdbc:cloudspanner:/projects/span-cloud-testing/instances/hengfeng-pg-tpcc/databases/tpcc-gsql</property>
 
 
     <!-- SQL dialect -->
     <property name="hibernate.dialect">com.google.cloud.spanner.hibernate.SpannerDialect</property>
 
     <!-- Print executed SQL to stdout -->
-    <property name="show_sql">true</property>
+    <property name="show_sql">false</property>
 
     <!-- Update database on startup -->
     <property name="hibernate.hbm2ddl.auto">none</property>
 
+    <property name="connection.pool_size">64</property>
+
     <!-- Annotated entity classes -->
     <mapping class="com.google.cloud.pgadapter.tpcc.entities.Warehouse"/>
     <mapping class="com.google.cloud.pgadapter.tpcc.entities.District"/>
-<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Customer"/>-->
-<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.History"/>-->
-<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Order"/>-->
-<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.NewOrder"/>-->
-<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.OrderLine"/>-->
-<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Stock"/>-->
-<!--    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Item"/>-->
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Customer"/>
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.History"/>
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Order"/>
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.NewOrder"/>
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.OrderLine"/>
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Stock"/>
+    <mapping class="com.google.cloud.pgadapter.tpcc.entities.Item"/>
 
   </session-factory>
 </hibernate-configuration>

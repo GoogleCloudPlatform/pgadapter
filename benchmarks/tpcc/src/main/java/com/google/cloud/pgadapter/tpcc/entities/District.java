@@ -134,37 +134,4 @@ public class District {
     this.dNextOId = dNextOId;
   }
 
-  @Override
-  public String toString() {
-    return "District{"
-        + "id="
-        + id
-        + ", warehouse="
-        + warehouse
-        + ", dName='"
-        + dName
-        + '\''
-        + ", dStreet1='"
-        + dStreet1
-        + '\''
-        + ", dStreet2='"
-        + dStreet2
-        + '\''
-        + ", dCity='"
-        + dCity
-        + '\''
-        + ", dState='"
-        + dState
-        + '\''
-        + ", dZip='"
-        + dZip
-        + '\''
-        + ", dTax="
-        + dTax
-        + ", dYtd="
-        + dYtd
-        + ", dNextOId="
-        + dNextOId
-        + '}';
-  }
 }

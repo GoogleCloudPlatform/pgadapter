@@ -7,65 +7,68 @@ import java.math.BigDecimal;
 @Table(name = "stock")
 public class Stock {
 
-  @Id
-  @Column(name = "s_i_id")
-  private Long sIId;
+  @EmbeddedId
+  private StockId id;
 
-  @ManyToOne
-  @JoinColumn(name = "w_id", referencedColumnName = "w_id")
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "w_id", insertable = false, updatable = false)
   private Warehouse warehouse;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "s_i_id", insertable = false, updatable = false)
+  private Item item;
+
   @Column(name = "s_quantity")
-  private Long sQuantity;
+  private Long quantity;
 
-  @Column(name = "s_dist_01", length = 24)
-  private String sDist01;
+  @Column(name = "s_dist_01")
+  private String dist01;
 
-  @Column(name = "s_dist_02", length = 24)
-  private String sDist02;
+  @Column(name = "s_dist_02")
+  private String dist02;
 
-  @Column(name = "s_dist_03", length = 24)
-  private String sDist03;
+  @Column(name = "s_dist_03")
+  private String dist03;
 
-  @Column(name = "s_dist_04", length = 24)
-  private String sDist04;
+  @Column(name = "s_dist_04")
+  private String dist04;
 
-  @Column(name = "s_dist_05", length = 24)
-  private String sDist05;
+  @Column(name = "s_dist_05")
+  private String dist05;
 
-  @Column(name = "s_dist_06", length = 24)
-  private String sDist06;
+  @Column(name = "s_dist_06")
+  private String dist06;
 
-  @Column(name = "s_dist_07", length = 24)
-  private String sDist07;
+  @Column(name = "s_dist_07")
+  private String dist07;
 
-  @Column(name = "s_dist_08", length = 24)
-  private String sDist08;
+  @Column(name = "s_dist_08")
+  private String dist08;
 
-  @Column(name = "s_dist_09", length = 24)
-  private String sDist09;
+  @Column(name = "s_dist_09")
+  private String dist09;
 
-  @Column(name = "s_dist_10", length = 24)
-  private String sDist10;
+  @Column(name = "s_dist_10")
+  private String dist10;
 
-  @Column(name = "s_ytd", precision = 12, scale = 4)
-  private BigDecimal sYtd;
+  @Column(name = "s_ytd")
+  private BigDecimal ytd;
 
   @Column(name = "s_order_cnt")
-  private Long sOrderCnt;
+  private Long orderCnt;
 
   @Column(name = "s_remote_cnt")
-  private Long sRemoteCnt;
+  private Long remoteCnt;
 
-  @Column(name = "s_data", length = 50)
-  private String sData;
+  @Column(name = "s_data")
+  private String data;
 
-  public Long getsIId() {
-    return sIId;
+  public StockId getId() {
+    return id;
   }
 
-  public void setsIId(Long sIId) {
-    this.sIId = sIId;
+  public void setId(StockId id) {
+    this.id = id;
   }
 
   public Warehouse getWarehouse() {
@@ -76,123 +79,132 @@ public class Stock {
     this.warehouse = warehouse;
   }
 
-  public Long getsQuantity() {
-    return sQuantity;
+  public Item getItem() {
+    return item;
   }
 
-  public void setsQuantity(Long sQuantity) {
-    this.sQuantity = sQuantity;
+  public void setItem(Item item) {
+    this.item = item;
   }
 
-  public String getsDist01() {
-    return sDist01;
+  public Long getQuantity() {
+    return quantity;
   }
 
-  public void setsDist01(String sDist01) {
-    this.sDist01 = sDist01;
+  public void setQuantity(Long quantity) {
+    this.quantity = quantity;
   }
 
-  public String getsDist02() {
-    return sDist02;
+  public String getDist01() {
+    return dist01;
   }
 
-  public void setsDist02(String sDist02) {
-    this.sDist02 = sDist02;
+  public void setDist01(String dist01) {
+    this.dist01 = dist01;
   }
 
-  public String getsDist03() {
-    return sDist03;
+  public String getDist02() {
+    return dist02;
   }
 
-  public void setsDist03(String sDist03) {
-    this.sDist03 = sDist03;
+  public void setDist02(String dist02) {
+    this.dist02 = dist02;
   }
 
-  public String getsDist04() {
-    return sDist04;
+  public String getDist03() {
+    return dist03;
   }
 
-  public void setsDist04(String sDist04) {
-    this.sDist04 = sDist04;
+  public void setDist03(String dist03) {
+    this.dist03 = dist03;
   }
 
-  public String getsDist05() {
-    return sDist05;
+  public String getDist04() {
+    return dist04;
   }
 
-  public void setsDist05(String sDist05) {
-    this.sDist05 = sDist05;
+  public void setDist04(String dist04) {
+    this.dist04 = dist04;
   }
 
-  public String getsDist06() {
-    return sDist06;
+  public String getDist05() {
+    return dist05;
   }
 
-  public void setsDist06(String sDist06) {
-    this.sDist06 = sDist06;
+  public void setDist05(String dist05) {
+    this.dist05 = dist05;
   }
 
-  public String getsDist07() {
-    return sDist07;
+  public String getDist06() {
+    return dist06;
   }
 
-  public void setsDist07(String sDist07) {
-    this.sDist07 = sDist07;
+  public void setDist06(String dist06) {
+    this.dist06 = dist06;
   }
 
-  public String getsDist08() {
-    return sDist08;
+  public String getDist07() {
+    return dist07;
   }
 
-  public void setsDist08(String sDist08) {
-    this.sDist08 = sDist08;
+  public void setDist07(String dist07) {
+    this.dist07 = dist07;
   }
 
-  public String getsDist09() {
-    return sDist09;
+  public String getDist08() {
+    return dist08;
   }
 
-  public void setsDist09(String sDist09) {
-    this.sDist09 = sDist09;
+  public void setDist08(String dist08) {
+    this.dist08 = dist08;
   }
 
-  public String getsDist10() {
-    return sDist10;
+  public String getDist09() {
+    return dist09;
   }
 
-  public void setsDist10(String sDist10) {
-    this.sDist10 = sDist10;
+  public void setDist09(String dist09) {
+    this.dist09 = dist09;
   }
 
-  public BigDecimal getsYtd() {
-    return sYtd;
+  public String getDist10() {
+    return dist10;
   }
 
-  public void setsYtd(BigDecimal sYtd) {
-    this.sYtd = sYtd;
+  public void setDist10(String dist10) {
+    this.dist10 = dist10;
   }
 
-  public Long getsOrderCnt() {
-    return sOrderCnt;
+  public BigDecimal getYtd() {
+    return ytd;
   }
 
-  public void setsOrderCnt(Long sOrderCnt) {
-    this.sOrderCnt = sOrderCnt;
+  public void setYtd(BigDecimal ytd) {
+    this.ytd = ytd;
   }
 
-  public Long getsRemoteCnt() {
-    return sRemoteCnt;
+  public Long getOrderCnt() {
+    return orderCnt;
   }
 
-  public void setsRemoteCnt(Long sRemoteCnt) {
-    this.sRemoteCnt = sRemoteCnt;
+  public void setOrderCnt(Long orderCnt) {
+    this.orderCnt = orderCnt;
   }
 
-  public String getsData() {
-    return sData;
+  public Long getRemoteCnt() {
+    return remoteCnt;
   }
 
-  public void setsData(String sData) {
-    this.sData = sData;
+  public void setRemoteCnt(Long remoteCnt) {
+    this.remoteCnt = remoteCnt;
   }
+
+  public String getData() {
+    return data;
+  }
+
+  public void setData(String data) {
+    this.data = data;
+  }
+
 }

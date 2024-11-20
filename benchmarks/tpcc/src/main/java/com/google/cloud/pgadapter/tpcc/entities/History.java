@@ -1,7 +1,9 @@
 package com.google.cloud.pgadapter.tpcc.entities;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -16,39 +18,35 @@ import java.sql.Timestamp;
 @Table(name = "history")
 public class History {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id; // You might want to add a surrogate key
+  @EmbeddedId
+  private HistoryId id;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
-    @JoinColumn(name = "c_id", referencedColumnName = "c_id"),
-    @JoinColumn(name = "d_id", referencedColumnName = "d_id"),
-    @JoinColumn(name = "w_id", referencedColumnName = "w_id")
+      @JoinColumn(name = "w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
+      @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable = false, updatable = false),
+      @JoinColumn(name = "c_id", referencedColumnName = "c_id", insertable = false, updatable = false)
   })
   private Customer customer;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
-    @JoinColumn(name = "h_w_id", referencedColumnName = "w_id"),
-    @JoinColumn(name = "h_d_id", referencedColumnName = "d_id")
+      @JoinColumn(name = "h_w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
+      @JoinColumn(name = "h_d_id", referencedColumnName = "d_id", insertable = false, updatable = false)
   })
   private District district;
 
-  @Column(name = "h_date")
-  private Timestamp hDate;
+  @Column(name = "h_amount")
+  private BigDecimal amount;
 
-  @Column(name = "h_amount", precision = 12, scale = 4)
-  private BigDecimal hAmount;
+  @Column(name = "h_data")
+  private String data;
 
-  @Column(name = "h_data", length = 24)
-  private String hData;
-
-  public Long getId() {
+  public HistoryId getId() {
     return id;
   }
 
-  public void setId(Long id) {
+  public void setId(HistoryId id) {
     this.id = id;
   }
 
@@ -68,27 +66,19 @@ public class History {
     this.district = district;
   }
 
-  public Timestamp gethDate() {
-    return hDate;
+  public BigDecimal getAmount() {
+    return amount;
   }
 
-  public void sethDate(Timestamp hDate) {
-    this.hDate = hDate;
+  public void setAmount(BigDecimal amount) {
+    this.amount = amount;
   }
 
-  public BigDecimal gethAmount() {
-    return hAmount;
+  public String getData() {
+    return data;
   }
 
-  public void sethAmount(BigDecimal hAmount) {
-    this.hAmount = hAmount;
-  }
-
-  public String gethData() {
-    return hData;
-  }
-
-  public void sethData(String hData) {
-    this.hData = hData;
+  public void setData(String data) {
+    this.data = data;
   }
 }

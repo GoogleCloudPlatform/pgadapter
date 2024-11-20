@@ -110,33 +110,4 @@ public class Warehouse {
     this.wYtd = wYtd;
   }
 
-  @Override
-  public String toString() {
-    return "Warehouse{"
-        + "wId="
-        + wId
-        + ", wName='"
-        + wName
-        + '\''
-        + ", wStreet1='"
-        + wStreet1
-        + '\''
-        + ", wStreet2='"
-        + wStreet2
-        + '\''
-        + ", wCity='"
-        + wCity
-        + '\''
-        + ", wState='"
-        + wState
-        + '\''
-        + ", wZip='"
-        + wZip
-        + '\''
-        + ", wTax="
-        + wTax
-        + ", wYtd="
-        + wYtd
-        + '}';
-  }
 }

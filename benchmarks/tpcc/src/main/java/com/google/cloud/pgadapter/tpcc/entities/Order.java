@@ -1,49 +1,28 @@
 package com.google.cloud.pgadapter.tpcc.entities;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.sql.Timestamp;
+import java.util.List;
 
 @Entity
 @Table(name = "orders")
 public class Order {
+  @EmbeddedId
+  private OrderId id;
 
-  @Id
-  @Column(name = "o_id")
-  private Long oId;
 
-  @ManyToOne
-  @JoinColumns({
-    @JoinColumn(name = "w_id", referencedColumnName = "w_id"),
-    @JoinColumn(name = "d_id", referencedColumnName = "d_id"),
-    @JoinColumn(name = "c_id", referencedColumnName = "c_id")
-  })
-  private Customer customer;
-
-  @Column(name = "o_entry_d")
-  private Timestamp oEntryD;
-
-  @Column(name = "o_carrier_id")
-  private Long oCarrierId;
-
-  @Column(name = "o_ol_cnt")
-  private Long oOlCnt;
-
-  @Column(name = "o_all_local")
-  private Long oAllLocal;
-
-  public Long getoId() {
-    return oId;
-  }
-
-  public void setoId(Long oId) {
-    this.oId = oId;
-  }
+  @OneToMany(mappedBy = "order", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+  private List<OrderLine> orderLines;
 
   public Customer getCustomer() {
     return customer;
@@ -53,35 +32,71 @@ public class Order {
     this.customer = customer;
   }
 
-  public Timestamp getoEntryD() {
-    return oEntryD;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumns({
+      @JoinColumn(name = "w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
+      @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable = false, updatable = false),
+      @JoinColumn(name = "c_id", referencedColumnName = "c_id", insertable = false, updatable = false)
+  })
+  private Customer customer;
+
+  public List<OrderLine> getOrderLines() {
+    return orderLines;
   }
 
-  public void setoEntryD(Timestamp oEntryD) {
-    this.oEntryD = oEntryD;
+  public void setOrderLines(List<OrderLine> orderLines) {
+    this.orderLines = orderLines;
   }
 
-  public Long getoCarrierId() {
-    return oCarrierId;
+  @Column(name = "o_entry_d")
+  private Timestamp entryD;
+
+  @Column(name = "o_carrier_id")
+  private Long carrierId;
+
+  @Column(name = "o_ol_cnt")
+  private Integer olCnt;
+
+  @Column(name = "o_all_local")
+  private Integer allLocal;
+
+  public OrderId getId() {
+    return id;
   }
 
-  public void setoCarrierId(Long oCarrierId) {
-    this.oCarrierId = oCarrierId;
+  public void setId(OrderId id) {
+    this.id = id;
   }
 
-  public Long getoOlCnt() {
-    return oOlCnt;
+  public Timestamp getEntryD() {
+    return entryD;
   }
 
-  public void setoOlCnt(Long oOlCnt) {
-    this.oOlCnt = oOlCnt;
+  public void setEntryD(Timestamp entryD) {
+    this.entryD = entryD;
   }
 
-  public Long getoAllLocal() {
-    return oAllLocal;
+  public Long getCarrierId() {
+    return carrierId;
   }
 
-  public void setoAllLocal(Long oAllLocal) {
-    this.oAllLocal = oAllLocal;
+  public void setCarrierId(Long carrierId) {
+    this.carrierId = carrierId;
+  }
+
+  public Integer getOlCnt() {
+    return olCnt;
+  }
+
+  public void setOlCnt(Integer olCnt) {
+    this.olCnt = olCnt;
+  }
+
+  public Integer getAllLocal() {
+    return allLocal;
+  }
+
+  public void setAllLocal(Integer allLocal) {
+    this.allLocal = allLocal;
   }
 }
