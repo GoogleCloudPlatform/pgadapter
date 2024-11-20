@@ -9,10 +9,10 @@ public class DistrictId implements java.io.Serializable {
   private static final long serialVersionUID = 1L;
 
   @Column(name = "w_id")
-  private Long dId;
+  private Long wId;
 
   @Column(name = "d_id")
-  private Long wId;
+  private Long dId;
 
   public DistrictId() {}
 
