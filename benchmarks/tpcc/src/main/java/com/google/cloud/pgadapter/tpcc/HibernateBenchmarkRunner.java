@@ -198,7 +198,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       if (tx != null) {
         tx.rollback();
       }
-      //e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
@@ -308,7 +308,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       if (tx != null) {
         tx.rollback();
       }
-      //e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
@@ -390,7 +390,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       if (tx != null) {
         tx.rollback();
       }
-      //e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
@@ -449,7 +449,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       if (tx != null) {
         tx.rollback();
       }
-      //e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
@@ -510,7 +510,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       if (tx != null) {
         tx.rollback();
       }
-      //e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
