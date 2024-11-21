@@ -25,6 +25,7 @@
     <property name="hibernate.hbm2ddl.auto">none</property>
 
     <property name="connection.pool_size">64</property>
+    <property name="hibernate.jdbc.batch_size">20</property>
 
     <!-- Annotated entity classes -->
     <mapping class="com.google.cloud.pgadapter.tpcc.entities.Warehouse"/>

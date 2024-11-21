@@ -475,6 +475,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
 
       long nextOrderId = session.createQuery(nextOrderQuery).getSingleResult();
 
+      // Retrieve items from the last 20 orders
       CriteriaQuery<Long> query = cb.createQuery(Long.class);
       Root<OrderLine> orderLine = query.from(OrderLine.class);
       Root<Stock> stock = query.from(Stock.class);
@@ -492,7 +493,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       );
       List<Long> result = session.createQuery(query).getResultList();
 
-      // Iterate through the order lines and count stock items with quantity below threshold
+      // Iterate through the items and check stock items with quantity below threshold
       for (Long orderLineItemId : result) {
         CriteriaQuery<Long> stockQuery = cb.createQuery(Long.class);
         Root<Stock> stockRoot = stockQuery.from(Stock.class);
