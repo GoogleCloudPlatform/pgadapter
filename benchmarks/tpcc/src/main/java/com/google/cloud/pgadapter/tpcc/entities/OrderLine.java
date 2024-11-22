@@ -16,8 +16,10 @@ package com.google.cloud.pgadapter.tpcc.entities;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
+@DynamicUpdate
 @Table(name = "order_line")
 public class OrderLine {
   @EmbeddedId

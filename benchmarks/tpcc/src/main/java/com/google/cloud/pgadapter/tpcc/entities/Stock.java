@@ -15,8 +15,10 @@ package com.google.cloud.pgadapter.tpcc.entities;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
+@DynamicUpdate
 @Table(name = "stock")
 public class Stock {
 
