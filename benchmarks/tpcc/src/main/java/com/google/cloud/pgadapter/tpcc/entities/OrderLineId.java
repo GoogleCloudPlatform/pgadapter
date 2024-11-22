@@ -37,11 +37,10 @@ public class OrderLineId implements java.io.Serializable {
   @Column(name = "ol_number")
   private Long olNumber;
 
-  public OrderLineId() {
-  }
+  public OrderLineId() {}
 
-  public OrderLineId(long districtNextOrderId, long customerId, long districtId, long warehouseId,
-      long l) {
+  public OrderLineId(
+      long districtNextOrderId, long customerId, long districtId, long warehouseId, long l) {
     this.oId = districtNextOrderId;
     this.cId = customerId;
     this.dId = districtId;

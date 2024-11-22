@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -106,7 +105,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     Session session = sessionFactory.openSession();
     Transaction tx = session.beginTransaction();
     try {
-      Customer customer = session.get(Customer.class, new CustomerId(customerId, districtId, warehouseId));
+      Customer customer =
+          session.get(Customer.class, new CustomerId(customerId, districtId, warehouseId));
       District district = customer.getDistrict();
       Warehouse warehouse = district.getWarehouse();
 
@@ -134,23 +134,24 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
 
         Item item = session.get(Item.class, orderLineItemId);
         if (item == null) {
-          //item not found, rollback(1% chance)
+          // item not found, rollback(1% chance)
           tx.rollback();
           return;
         }
 
-        Stock stock = session.get(Stock.class, new StockId(orderLineItemId, supplyWarehouses[line]));
+        Stock stock =
+            session.get(Stock.class, new StockId(orderLineItemId, supplyWarehouses[line]));
         String[] stockDistrict = {
-            stock.getDist01(),
-            stock.getDist02(),
-            stock.getDist03(),
-            stock.getDist04(),
-            stock.getDist05(),
-            stock.getDist06(),
-            stock.getDist07(),
-            stock.getDist08(),
-            stock.getDist09(),
-            stock.getDist10()
+          stock.getDist01(),
+          stock.getDist02(),
+          stock.getDist03(),
+          stock.getDist04(),
+          stock.getDist05(),
+          stock.getDist06(),
+          stock.getDist07(),
+          stock.getDist08(),
+          stock.getDist09(),
+          stock.getDist10()
         };
         String orderLineDistrictInfo =
             stockDistrict[(int) (Long.reverse(districtId) % stockDistrict.length)];
@@ -175,7 +176,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
 
         // Create and add order line to the list
         OrderLine orderLine = new OrderLine();
-        orderLine.setId(new OrderLineId(districtNextOrderId, customerId, districtId, warehouseId, line));
+        orderLine.setId(
+            new OrderLineId(districtNextOrderId, customerId, districtId, warehouseId, line));
         orderLine.setOlIId(orderLineItemId);
         orderLine.setOlSupplyWId(supplyWarehouses[line]);
         orderLine.setOlQuantity(orderLineQuantity);
@@ -238,8 +240,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         countQuery.where(
             cb.equal(countRoot.get("id").get("wId"), customerWarehouseId),
             cb.equal(countRoot.get("id").get("dId"), customerDistrictId),
-            cb.equal(countRoot.get("last"), lastName)
-        );
+            cb.equal(countRoot.get("last"), lastName));
         int nameCount = session.createQuery(countQuery).getSingleResult().intValue();
         if (nameCount % 2 == 0) {
           nameCount++;
@@ -252,8 +253,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         idQuery.where(
             cb.equal(idRoot.get("id").get("wId"), customerWarehouseId),
             cb.equal(idRoot.get("id").get("dId"), customerDistrictId),
-            cb.equal(idRoot.get("last"), lastName)
-        );
+            cb.equal(idRoot.get("last"), lastName));
         idQuery.orderBy(cb.asc(idRoot.get("first")));
 
         List<Long> results = session.createQuery(idQuery).getResultList();
@@ -263,7 +263,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       }
 
       // Update customer balance and Ytd amount
-      Customer customer = session.get(Customer.class, new CustomerId(customerId, customerDistrictId, customerWarehouseId));
+      Customer customer =
+          session.get(
+              Customer.class, new CustomerId(customerId, customerDistrictId, customerWarehouseId));
       customer.setBalance(customer.getBalance().subtract(amount));
       customer.setYtdPayment(customer.getYtdPayment().add(amount));
 
@@ -277,16 +279,17 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
 
       if ("BC".equals(customer.getCredit())) {
         String customerData = customer.getData();
-        String newCustomerData = String.format(
-            "| %4d %2d %4d %2d %4d $%7.2f %12s %24s",
-            customerId,
-            customerDistrictId,
-            customerWarehouseId,
-            districtId,
-            warehouseId,
-            amount,
-            LocalDateTime.now(),
-            customerData);
+        String newCustomerData =
+            String.format(
+                "| %4d %2d %4d %2d %4d $%7.2f %12s %24s",
+                customerId,
+                customerDistrictId,
+                customerWarehouseId,
+                districtId,
+                warehouseId,
+                amount,
+                LocalDateTime.now(),
+                customerData);
         if (newCustomerData.length() > 500) {
           newCustomerData = newCustomerData.substring(0, 500);
         }
@@ -295,7 +298,14 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
 
       // Insert history
       History history = new History();
-      history.setId(new HistoryId(customerId, customerDistrictId, customerWarehouseId, districtId, warehouseId, new Timestamp(System.currentTimeMillis())));
+      history.setId(
+          new HistoryId(
+              customerId,
+              customerDistrictId,
+              customerWarehouseId,
+              districtId,
+              warehouseId,
+              new Timestamp(System.currentTimeMillis())));
       history.setAmount(amount);
       history.setData(String.format("%10s %10s", warehouse.getwName(), district.getdName()));
       session.persist(history);
@@ -335,8 +345,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         countQuery.where(
             cb.equal(countRoot.get("id").get("wId"), warehouseId),
             cb.equal(countRoot.get("id").get("dId"), districtId),
-            cb.equal(countRoot.get("last"), lastName)
-        );
+            cb.equal(countRoot.get("last"), lastName));
         int nameCount = session.createQuery(countQuery).getSingleResult().intValue();
 
         if (nameCount % 2 == 0) {
@@ -349,8 +358,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         customerQuery.where(
             cb.equal(idRoot.get("id").get("wId"), warehouseId),
             cb.equal(idRoot.get("id").get("dId"), districtId),
-            cb.equal(idRoot.get("last"), lastName)
-        );
+            cb.equal(idRoot.get("last"), lastName));
         customerQuery.orderBy(cb.asc(idRoot.get("first")));
 
         List<Customer> results = session.createQuery(customerQuery).getResultList();
@@ -370,13 +378,10 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         orderQuery.where(
             cb.equal(orderRoot.get("id").get("wId"), warehouseId),
             cb.equal(orderRoot.get("id").get("dId"), districtId),
-            cb.equal(orderRoot.get("id").get("cId"), customerId)
-        );
+            cb.equal(orderRoot.get("id").get("cId"), customerId));
         orderQuery.orderBy(cb.desc(orderRoot.get("id").get("oId")));
 
-        Order order = session.createQuery(orderQuery)
-            .setMaxResults(1)
-            .getSingleResult();
+        Order order = session.createQuery(orderQuery).setMaxResults(1).getSingleResult();
 
         List<OrderLine> orderLines = order.getOrderLines();
         for (OrderLine orderLine : orderLines) {
@@ -394,7 +399,6 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     }
   }
 
-
   @Override
   public void delivery() throws SQLException {
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
@@ -402,7 +406,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     Session session = sessionFactory.openSession();
     Transaction tx = session.beginTransaction();
     try {
-      for (long district = 0L; district < tpccConfiguration.getDistrictsPerWarehouse(); district++) {
+      for (long district = 0L;
+          district < tpccConfiguration.getDistrictsPerWarehouse();
+          district++) {
         // find the oldest new_order in district
         long districtId = Long.reverse(district);
         CriteriaBuilder cb = session.getCriteriaBuilder();
@@ -410,13 +416,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         Root<NewOrder> root = query.from(NewOrder.class);
         query.where(
             cb.equal(root.get("id").get("dId"), districtId),
-            cb.equal(root.get("id").get("wId"), warehouseId)
-        );
+            cb.equal(root.get("id").get("wId"), warehouseId));
         query.orderBy(cb.asc(root.get("id").get("oId")));
-        NewOrder newOrder = session.createQuery(query)
-            .setMaxResults(1)
-            .getSingleResult();
-
+        NewOrder newOrder = session.createQuery(query).setMaxResults(1).getSingleResult();
 
         if (newOrder != null) {
           // Get the Order and Customer entities
@@ -440,9 +442,10 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
           // session.createMutationQuery(updateQuery).executeUpdate();
 
           // Calculate the sum of order line amounts
-          BigDecimal sumOrderLineAmount = order.getOrderLines().stream()
-              .map(OrderLine::getOlAmount)
-              .reduce(BigDecimal.ZERO, BigDecimal::add);
+          BigDecimal sumOrderLineAmount =
+              order.getOrderLines().stream()
+                  .map(OrderLine::getOlAmount)
+                  .reduce(BigDecimal.ZERO, BigDecimal::add);
 
           // CriteriaQuery<BigDecimal> sumQuery = cb.createQuery(BigDecimal.class);
           // Root<OrderLine> orderLine = sumQuery.from(OrderLine.class);
@@ -482,8 +485,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       nextOrderQuery.select(districtRoot.get("dNextOId"));
       nextOrderQuery.where(
           cb.equal(districtRoot.get("id").get("dId"), districtId),
-          cb.equal(districtRoot.get("id").get("wId"), warehouseId)
-      );
+          cb.equal(districtRoot.get("id").get("wId"), warehouseId));
 
       long nextOrderId = session.createQuery(nextOrderQuery).getSingleResult();
 
@@ -501,8 +503,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
           cb.greaterThanOrEqualTo(orderLine.get("id").get("oId"), nextOrderId - 20),
           cb.equal(stock.get("id").get("wId"), warehouseId),
           cb.equal(orderLine.get("olIId"), stock.get("id").get("sIId")),
-          cb.lt(stock.get("quantity"), level)
-      );
+          cb.lt(stock.get("quantity"), level));
       List<Long> result = session.createQuery(query).getResultList();
 
       // Iterate through the items and check stock items with quantity below threshold
@@ -513,8 +514,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         stockQuery.where(
             cb.equal(stockRoot.get("id").get("wId"), warehouseId),
             cb.equal(stockRoot.get("id").get("sIId"), orderLineItemId),
-            cb.lt(stockRoot.get("quantity"), level)
-        );
+            cb.lt(stockRoot.get("quantity"), level));
         long stockCount = session.createQuery(stockQuery).getSingleResult();
       }
 

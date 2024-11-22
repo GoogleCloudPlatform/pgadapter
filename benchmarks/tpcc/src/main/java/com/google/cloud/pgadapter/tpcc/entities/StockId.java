@@ -29,8 +29,7 @@ public class StockId implements Serializable {
   @Column(name = "w_id")
   private Long wId;
 
-  public StockId() {
-  }
+  public StockId() {}
 
   public StockId(long orderLineItemId, long supplyWarehouse) {
     this.sIId = orderLineItemId;

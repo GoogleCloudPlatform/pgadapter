@@ -16,14 +16,11 @@ package com.google.cloud.pgadapter.tpcc.entities;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate
 @Table(name = "order_line")
 public class OrderLine {
-  @EmbeddedId
-  private OrderLineId id;
+  @EmbeddedId private OrderLineId id;
 
   @Column(name = "ol_i_id", insertable = false, updatable = false)
   private Long olIId;
@@ -45,10 +42,22 @@ public class OrderLine {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
-    @JoinColumn(name = "w_id", referencedColumnName = "w_id", insertable=false, updatable=false),
-    @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable=false, updatable=false),
-    @JoinColumn(name = "c_id", referencedColumnName = "c_id", insertable=false, updatable=false),
-    @JoinColumn(name = "o_id", referencedColumnName = "o_id", insertable=false, updatable=false)
+    @JoinColumn(
+        name = "w_id",
+        referencedColumnName = "w_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(
+        name = "d_id",
+        referencedColumnName = "d_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(
+        name = "c_id",
+        referencedColumnName = "c_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(name = "o_id", referencedColumnName = "o_id", insertable = false, updatable = false)
   })
   private Order order;
 

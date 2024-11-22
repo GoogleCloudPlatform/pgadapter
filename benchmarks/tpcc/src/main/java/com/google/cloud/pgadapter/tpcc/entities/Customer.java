@@ -25,20 +25,21 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate
 @Table(name = "customer")
 public class Customer {
 
-  @EmbeddedId
-  private CustomerId id;
+  @EmbeddedId private CustomerId id;
 
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumns({
-      @JoinColumn(name = "w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
-      @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable = false, updatable = false)
+    @JoinColumn(
+        name = "w_id",
+        referencedColumnName = "w_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable = false, updatable = false)
   })
   private District district;
 
@@ -257,5 +258,4 @@ public class Customer {
   public void setData(String data) {
     this.data = data;
   }
-
 }

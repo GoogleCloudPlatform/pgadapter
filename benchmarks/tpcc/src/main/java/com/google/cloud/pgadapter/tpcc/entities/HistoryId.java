@@ -40,11 +40,15 @@ public class HistoryId implements Serializable {
   @Column(name = "h_date")
   private Timestamp hDate;
 
-  public HistoryId() {
-  }
+  public HistoryId() {}
 
-  public HistoryId(long customerId, long customerDistrictId, long customerWarehouseId,
-      long districtId, long warehouseId, Timestamp timestamp) {
+  public HistoryId(
+      long customerId,
+      long customerDistrictId,
+      long customerWarehouseId,
+      long districtId,
+      long warehouseId,
+      Timestamp timestamp) {
     this.cId = customerId;
     this.dId = customerDistrictId;
     this.wId = customerWarehouseId;
@@ -124,13 +128,19 @@ public class HistoryId implements Serializable {
 
   @Override
   public String toString() {
-    return "HistoryId{" +
-        "cId=" + cId +
-        ", dId=" + dId +
-        ", wId=" + wId +
-        ", hDId=" + hDId +
-        ", hWId=" + hWId +
-        ", hDate=" + hDate +
-        '}';
+    return "HistoryId{"
+        + "cId="
+        + cId
+        + ", dId="
+        + dId
+        + ", wId="
+        + wId
+        + ", hDId="
+        + hDId
+        + ", hWId="
+        + hWId
+        + ", hDate="
+        + hDate
+        + '}';
   }
 }

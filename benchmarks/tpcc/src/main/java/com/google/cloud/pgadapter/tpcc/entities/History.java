@@ -17,35 +17,46 @@ import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 
 @Entity
 @Table(name = "history")
 public class History {
 
-  @EmbeddedId
-  private HistoryId id;
+  @EmbeddedId private HistoryId id;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
-      @JoinColumn(name = "w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
-      @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable = false, updatable = false),
-      @JoinColumn(name = "c_id", referencedColumnName = "c_id", insertable = false, updatable = false)
+    @JoinColumn(
+        name = "w_id",
+        referencedColumnName = "w_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(
+        name = "d_id",
+        referencedColumnName = "d_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(name = "c_id", referencedColumnName = "c_id", insertable = false, updatable = false)
   })
   private Customer customer;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
-      @JoinColumn(name = "h_w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
-      @JoinColumn(name = "h_d_id", referencedColumnName = "d_id", insertable = false, updatable = false)
+    @JoinColumn(
+        name = "h_w_id",
+        referencedColumnName = "w_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(
+        name = "h_d_id",
+        referencedColumnName = "d_id",
+        insertable = false,
+        updatable = false)
   })
   private District district;
 

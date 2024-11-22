@@ -25,15 +25,26 @@ import jakarta.persistence.Table;
 @Table(name = "new_orders")
 public class NewOrder {
 
-  @EmbeddedId
-  private OrderId id;
+  @EmbeddedId private OrderId id;
 
   @OneToOne(fetch = FetchType.EAGER)
   @JoinColumns({
-      @JoinColumn(name = "w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
-      @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable = false, updatable = false),
-      @JoinColumn(name = "c_id", referencedColumnName = "c_id", insertable = false, updatable = false),
-      @JoinColumn(name = "o_id", referencedColumnName = "o_id", insertable = false, updatable = false)
+    @JoinColumn(
+        name = "w_id",
+        referencedColumnName = "w_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(
+        name = "d_id",
+        referencedColumnName = "d_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(
+        name = "c_id",
+        referencedColumnName = "c_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(name = "o_id", referencedColumnName = "o_id", insertable = false, updatable = false)
   })
   private Order order;
 

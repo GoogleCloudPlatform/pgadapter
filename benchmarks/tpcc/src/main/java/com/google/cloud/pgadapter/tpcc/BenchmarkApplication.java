@@ -75,7 +75,8 @@ public class BenchmarkApplication implements CommandLineRunner {
   public BenchmarkApplication(
       SpannerConfiguration spannerConfiguration,
       PGAdapterConfiguration pgAdapterConfiguration,
-      TpccConfiguration tpccConfiguration, HibernateConfiguration hibernateConfiguration) {
+      TpccConfiguration tpccConfiguration,
+      HibernateConfiguration hibernateConfiguration) {
     this.spannerConfiguration = spannerConfiguration;
     this.pgAdapterConfiguration = pgAdapterConfiguration;
     this.tpccConfiguration = tpccConfiguration;
@@ -145,12 +146,14 @@ public class BenchmarkApplication implements CommandLineRunner {
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
 
         if (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.HIBERNATE_RUNNER)) {
-          registry = new StandardServiceRegistryBuilder()
-              .configure()
-              .applySetting("hibernate.show_sql", hibernateConfiguration.isShowSql())
-              .applySetting("hibernate.jdbc.batch_size", hibernateConfiguration.getBatchSize())
-              .applySetting("hibernate.connection.pool_size", hibernateConfiguration.getPoolSize())
-              .build();
+          registry =
+              new StandardServiceRegistryBuilder()
+                  .configure()
+                  .applySetting("hibernate.show_sql", hibernateConfiguration.isShowSql())
+                  .applySetting("hibernate.jdbc.batch_size", hibernateConfiguration.getBatchSize())
+                  .applySetting(
+                      "hibernate.connection.pool_size", hibernateConfiguration.getPoolSize())
+                  .build();
           sessionFactory = new MetadataSources(registry).buildMetadata().buildSessionFactory();
         }
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {

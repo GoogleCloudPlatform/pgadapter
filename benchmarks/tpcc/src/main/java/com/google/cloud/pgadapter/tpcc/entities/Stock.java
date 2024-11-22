@@ -15,15 +15,12 @@ package com.google.cloud.pgadapter.tpcc.entities;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate
 @Table(name = "stock")
 public class Stock {
 
-  @EmbeddedId
-  private StockId id;
+  @EmbeddedId private StockId id;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "w_id", insertable = false, updatable = false)
@@ -221,5 +218,4 @@ public class Stock {
   public void setData(String data) {
     this.data = data;
   }
-
 }

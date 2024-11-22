@@ -33,8 +33,7 @@ public class OrderId implements Serializable {
   @Column(name = "w_id")
   private Long wId;
 
-  public OrderId() {
-  }
+  public OrderId() {}
 
   public OrderId(long newOrderId, long customerId, long districtId, long warehouseId) {
     this.oId = newOrderId;
@@ -96,11 +95,6 @@ public class OrderId implements Serializable {
 
   @Override
   public String toString() {
-    return "OrderId{" +
-        "oId=" + oId +
-        ", cId=" + cId +
-        ", dId=" + dId +
-        ", wId=" + wId +
-        '}';
+    return "OrderId{" + "oId=" + oId + ", cId=" + cId + ", dId=" + dId + ", wId=" + wId + '}';
   }
 }

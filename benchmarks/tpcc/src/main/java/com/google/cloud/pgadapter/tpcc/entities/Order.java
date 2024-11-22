@@ -18,7 +18,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
@@ -26,15 +25,11 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.sql.Timestamp;
 import java.util.List;
-import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate
 @Table(name = "orders")
 public class Order {
-  @EmbeddedId
-  private OrderId id;
-
+  @EmbeddedId private OrderId id;
 
   @OneToMany(mappedBy = "order", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
   private List<OrderLine> orderLines;
@@ -49,9 +44,17 @@ public class Order {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumns({
-      @JoinColumn(name = "w_id", referencedColumnName = "w_id", insertable = false, updatable = false),
-      @JoinColumn(name = "d_id", referencedColumnName = "d_id", insertable = false, updatable = false),
-      @JoinColumn(name = "c_id", referencedColumnName = "c_id", insertable = false, updatable = false)
+    @JoinColumn(
+        name = "w_id",
+        referencedColumnName = "w_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(
+        name = "d_id",
+        referencedColumnName = "d_id",
+        insertable = false,
+        updatable = false),
+    @JoinColumn(name = "c_id", referencedColumnName = "c_id", insertable = false, updatable = false)
   })
   private Customer customer;
 

@@ -18,10 +18,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate
 @Table(name = "warehouse")
 public class Warehouse {
 
@@ -124,5 +122,4 @@ public class Warehouse {
   public void setwYtd(BigDecimal wYtd) {
     this.wYtd = wYtd;
   }
-
 }
