@@ -226,7 +226,7 @@ public class BenchmarkApplication implements CommandLineRunner {
         while (watch.elapsed().compareTo(tpccConfiguration.getBenchmarkDuration()) <= 0) {
           //noinspection BusyWait
           Thread.sleep(1_000L);
-          //statistics.print(watch.elapsed());
+          statistics.print(watch.elapsed());
         }
         executor.shutdownNow();
         if (!executor.awaitTermination(60L, TimeUnit.SECONDS)) {

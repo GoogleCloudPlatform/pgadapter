@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -427,11 +428,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
           // Update the corresponding order with the carrier ID
           order.setCarrierId(carrierId);
 
-          // // Update the delivery date in the order lines
-          for (OrderLine orderLine : order.getOrderLines()) {
-            Timestamp t = new Timestamp(System.currentTimeMillis());
-            orderLine.setOlDeliveryD(t);
-          }
+          // Update the delivery date in the order lines
+          Timestamp t = new Timestamp(System.currentTimeMillis());
+          order.getOrderLines().forEach(orderLine -> orderLine.setOlDeliveryD(t));
 
           // // Update the delivery date in the order lines using Criteria API
           // CriteriaUpdate<OrderLine> updateQuery = cb.createCriteriaUpdate(OrderLine.class);
