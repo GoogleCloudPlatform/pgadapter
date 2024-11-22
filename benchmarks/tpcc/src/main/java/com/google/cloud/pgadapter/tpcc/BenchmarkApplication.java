@@ -15,6 +15,7 @@ package com.google.cloud.pgadapter.tpcc;
 
 import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
+import com.google.cloud.pgadapter.tpcc.config.HibernateConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
@@ -69,13 +70,16 @@ public class BenchmarkApplication implements CommandLineRunner {
 
   private final TpccConfiguration tpccConfiguration;
 
+  private final HibernateConfiguration hibernateConfiguration;
+
   public BenchmarkApplication(
       SpannerConfiguration spannerConfiguration,
       PGAdapterConfiguration pgAdapterConfiguration,
-      TpccConfiguration tpccConfiguration) {
+      TpccConfiguration tpccConfiguration, HibernateConfiguration hibernateConfiguration) {
     this.spannerConfiguration = spannerConfiguration;
     this.pgAdapterConfiguration = pgAdapterConfiguration;
     this.tpccConfiguration = tpccConfiguration;
+    this.hibernateConfiguration = hibernateConfiguration;
   }
 
   @Override
@@ -141,7 +145,12 @@ public class BenchmarkApplication implements CommandLineRunner {
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
 
         if (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.HIBERNATE_RUNNER)) {
-          registry = new StandardServiceRegistryBuilder().configure().build();
+          registry = new StandardServiceRegistryBuilder()
+              .configure()
+              .applySetting("hibernate.show_sql", hibernateConfiguration.isShowSql())
+              .applySetting("hibernate.jdbc.batch_size", hibernateConfiguration.getBatchSize())
+              .applySetting("hibernate.connection.pool_size", hibernateConfiguration.getPoolSize())
+              .build();
           sessionFactory = new MetadataSources(registry).buildMetadata().buildSessionFactory();
         }
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
@@ -217,7 +226,7 @@ public class BenchmarkApplication implements CommandLineRunner {
         while (watch.elapsed().compareTo(tpccConfiguration.getBenchmarkDuration()) <= 0) {
           //noinspection BusyWait
           Thread.sleep(1_000L);
-          statistics.print(watch.elapsed());
+          //statistics.print(watch.elapsed());
         }
         executor.shutdownNow();
         if (!executor.awaitTermination(60L, TimeUnit.SECONDS)) {

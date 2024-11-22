@@ -1,3 +1,16 @@
+// Copyright 2024 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package com.google.cloud.pgadapter.tpcc;
 
 import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
@@ -6,7 +19,6 @@ import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.pgadapter.tpcc.entities.Customer;
 import com.google.cloud.pgadapter.tpcc.entities.CustomerId;
 import com.google.cloud.pgadapter.tpcc.entities.District;
-import com.google.cloud.pgadapter.tpcc.entities.DistrictId;
 import com.google.cloud.pgadapter.tpcc.entities.History;
 import com.google.cloud.pgadapter.tpcc.entities.HistoryId;
 import com.google.cloud.pgadapter.tpcc.entities.Item;
@@ -21,9 +33,7 @@ import com.google.cloud.pgadapter.tpcc.entities.Warehouse;
 import com.google.cloud.spanner.Dialect;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Root;
-import jakarta.persistence.criteria.Subquery;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -35,12 +45,10 @@ import java.util.Random;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
-import org.hibernate.query.Query;
 
 public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
 
   private final SessionFactory sessionFactory;
-  private final ThreadLocal<Session> sessionThreadLocal = new ThreadLocal<>();
   private final Random random = new Random();
 
   HibernateBenchmarkRunner(
@@ -62,23 +70,13 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
   }
 
   @Override
-  void setup() throws SQLException, IOException {
-    sessionThreadLocal.set(sessionFactory.openSession());
-  }
+  void setup() throws SQLException, IOException {}
 
   @Override
-  void teardown() throws SQLException {
-    Session session = sessionThreadLocal.get();
-    if (session != null) {
-      session.close();
-      sessionThreadLocal.remove();
-    }
-  }
+  void teardown() throws SQLException {}
 
   @Override
   public void newOrder() throws SQLException {
-    Session session = sessionThreadLocal.get();
-
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long districtId = Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     long customerId = Long.reverse(random.nextInt(tpccConfiguration.getCustomersPerDistrict()));
@@ -104,7 +102,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       }
       quantities[line] = random.nextInt(1, 10);
     }
-
+    Session session = sessionFactory.openSession();
     Transaction tx = session.beginTransaction();
     try {
       Customer customer = session.get(Customer.class, new CustomerId(customerId, districtId, warehouseId));
@@ -124,11 +122,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       order.setAllLocal(allLocal);
       order.setCustomer(customer);
 
-
       NewOrder newOrder = new NewOrder();
       newOrder.setId(orderId);
       newOrder.setOrder(order);
-
 
       // Create and process order lines
       List<OrderLine> orderLines = new ArrayList<>();
@@ -199,12 +195,13 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         tx.rollback();
       }
       throw new RuntimeException(e);
+    } finally {
+      session.close();
     }
   }
 
   @Override
   public void payment() throws SQLException {
-    Session session = sessionThreadLocal.get();
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long districtId = Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     long customerId = Long.reverse(random.nextInt(tpccConfiguration.getCustomersPerDistrict()));
@@ -228,16 +225,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       customerDistrictId =
           Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     }
+    Session session = sessionFactory.openSession();
     Transaction tx = session.beginTransaction();
     try {
-      // update warehouse YTD amount
-      Warehouse warehouse = session.get(Warehouse.class, warehouseId);
-      warehouse.setwYtd(warehouse.getwYtd().add(amount));
-
-      // Update district YTD amount
-      District district = session.get(District.class, new DistrictId(districtId, warehouseId));
-      district.setdYtd(district.getdYtd().add(amount));
-
       if (byName) {
         CriteriaBuilder cb = session.getCriteriaBuilder();
         // Count customers with the given last name
@@ -271,37 +261,43 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         }
       }
 
-      // Update customer
+      // Update customer balance and Ytd amount
       Customer customer = session.get(Customer.class, new CustomerId(customerId, customerDistrictId, customerWarehouseId));
-      if (customer != null) {
-        customer.setBalance(customer.getBalance().subtract(amount));
-        customer.setYtdPayment(customer.getYtdPayment().add(amount));
+      customer.setBalance(customer.getBalance().subtract(amount));
+      customer.setYtdPayment(customer.getYtdPayment().add(amount));
 
-        if ("BC".equals(customer.getCredit())) {
-          String customerData = customer.getData();
-          String newCustomerData = String.format(
-              "| %4d %2d %4d %2d %4d $%7.2f %12s %24s",
-              customerId,
-              customerDistrictId,
-              customerWarehouseId,
-              districtId,
-              warehouseId,
-              amount,
-              LocalDateTime.now(),
-              customerData);
-          if (newCustomerData.length() > 500) {
-            newCustomerData = newCustomerData.substring(0, 500);
-          }
-          customer.setData(newCustomerData);
+      // Update district YTD amount
+      District district = customer.getDistrict();
+      district.setdYtd(district.getdYtd().add(amount));
+
+      // update warehouse YTD amount
+      Warehouse warehouse = district.getWarehouse();
+      warehouse.setwYtd(warehouse.getwYtd().add(amount));
+
+      if ("BC".equals(customer.getCredit())) {
+        String customerData = customer.getData();
+        String newCustomerData = String.format(
+            "| %4d %2d %4d %2d %4d $%7.2f %12s %24s",
+            customerId,
+            customerDistrictId,
+            customerWarehouseId,
+            districtId,
+            warehouseId,
+            amount,
+            LocalDateTime.now(),
+            customerData);
+        if (newCustomerData.length() > 500) {
+          newCustomerData = newCustomerData.substring(0, 500);
         }
-
-        // Insert history
-        History history = new History();
-        history.setId(new HistoryId(customerId, customerDistrictId, customerWarehouseId, districtId, warehouseId, new Timestamp(System.currentTimeMillis())));
-        history.setAmount(amount);
-        history.setData(String.format("%10s %10s", warehouse.getwName(), district.getdName()));
-        session.persist(history);
+        customer.setData(newCustomerData);
       }
+
+      // Insert history
+      History history = new History();
+      history.setId(new HistoryId(customerId, customerDistrictId, customerWarehouseId, districtId, warehouseId, new Timestamp(System.currentTimeMillis())));
+      history.setAmount(amount);
+      history.setData(String.format("%10s %10s", warehouse.getwName(), district.getdName()));
+      session.persist(history);
 
       tx.commit();
     } catch (Exception e) {
@@ -309,13 +305,13 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         tx.rollback();
       }
       throw new RuntimeException(e);
+    } finally {
+      session.close();
     }
   }
 
   @Override
   public void orderStatus() throws SQLException {
-    Session session = sessionThreadLocal.get();
-
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long districtId = Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     long customerId = Long.reverse(random.nextInt(tpccConfiguration.getCustomersPerDistrict()));
@@ -323,6 +319,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     String lastName = LastNameGenerator.generateLastName(this.random, Long.MAX_VALUE);
     boolean byName = random.nextInt(100) < 60;
 
+    Session session = sessionFactory.openSession();
     Transaction tx = session.beginTransaction();
     try {
       Customer customer = null;
@@ -391,15 +388,17 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         tx.rollback();
       }
       throw new RuntimeException(e);
+    } finally {
+      session.close();
     }
   }
 
 
   @Override
   public void delivery() throws SQLException {
-    Session session = sessionThreadLocal.get();
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long carrierId = Long.reverse(random.nextInt(10));
+    Session session = sessionFactory.openSession();
     Transaction tx = session.beginTransaction();
     try {
       for (long district = 0L; district < tpccConfiguration.getDistrictsPerWarehouse(); district++) {
@@ -428,16 +427,29 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
           // Update the corresponding order with the carrier ID
           order.setCarrierId(carrierId);
 
-          // Update the delivery date in the order lines
+          // // Update the delivery date in the order lines
           for (OrderLine orderLine : order.getOrderLines()) {
             Timestamp t = new Timestamp(System.currentTimeMillis());
             orderLine.setOlDeliveryD(t);
           }
 
+          // // Update the delivery date in the order lines using Criteria API
+          // CriteriaUpdate<OrderLine> updateQuery = cb.createCriteriaUpdate(OrderLine.class);
+          // Root<OrderLine> updateRoot = updateQuery.from(OrderLine.class);
+          // updateQuery.set(updateRoot.<Timestamp>get("olDeliveryD"), cb.currentTimestamp());
+          // updateQuery.where(cb.equal(updateRoot.get("order"), order));
+          // session.createMutationQuery(updateQuery).executeUpdate();
+
           // Calculate the sum of order line amounts
           BigDecimal sumOrderLineAmount = order.getOrderLines().stream()
               .map(OrderLine::getOlAmount)
               .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+          // CriteriaQuery<BigDecimal> sumQuery = cb.createQuery(BigDecimal.class);
+          // Root<OrderLine> orderLine = sumQuery.from(OrderLine.class);
+          // sumQuery.select(cb.sum(orderLine.get("olAmount")));
+          // sumQuery.where(cb.equal(orderLine.get("order"), order));
+          // BigDecimal sumOrderLineAmount = session.createQuery(sumQuery).getSingleResult();
 
           // Update the customer's balance and delivery count
           customer.setBalance(customer.getBalance().add(sumOrderLineAmount));
@@ -450,6 +462,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         tx.rollback();
       }
       throw new RuntimeException(e);
+    } finally {
+      session.close();
     }
   }
 
@@ -458,9 +472,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     long districtId = Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     int level = random.nextInt(10, 21);
 
-    Session session = sessionThreadLocal.get();
+    Session session = sessionFactory.openSession();
     Transaction tx = session.beginTransaction();
-
     try {
       CriteriaBuilder cb = session.getCriteriaBuilder();
 
@@ -512,6 +525,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         tx.rollback();
       }
       throw new RuntimeException(e);
+    } finally {
+      session.close();
     }
   }
 

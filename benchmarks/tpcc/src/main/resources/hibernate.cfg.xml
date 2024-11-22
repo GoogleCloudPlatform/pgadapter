@@ -19,13 +19,14 @@
     <property name="hibernate.dialect">com.google.cloud.spanner.hibernate.SpannerDialect</property>
 
     <!-- Print executed SQL to stdout -->
-    <property name="show_sql">false</property>
+    <property name="hibernate.show_sql">true</property>
 
     <!-- Update database on startup -->
     <property name="hibernate.hbm2ddl.auto">none</property>
 
     <property name="connection.pool_size">64</property>
     <property name="hibernate.jdbc.batch_size">20</property>
+    <property name="hibernate.generate_statistics">true</property>
 
     <!-- Annotated entity classes -->
     <mapping class="com.google.cloud.pgadapter.tpcc.entities.Warehouse"/>
