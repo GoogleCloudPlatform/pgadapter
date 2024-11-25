@@ -26,7 +26,7 @@
 
     <property name="connection.pool_size">64</property>
     <property name="hibernate.jdbc.batch_size">20</property>
-    <property name="hibernate.generate_statistics">true</property>
+<!--    <property name="hibernate.generate_statistics">true</property>-->
 
     <!-- Annotated entity classes -->
     <mapping class="com.google.cloud.pgadapter.tpcc.entities.Warehouse"/>
