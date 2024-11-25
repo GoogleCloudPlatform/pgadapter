@@ -34,6 +34,7 @@ import com.google.cloud.pgadapter.tpcc.entities.Warehouse;
 import com.google.cloud.spanner.Dialect;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.CriteriaUpdate;
 import jakarta.persistence.criteria.Root;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -443,41 +444,57 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         NewOrder newOrder = session.createQuery(query).setMaxResults(1).getSingleResult();
 
         if (newOrder != null) {
-          // Get the Order and Customer entities
+          // Get the Order entitie
           Order order = newOrder.getOrder();
-          Customer customer = order.getCustomer();
           // mark newOrder for removal
           session.remove(newOrder);
-
           // Update the corresponding order with the carrier ID
           order.setCarrierId(carrierId);
 
-          // Update the delivery date in the order lines
-          Timestamp t = new Timestamp(System.currentTimeMillis());
-          order.getOrderLines().forEach(orderLine -> orderLine.setOlDeliveryD(t));
+          // // Calculate the sum of order line amounts
+          // BigDecimal sumOrderLineAmount =
+          //     order.getOrderLines().stream()
+          //         .map(OrderLine::getOlAmount)
+          //         .reduce(BigDecimal.ZERO, BigDecimal::add);
+          //
+          // // Update the delivery date in the order lines
+          // Timestamp t = new Timestamp(System.currentTimeMillis());
+          // order.getOrderLines().forEach(orderLine -> orderLine.setOlDeliveryD(t));
 
-          // // Update the delivery date in the order lines using Criteria API
-          // CriteriaUpdate<OrderLine> updateQuery = cb.createCriteriaUpdate(OrderLine.class);
-          // Root<OrderLine> updateRoot = updateQuery.from(OrderLine.class);
-          // updateQuery.set(updateRoot.<Timestamp>get("olDeliveryD"), cb.currentTimestamp());
-          // updateQuery.where(cb.equal(updateRoot.get("order"), order));
-          // session.createMutationQuery(updateQuery).executeUpdate();
+          // //Update the customer's balance and delivery count
+          // Customer customer = order.getCustomer();
+          // customer.setBalance(customer.getBalance().add(sumOrderLineAmount));
+          // customer.setDeliveryCnt(customer.getDeliveryCnt() + 1);
 
-          // Calculate the sum of order line amounts
-          BigDecimal sumOrderLineAmount =
-              order.getOrderLines().stream()
-                  .map(OrderLine::getOlAmount)
-                  .reduce(BigDecimal.ZERO, BigDecimal::add);
+          // Update the delivery date in the order lines using Criteria API
+          CriteriaUpdate<OrderLine> updateQuery = cb.createCriteriaUpdate(OrderLine.class);
+          Root<OrderLine> updateRoot = updateQuery.from(OrderLine.class);
+          updateQuery.set(updateRoot.<Timestamp>get("olDeliveryD"), cb.currentTimestamp());
+          updateQuery.where(cb.equal(updateRoot.get("order"), order));
+          session.createMutationQuery(updateQuery).executeUpdate();
 
-          // CriteriaQuery<BigDecimal> sumQuery = cb.createQuery(BigDecimal.class);
-          // Root<OrderLine> orderLine = sumQuery.from(OrderLine.class);
-          // sumQuery.select(cb.sum(orderLine.get("olAmount")));
-          // sumQuery.where(cb.equal(orderLine.get("order"), order));
-          // BigDecimal sumOrderLineAmount = session.createQuery(sumQuery).getSingleResult();
+          CriteriaQuery<BigDecimal> sumQuery = cb.createQuery(BigDecimal.class);
+          Root<OrderLine> orderLine = sumQuery.from(OrderLine.class);
+          sumQuery.select(cb.sum(orderLine.get("olAmount")));
+          sumQuery.where(cb.equal(orderLine.get("order"), order));
+          BigDecimal sumOrderLineAmount = session.createQuery(sumQuery).getSingleResult();
 
-          // Update the customer's balance and delivery count
-          customer.setBalance(customer.getBalance().add(sumOrderLineAmount));
-          customer.setDeliveryCnt(customer.getDeliveryCnt() + 1);
+          CriteriaUpdate<Customer> customerUpdate = cb.createCriteriaUpdate(Customer.class);
+          Root<Customer> customerRoot = customerUpdate.from(Customer.class);
+          customerUpdate.set(
+              customerRoot.<BigDecimal>get("balance"),
+              cb.sum(customerRoot.get("balance"), sumOrderLineAmount)
+          );
+          customerUpdate.set(
+              customerRoot.<Integer>get("deliveryCnt"),
+              cb.sum(customerRoot.<Integer>get("deliveryCnt"), 1)
+          );
+          CustomerId customerId =
+              new CustomerId(
+                  order.getId().getcId(), order.getId().getdId(), order.getId().getwId());
+          customerUpdate.where(cb.equal(customerRoot.get("id"), customerId));
+          session.createMutationQuery(customerUpdate).executeUpdate();
+
         }
       }
       session.flush();
