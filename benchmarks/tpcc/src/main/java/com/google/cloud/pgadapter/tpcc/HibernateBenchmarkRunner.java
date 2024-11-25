@@ -13,6 +13,7 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc;
 
+import com.google.cloud.pgadapter.tpcc.config.HibernateConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
@@ -49,6 +50,8 @@ import org.hibernate.Transaction;
 public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
 
   private final SessionFactory sessionFactory;
+
+  private final HibernateConfiguration hibernateConfiguration;
   private final Random random = new Random();
 
   HibernateBenchmarkRunner(
@@ -57,6 +60,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       TpccConfiguration tpccConfiguration,
       PGAdapterConfiguration pgAdapterConfiguration,
       SpannerConfiguration spannerConfiguration,
+      HibernateConfiguration hibernateConfiguration,
       Metrics metrics,
       Dialect dialect) {
     super(
@@ -66,6 +70,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         spannerConfiguration,
         metrics,
         dialect);
+    this.hibernateConfiguration = hibernateConfiguration;
     this.sessionFactory = sessionFactory;
   }
 
@@ -103,6 +108,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       quantities[line] = random.nextInt(1, 10);
     }
     Session session = sessionFactory.openSession();
+    if (hibernateConfiguration.isAutoBatchDml()) {
+      session.doWork(connection -> connection.createStatement().execute("set auto_batch_dml=true"));
+    }
     Transaction tx = session.beginTransaction();
     try {
       Customer customer =
@@ -191,9 +199,13 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       order.setOrderLines(orderLines);
       session.persist(order);
       session.persist(newOrder);
-
+      session.flush();
+      session.doWork(
+          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       tx.commit();
     } catch (Exception e) {
+      session.doWork(
+          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       if (tx != null) {
         tx.rollback();
       }
@@ -229,6 +241,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
           Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     }
     Session session = sessionFactory.openSession();
+    if (hibernateConfiguration.isAutoBatchDml()) {
+      session.doWork(connection -> connection.createStatement().execute("set auto_batch_dml=true"));
+    }
     Transaction tx = session.beginTransaction();
     try {
       if (byName) {
@@ -309,9 +324,13 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       history.setAmount(amount);
       history.setData(String.format("%10s %10s", warehouse.getwName(), district.getdName()));
       session.persist(history);
-
+      session.flush();
+      session.doWork(
+          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       tx.commit();
     } catch (Exception e) {
+      session.doWork(
+          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       if (tx != null) {
         tx.rollback();
       }
@@ -404,6 +423,9 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long carrierId = Long.reverse(random.nextInt(10));
     Session session = sessionFactory.openSession();
+    if (hibernateConfiguration.isAutoBatchDml()) {
+      session.doWork(connection -> connection.createStatement().execute("set auto_batch_dml=true"));
+    }
     Transaction tx = session.beginTransaction();
     try {
       for (long district = 0L;
@@ -458,8 +480,13 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
           customer.setDeliveryCnt(customer.getDeliveryCnt() + 1);
         }
       }
+      session.flush();
+      session.doWork(
+          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       tx.commit();
     } catch (Exception e) {
+      session.doWork(
+          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       if (tx != null) {
         tx.rollback();
       }

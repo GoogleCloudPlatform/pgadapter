@@ -146,14 +146,7 @@ public class BenchmarkApplication implements CommandLineRunner {
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
 
         if (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.HIBERNATE_RUNNER)) {
-          registry =
-              new StandardServiceRegistryBuilder()
-                  .configure()
-                  .applySetting("hibernate.show_sql", hibernateConfiguration.isShowSql())
-                  .applySetting("hibernate.jdbc.batch_size", hibernateConfiguration.getBatchSize())
-                  .applySetting(
-                      "hibernate.connection.pool_size", hibernateConfiguration.getPoolSize())
-                  .build();
+          registry = buildHibernateConfiguration();
           sessionFactory = new MetadataSources(registry).buildMetadata().buildSessionFactory();
         }
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
@@ -220,6 +213,7 @@ public class BenchmarkApplication implements CommandLineRunner {
                     tpccConfiguration,
                     pgAdapterConfiguration,
                     spannerConfiguration,
+                    hibernateConfiguration,
                     metrics,
                     Dialect.GOOGLE_STANDARD_SQL));
           }
@@ -321,5 +315,18 @@ public class BenchmarkApplication implements CommandLineRunner {
     server.awaitRunning();
 
     return server;
+  }
+
+  private StandardServiceRegistry buildHibernateConfiguration() {
+    return new StandardServiceRegistryBuilder()
+        .configure()
+        .applySetting("hibernate.show_sql", hibernateConfiguration.isShowSql())
+        .applySetting("hibernate.jdbc.batch_size", hibernateConfiguration.getBatchSize())
+        .applySetting("hibernate.connection.pool_size", hibernateConfiguration.getPoolSize())
+        .applySetting("hibernate.order_inserts", hibernateConfiguration.isOrderInserts())
+        .applySetting("hibernate.order_updates", hibernateConfiguration.isOrderUpdates())
+        .applySetting(
+            "hibernate.jdbc.batch_versioned_data", hibernateConfiguration.isBatchVersionedData())
+        .build();
   }
 }

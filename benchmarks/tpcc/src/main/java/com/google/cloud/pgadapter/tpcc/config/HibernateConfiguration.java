@@ -26,6 +26,46 @@ public class HibernateConfiguration {
 
   private int poolSize;
 
+  private boolean orderInserts;
+
+  private boolean orderUpdates;
+
+  private boolean batchVersionedData;
+
+  private boolean autoBatchDml;
+
+  public boolean isAutoBatchDml() {
+    return autoBatchDml;
+  }
+
+  public void setAutoBatchDml(boolean autoBatchDml) {
+    this.autoBatchDml = autoBatchDml;
+  }
+
+  public boolean isBatchVersionedData() {
+    return batchVersionedData;
+  }
+
+  public void setBatchVersionedData(boolean batchVersionedData) {
+    this.batchVersionedData = batchVersionedData;
+  }
+
+  public boolean isOrderInserts() {
+    return orderInserts;
+  }
+
+  public void setOrderInserts(boolean orderInserts) {
+    this.orderInserts = orderInserts;
+  }
+
+  public boolean isOrderUpdates() {
+    return orderUpdates;
+  }
+
+  public void setOrderUpdates(boolean orderUpdates) {
+    this.orderUpdates = orderUpdates;
+  }
+
   public boolean isShowSql() {
     return showSql;
   }
