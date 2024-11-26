@@ -425,7 +425,10 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     long carrierId = Long.reverse(random.nextInt(10));
     Session session = sessionFactory.openSession();
     if (hibernateConfiguration.isAutoBatchDml()) {
-      session.doWork(connection -> connection.createStatement().execute("set auto_batch_dml=true"));
+      session.doWork(connection -> {
+        connection.createStatement().execute("set auto_batch_dml=true");
+        connection.createStatement().execute("set auto_batch_dml_update_count_verification=false");
+      });
     }
     Transaction tx = session.beginTransaction();
     try {
@@ -460,13 +463,13 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
           // // Update the delivery date in the order lines
           // Timestamp t = new Timestamp(System.currentTimeMillis());
           // order.getOrderLines().forEach(orderLine -> orderLine.setOlDeliveryD(t));
-
+          //
           // //Update the customer's balance and delivery count
           // Customer customer = order.getCustomer();
           // customer.setBalance(customer.getBalance().add(sumOrderLineAmount));
           // customer.setDeliveryCnt(customer.getDeliveryCnt() + 1);
 
-          // Update the delivery date in the order lines using Criteria API
+          //Update the delivery date in the order lines using Criteria API
           CriteriaUpdate<OrderLine> updateQuery = cb.createCriteriaUpdate(OrderLine.class);
           Root<OrderLine> updateRoot = updateQuery.from(OrderLine.class);
           updateQuery.set(updateRoot.<Timestamp>get("olDeliveryD"), cb.currentTimestamp());
@@ -499,11 +502,15 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       }
       session.flush();
       session.doWork(
-          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
+          connection -> {connection.createStatement().execute("set auto_batch_dml=false");
+            connection.createStatement().execute("set auto_batch_dml_update_count_verification=true");
+          });
       tx.commit();
     } catch (Exception e) {
       session.doWork(
-          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
+          connection -> {connection.createStatement().execute("set auto_batch_dml=false");
+            connection.createStatement().execute("set auto_batch_dml_update_count_verification=true");
+          });
       if (tx != null) {
         tx.rollback();
       }
