@@ -25,8 +25,10 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.sql.Timestamp;
 import java.util.List;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
+@DynamicUpdate
 @Table(name = "orders")
 public class Order {
   @EmbeddedId private OrderId id;

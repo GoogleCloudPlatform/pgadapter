@@ -96,17 +96,17 @@ abstract class AbstractBenchmarkRunner implements Runnable {
         int transaction = random.nextInt(23);
         Stopwatch stopwatch = Stopwatch.createStarted();
         if (transaction < 10) {
-          newOrder();
+          delivery();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordNewOrderLatency(executionDuration.toMillis());
           statistics.incNewOrder();
         } else if (transaction < 20) {
-          payment();
+          delivery();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordPaymentLatency(executionDuration.toMillis());
           statistics.incPayment();
         } else if (transaction < 21) {
-          orderStatus();
+          delivery();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordOrderStatusLatency(executionDuration.toMillis());
           statistics.incOrderStatus();
@@ -116,7 +116,7 @@ abstract class AbstractBenchmarkRunner implements Runnable {
           metrics.recordDeliveryLatency(executionDuration.toMillis());
           statistics.incDelivery();
         } else if (transaction < 23) {
-          stockLevel();
+          delivery();
           Duration executionDuration = stopwatch.elapsed();
           metrics.recordStockLevelLatency(executionDuration.toMillis());
           statistics.incStockLevel();
