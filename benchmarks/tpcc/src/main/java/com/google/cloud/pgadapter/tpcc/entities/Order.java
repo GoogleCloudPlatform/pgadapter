@@ -25,7 +25,6 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.sql.Timestamp;
 import java.util.List;
-import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(name = "orders")

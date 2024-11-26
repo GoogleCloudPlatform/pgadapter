@@ -34,7 +34,6 @@ import com.google.cloud.pgadapter.tpcc.entities.Warehouse;
 import com.google.cloud.spanner.Dialect;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.CriteriaUpdate;
 import jakarta.persistence.criteria.Root;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -45,19 +44,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 
 public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
 
-  private final SessionFactory sessionFactory;
+  private final SessionHelper sessionHelper;
 
   private final HibernateConfiguration hibernateConfiguration;
   private final Random random = new Random();
 
   HibernateBenchmarkRunner(
       Statistics statistics,
-      SessionFactory sessionFactory,
+      SessionHelper sessionHelper,
       TpccConfiguration tpccConfiguration,
       PGAdapterConfiguration pgAdapterConfiguration,
       SpannerConfiguration spannerConfiguration,
@@ -72,7 +70,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         metrics,
         dialect);
     this.hibernateConfiguration = hibernateConfiguration;
-    this.sessionFactory = sessionFactory;
+    this.sessionHelper = sessionHelper;
   }
 
   @Override
@@ -108,10 +106,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       }
       quantities[line] = random.nextInt(1, 10);
     }
-    Session session = sessionFactory.openSession();
-    if (hibernateConfiguration.isAutoBatchDml()) {
-      session.doWork(connection -> connection.createStatement().execute("set auto_batch_dml=true"));
-    }
+    Session session = sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml());
     Transaction tx = session.beginTransaction();
     try {
       Customer customer =
@@ -201,12 +196,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       session.persist(order);
       session.persist(newOrder);
       session.flush();
-      session.doWork(
-          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       tx.commit();
     } catch (Exception e) {
-      session.doWork(
-          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       if (tx != null) {
         tx.rollback();
       }
@@ -241,10 +232,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       customerDistrictId =
           Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     }
-    Session session = sessionFactory.openSession();
-    if (hibernateConfiguration.isAutoBatchDml()) {
-      session.doWork(connection -> connection.createStatement().execute("set auto_batch_dml=true"));
-    }
+    Session session = sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml());
     Transaction tx = session.beginTransaction();
     try {
       if (byName) {
@@ -326,12 +314,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       history.setData(String.format("%10s %10s", warehouse.getwName(), district.getdName()));
       session.persist(history);
       session.flush();
-      session.doWork(
-          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       tx.commit();
     } catch (Exception e) {
-      session.doWork(
-          connection -> connection.createStatement().execute("set auto_batch_dml=false"));
       if (tx != null) {
         tx.rollback();
       }
@@ -350,7 +334,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     String lastName = LastNameGenerator.generateLastName(this.random, Long.MAX_VALUE);
     boolean byName = random.nextInt(100) < 60;
 
-    Session session = sessionFactory.openSession();
+    Session session = sessionHelper.createSession(hibernateConfiguration.isReadOnly(), false);
     Transaction tx = session.beginTransaction();
     try {
       Customer customer = null;
@@ -423,13 +407,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
   public void delivery() throws SQLException {
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long carrierId = Long.reverse(random.nextInt(10));
-    Session session = sessionFactory.openSession();
-    if (hibernateConfiguration.isAutoBatchDml()) {
-      session.doWork(connection -> {
-        connection.createStatement().execute("set auto_batch_dml=true");
-        connection.createStatement().execute("set auto_batch_dml_update_count_verification=false");
-      });
-    }
+    Session session = sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml());
     Transaction tx = session.beginTransaction();
     try {
       for (long district = 0L;
@@ -464,7 +442,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
           Timestamp t = new Timestamp(System.currentTimeMillis());
           order.getOrderLines().forEach(orderLine -> orderLine.setOlDeliveryD(t));
 
-          //Update the customer's balance and delivery count
+          // Update the customer's balance and delivery count
           Customer customer = order.getCustomer();
           customer.setBalance(customer.getBalance().add(sumOrderLineAmount));
           customer.setDeliveryCnt(customer.getDeliveryCnt() + 1);
@@ -501,16 +479,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
         }
       }
       session.flush();
-      session.doWork(
-          connection -> {connection.createStatement().execute("set auto_batch_dml=false");
-            connection.createStatement().execute("set auto_batch_dml_update_count_verification=true");
-          });
       tx.commit();
     } catch (Exception e) {
-      session.doWork(
-          connection -> {connection.createStatement().execute("set auto_batch_dml=false");
-            connection.createStatement().execute("set auto_batch_dml_update_count_verification=true");
-          });
       if (tx != null) {
         tx.rollback();
       }
@@ -525,7 +495,7 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     long districtId = Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     int level = random.nextInt(10, 21);
 
-    Session session = sessionFactory.openSession();
+    Session session = sessionHelper.createSession(hibernateConfiguration.isReadOnly(), false);
     Transaction tx = session.beginTransaction();
     try {
       CriteriaBuilder cb = session.getCriteriaBuilder();
@@ -568,7 +538,6 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
             cb.lt(stockRoot.get("quantity"), level));
         long stockCount = session.createQuery(stockQuery).getSingleResult();
       }
-
       tx.commit();
     } catch (Exception e) {
       if (tx != null) {

@@ -34,6 +34,16 @@ public class HibernateConfiguration {
 
   private boolean autoBatchDml;
 
+  private boolean readOnly;
+
+  public boolean isReadOnly() {
+    return readOnly;
+  }
+
+  public void setReadOnly(boolean readOnly) {
+    this.readOnly = readOnly;
+  }
+
   public boolean isAutoBatchDml() {
     return autoBatchDml;
   }

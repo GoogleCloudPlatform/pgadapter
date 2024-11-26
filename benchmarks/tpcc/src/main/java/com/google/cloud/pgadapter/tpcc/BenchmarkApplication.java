@@ -209,7 +209,7 @@ public class BenchmarkApplication implements CommandLineRunner {
             executor.submit(
                 new HibernateBenchmarkRunner(
                     statistics,
-                    sessionFactory,
+                    new SessionHelper(sessionFactory),
                     tpccConfiguration,
                     pgAdapterConfiguration,
                     spannerConfiguration,
