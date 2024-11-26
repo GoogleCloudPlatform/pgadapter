@@ -106,7 +106,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       }
       quantities[line] = random.nextInt(1, 10);
     }
-    Session session = sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml());
+    Session session =
+        sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml(), "new_order");
     Transaction tx = session.beginTransaction();
     try {
       Customer customer =
@@ -232,7 +233,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
       customerDistrictId =
           Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     }
-    Session session = sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml());
+    Session session =
+        sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml(), "payment");
     Transaction tx = session.beginTransaction();
     try {
       if (byName) {
@@ -334,7 +336,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     String lastName = LastNameGenerator.generateLastName(this.random, Long.MAX_VALUE);
     boolean byName = random.nextInt(100) < 60;
 
-    Session session = sessionHelper.createSession(hibernateConfiguration.isReadOnly(), false);
+    Session session =
+        sessionHelper.createSession(hibernateConfiguration.isReadOnly(), false, "order_status");
     Transaction tx = session.beginTransaction();
     try {
       Customer customer = null;
@@ -407,7 +410,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
   public void delivery() throws SQLException {
     long warehouseId = Long.reverse(random.nextInt(tpccConfiguration.getWarehouses()));
     long carrierId = Long.reverse(random.nextInt(10));
-    Session session = sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml());
+    Session session =
+        sessionHelper.createSession(false, hibernateConfiguration.isAutoBatchDml(), "delivery");
     Transaction tx = session.beginTransaction();
     try {
       for (long district = 0L;
@@ -495,7 +499,8 @@ public class HibernateBenchmarkRunner extends AbstractBenchmarkRunner {
     long districtId = Long.reverse(random.nextInt(tpccConfiguration.getDistrictsPerWarehouse()));
     int level = random.nextInt(10, 21);
 
-    Session session = sessionHelper.createSession(hibernateConfiguration.isReadOnly(), false);
+    Session session =
+        sessionHelper.createSession(hibernateConfiguration.isReadOnly(), false, "stock_level");
     Transaction tx = session.beginTransaction();
     try {
       CriteriaBuilder cb = session.getCriteriaBuilder();
