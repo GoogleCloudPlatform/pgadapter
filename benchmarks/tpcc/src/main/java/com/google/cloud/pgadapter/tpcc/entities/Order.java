@@ -28,7 +28,6 @@ import java.util.List;
 import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate
 @Table(name = "orders")
 public class Order {
   @EmbeddedId private OrderId id;

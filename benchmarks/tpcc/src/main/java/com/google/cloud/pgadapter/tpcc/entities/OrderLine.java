@@ -19,7 +19,6 @@ import java.sql.Timestamp;
 import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate
 @Table(name = "order_line")
 public class OrderLine {
   @EmbeddedId private OrderLineId id;

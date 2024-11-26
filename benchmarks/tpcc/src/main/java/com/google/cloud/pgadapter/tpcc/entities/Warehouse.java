@@ -21,7 +21,6 @@ import java.math.BigDecimal;
 import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
-@DynamicUpdate
 @Table(name = "warehouse")
 public class Warehouse {
 
