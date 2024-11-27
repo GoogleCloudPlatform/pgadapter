@@ -12,7 +12,7 @@ public class SessionHelper {
   }
 
   public Session createSession(boolean readOnly, boolean autoBatchDml, String transactionTag) {
-    if (readOnly) return createReadOnlySession(transactionTag);
+    if (readOnly) return createReadOnlySession();
     if (autoBatchDml) return createAutoBatchDmlSession(transactionTag);
     return createReadWriteSession(transactionTag);
   }
@@ -21,10 +21,9 @@ public class SessionHelper {
     Session session = sessionFactory.openSession();
     session.doWork(
         conn -> {
+          conn.createStatement().execute("RESET ALL");
           conn.setReadOnly(false);
-          conn.createStatement().execute("set auto_batch_dml=false");
-          conn.createStatement().execute("set auto_batch_dml_update_count_verification=true");
-          conn.createStatement().execute("set transaction_tag='" + transactionTag + "'");
+          //conn.createStatement().execute("set transaction_tag='" + transactionTag + "'");
         });
     return session;
   }
@@ -33,22 +32,21 @@ public class SessionHelper {
     Session session = sessionFactory.openSession();
     session.doWork(
         conn -> {
+          conn.createStatement().execute("RESET ALL");
           conn.setReadOnly(false);
           conn.createStatement().execute("set auto_batch_dml=true");
           conn.createStatement().execute("set auto_batch_dml_update_count_verification=false");
-          conn.createStatement().execute("set transaction_tag='" + transactionTag + "'");
+          //conn.createStatement().execute("set transaction_tag='" + transactionTag + "'");
         });
     return session;
   }
 
-  public Session createReadOnlySession(String transactionTag) {
+  public Session createReadOnlySession() {
     Session session = sessionFactory.openSession();
     session.doWork(
         conn -> {
+          conn.createStatement().execute("RESET ALL");
           conn.setReadOnly(true);
-          conn.createStatement().execute("set auto_batch_dml=false");
-          conn.createStatement().execute("set auto_batch_dml_update_count_verification=false");
-          conn.createStatement().execute("set transaction_tag='" + transactionTag + "'");
         });
     return session;
   }

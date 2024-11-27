@@ -25,6 +25,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(name = "customer")
