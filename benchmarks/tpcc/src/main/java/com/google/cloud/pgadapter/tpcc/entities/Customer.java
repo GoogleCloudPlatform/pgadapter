@@ -28,6 +28,7 @@ import java.sql.Timestamp;
 import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
+@DynamicUpdate
 @Table(name = "customer")
 public class Customer {
 
