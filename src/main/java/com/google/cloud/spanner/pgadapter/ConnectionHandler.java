@@ -276,7 +276,6 @@ public class ConnectionHandler implements Runnable {
   @VisibleForTesting
   static String buildConnectionURL(
       String database, OptionsMetadata options, Properties properties) {
-    boolean checkForCredentials = true;
     String uri =
         options.hasDefaultConnectionUrl()
             ? options.getDefaultConnectionUrl()

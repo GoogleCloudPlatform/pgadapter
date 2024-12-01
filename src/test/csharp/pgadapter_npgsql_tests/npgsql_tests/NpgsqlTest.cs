@@ -72,7 +72,7 @@ public class NpgsqlTest
             while (reader.Read())
             {
                 var version = reader.GetString(0);
-                Console.WriteLine($"{version}");
+                Console.Write($"{version}\n");
             }
         }
     }
@@ -88,7 +88,7 @@ public class NpgsqlTest
             while (reader.Read())
             {
                 var applicationName = reader.GetString(0);
-                Console.WriteLine($"{applicationName}");
+                Console.Write($"{applicationName}\n");
             }
         }
     }
@@ -113,7 +113,7 @@ public class NpgsqlTest
                 return;
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestSelectArray()
@@ -136,7 +136,7 @@ public class NpgsqlTest
                 return;
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestQueryWithParameter()
@@ -165,7 +165,7 @@ public class NpgsqlTest
                 return;
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestQueryAllDataTypes()
@@ -245,7 +245,7 @@ public class NpgsqlTest
                 }
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestUpdateAllDataTypes()
@@ -279,7 +279,7 @@ public class NpgsqlTest
             Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
             return;
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestInsertAllDataTypes()
@@ -313,7 +313,7 @@ public class NpgsqlTest
             Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
             return;
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestInsertNullsAllDataTypes()
@@ -348,7 +348,7 @@ public class NpgsqlTest
             Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
             return;
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestInsertAllDataTypesReturning()
@@ -446,7 +446,7 @@ public class NpgsqlTest
                 }
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestInsertBatch()
@@ -486,7 +486,7 @@ public class NpgsqlTest
             Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: {batchSize}");
             return;
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestMixedBatch()
@@ -572,7 +572,7 @@ public class NpgsqlTest
                 return;
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestBatchExecutionError()
@@ -609,7 +609,7 @@ public class NpgsqlTest
         try
         {
             var updateCount = batch.ExecuteNonQuery();
-            Console.WriteLine($"Update count: {updateCount}");
+            Console.Write($"Update count: {updateCount}\n");
         }
         catch (Exception exception)
         {
@@ -683,7 +683,7 @@ public class NpgsqlTest
             Console.WriteLine($"Batch returned {updateCount} updates, expected -1.");
             return;
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestDdlScript()
@@ -757,7 +757,7 @@ public class NpgsqlTest
             Console.WriteLine($"Batch returned {updateCount} updates, expected -1.");
             return;
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestBinaryCopyIn()
@@ -799,7 +799,7 @@ public class NpgsqlTest
             writer.Complete();
         }
         
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestTextCopyIn()
@@ -838,7 +838,7 @@ public class NpgsqlTest
             writer.Write("\\N\n");
         }
         
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestBinaryCopyOut()
@@ -1085,7 +1085,7 @@ public class NpgsqlTest
                 Console.Write("\n");
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestTextCopyOut()
@@ -1104,10 +1104,11 @@ public class NpgsqlTest
                 {
                     break;
                 }
-                Console.WriteLine(line);
+                Console.Write(line);
+                Console.Write("\n");
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestSimplePrepare()
@@ -1118,7 +1119,7 @@ public class NpgsqlTest
         var cmd = new NpgsqlCommand("SELECT * FROM all_types WHERE col_bigint=$1", connection);
         cmd.Parameters.Add("param", NpgsqlDbType.Integer);
         cmd.Prepare();
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestPrepareAndExecute()
@@ -1168,7 +1169,7 @@ public class NpgsqlTest
                 return;
             }
         }
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestReadWriteTransaction()
@@ -1185,7 +1186,7 @@ public class NpgsqlTest
         {
             while (reader.Read())
             {
-                Console.WriteLine("Row: " + reader.GetInt64(0));
+                Console.Write("Row: " + reader.GetInt64(0) + "\n");
             }
         }
         var insertSql =
@@ -1223,7 +1224,7 @@ public class NpgsqlTest
             }
         }
         transaction.Commit();
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
 
     public void TestReadOnlyTransaction()
@@ -1242,12 +1243,12 @@ public class NpgsqlTest
             using var reader = selectCommand.ExecuteReader();
             while (reader.Read())
             {
-                Console.WriteLine("Row: " + reader.GetInt64(0));
+                Console.Write("Row: " + reader.GetInt64(0) + "\n");
             }
         }
         // We need to either commit or rollback the transaction to release the underlying resources.
         transaction.Commit();
-        Console.WriteLine("Success");
+        Console.Write("Success\n");
     }
     
 }
