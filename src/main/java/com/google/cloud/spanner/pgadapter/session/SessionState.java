@@ -145,8 +145,9 @@ public class SessionState {
         + "\n),\n"
         + "pg_settings_names_ as (\n"
         + "select name from pg_settings_inmem_\n"
-        + "union\n"
-        + "select name from pg_catalog.pg_settings\n"
+        // TODO: Re-enable when the pg_settings table in the emulator has been fixed.
+        // + "union\n"
+        // + "select name from pg_catalog.pg_settings\n"
         + "),\n"
         + "pg_settings as (\n"
         + "select n.name, "
@@ -154,7 +155,9 @@ public class SessionState {
         + "\n"
         + "from pg_settings_names_ n\n"
         + "left join pg_settings_inmem_ s1 using (name)\n"
-        + "left join pg_catalog.pg_settings s2 using (name)\n"
+        // TODO: Re-enable when the pg_settings table in the emulator has been fixed.
+        // + "left join pg_catalog.pg_settings s2 using (name)\n"
+        + "left join pg_settings_inmem_ s2 using (name)\n"
         + "order by name\n"
         + ")\n";
   }

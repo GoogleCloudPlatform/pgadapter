@@ -1024,6 +1024,14 @@ public class OptionsMetadata {
       host = environment.get(SPANNER_EMULATOR_HOST_ENV_VAR);
       usePlainText = true;
     }
+    if (propertyMap != null
+        && Boolean.parseBoolean(propertyMap.getOrDefault("autoConfigEmulator", "false"))) {
+      usePlainText = true;
+    }
+    if (propertyMap != null
+        && Boolean.parseBoolean(propertyMap.getOrDefault("usePlainText", "false"))) {
+      usePlainText = true;
+    }
     String endpoint;
     if (host.isEmpty()) {
       endpoint = "cloudspanner:/";
@@ -1041,8 +1049,7 @@ public class OptionsMetadata {
     // Note that Credentials here is the credentials file, not the actual credentials
     String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
-    if (!shouldAuthenticate()
-        && Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))) {
+    if (!shouldAuthenticate() && !usePlainText) {
       String credentials = buildCredentialsFile();
       if (!Strings.isNullOrEmpty(credentials)) {
         url = String.format("%s;credentials=%s", url, credentials);

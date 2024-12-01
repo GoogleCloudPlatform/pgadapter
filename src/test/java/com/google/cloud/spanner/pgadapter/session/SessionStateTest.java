@@ -441,14 +441,17 @@ public class SessionStateTest {
         + "),\n"
         + "pg_settings_names_ as (\n"
         + "select name from pg_settings_inmem_\n"
-        + "union\n"
-        + "select name from pg_catalog.pg_settings\n"
+        // TODO: Re-enable when the pg_settings table in the emulator has been fixed.
+        // + "union\n"
+        // + "select name from pg_catalog.pg_settings\n"
         + "),\n"
         + "pg_settings as (\n"
         + "select n.name, coalesce(s1.setting, s2.setting) as setting,coalesce(s1.unit, s2.unit) as unit,coalesce(s1.category, s2.category) as category,coalesce(s1.short_desc, s2.short_desc) as short_desc,coalesce(s1.extra_desc, s2.extra_desc) as extra_desc,coalesce(s1.context, s2.context) as context,coalesce(s1.vartype, s2.vartype) as vartype,coalesce(s1.source, s2.source) as source,coalesce(s1.min_val, s2.min_val) as min_val,coalesce(s1.max_val, s2.max_val) as max_val,coalesce(s1.enumvals, s2.enumvals) as enumvals,coalesce(s1.boot_val, s2.boot_val) as boot_val,coalesce(s1.reset_val, s2.reset_val) as reset_val,coalesce(s1.sourcefile, s2.sourcefile) as sourcefile,coalesce(s1.sourceline, s2.sourceline) as sourceline,coalesce(s1.pending_restart, s2.pending_restart) as pending_restart\n"
         + "from pg_settings_names_ n\n"
         + "left join pg_settings_inmem_ s1 using (name)\n"
-        + "left join pg_catalog.pg_settings s2 using (name)\n"
+        // TODO: Re-enable when the pg_settings table in the emulator has been fixed.
+        // + "left join pg_catalog.pg_settings s2 using (name)\n"
+        + "left join pg_settings_inmem_ s2 using (name)\n"
         + "order by name\n"
         + ")\n";
   }

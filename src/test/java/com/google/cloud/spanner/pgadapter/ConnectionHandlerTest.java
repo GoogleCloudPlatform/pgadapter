@@ -689,7 +689,7 @@ public class ConnectionHandlerTest {
     // Enable the autoConfigEmulator flag through the options builder.
     OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;autoConfigEmulator=true;dialect=postgresql",
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;usePlainText=true;autoConfigEmulator=true;dialect=postgresql",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             emulatorOptions,
