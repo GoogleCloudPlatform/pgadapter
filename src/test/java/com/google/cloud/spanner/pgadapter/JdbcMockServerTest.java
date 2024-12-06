@@ -5600,6 +5600,33 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testRetryDmlAsPdml() throws SQLException {
+    String sql = "update foo set bar=0 where bar is null";
+    mockSpanner.setExecuteSqlExecutionTime(
+        SimulatedExecutionTime.ofException(createTransactionMutationLimitExceededException()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 100_000L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        java.sql.Statement statement = connection.createStatement()) {
+      assertTrue(connection.getAutoCommit());
+      statement.execute(
+          "set spanner.autocommit_dml_mode='TRANSACTIONAL_WITH_FALLBACK_TO_PARTITIONED_NON_ATOMIC'");
+      assertEquals(100_000, statement.executeUpdate(sql));
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    BeginTransactionRequest beginTransactionRequest =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+    assertTrue(beginTransactionRequest.getOptions().hasPartitionedDml());
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest atomicRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertTrue(atomicRequest.getTransaction().hasBegin());
+    assertTrue(atomicRequest.getTransaction().getBegin().hasReadWrite());
+    ExecuteSqlRequest pdmlRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertTrue(pdmlRequest.getTransaction().hasId());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
   public void testShutdown_failsByDefault() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl());
         java.sql.Statement statement = connection.createStatement()) {
