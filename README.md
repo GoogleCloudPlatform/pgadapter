@@ -14,6 +14,7 @@ PGAdapter can be used with the following drivers and clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
 1. `IntelliJ`, `DataGrip` and other `JetBrains` IDEs. See [Connect Cloud Spanner PostgreSQL to JetBrains](docs/intellij.md) for more details.
 1. `JDBC`: Versions 42.x and higher are supported. See [JDBC support](docs/jdbc.md) for more details.
+1. `R2DBC`: Versions 1.0.7 and higher are supported. See [R2DBC sample](samples/java/r2dbc) for a small sample application.
 1. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 1. `psycopg2`: Version 2.9.3 and higher are supported. See [psycopg2](docs/psycopg2.md) for more details.
 1. `psycopg3`: Version 3.1.x and higher are supported. See [psycopg3 support](docs/psycopg3.md) for more details.
