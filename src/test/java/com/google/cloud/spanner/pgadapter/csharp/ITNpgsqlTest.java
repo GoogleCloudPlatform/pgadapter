@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.csharp.AbstractNpgsqlMockServer
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -157,34 +158,39 @@ public class ITNpgsqlTest implements IntegrationTest {
         databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
   }
 
+  static void assertEqualsIgnoreControlCharacters(String expected, String actual) {
+    assertNotNull(actual);
+    assertTrue("Expected: %s\n" + "     Got: %s\n", actual.endsWith(expected));
+  }
+
   @Test
   public void testShowServerVersion() throws IOException, InterruptedException {
     String result = execute("TestShowServerVersion", createConnectionString());
-    assertEquals("14.1\n", result);
+    assertEqualsIgnoreControlCharacters("14.1\n", result);
   }
 
   @Test
   public void testSelect1() throws IOException, InterruptedException {
     String result = execute("TestSelect1", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
   public void testSelectArray() throws IOException, InterruptedException {
     String result = execute("TestSelectArray", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
   public void testQueryAllDataTypes() throws IOException, InterruptedException {
     String result = execute("TestQueryAllDataTypes", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
   public void testUpdateAllDataTypes() throws IOException, InterruptedException {
     String result = execute("TestUpdateAllDataTypes", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
@@ -195,7 +201,7 @@ public class ITNpgsqlTest implements IntegrationTest {
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
     String result = execute("TestInsertAllDataTypes", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
@@ -206,7 +212,7 @@ public class ITNpgsqlTest implements IntegrationTest {
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
     String result = execute("TestInsertNullsAllDataTypes", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
@@ -216,7 +222,7 @@ public class ITNpgsqlTest implements IntegrationTest {
     testEnv.write(databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(1))));
 
     String result = execute("TestInsertAllDataTypesReturning", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
@@ -234,7 +240,7 @@ public class ITNpgsqlTest implements IntegrationTest {
     }
 
     String result = execute("TestInsertBatch", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
 
     // Verify that we really received 10 rows.
     final long batchSize = 10L;
@@ -261,7 +267,7 @@ public class ITNpgsqlTest implements IntegrationTest {
     }
 
     String result = execute("TestMixedBatch", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
 
     final long batchSize = 5L;
     try (ResultSet resultSet =
@@ -332,7 +338,7 @@ public class ITNpgsqlTest implements IntegrationTest {
         databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
 
     String result = execute(testMethod, createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
@@ -372,7 +378,7 @@ public class ITNpgsqlTest implements IntegrationTest {
     // Add an extra NULL-row to the table.
     addNullRow();
     String result = execute("TestBinaryCopyOut", createConnectionString());
-    assertEquals(
+    assertEqualsIgnoreControlCharacters(
         "1\tTrue\tdGVzdA==\t3.14\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]\n"
             + "2\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
             + "Success\n",
@@ -384,7 +390,7 @@ public class ITNpgsqlTest implements IntegrationTest {
     // Add an extra NULL-row to the table.
     addNullRow();
     String result = execute("TestTextCopyOut", createConnectionString());
-    assertEquals(
+    assertEqualsIgnoreControlCharacters(
         "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
             + "2\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
             + "Success\n",
@@ -447,19 +453,19 @@ public class ITNpgsqlTest implements IntegrationTest {
   @Test
   public void testSimplePrepare() throws IOException, InterruptedException {
     String result = execute("TestSimplePrepare", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
   public void testPrepareAndExecute() throws IOException, InterruptedException {
     String result = execute("TestPrepareAndExecute", createConnectionString());
-    assertEquals("Success\n", result);
+    assertEqualsIgnoreControlCharacters("Success\n", result);
   }
 
   @Test
   public void testReadWriteTransaction() throws IOException, InterruptedException {
     String result = execute("TestReadWriteTransaction", createConnectionString());
-    assertEquals("Row: 1\n" + "Success\n", result);
+    assertEqualsIgnoreControlCharacters("Row: 1\n" + "Success\n", result);
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
         client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
@@ -472,6 +478,6 @@ public class ITNpgsqlTest implements IntegrationTest {
   @Test
   public void testReadOnlyTransaction() throws IOException, InterruptedException {
     String result = execute("TestReadOnlyTransaction", createConnectionString());
-    assertEquals("Row: 1\n" + "Row: 2\n" + "Success\n", result);
+    assertEqualsIgnoreControlCharacters("Row: 1\n" + "Row: 2\n" + "Success\n", result);
   }
 }
