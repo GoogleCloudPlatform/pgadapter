@@ -47,7 +47,7 @@ public class AuthMockServerTest extends AbstractMockServerTest {
       "ERROR: Invalid credentials received.\n"
           + "  Hint: PGAdapter expects credentials to be one of the following:\n"
           + "1. Username contains the fixed string 'oauth2' and the password field contains a valid OAuth2 token.\n"
-          + "2. Username contains any string and the password field contains the JSON payload of a credentials file (e.g. a service account file).\n"
+          + "2. Username contains any string and the password field contains the JSON payload of a service account or user account credentials file. Note: Only user accounts and service accounts are supported.\n"
           + "3. Username contains the email address of a service account and the password contains the corresponding private key for the service account.";
 
   @BeforeClass
@@ -102,13 +102,7 @@ public class AuthMockServerTest extends AbstractMockServerTest {
     PSQLException exception =
         assertThrows(
             PSQLException.class, () -> DriverManager.getConnection(createUrl(), "oauth2", ""));
-    assertEquals(
-        "ERROR: Invalid credentials received.\n"
-            + "  Hint: PGAdapter expects credentials to be one of the following:\n"
-            + "1. Username contains the fixed string 'oauth2' and the password field contains a valid OAuth2 token.\n"
-            + "2. Username contains any string and the password field contains the JSON payload of a credentials file (e.g. a service account file).\n"
-            + "3. Username contains the email address of a service account and the password contains the corresponding private key for the service account.",
-        exception.getMessage());
+    assertEquals(CREDENTIALS_ERROR, exception.getMessage());
   }
 
   @Test
@@ -181,6 +175,20 @@ public class AuthMockServerTest extends AbstractMockServerTest {
           + "  \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/invalid.com\"\n"
           + "}\n";
 
+  private static final String INVALID_CREDENTIALS_FILE =
+      "{\n"
+          + "  \"type\": \"external_account\",\n"
+          + "  \"project_id\": \"pgadapter-mock-server-test-project\",\n"
+          + "  \"private_key_id\": \"random-key-id\",\n"
+          + "  \"private_key\": \"%s\",\n"
+          + "  \"client_email\": \"pgadapter-test-account@pgadapter-mock-server-test-project.iam.invalid.com\",\n"
+          + "  \"client_id\": \"123456789\",\n"
+          + "  \"auth_uri\": \"https://accounts.google.com/o/oauth2/auth\",\n"
+          + "  \"token_uri\": \"https://oauth2.googleapis.com/token\",\n"
+          + "  \"auth_provider_x509_cert_url\": \"https://www.googleapis.com/oauth2/v1/certs\",\n"
+          + "  \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/invalid.com\"\n"
+          + "}\n";
+
   @Test
   public void testConnectWithCredentialsFile() throws Exception {
     // The username is ignored by PGAdapter when a credentials file is used.
@@ -206,6 +214,18 @@ public class AuthMockServerTest extends AbstractMockServerTest {
     assertNotNull(passwordMessage);
     assertEquals("whatever", passwordMessage.getUsername());
     assertEquals(password, passwordMessage.getPassword());
+  }
+
+  @Test
+  public void testConnectWithInvalidCredentialsFile() throws Exception {
+    // The username is ignored by PGAdapter when a credentials file is used.
+    String username = "whatever";
+    String password = String.format(INVALID_CREDENTIALS_FILE, generateRandomPrivateKey());
+    PSQLException exception =
+        assertThrows(
+            PSQLException.class,
+            () -> DriverManager.getConnection(createUrl(), username, password));
+    assertEquals(CREDENTIALS_ERROR, exception.getMessage());
   }
 
   private String generateRandomPrivateKey() throws NoSuchAlgorithmException, IOException {
