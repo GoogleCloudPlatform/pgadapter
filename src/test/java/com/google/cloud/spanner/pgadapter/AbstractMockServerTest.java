@@ -46,6 +46,8 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
+import com.google.rpc.Help;
+import com.google.rpc.Help.Link;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.v1.Partition;
 import com.google.spanner.v1.PartitionQueryRequest;
@@ -61,6 +63,7 @@ import com.google.spanner.v1.TypeCode;
 import io.grpc.Context;
 import io.grpc.Contexts;
 import io.grpc.Metadata;
+import io.grpc.Metadata.Key;
 import io.grpc.Server;
 import io.grpc.ServerCall;
 import io.grpc.ServerCall.Listener;
@@ -1373,6 +1376,25 @@ public abstract class AbstractMockServerTest {
     if (!ignoreException) {
       throw exception;
     }
+  }
+
+  static StatusRuntimeException createTransactionMutationLimitExceededException() {
+    Metadata.Key<byte[]> key = Key.of("grpc-status-details-bin", Metadata.BINARY_BYTE_MARSHALLER);
+    Help help =
+        Help.newBuilder()
+            .addLinks(
+                Link.newBuilder()
+                    .setDescription("Cloud Spanner limits documentation.")
+                    .setUrl("https://cloud.google.com/spanner/docs/limits")
+                    .build())
+            .build();
+    com.google.rpc.Status status =
+        com.google.rpc.Status.newBuilder().addDetails(Any.pack(help)).build();
+    Metadata trailers = new Metadata();
+    trailers.put(key, status.toByteArray());
+    return io.grpc.Status.INVALID_ARGUMENT
+        .withDescription("The transaction contains too many mutations.")
+        .asRuntimeException(trailers);
   }
 
   @Before
