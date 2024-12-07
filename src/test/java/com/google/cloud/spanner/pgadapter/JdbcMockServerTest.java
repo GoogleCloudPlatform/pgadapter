@@ -95,6 +95,10 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -5636,6 +5640,47 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           "ERROR: SHUTDOWN [SMART | FAST | IMMEDIATE] statement is not enabled for this server. "
               + "Start PGAdapter with --allow_shutdown_statement to enable the use of the SHUTDOWN statement.",
           exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testCancel() throws Exception {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        java.sql.Statement statement = connection.createStatement()) {
+      mockSpanner.freeze();
+      Future<Long> queryResult =
+          executor.submit(
+              () -> {
+                try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
+                  if (resultSet.next()) {
+                    return resultSet.getLong(1);
+                  }
+                  return 0L;
+                }
+              });
+      // Wait for the request to have landed on the server.
+      mockSpanner.waitForRequestsToContain(
+          msg -> {
+            if (!(msg instanceof ExecuteSqlRequest)) {
+              return false;
+            }
+            ExecuteSqlRequest executeSqlRequest = (ExecuteSqlRequest) msg;
+            return executeSqlRequest.getSql().equals("SELECT 1");
+          },
+          1000L);
+      // Cancel the statement.
+      statement.cancel();
+      ExecutionException exception = assertThrows(ExecutionException.class, queryResult::get);
+      assertEquals(PSQLException.class, exception.getCause().getClass());
+      PSQLException psqlException = (PSQLException) exception.getCause();
+      assertNotNull(psqlException.getServerErrorMessage());
+      assertEquals(
+          SQLState.QueryCanceled.toString(), psqlException.getServerErrorMessage().getSQLState());
+    } finally {
+      mockSpanner.unfreeze();
+      executor.shutdown();
     }
   }
 
