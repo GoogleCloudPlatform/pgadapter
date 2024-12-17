@@ -5678,6 +5678,14 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertNotNull(psqlException.getServerErrorMessage());
       assertEquals(
           SQLState.QueryCanceled.toString(), psqlException.getServerErrorMessage().getSQLState());
+
+      mockSpanner.unfreeze();
+      // Verify that the connection is still usable.
+      try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
     } finally {
       mockSpanner.unfreeze();
       executor.shutdown();

@@ -17,6 +17,7 @@ package com.google.cloud.spanner.connection;
 import com.google.api.core.InternalApi;
 import com.google.auth.Credentials;
 import com.google.cloud.spanner.connection.ConnectionOptions.Builder;
+import com.google.cloud.spanner.connection.StatementExecutor.StatementExecutorType;
 import com.google.cloud.spanner.pgadapter.logging.GrpcLogInterceptor;
 import com.google.common.collect.ImmutableList;
 import java.util.logging.Level;
@@ -30,6 +31,10 @@ public class ConnectionOptionsHelper {
   // TODO: Remove when Builder.setCredentials(..) has been made public.
   public static Builder setCredentials(Builder connectionOptionsBuilder, Credentials credentials) {
     return connectionOptionsBuilder.setCredentials(credentials);
+  }
+
+  public static Builder useDirectExecutor(Builder connectionOptionsBuilder) {
+    return connectionOptionsBuilder.setStatementExecutorType(StatementExecutorType.DIRECT_EXECUTOR);
   }
 
   /** Adds a gRPC log interceptor if the log level has been set to FINEST. */
