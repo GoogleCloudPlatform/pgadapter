@@ -483,7 +483,6 @@ public class OptionsMetadata {
           || numChannels != null
           || databaseRole != null
           || autoConfigEmulator
-          || useVirtualThreads
           || useVirtualGrpcTransportThreads
           || enableEndToEndTracing) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
@@ -498,11 +497,6 @@ public class OptionsMetadata {
         }
         if (autoConfigEmulator) {
           jdbcOptionBuilder.append("autoConfigEmulator=true;");
-        }
-        if (useVirtualThreads) {
-          jdbcOptionBuilder
-              .append(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME)
-              .append("=true;");
         }
         if (useVirtualGrpcTransportThreads) {
           jdbcOptionBuilder

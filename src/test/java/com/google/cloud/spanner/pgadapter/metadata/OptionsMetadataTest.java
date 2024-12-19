@@ -429,8 +429,9 @@ public class OptionsMetadataTest {
             .build()
             .getPropertyMap()
             .get("useVirtualThreads"));
-    assertEquals(
-        "true",
+    // Virtual threads should not be carried over to the underlying connection. Instead, this
+    // option only determines the type of thread that is used for a connection handler.
+    assertNull(
         OptionsMetadata.newBuilder()
             .useVirtualThreads()
             .setCredentials(NoCredentials.getInstance())
