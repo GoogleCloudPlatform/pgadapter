@@ -64,7 +64,7 @@ jobs:
       - name: Setup psql
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends postgresql-client-14
+          sudo apt-get install --yes --no-install-recommends postgresql-client-17
       - name: Create PostgreSQL test database
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
