@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google-cloud/spanner": "^6.4.0",
+    "@google-cloud/spanner": "^7.0.0",
     "pg": "^8.8.0"
   }
 }

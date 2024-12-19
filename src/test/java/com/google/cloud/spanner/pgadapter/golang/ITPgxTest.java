@@ -134,6 +134,8 @@ public class ITPgxTest implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")
@@ -155,6 +157,8 @@ public class ITPgxTest implements IntegrationTest {
                 .set("col_array_bytea")
                 .toBytesArray(
                     Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float4")
+                .toFloat32Array(Arrays.asList(3.14f, null, -99.99f))
                 .set("col_array_float8")
                 .toFloat64Array(Arrays.asList(3.14d, null, -99.99d))
                 .set("col_array_int")

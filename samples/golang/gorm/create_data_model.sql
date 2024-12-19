@@ -13,7 +13,7 @@ create table if not exists singers (
              ELSE first_name || ' ' || last_name
         END) stored,
     active     boolean,
-    created_at timestamptz,
+    created_at timestamptz default current_timestamp,
     updated_at timestamptz
 );
 
@@ -24,7 +24,7 @@ create table if not exists albums (
     release_date     date,
     cover_picture    bytea,
     singer_id        varchar not null,
-    created_at       timestamptz,
+    created_at       timestamptz default current_timestamp,
     updated_at       timestamptz,
     constraint fk_albums_singers foreign key (singer_id) references singers (id)
 );
@@ -34,7 +34,7 @@ create table if not exists tracks (
     track_number bigint not null,
     title        varchar not null,
     sample_rate  float8 not null,
-    created_at   timestamptz,
+    created_at   timestamptz default current_timestamp,
     updated_at   timestamptz,
     primary key (id, track_number)
 )
@@ -45,7 +45,7 @@ create table if not exists venues (
     id          varchar not null primary key,
     name        varchar not null,
     description varchar not null,
-    created_at  timestamptz,
+    created_at  timestamptz default current_timestamp,
     updated_at  timestamptz
 );
 
@@ -56,7 +56,7 @@ create table if not exists concerts (
     name        varchar not null,
     start_time  timestamptz not null,
     end_time    timestamptz not null,
-    created_at  timestamptz,
+    created_at  timestamptz default current_timestamp,
     updated_at  timestamptz,
     constraint fk_concerts_venues  foreign key (venue_id)  references venues  (id),
     constraint fk_concerts_singers foreign key (singer_id) references singers (id),
@@ -79,7 +79,7 @@ create table if not exists ticket_sales (
     customer_name    varchar not null,
     price            decimal not null,
     seats            text[],
-    created_at       timestamptz,
+    created_at       timestamptz default current_timestamp,
     updated_at       timestamptz,
     deleted_at       timestamptz,
     constraint fk_ticket_sales_concerts foreign key (concert_id) references concerts (id)

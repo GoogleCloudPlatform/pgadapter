@@ -63,7 +63,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -281,6 +280,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -291,6 +291,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -324,6 +325,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -334,6 +336,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -380,6 +383,9 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + String.format(
+                "col_float4: %s\n",
+                format == DataFormat.POSTGRESQL_BINARY ? "3.140000104904175" : "3.14")
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -390,6 +396,10 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + String.format(
+                "col_array_float4: [%s, None, %s]\n",
+                format == DataFormat.POSTGRESQL_BINARY ? "3.140000104904175" : "3.14",
+                format == DataFormat.POSTGRESQL_BINARY ? "-99.98999786376953" : "-99.99")
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -421,7 +431,9 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   @Test
   public void testUpdateAllDataTypes() throws Exception {
     String sql =
-        "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float8=$3, col_int=$4, col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_varchar = $10";
+        "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float4=$3, col_float8=$4, col_int=$5, "
+            + "col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 "
+            + "WHERE col_varchar = $11";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -431,6 +443,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                         ImmutableList.of(
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -451,18 +464,20 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(3.14d)
                 .bind("p4")
-                .to(1L)
+                .to(3.14d)
                 .bind("p5")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(1L)
                 .bind("p6")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p7")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p8")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p9")
-                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
+                .to("test_string")
                 .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
+                .bind("p11")
                 .to("test")
                 .build(),
             1L));
@@ -509,16 +524,18 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
-                .to(100)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(100)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p10")
+                .to("test_string")
+                .bind("p11")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             1L));
@@ -564,16 +581,18 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
-                .to(100)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(100)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p10")
+                .to("test_string")
+                .bind("p11")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             1L));
@@ -603,9 +622,9 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             .collect(Collectors.toList());
     assertEquals(1, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(10, bindMessage.getFormatCodes().size());
+    assertEquals(11, bindMessage.getFormatCodes().size());
     assertArrayEquals(
-        new Short[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+        new Short[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
         bindMessage.getFormatCodes().toArray(new Short[0]));
   }
 
@@ -671,9 +690,9 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             .collect(Collectors.toList());
     assertEquals(1, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(10, bindMessage.getFormatCodes().size());
+    assertEquals(11, bindMessage.getFormatCodes().size());
     assertArrayEquals(
-        new Short[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        new Short[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         bindMessage.getFormatCodes().toArray(new Short[0]));
   }
 
@@ -702,6 +721,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p10")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p11")
                 .to((com.google.cloud.spanner.Value) null)
                 .build(),
             1L));
@@ -735,6 +756,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -763,16 +785,18 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
-                .to(100L)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(100L)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z"))
                 .bind("p9")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p10")
+                .to("test")
+                .bind("p11")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             ResultSet.newBuilder()
@@ -786,6 +810,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -796,6 +821,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -1002,20 +1028,23 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     Mutation mutation = request.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(2, mutation.getInsert().getValuesCount());
-    assertEquals(10, mutation.getInsert().getColumnsCount());
+    assertEquals(11, mutation.getInsert().getColumnsCount());
     ListValue insert = mutation.getInsert().getValues(0);
-    assertEquals("1", insert.getValues(0).getStringValue());
-    assertTrue(insert.getValues(1).getBoolValue());
+
+    int index = -1;
+    assertEquals("1", insert.getValues(++index).getStringValue());
+    assertTrue(insert.getValues(++index).getBoolValue());
     assertEquals(
         Base64.getEncoder().encodeToString("test_bytes".getBytes(StandardCharsets.UTF_8)),
-        insert.getValues(2).getStringValue());
-    assertEquals(3.14, insert.getValues(3).getNumberValue(), 0.0);
-    assertEquals("10", insert.getValues(4).getStringValue());
-    assertEquals("6.626", insert.getValues(5).getStringValue());
-    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(6).getStringValue());
-    assertEquals("2022-07-01", insert.getValues(7).getStringValue());
-    assertEquals("test", insert.getValues(8).getStringValue());
-    assertEquals("{\"key\": \"value\"}", insert.getValues(9).getStringValue());
+        insert.getValues(++index).getStringValue());
+    assertEquals(3.14f, (float) insert.getValues(++index).getNumberValue(), 0.0f);
+    assertEquals(3.14, insert.getValues(++index).getNumberValue(), 0.0);
+    assertEquals("10", insert.getValues(++index).getStringValue());
+    assertEquals("6.626", insert.getValues(++index).getStringValue());
+    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(++index).getStringValue());
+    assertEquals("2022-07-01", insert.getValues(++index).getStringValue());
+    assertEquals("test", insert.getValues(++index).getStringValue());
+    assertEquals("{\"key\": \"value\"}", insert.getValues(++index).getStringValue());
 
     insert = mutation.getInsert().getValues(1);
     assertEquals("2", insert.getValues(0).getStringValue());
@@ -1029,7 +1058,11 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
+                "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
+                    + "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+                    + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, "
+                    + "col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, "
+                    + "col_array_date, col_array_varchar, col_array_jsonb from all_types"),
             ALL_TYPES_RESULTSET
                 .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
@@ -1043,6 +1076,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.140000104904175\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -1053,6 +1087,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.140000104904175, None, -99.98999786376953]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -1063,6 +1098,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_bigint: None\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -1073,6 +1109,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -1088,12 +1125,11 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, "
-                    + "col_timestamptz, col_date, col_varchar, col_jsonb, "
-                    + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, "
-                    + "col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, "
-                    + "col_array_varchar, col_array_jsonb "
-                    + "from all_types"),
+                "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
+                    + "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+                    + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, "
+                    + "col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, "
+                    + "col_array_date, col_array_varchar, col_array_jsonb from all_types"),
             ALL_TYPES_RESULTSET
                 .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
@@ -1107,6 +1143,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -1117,6 +1154,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -1127,6 +1165,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_bigint: None\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -1137,6 +1176,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -1162,6 +1202,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -1172,6 +1213,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -1182,6 +1224,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_bigint: None\n"
             + "col_bool: None\n"
             + "col_bytea: None\n"
+            + "col_float4: None\n"
             + "col_float8: None\n"
             + "col_int: None\n"
             + "col_numeric: None\n"
@@ -1192,6 +1235,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: None\n"
             + "col_array_bool: None\n"
             + "col_array_bytea: None\n"
+            + "col_array_float4: None\n"
             + "col_array_float8: None\n"
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
@@ -1270,16 +1314,18 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                   .bind("p4")
                   .to(3.14d)
                   .bind("p5")
-                  .to(100L)
+                  .to(3.14d)
                   .bind("p6")
-                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                  .to(100L)
                   .bind("p7")
-                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                   .bind("p8")
-                  .to(Date.parseDate("2022-04-02"))
+                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                   .bind("p9")
-                  .to("test_string")
+                  .to(Date.parseDate("2022-04-02"))
                   .bind("p10")
+                  .to("test_string")
+                  .bind("p11")
                   .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                   .build(),
               1L));
@@ -1342,28 +1388,34 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  @Ignore("Named cursors are not yet supported")
   public void testNamedCursor() throws Exception {
-    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(sql), ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
+    String sql = "SELECT * FROM all_types WHERE col_bigint=1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
     String result = execute("named_cursor");
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
-            + "col_jsonb: {'key': 'value'}\n",
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_array_bigint: [1, None, 2]\n"
+            + "col_array_bool: [True, None, False]\n"
+            + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
+            + "col_array_float8: [3.14, None, -99.99]\n"
+            + "col_array_int: [-100, None, -200]\n"
+            + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
+            + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+            + "col_array_string: ['string1', None, 'string2']\n"
+            + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
         result);
   }
 
@@ -1382,6 +1434,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         "col_bigint: 1\n"
             + "col_bool: True\n"
             + "col_bytea: b'test'\n"
+            + "col_float4: 3.14\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -1392,6 +1445,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_bigint: [1, None, 2]\n"
             + "col_array_bool: [True, None, False]\n"
             + "col_array_bytea: [b'bytes1', None, b'bytes2']\n"
+            + "col_array_float4: [3.14, None, -99.99]\n"
             + "col_array_float8: [3.14, None, -99.99]\n"
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
@@ -1420,9 +1474,9 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   private static String getInsertAllTypesSql() {
-    return "INSERT INTO all_types "
-        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    return "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, "
+        + "col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
   }
 
   private static Statement createBatchInsertStatement(int index) {
@@ -1436,16 +1490,18 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         .bind("p4")
         .to(3.14d + index)
         .bind("p5")
-        .to(index)
+        .to(3.14d + index)
         .bind("p6")
-        .to(com.google.cloud.spanner.Value.pgNumeric(index + ".123"))
+        .to(index)
         .bind("p7")
-        .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", index)))
+        .to(com.google.cloud.spanner.Value.pgNumeric(index + ".123"))
         .bind("p8")
-        .to(Date.parseDate(String.format("2022-04-%02d", index + 1)))
+        .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", index)))
         .bind("p9")
-        .to("test_string" + index)
+        .to(Date.parseDate(String.format("2022-04-%02d", index + 1)))
         .bind("p10")
+        .to("test_string" + index)
+        .bind("p11")
         .to(com.google.cloud.spanner.Value.pgJsonb(String.format("{\"key\": \"value%d\"}", index)))
         .build();
   }
@@ -1461,6 +1517,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,

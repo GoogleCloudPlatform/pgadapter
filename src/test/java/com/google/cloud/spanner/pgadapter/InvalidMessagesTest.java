@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -29,12 +30,21 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class InvalidMessagesTest extends AbstractMockServerTest {
+  @BeforeClass
+  public static void startMockSpannerAndPgAdapterServers() throws Exception {
+    doStartMockSpannerAndPgAdapterServers(
+        createMockSpannerThatReturnsOneQueryPartition(),
+        "d",
+        configurator -> {},
+        OpenTelemetry.noop());
+  }
 
   @Test
   public void testConnectionWithoutMessages() throws IOException {

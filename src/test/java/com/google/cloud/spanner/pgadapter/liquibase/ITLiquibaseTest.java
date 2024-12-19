@@ -18,7 +18,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
@@ -61,10 +60,6 @@ public class ITLiquibaseTest {
 
   @BeforeClass
   public static void setup() throws ClassNotFoundException, IOException, SQLException {
-    assumeTrue(
-        "This test is not supported on the emulator due to a failure to add a column of type numeric with a default value to a non-empty table",
-        System.getenv("SPANNER_EMULATOR_HOST") == null);
-
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
 
@@ -85,7 +80,9 @@ public class ITLiquibaseTest {
           String.format(
               "changeLogFile: dbchangelog.xml\n"
                   + "url: jdbc:postgresql://localhost:%d/%s"
-                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
+                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n"
+                  + "username: ignored\n"
+                  + "password: ignored\n",
               testEnv.getPGAdapterPort(), database.getId().getDatabase());
       LOGGER.info("Using Liquibase properties:\n" + properties);
       writer.write(properties);
@@ -175,6 +172,18 @@ public class ITLiquibaseTest {
               .executeQuery("select count(*) from singers where address is null")) {
         assertTrue(resultSet.next());
         assertEquals(5L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      // Manually add a tag to the database.
+      runLiquibaseCommand(
+          "liquibase:tag", "-Dliquibase.tag=tag-set-with-command", "-Dliquibase.verbose=true");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select tag from databasechangelog where id='23 - remove all addresses'")) {
+        assertTrue(resultSet.next());
+        assertEquals("tag-set-with-command", resultSet.getString(1));
         assertFalse(resultSet.next());
       }
 

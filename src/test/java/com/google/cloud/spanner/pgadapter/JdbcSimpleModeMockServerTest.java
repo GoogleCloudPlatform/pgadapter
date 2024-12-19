@@ -16,12 +16,14 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
@@ -55,13 +57,13 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.jdbc.TimestampUtils;
+import org.postgresql.util.PSQLException;
 
 /**
  * Tests the native PG JDBC driver in simple query mode. This is similar to the protocol that is
@@ -403,15 +405,17 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
             .timeToString(java.sql.Timestamp.from(Instant.from(zonedDateTime)), true);
 
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar, col_jsonb "
-            + "from all_types "
-            + "where col_bigint=1 "
-            + "and col_bool='TRUE' "
-            + "and col_float8=3.14 "
-            + "and col_numeric=6.626 "
-            + String.format("and col_timestamptz='%s' ", timestampString)
-            + "and col_varchar='test' "
-            + "and col_jsonb='{\"key\": \"value\"}'";
+        String.format(
+            "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar, col_jsonb "
+                + "from all_types "
+                + "where col_bigint=('1'::int8) "
+                + "and col_bool=('TRUE'::boolean) "
+                + "and col_float8=('3.14'::double precision) "
+                + "and col_numeric=('6.626'::numeric) "
+                + "and col_timestamptz=('%s') "
+                + "and col_varchar=('test') "
+                + "and col_jsonb=('{\"key\": \"value\"}')",
+            timestampString);
     String jdbcSql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar, col_jsonb "
             + "from all_types "
@@ -426,6 +430,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         StatementResult.query(com.google.cloud.spanner.Statement.of(pgSql), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'utc'");
       try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
         int index = 0;
         preparedStatement.setLong(++index, 1L);
@@ -573,6 +578,57 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         assertThrows(SQLException.class, () -> statement.execute("execute my_statement"));
       }
+    }
+  }
+
+  @Test
+  public void testDiscard() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(true);
+      // Verify that all variants are supported.
+      connection.createStatement().execute("discard all");
+      connection.createStatement().execute("discard plans");
+      connection.createStatement().execute("discard sequences");
+      connection.createStatement().execute("discard temp");
+      connection.createStatement().execute("discard temporary");
+
+      // Create a prepared statement verify that it is dropped by DISCARD ALL.
+      connection.createStatement().execute("prepare foo as SELECT 1");
+      connection.createStatement().execute("execute foo");
+      connection.createStatement().execute("discard all");
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class, () -> connection.createStatement().execute("execute foo"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          SQLState.InvalidSqlStatementName.toString(),
+          exception.getServerErrorMessage().getSQLState());
+
+      // Verify that DISCARD ALL resets all session state.
+      connection.createStatement().execute("set spanner.copy_upsert=true");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.copy_upsert")) {
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+      connection.createStatement().execute("discard all");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.copy_upsert")) {
+        assertTrue(resultSet.next());
+        assertFalse(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Verify that 'discard all' is not accepted in a transaction block.
+      connection.setAutoCommit(false);
+      exception =
+          assertThrows(
+              PSQLException.class, () -> connection.createStatement().execute("discard all"));
+      assertNotNull(exception.getServerErrorMessage());
+      assertEquals(
+          SQLState.ActiveSqlTransaction.toString(),
+          exception.getServerErrorMessage().getSQLState());
     }
   }
 
@@ -764,7 +820,6 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(0, requests.size());
   }
 
-  @Ignore("https://github.com/pgjdbc/pgjdbc/issues/3007")
   @Test
   public void testImplicitBatchOfClientSideStatements() throws SQLException {
     String sql = "set statement_timeout = '10s'; " + "show statement_timeout; ";

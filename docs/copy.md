@@ -8,7 +8,7 @@ You can still copy data from/to a file by redirecting STDIN/STOUT to a file.
 ## COPY table_name FROM STDIN [BINARY]
 `COPY table_name FROM STDIN [BINARY]` is supported. This feature can be used to insert bulk data to a Cloud
 Spanner database. `COPY FROM STDIN` operations are atomic by default, but the standard transaction limits of
-Cloud Spanner apply to these transactions. That means that at most 20,000 mutations can be included
+Cloud Spanner apply to these transactions. That means that at most 80,000 mutations can be included
 in one `COPY` operation. `COPY FROM STDIN` can also be executed in non-atomic mode by executing the statement
 `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing the copy operation.
 
@@ -36,7 +36,7 @@ create table numbers (number bigint not null primary key, name varchar);
 cat numbers.txt | psql -h /tmp -d test-db -c "copy numbers from stdin;"
 ```
 
-The above operation will fail if the `numbers.txt` file contains more than 20,000 mutations.
+The above operation will fail if the `numbers.txt` file contains more than 80,000 mutations.
 
 ### Non-atomic COPY FROM STDIN example
 ```sql
@@ -48,7 +48,7 @@ cat numbers.txt | psql -h /tmp -d test-db -c "set spanner.autocommit_dml_mode='p
 ```
 
 The above operation will automatically split the data over multiple transactions if the file
-contains more than 20,000 mutations.
+contains more than 80,000 mutations.
 
 Note that this also means that if an error is encountered
 during the `COPY` operation, some rows may already have been persisted to the database. This will

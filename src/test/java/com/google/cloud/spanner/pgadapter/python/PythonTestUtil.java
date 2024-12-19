@@ -47,11 +47,6 @@ public class PythonTestUtil {
     builder.command(command);
     builder.directory(directory);
     builder.environment().put("VIRTUAL_ENV", directoryName + "/venv");
-    builder
-        .environment()
-        .put(
-            "C_INCLUDE_PATH",
-            "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.8/Headers");
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
     Scanner errorScanner = new Scanner(process.getErrorStream());

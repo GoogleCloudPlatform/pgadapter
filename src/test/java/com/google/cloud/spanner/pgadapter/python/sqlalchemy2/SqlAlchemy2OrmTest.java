@@ -55,6 +55,61 @@ import org.junit.runners.Parameterized.Parameters;
 public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
   private static final com.google.cloud.spanner.Value UNTYPED_NULL_VALUE = null;
 
+  private static final String SELECT_ALL_TYPES_SQL =
+      "SELECT "
+          + "all_types.col_bigint AS all_types_col_bigint, "
+          + "all_types.col_bool AS all_types_col_bool, "
+          + "all_types.col_bytea AS all_types_col_bytea, "
+          + "all_types.col_float4 AS all_types_col_float4, "
+          + "all_types.col_float8 AS all_types_col_float8, "
+          + "all_types.col_int AS all_types_col_int, "
+          + "all_types.col_numeric AS all_types_col_numeric, "
+          + "all_types.col_timestamptz AS all_types_col_timestamptz, "
+          + "all_types.col_date AS all_types_col_date, "
+          + "all_types.col_varchar AS all_types_col_varchar, "
+          + "all_types.col_jsonb AS all_types_col_jsonb, "
+          + "all_types.col_array_bigint AS all_types_col_array_bigint, "
+          + "all_types.col_array_bool AS all_types_col_array_bool, "
+          + "all_types.col_array_bytea AS all_types_col_array_bytea, "
+          + "all_types.col_array_float4 AS all_types_col_array_float4, "
+          + "all_types.col_array_float8 AS all_types_col_array_float8, "
+          + "all_types.col_array_int AS all_types_col_array_int, "
+          + "all_types.col_array_numeric AS all_types_col_array_numeric, "
+          + "all_types.col_array_timestamptz AS all_types_col_array_timestamptz, "
+          + "all_types.col_array_date AS all_types_col_array_date, "
+          + "all_types.col_array_varchar AS all_types_col_array_varchar, "
+          + "all_types.col_array_jsonb AS all_types_col_array_jsonb \n"
+          + "FROM all_types";
+
+  private static final String SELECT_ALL_TYPES_SINGLE_ROW_SQL =
+      SELECT_ALL_TYPES_SQL + " \nWHERE all_types.col_bigint = $1::INTEGER";
+
+  private static final String ALL_TYPES_ROW =
+      "AllTypes(\n"
+          + "col_bigint=     1,\n"
+          + "col_bool=       True,\n"
+          + "col_bytea=      b'test'\n"
+          + "col_float4=     3.14\n"
+          + "col_float8=     3.14\n"
+          + "col_int=        100\n"
+          + "col_numeric=    Decimal('6.626')\n"
+          + "col_timestamptz='2022-02-16T13:18:02.123456+00:00'\n"
+          + "col_date=       datetime.date(2022, 3, 29)\n"
+          + "col_varchar=    'test'\n"
+          + "col_jsonb=      {'key': 'value'}\n"
+          + "col_array_bigint=     [1, None, 2]\n"
+          + "col_array_bool=       [True, None, False]\n"
+          + "col_array_bytea=      [b'bytes1', None, b'bytes2']\n"
+          + "col_array_float4=     [3.14, None, -99.99]\n"
+          + "col_array_float8=     [3.14, None, -99.99]\n"
+          + "col_array_int=        [-100, None, -200]\n"
+          + "col_array_numeric=    [Decimal('6.626'), None, Decimal('-3.14')]\n"
+          + "col_array_timestamptz=[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+          + "col_array_date=       [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
+          + "col_array_varchar=    ['string1', None, 'string2']\n"
+          + "col_array_jsonb=      [{'key': 'value1'}, None, {'key': 'value2'}]\n"
+          + ")\n";
+
   @Parameter public String host;
 
   @Parameters(name = "host = {0}")
@@ -82,44 +137,48 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
             .bind("p4")
             .to(3.14d)
             .bind("p5")
-            .to(100)
+            .to(3.14d)
             .bind("p6")
-            .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+            .to(100)
             .bind("p7")
-            .to(Timestamp.parseTimestamp("2011-11-04T00:05:23.123456000Z"))
+            .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
             .bind("p8")
-            .to(Date.parseDate("2011-11-04"))
+            .to(Timestamp.parseTimestamp("2011-11-04T00:05:23.123456000Z"))
             .bind("p9")
-            .to("test string")
+            .to(Date.parseDate("2011-11-04"))
             .bind("p10")
+            .to("test string")
+            .bind("p11")
             .to(
                 com.google.cloud.spanner.Value.pgJsonb(
                     "{\"key1\": \"value1\", \"key2\": \"value2\"}"))
-            .bind("p11")
-            .toInt64Array(Arrays.asList(1L, null, 2L))
             .bind("p12")
-            .toBoolArray(Arrays.asList(true, null, false))
+            .toInt64Array(Arrays.asList(1L, null, 2L))
             .bind("p13")
+            .toBoolArray(Arrays.asList(true, null, false))
+            .bind("p14")
             .toBytesArray(
                 Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
-            .bind("p14")
-            .toFloat64Array(Arrays.asList(-3.14d, null, 99.99d))
             .bind("p15")
-            .toInt64Array(Arrays.asList(-100L, null, -200L))
+            .toFloat64Array(Arrays.asList(-3.14d, null, 99.99d))
             .bind("p16")
-            .toPgNumericArray(Arrays.asList("-6.626", null, "99.99"))
+            .toFloat64Array(Arrays.asList(-3.14d, null, 99.99d))
             .bind("p17")
+            .toInt64Array(Arrays.asList(-100L, null, -200L))
+            .bind("p18")
+            .toPgNumericArray(Arrays.asList("-6.626", null, "99.99"))
+            .bind("p19")
             .toTimestampArray(
                 Arrays.asList(
                     Timestamp.parseTimestamp("2010-11-08T17:33:12Z"),
                     null,
                     Timestamp.parseTimestamp("2012-05-04T23:05:23.123Z")))
-            .bind("p18")
+            .bind("p20")
             .toDateArray(
                 Arrays.asList(Date.parseDate("2010-11-08"), null, Date.parseDate("2012-05-05")))
-            .bind("p19")
+            .bind("p21")
             .toStringArray(Arrays.asList("string1", null, "string2"))
-            .bind("p20")
+            .bind("p22")
             .toPgJsonbArray(
                 Arrays.asList(
                     "{\"key1\": \"value1\", \"key2\": \"value2\"}",
@@ -176,9 +235,9 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to(UNTYPED_NULL_VALUE)
                 .bind("p10")
-                .to(com.google.cloud.spanner.Value.pgJsonb("null"))
+                .to(UNTYPED_NULL_VALUE)
                 .bind("p11")
-                .to((com.google.cloud.spanner.Value) null)
+                .to(com.google.cloud.spanner.Value.pgJsonb("null"))
                 .bind("p12")
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p13")
@@ -196,6 +255,10 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                 .bind("p19")
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p20")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p21")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p22")
                 .to((com.google.cloud.spanner.Value) null)
                 .build(),
             1L));
@@ -215,29 +278,35 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
   @Test
   public void testSelectAllTypes() throws Exception {
     String sql =
-        "SELECT all_types.col_bigint, all_types.col_bool, all_types.col_bytea, all_types.col_float8, all_types.col_int, all_types.col_numeric, all_types.col_timestamptz, all_types.col_date, all_types.col_varchar, all_types.col_jsonb, all_types.col_array_bigint, all_types.col_array_bool, all_types.col_array_bytea, all_types.col_array_float8, all_types.col_array_int, all_types.col_array_numeric, all_types.col_array_timestamptz, all_types.col_array_date, all_types.col_array_varchar, all_types.col_array_jsonb \n"
+        "SELECT "
+            + "all_types.col_bigint, "
+            + "all_types.col_bool, "
+            + "all_types.col_bytea, "
+            + "all_types.col_float4, "
+            + "all_types.col_float8, "
+            + "all_types.col_int, "
+            + "all_types.col_numeric, "
+            + "all_types.col_timestamptz, "
+            + "all_types.col_date, "
+            + "all_types.col_varchar, "
+            + "all_types.col_jsonb, "
+            + "all_types.col_array_bigint, "
+            + "all_types.col_array_bool, "
+            + "all_types.col_array_bytea, "
+            + "all_types.col_array_float4, "
+            + "all_types.col_array_float8, "
+            + "all_types.col_array_int, "
+            + "all_types.col_array_numeric, "
+            + "all_types.col_array_timestamptz, "
+            + "all_types.col_array_date, "
+            + "all_types.col_array_varchar, "
+            + "all_types.col_array_jsonb \n"
             + "FROM all_types";
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("", true)));
 
     String actualOutput = execute("orm_select_first.py", host, pgServer.getLocalPort());
-    String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'"
-            + "col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')"
-            + "col_timestamptz='2022-02-16T13:18:02.123456+00:00'"
-            + "col_date=       datetime.date(2022, 3, 29)"
-            + "col_varchar=    'test'col_jsonb=      {'key': 'value'}"
-            + "col_array_bigint=     [1, None, 2]"
-            + "col_array_bool=       [True, None, False]"
-            + "col_array_bytea=      [b'bytes1', None, b'bytes2']"
-            + "col_array_float8=     [3.14, None, -99.99]"
-            + "col_array_int=        [-100, None, -200]"
-            + "col_array_numeric=    [Decimal('6.626'), None, Decimal('-3.14')]"
-            + "col_array_timestamptz=[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]"
-            + "col_array_date=       [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]"
-            + "col_array_varchar=    ['string1', None, 'string2']"
-            + "col_array_jsonb=      [{'key': 'value1'}, None, {'key': 'value2'}])\n";
-    assertEquals(expectedOutput, actualOutput);
+    assertEquals(ALL_TYPES_ROW, actualOutput);
 
     assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
@@ -250,37 +319,17 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testGetAllTypes() throws Exception {
-    String sql =
-        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb, all_types.col_array_bigint AS all_types_col_array_bigint, all_types.col_array_bool AS all_types_col_array_bool, all_types.col_array_bytea AS all_types_col_array_bytea, all_types.col_array_float8 AS all_types_col_array_float8, all_types.col_array_int AS all_types_col_array_int, all_types.col_array_numeric AS all_types_col_array_numeric, all_types.col_array_timestamptz AS all_types_col_array_timestamptz, all_types.col_array_date AS all_types_col_array_date, all_types.col_array_varchar AS all_types_col_array_varchar, all_types.col_array_jsonb AS all_types_col_array_jsonb \n"
-            + "FROM all_types \n"
-            + "WHERE all_types.col_bigint = $1::INTEGER";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            Statement.newBuilder(SELECT_ALL_TYPES_SINGLE_ROW_SQL).bind("p1").to(1L).build(),
             createAllTypesResultSet("", true)));
 
     String actualOutput = execute("orm_get.py", host, pgServer.getLocalPort());
-    String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14"
-            + "col_int=        100col_numeric=    Decimal('6.626')"
-            + "col_timestamptz='2022-02-16T13:18:02.123456+00:00'"
-            + "col_date=       datetime.date(2022, 3, 29)"
-            + "col_varchar=    'test'col_jsonb=      {'key': 'value'}"
-            + "col_array_bigint=     [1, None, 2]"
-            + "col_array_bool=       [True, None, False]"
-            + "col_array_bytea=      [b'bytes1', None, b'bytes2']"
-            + "col_array_float8=     [3.14, None, -99.99]"
-            + "col_array_int=        [-100, None, -200]"
-            + "col_array_numeric=    [Decimal('6.626'), None, Decimal('-3.14')]"
-            + "col_array_timestamptz=[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]"
-            + "col_array_date=       [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]"
-            + "col_array_varchar=    ['string1', None, 'string2']"
-            + "col_array_jsonb=      [{'key': 'value1'}, None, {'key': 'value2'}])\n";
-    assertEquals(expectedOutput, actualOutput);
+    assertEquals(ALL_TYPES_ROW, actualOutput);
 
     assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
-    assertEquals(sql, request.getSql());
+    assertEquals(SELECT_ALL_TYPES_SINGLE_ROW_SQL, request.getSql());
     assertTrue(request.getTransaction().hasBegin());
     assertTrue(request.getTransaction().getBegin().hasReadWrite());
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -289,23 +338,42 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testGetAllTypes_NullValues() throws Exception {
-    String sql =
-        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb, all_types.col_array_bigint AS all_types_col_array_bigint, all_types.col_array_bool AS all_types_col_array_bool, all_types.col_array_bytea AS all_types_col_array_bytea, all_types.col_array_float8 AS all_types_col_array_float8, all_types.col_array_int AS all_types_col_array_int, all_types.col_array_numeric AS all_types_col_array_numeric, all_types.col_array_timestamptz AS all_types_col_array_timestamptz, all_types.col_array_date AS all_types_col_array_date, all_types.col_array_varchar AS all_types_col_array_varchar, all_types.col_array_jsonb AS all_types_col_array_jsonb \n"
-            + "FROM all_types \n"
-            + "WHERE all_types.col_bigint = $1::INTEGER";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            Statement.newBuilder(SELECT_ALL_TYPES_SINGLE_ROW_SQL).bind("p1").to(1L).build(),
             createAllTypesNullResultSet("", 1L)));
 
     String actualOutput = execute("orm_get.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       None,col_bytea=      Nonecol_float8=     Nonecol_int=        Nonecol_numeric=    Nonecol_timestamptz=Nonecol_date=       Nonecol_varchar=    Nonecol_jsonb=      Nonecol_array_bigint=     Nonecol_array_bool=       Nonecol_array_bytea=      Nonecol_array_float8=     Nonecol_array_int=        Nonecol_array_numeric=    Nonecol_array_timestamptz=Nonecol_array_date=       Nonecol_array_varchar=    Nonecol_array_jsonb=      None)\n";
+        "AllTypes(\n"
+            + "col_bigint=     1,\n"
+            + "col_bool=       None,\n"
+            + "col_bytea=      None\n"
+            + "col_float4=     None\n"
+            + "col_float8=     None\n"
+            + "col_int=        None\n"
+            + "col_numeric=    None\n"
+            + "col_timestamptz=None\n"
+            + "col_date=       None\n"
+            + "col_varchar=    None\n"
+            + "col_jsonb=      None\n"
+            + "col_array_bigint=     None\n"
+            + "col_array_bool=       None\n"
+            + "col_array_bytea=      None\n"
+            + "col_array_float4=     None\n"
+            + "col_array_float8=     None\n"
+            + "col_array_int=        None\n"
+            + "col_array_numeric=    None\n"
+            + "col_array_timestamptz=None\n"
+            + "col_array_date=       None\n"
+            + "col_array_varchar=    None\n"
+            + "col_array_jsonb=      None\n"
+            + ")\n";
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
-    assertEquals(sql, request.getSql());
+    assertEquals(SELECT_ALL_TYPES_SINGLE_ROW_SQL, request.getSql());
     assertTrue(request.getTransaction().hasBegin());
     assertTrue(request.getTransaction().getBegin().hasReadWrite());
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -314,37 +382,17 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testOrmReadOnlyTransaction() throws Exception {
-    String sql =
-        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb, all_types.col_array_bigint AS all_types_col_array_bigint, all_types.col_array_bool AS all_types_col_array_bool, all_types.col_array_bytea AS all_types_col_array_bytea, all_types.col_array_float8 AS all_types_col_array_float8, all_types.col_array_int AS all_types_col_array_int, all_types.col_array_numeric AS all_types_col_array_numeric, all_types.col_array_timestamptz AS all_types_col_array_timestamptz, all_types.col_array_date AS all_types_col_array_date, all_types.col_array_varchar AS all_types_col_array_varchar, all_types.col_array_jsonb AS all_types_col_array_jsonb \n"
-            + "FROM all_types \n"
-            + "WHERE all_types.col_bigint = $1::INTEGER";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            Statement.newBuilder(SELECT_ALL_TYPES_SINGLE_ROW_SQL).bind("p1").to(1L).build(),
             createAllTypesResultSet("", true)));
 
     String actualOutput = execute("orm_read_only_transaction.py", host, pgServer.getLocalPort());
-    String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14"
-            + "col_int=        100col_numeric=    Decimal('6.626')"
-            + "col_timestamptz='2022-02-16T13:18:02.123456+00:00'"
-            + "col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'"
-            + "col_jsonb=      {'key': 'value'}"
-            + "col_array_bigint=     [1, None, 2]"
-            + "col_array_bool=       [True, None, False]"
-            + "col_array_bytea=      [b'bytes1', None, b'bytes2']"
-            + "col_array_float8=     [3.14, None, -99.99]"
-            + "col_array_int=        [-100, None, -200]"
-            + "col_array_numeric=    [Decimal('6.626'), None, Decimal('-3.14')]"
-            + "col_array_timestamptz=[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]"
-            + "col_array_date=       [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]"
-            + "col_array_varchar=    ['string1', None, 'string2']"
-            + "col_array_jsonb=      [{'key': 'value1'}, None, {'key': 'value2'}])\n";
-    assertEquals(expectedOutput, actualOutput);
+    assertEquals(ALL_TYPES_ROW, actualOutput);
 
     assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
-    assertEquals(sql, request.getSql());
+    assertEquals(SELECT_ALL_TYPES_SINGLE_ROW_SQL, request.getSql());
     assertFalse(request.getTransaction().hasBegin());
     assertTrue(request.getTransaction().hasId());
     assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
@@ -361,22 +409,18 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testStaleRead() throws Exception {
-    String sql =
-        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb, all_types.col_array_bigint AS all_types_col_array_bigint, all_types.col_array_bool AS all_types_col_array_bool, all_types.col_array_bytea AS all_types_col_array_bytea, all_types.col_array_float8 AS all_types_col_array_float8, all_types.col_array_int AS all_types_col_array_int, all_types.col_array_numeric AS all_types_col_array_numeric, all_types.col_array_timestamptz AS all_types_col_array_timestamptz, all_types.col_array_date AS all_types_col_array_date, all_types.col_array_varchar AS all_types_col_array_varchar, all_types.col_array_jsonb AS all_types_col_array_jsonb \n"
-            + "FROM all_types \n"
-            + "WHERE all_types.col_bigint = $1::INTEGER";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            Statement.newBuilder(SELECT_ALL_TYPES_SINGLE_ROW_SQL).bind("p1").to(1L).build(),
             createAllTypesResultSet("1", "", true)));
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(2L).build(),
+            Statement.newBuilder(SELECT_ALL_TYPES_SINGLE_ROW_SQL).bind("p1").to(2L).build(),
             createAllTypesResultSet("2", "", true)));
 
     String actualOutput = execute("orm_stale_read.py", host, pgServer.getLocalPort());
-    assertTrue(actualOutput, actualOutput.contains("AllTypes(col_bigint=     1"));
-    assertTrue(actualOutput, actualOutput.contains("AllTypes(col_bigint=     2"));
+    assertTrue(actualOutput, actualOutput.contains("AllTypes(\ncol_bigint=     1"));
+    assertTrue(actualOutput, actualOutput.contains("AllTypes(\ncol_bigint=     2"));
 
     assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     for (int index = 2; index < 4; index++) {
@@ -395,13 +439,9 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testUpdateAllTypes() throws Exception {
-    String sql =
-        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb, all_types.col_array_bigint AS all_types_col_array_bigint, all_types.col_array_bool AS all_types_col_array_bool, all_types.col_array_bytea AS all_types_col_array_bytea, all_types.col_array_float8 AS all_types_col_array_float8, all_types.col_array_int AS all_types_col_array_int, all_types.col_array_numeric AS all_types_col_array_numeric, all_types.col_array_timestamptz AS all_types_col_array_timestamptz, all_types.col_array_date AS all_types_col_array_date, all_types.col_array_varchar AS all_types_col_array_varchar, all_types.col_array_jsonb AS all_types_col_array_jsonb \n"
-            + "FROM all_types \n"
-            + "WHERE all_types.col_bigint = $1::INTEGER";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            Statement.newBuilder(SELECT_ALL_TYPES_SINGLE_ROW_SQL).bind("p1").to(1L).build(),
             createAllTypesResultSet("", true)));
     String updateSql =
         "UPDATE all_types SET col_varchar=$1::VARCHAR WHERE all_types.col_bigint = $2::INTEGER";
@@ -425,26 +465,12 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
     String actualOutput = execute("orm_update.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14"
-            + "col_int=        100col_numeric=    Decimal('6.626')"
-            + "col_timestamptz='2022-02-16T13:18:02.123456+00:00'"
-            + "col_date=       datetime.date(2022, 3, 29)col_varchar=    'updated string'"
-            + "col_jsonb=      {'key': 'value'}"
-            + "col_array_bigint=     [1, None, 2]"
-            + "col_array_bool=       [True, None, False]"
-            + "col_array_bytea=      [b'bytes1', None, b'bytes2']"
-            + "col_array_float8=     [3.14, None, -99.99]"
-            + "col_array_int=        [-100, None, -200]"
-            + "col_array_numeric=    [Decimal('6.626'), None, Decimal('-3.14')]"
-            + "col_array_timestamptz=[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]"
-            + "col_array_date=       [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]"
-            + "col_array_varchar=    ['string1', None, 'string2']"
-            + "col_array_jsonb=      [{'key': 'value1'}, None, {'key': 'value2'}])\n";
+        ALL_TYPES_ROW.replaceFirst("col_varchar=(\\s*)'test'", "col_varchar=$1'updated string'");
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(5, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest selectRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
-    assertEquals(sql, selectRequest.getSql());
+    assertEquals(SELECT_ALL_TYPES_SINGLE_ROW_SQL, selectRequest.getSql());
     assertTrue(selectRequest.getTransaction().hasBegin());
     assertTrue(selectRequest.getTransaction().getBegin().hasReadWrite());
 
@@ -466,13 +492,9 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testDeleteAllTypes() throws Exception {
-    String sql =
-        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb, all_types.col_array_bigint AS all_types_col_array_bigint, all_types.col_array_bool AS all_types_col_array_bool, all_types.col_array_bytea AS all_types_col_array_bytea, all_types.col_array_float8 AS all_types_col_array_float8, all_types.col_array_int AS all_types_col_array_int, all_types.col_array_numeric AS all_types_col_array_numeric, all_types.col_array_timestamptz AS all_types_col_array_timestamptz, all_types.col_array_date AS all_types_col_array_date, all_types.col_array_varchar AS all_types_col_array_varchar, all_types.col_array_jsonb AS all_types_col_array_jsonb \n"
-            + "FROM all_types \n"
-            + "WHERE all_types.col_bigint = $1::INTEGER";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            Statement.newBuilder(SELECT_ALL_TYPES_SINGLE_ROW_SQL).bind("p1").to(1L).build(),
             createAllTypesResultSet("", true)));
     String deleteSql = "DELETE FROM all_types WHERE all_types.col_bigint = $1::INTEGER";
     mockSpanner.putStatementResult(
@@ -484,7 +506,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
     assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest selectRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
-    assertEquals(sql, selectRequest.getSql());
+    assertEquals(SELECT_ALL_TYPES_SINGLE_ROW_SQL, selectRequest.getSql());
     assertTrue(selectRequest.getTransaction().hasBegin());
     assertTrue(selectRequest.getTransaction().getBegin().hasReadWrite());
 
@@ -498,13 +520,9 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testRollback() throws Exception {
-    String sql =
-        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb, all_types.col_array_bigint AS all_types_col_array_bigint, all_types.col_array_bool AS all_types_col_array_bool, all_types.col_array_bytea AS all_types_col_array_bytea, all_types.col_array_float8 AS all_types_col_array_float8, all_types.col_array_int AS all_types_col_array_int, all_types.col_array_numeric AS all_types_col_array_numeric, all_types.col_array_timestamptz AS all_types_col_array_timestamptz, all_types.col_array_date AS all_types_col_array_date, all_types.col_array_varchar AS all_types_col_array_varchar, all_types.col_array_jsonb AS all_types_col_array_jsonb \n"
-            + "FROM all_types \n"
-            + "WHERE all_types.col_bigint = $1::INTEGER";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            Statement.newBuilder(SELECT_ALL_TYPES_SINGLE_ROW_SQL).bind("p1").to(1L).build(),
             createAllTypesResultSet("", true)));
     String updateSql =
         "UPDATE all_types SET col_varchar=$1::VARCHAR WHERE all_types.col_bigint = $2::INTEGER";
@@ -528,13 +546,16 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
     String actualOutput = execute("orm_rollback.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "Before rollback: AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz='2022-02-16T13:18:02.123456+00:00'col_date=       datetime.date(2022, 3, 29)col_varchar=    'updated string'col_jsonb=      {'key': 'value'}col_array_bigint=     [1, None, 2]col_array_bool=       [True, None, False]col_array_bytea=      [b'bytes1', None, b'bytes2']col_array_float8=     [3.14, None, -99.99]col_array_int=        [-100, None, -200]col_array_numeric=    [Decimal('6.626'), None, Decimal('-3.14')]col_array_timestamptz=[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]col_array_date=       [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]col_array_varchar=    ['string1', None, 'string2']col_array_jsonb=      [{'key': 'value1'}, None, {'key': 'value2'}])\n"
-            + "After rollback: AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz='2022-02-16T13:18:02.123456+00:00'col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'}col_array_bigint=     [1, None, 2]col_array_bool=       [True, None, False]col_array_bytea=      [b'bytes1', None, b'bytes2']col_array_float8=     [3.14, None, -99.99]col_array_int=        [-100, None, -200]col_array_numeric=    [Decimal('6.626'), None, Decimal('-3.14')]col_array_timestamptz=[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]col_array_date=       [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]col_array_varchar=    ['string1', None, 'string2']col_array_jsonb=      [{'key': 'value1'}, None, {'key': 'value2'}])\n";
+        "Before rollback: "
+            + ALL_TYPES_ROW.replaceFirst(
+                "col_varchar=(\\s*)'test'", "col_varchar=$1'updated string'")
+            + "After rollback: "
+            + ALL_TYPES_ROW;
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest selectRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
-    assertEquals(sql, selectRequest.getSql());
+    assertEquals(SELECT_ALL_TYPES_SINGLE_ROW_SQL, selectRequest.getSql());
     assertTrue(selectRequest.getTransaction().hasBegin());
     assertTrue(selectRequest.getTransaction().getBegin().hasReadWrite());
 
@@ -552,7 +573,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
     ExecuteSqlRequest refreshRequest =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(5);
-    assertEquals(sql, refreshRequest.getSql());
+    assertEquals(SELECT_ALL_TYPES_SINGLE_ROW_SQL, refreshRequest.getSql());
     assertTrue(refreshRequest.getTransaction().hasBegin());
     assertTrue(refreshRequest.getTransaction().getBegin().hasReadWrite());
 
@@ -819,38 +840,42 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
             .bind("p4")
             .to(3.14d)
             .bind("p5")
-            .to(100)
+            .to(3.14d)
             .bind("p6")
-            .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+            .to(100)
             .bind("p7")
-            .to(Timestamp.parseTimestamp("2011-11-04T00:05:23.123456000Z"))
+            .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
             .bind("p8")
-            .to(Date.parseDate("2011-11-04"))
+            .to(Timestamp.parseTimestamp("2011-11-04T00:05:23.123456000Z"))
             .bind("p9")
-            .to("test string")
+            .to(Date.parseDate("2011-11-04"))
             .bind("p10")
+            .to("test string")
+            .bind("p11")
             .to(
                 com.google.cloud.spanner.Value.pgJsonb(
                     "{\"key1\": \"value1\", \"key2\": \"value2\"}"))
-            .bind("p11")
-            .toInt64Array((long[]) null)
             .bind("p12")
-            .toBoolArray((boolean[]) null)
-            .bind("p13")
-            .toBytesArray(null)
-            .bind("p14")
-            .toFloat64Array((double[]) null)
-            .bind("p15")
             .toInt64Array((long[]) null)
+            .bind("p13")
+            .toBoolArray((boolean[]) null)
+            .bind("p14")
+            .toBytesArray(null)
+            .bind("p15")
+            .toFloat32Array((float[]) null)
             .bind("p16")
-            .toPgNumericArray(null)
+            .toFloat64Array((double[]) null)
             .bind("p17")
-            .toTimestampArray(null)
+            .toInt64Array((long[]) null)
             .bind("p18")
-            .toDateArray(null)
+            .toPgNumericArray(null)
             .bind("p19")
-            .toStringArray(null)
+            .toTimestampArray(null)
             .bind("p20")
+            .toDateArray(null)
+            .bind("p21")
+            .toStringArray(null)
+            .bind("p22")
             .toPgJsonbArray(null)
             .build();
     mockSpanner.putStatementResult(
@@ -899,38 +924,42 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
             .bind("p4")
             .to(3.14d)
             .bind("p5")
-            .to(100)
+            .to(3.14d)
             .bind("p6")
-            .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+            .to(100)
             .bind("p7")
-            .to(Timestamp.parseTimestamp("2011-11-04T00:05:23.123456000Z"))
+            .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
             .bind("p8")
-            .to(Date.parseDate("2011-11-04"))
+            .to(Timestamp.parseTimestamp("2011-11-04T00:05:23.123456000Z"))
             .bind("p9")
-            .to("test string")
+            .to(Date.parseDate("2011-11-04"))
             .bind("p10")
+            .to("test string")
+            .bind("p11")
             .to(
                 com.google.cloud.spanner.Value.pgJsonb(
                     "{\"key1\": \"value1\", \"key2\": \"value2\"}"))
-            .bind("p11")
-            .toInt64Array((long[]) null)
             .bind("p12")
-            .toBoolArray((boolean[]) null)
-            .bind("p13")
-            .toBytesArray(null)
-            .bind("p14")
-            .toFloat64Array((double[]) null)
-            .bind("p15")
             .toInt64Array((long[]) null)
+            .bind("p13")
+            .toBoolArray((boolean[]) null)
+            .bind("p14")
+            .toBytesArray(null)
+            .bind("p15")
+            .toFloat32Array((float[]) null)
             .bind("p16")
-            .toPgNumericArray(null)
+            .toFloat64Array((double[]) null)
             .bind("p17")
-            .toTimestampArray(null)
+            .toInt64Array((long[]) null)
             .bind("p18")
-            .toDateArray(null)
+            .toPgNumericArray(null)
             .bind("p19")
-            .toStringArray(null)
+            .toTimestampArray(null)
             .bind("p20")
+            .toDateArray(null)
+            .bind("p21")
+            .toStringArray(null)
+            .bind("p22")
             .toPgJsonbArray(null)
             .build();
     mockSpanner.putStatementResult(
@@ -967,7 +996,6 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testInsertAll() throws Exception {
-    String sql = getInsertAllTypesSql();
     addDescribeInsertAllTypesResult();
     mockSpanner.putStatementResult(StatementResult.update(createInsertAllTypesNullValues(1L), 1L));
     mockSpanner.putStatementResult(StatementResult.update(createInsertAllTypesNullValues(2L), 1L));
@@ -988,8 +1016,11 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
   }
 
   private static String getInsertAllTypesSql() {
-    return "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
-        + "VALUES ($1::INTEGER, $2, $3, $4, $5::INTEGER, $6, $7::TIMESTAMP WITH TIME ZONE, $8::DATE, $9::VARCHAR, $10::JSONB, $11::INTEGER[], $12::BOOLEAN[], $13::BYTEA[], $14::FLOAT[], $15::INTEGER[], $16::NUMERIC[], $17::TIMESTAMP WITH TIME ZONE[], $18::DATE[], $19::VARCHAR[], $20::JSONB[])";
+    return "INSERT INTO all_types "
+        + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+        + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+        + "VALUES ($1::INTEGER, $2, $3, $4, $5, $6::INTEGER, $7, $8::TIMESTAMP WITH TIME ZONE, $9::DATE, $10::VARCHAR, $11::JSONB, "
+        + "$12::INTEGER[], $13::BOOLEAN[], $14::BYTEA[], $15::REAL[], $16::FLOAT[], $17::INTEGER[], $18::NUMERIC[], $19::TIMESTAMP WITH TIME ZONE[], $20::DATE[], $21::VARCHAR[], $22::JSONB[])";
   }
 
   private Statement createInsertAllTypesNullValues(long id) {
@@ -1013,9 +1044,9 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
         .bind("p9")
         .to(UNTYPED_NULL_VALUE)
         .bind("p10")
-        .to(com.google.cloud.spanner.Value.pgJsonb("null"))
-        .bind("p11")
         .to(UNTYPED_NULL_VALUE)
+        .bind("p11")
+        .to(com.google.cloud.spanner.Value.pgJsonb("null"))
         .bind("p12")
         .to(UNTYPED_NULL_VALUE)
         .bind("p13")
@@ -1034,6 +1065,10 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
         .to(UNTYPED_NULL_VALUE)
         .bind("p20")
         .to(UNTYPED_NULL_VALUE)
+        .bind("p21")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p22")
+        .to(UNTYPED_NULL_VALUE)
         .build();
   }
 
@@ -1048,6 +1083,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,

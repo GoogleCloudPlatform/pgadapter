@@ -110,6 +110,7 @@ public class ArrayParser extends Parser<List<?>> {
       case BYTES:
         return value.getBytesArray();
       case INT64:
+      case PG_OID:
         return value.getInt64Array();
       case STRING:
       case PG_NUMERIC:
@@ -118,6 +119,8 @@ public class ArrayParser extends Parser<List<?>> {
         return value.getStringArray();
       case TIMESTAMP:
         return value.getTimestampArray();
+      case FLOAT32:
+        return value.getFloat32Array();
       case FLOAT64:
         return value.getFloat64Array();
       case NUMERIC: // Only PG_NUMERIC is supported
@@ -212,8 +215,6 @@ public class ArrayParser extends Parser<List<?>> {
         return ((Short) value).longValue();
       case Oid.INT4:
         return ((Integer) value).longValue();
-      case Oid.FLOAT4:
-        return ((Float) value).doubleValue();
     }
     return value;
   }
@@ -377,21 +378,14 @@ public class ArrayParser extends Parser<List<?>> {
       case Oid.INT8:
         statementBuilder.bind(name).toInt64Array((List<Long>) this.item);
         break;
+      case Oid.OID:
+        statementBuilder.bind(name).toPgOidArray((List<Long>) this.item);
+        break;
       case Oid.NUMERIC:
         statementBuilder.bind(name).toPgNumericArray((List<String>) this.item);
         break;
       case Oid.FLOAT4:
-        if (this.item == null) {
-          statementBuilder.bind(name).toFloat64Array((double[]) null);
-        } else {
-          statementBuilder
-              .bind(name)
-              .toFloat64Array(
-                  ((List<Float>) this.item)
-                      .stream()
-                          .map(f -> f == null ? null : f.doubleValue())
-                          .collect(Collectors.toList()));
-        }
+        statementBuilder.bind(name).toFloat32Array((List<Float>) this.item);
         break;
       case Oid.FLOAT8:
         statementBuilder.bind(name).toFloat64Array((List<Double>) this.item);

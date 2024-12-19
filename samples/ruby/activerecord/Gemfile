@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-gem 'docker-api'
+gem "testcontainers"
 gem 'pg'
 gem 'rake'
 gem 'activerecord', '~> 7.0'

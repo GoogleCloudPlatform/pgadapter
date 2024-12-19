@@ -17,7 +17,9 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replaceForUpdate;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
@@ -46,7 +48,6 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
@@ -64,6 +65,7 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClie
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
 import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
@@ -80,6 +82,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.api.trace.StatusCode;
@@ -122,6 +125,10 @@ public class BackendConnection {
   private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
 
   private final Tracer tracer;
+
+  private final Metrics metrics;
+
+  private final Attributes metricAttributes;
 
   private final Deque<Context> statementContext = new ConcurrentLinkedDeque<>();
 
@@ -278,7 +285,7 @@ public class BackendConnection {
 
     @Override
     boolean isBatchingPossible() {
-      return !analyze;
+      return !analyze && !this.parsedStatement.hasReturningClause();
     }
 
     @Override
@@ -296,7 +303,8 @@ public class BackendConnection {
         //  SELECT statements, then we should create a read-only transaction. Also, if a transaction
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
-        SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
+        SessionStatement sessionStatement =
+            getSessionManagementStatement(updatedStatement, parsedStatement);
         if (!localStatements.get().isEmpty()
             && localStatements.get().containsKey(statement.getSql())
             && localStatements.get().get(statement.getSql()) != null
@@ -306,7 +314,7 @@ public class BackendConnection {
               Objects.requireNonNull(localStatements.get().get(statement.getSql()));
           result.set(localStatement.execute(BackendConnection.this));
         } else if (sessionStatement != null) {
-          result.set(sessionStatement.execute(sessionState));
+          result.set(sessionStatement.execute(sessionState, spannerConnection));
         } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
@@ -472,6 +480,7 @@ public class BackendConnection {
         Stopwatch stopwatch = Stopwatch.createStarted();
         StatementResult result = spannerConnection.execute(statement);
         Duration executionDuration = stopwatch.elapsed();
+        metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         logger.log(
             Level.FINER,
             Logging.format(
@@ -512,14 +521,14 @@ public class BackendConnection {
     }
 
     @Nullable
-    SessionStatement getSessionManagementStatement(ParsedStatement parsedStatement) {
+    SessionStatement getSessionManagementStatement(
+        Statement statement, ParsedStatement parsedStatement) {
       if (parsedStatement.getType() == StatementType.UNKNOWN
           || (parsedStatement.getType() == StatementType.QUERY
-              && parsedStatement.getSqlWithoutComments().length() >= 4
-              && parsedStatement
-                  .getSqlWithoutComments()
-                  .substring(0, 4)
-                  .equalsIgnoreCase("show"))) {
+              && isCommand(SHOW, statement.getSql()))
+          || (parsedStatement.getType() == StatementType.CLIENT_SIDE
+              && parsedStatement.getClientSideStatementType()
+                  == ClientSideStatementType.RESET_ALL)) {
         return SessionStatementParser.parse(parsedStatement);
       }
       return null;
@@ -544,10 +553,10 @@ public class BackendConnection {
     void doExecute() {
       checkConnectionState();
       try {
-        if (transactionMode != TransactionMode.IMPLICIT) {
+        if (transactionMode != TransactionMode.IMPLICIT || !sessionState.isCopyPartitionQuery()) {
           result.set(spannerConnection.execute(statement));
         } else {
-          Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+          Spanner spanner = spannerConnection.getSpanner();
           BatchClient batchClient = spanner.getBatchClient(databaseId);
           BatchReadOnlyTransaction batchReadOnlyTransaction =
               batchClient.batchReadOnlyTransaction(spannerConnection.getReadOnlyStaleness());
@@ -565,9 +574,7 @@ public class BackendConnection {
                   spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
               result.set(
                   new PartitionQueryResult(
-                      batchReadOnlyTransaction.getBatchTransactionId(),
-                      partitions,
-                      metadataResultSet));
+                      batchReadOnlyTransaction, partitions, metadataResultSet));
             }
           } catch (SpannerException spannerException) {
             // The query might not be suitable for partitioning. Just try with a normal query.
@@ -629,9 +636,7 @@ public class BackendConnection {
 
         // Make sure both the front-end CopyDataReceiver and the backend MutationWriter processes
         // have finished before we proceed.
-        //noinspection UnstableApiUsage
         Futures.successfulAsList(copyDataReceiverFuture, statementResultFuture).get();
-        //noinspection UnstableApiUsage
         Futures.allAsList(copyDataReceiverFuture, statementResultFuture).get();
       } catch (ExecutionException executionException) {
         result.setException(executionException.getCause());
@@ -838,6 +843,8 @@ public class BackendConnection {
   /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
       Tracer tracer,
+      Metrics metrics,
+      Attributes metricAttributes,
       String connectionId,
       Runnable closeAllPortals,
       DatabaseId databaseId,
@@ -846,6 +853,8 @@ public class BackendConnection {
       OptionsMetadata optionsMetadata,
       Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.tracer = tracer;
+    this.metrics = metrics;
+    this.metricAttributes = metricAttributes;
     this.connectionId = connectionId;
     this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
@@ -914,6 +923,20 @@ public class BackendConnection {
     return this.connectionState;
   }
 
+  @VisibleForTesting
+  public Tracer getTracer() {
+    return this.tracer;
+  }
+
+  @VisibleForTesting
+  public Metrics getMetrics() {
+    return this.metrics;
+  }
+
+  Attributes getMetricAttributes() {
+    return metricAttributes;
+  }
+
   private Span createSpan(String name, Statement statement) {
     return createSpan(name, statement, null);
   }
@@ -922,6 +945,8 @@ public class BackendConnection {
     SpanBuilder builder =
         tracer.spanBuilder(name).setAttribute("pgadapter.connection_id", connectionId);
     if (statement != null) {
+      // Ignore deprecation for now, as there is no alternative offered (yet?).
+      //noinspection deprecation
       builder.setAttribute(SemanticAttributes.DB_STATEMENT, statement.getSql());
     }
     if (currentTransactionId != null) {
@@ -1035,7 +1060,8 @@ public class BackendConnection {
     AbstractStatementParser statementParser =
         AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
     if ("options".equalsIgnoreCase(name)) {
-      String[] commands = value.split("-c\\s+");
+      // Some drivers encode spaces as '+'.
+      String[] commands = value.split("-c[\\s+]+");
       for (String command : commands) {
         // Special case: If the setting is one that is handled by the Connection API, then we need
         // to execute the statement on the connection instead.
@@ -1060,11 +1086,17 @@ public class BackendConnection {
         }
       }
     } else {
-      SimpleParser parser = new SimpleParser(name);
-      TableOrIndexName key = parser.readTableOrIndexName();
-      if (key == null) {
-        return;
-      }
+      initSessionSetting(name, value, true);
+    }
+  }
+
+  public void initSessionSetting(String name, String value, boolean overwrite) {
+    SimpleParser parser = new SimpleParser(name);
+    TableOrIndexName key = parser.readTableOrIndexName();
+    if (key == null) {
+      return;
+    }
+    if (overwrite || this.sessionState.tryGet(key.schema, key.name) == null) {
       this.sessionState.setConnectionStartupValue(key.schema, key.name, value);
     }
   }
@@ -1123,8 +1155,11 @@ public class BackendConnection {
             && bufferedStatement.isBatchingPossible()
             && index < (getStatementCount() - 1)) {
           StatementType statementType = getStatementType(index);
-          StatementType nextStatementType = getStatementType(index + 1);
-          canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
+          // Do not start an explicit batch if the connection is already in auto-DML-batch mode.
+          if (!(statementType == StatementType.UPDATE && spannerConnection.isAutoBatchDml())) {
+            StatementType nextStatementType = getStatementType(index + 1);
+            canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
+          }
         }
 
         if (canUseBatch) {
@@ -1143,15 +1178,18 @@ public class BackendConnection {
               sessionState.rollback();
             }
             closeAllPortals.run();
-            transactionMode = TransactionMode.IMPLICIT;
-            connectionState = ConnectionState.IDLE;
-            currentTransactionId = null;
+            clearCurrentTransaction();
           }
           index++;
         }
       }
     } catch (Exception exception) {
-      connectionState = ConnectionState.ABORTED;
+      // The connection should not transition to the ABORTED state if a COMMIT or ROLLBACK fails.
+      if (isCommit(index) || isRollback(index)) {
+        clearCurrentTransaction();
+      } else {
+        connectionState = ConnectionState.ABORTED;
+      }
       closeAllPortals.run();
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
@@ -1166,6 +1204,12 @@ public class BackendConnection {
     } finally {
       bufferedStatements.clear();
     }
+  }
+
+  private void clearCurrentTransaction() {
+    transactionMode = TransactionMode.IMPLICIT;
+    connectionState = ConnectionState.IDLE;
+    currentTransactionId = null;
   }
 
   /** Starts an implicit transaction if that is necessary. */
@@ -1474,7 +1518,10 @@ public class BackendConnection {
       }
       Span runBatchSpan = createSpan("execute_batch_on_spanner", null);
       try (Scope ignoreRunBatchSpan = runBatchSpan.makeCurrent()) {
+        Stopwatch stopwatch = Stopwatch.createStarted();
         long[] counts = spannerConnection.runBatch();
+        Duration executionDuration = stopwatch.elapsed();
+        metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         if (batchType == StatementType.DDL) {
           counts = extractDdlUpdateCounts(statementResults, counts);
         }
@@ -1642,21 +1689,25 @@ public class BackendConnection {
 
   @InternalApi
   public static final class PartitionQueryResult implements StatementResult {
-    private final BatchTransactionId batchTransactionId;
+    private final BatchReadOnlyTransaction transaction;
     private final List<Partition> partitions;
     private final ResultSet metadataResultSet;
 
     public PartitionQueryResult(
-        BatchTransactionId batchTransactionId,
+        BatchReadOnlyTransaction transaction,
         List<Partition> partitions,
         ResultSet metadataResultSet) {
-      this.batchTransactionId = batchTransactionId;
+      this.transaction = Preconditions.checkNotNull(transaction);
       this.partitions = partitions;
       this.metadataResultSet = metadataResultSet;
     }
 
+    public void cleanup() {
+      this.transaction.cleanup();
+    }
+
     public BatchTransactionId getBatchTransactionId() {
-      return batchTransactionId;
+      return transaction.getBatchTransactionId();
     }
 
     public List<Partition> getPartitions() {

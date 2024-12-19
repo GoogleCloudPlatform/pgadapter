@@ -12,6 +12,7 @@ require_relative 'config/environment'
 require_relative 'models/singer'
 require_relative 'models/album'
 require_relative 'models/concert'
+require_relative 'models/ticket_sale'
 
 # This sample application shows the basic features of
 # ActiveRecord with Google Cloud Spanner PostgreSQL-dialect.
@@ -28,6 +29,9 @@ class Application
 
     # List all singers and related venue information.
     query_concerts
+
+    # Create a ticket_sale record that will be assigned a auto-generated primary key value.
+    create_ticket_sale
   end
 
   def self.query_singers
@@ -86,6 +90,20 @@ class Application
       puts "  Start time: #{concert.start_time}"
       puts "  Venue description: #{concert.venue.description}"
     end
+  end
+
+  def self.create_ticket_sale
+    concert = Concert.first
+    ticket_sale = TicketSale.create({
+                                      concert: concert,
+                                      customer_name: "Alice",
+                                      price: 99.90,
+                                      seats: %w[A19 A20 A21],
+                                    })
+    puts ""
+    puts "Created ticket sale for concert '#{concert.name}' for customer #{ticket_sale.customer_name}"
+    puts "The ticket sale was assigned auto-generated key #{ticket_sale.id}"
+    puts ""
   end
 
 end

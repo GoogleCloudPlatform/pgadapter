@@ -19,9 +19,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
-import com.google.cloud.spanner.RandomResultSetGenerator;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -152,7 +153,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from random"),
-            new RandomResultSetGenerator(numRows).generate()));
+            new RandomResultSetGenerator(numRows, Dialect.POSTGRESQL).generate()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("begin transaction");
@@ -179,7 +180,8 @@ public class CursorMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from random"),
-            new RandomResultSetGenerator(new Random().nextInt(10) + 2).generate()));
+            new RandomResultSetGenerator(new Random().nextInt(10) + 2, Dialect.POSTGRESQL)
+                .generate()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("begin transaction");
@@ -196,8 +198,8 @@ public class CursorMockServerTest extends AbstractMockServerTest {
     int totalRows = 0;
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of("select * from random where some_col='some-value'"),
-            new RandomResultSetGenerator(numRows).generate()));
+            Statement.of("select * from random where some_col=('some-value')"),
+            new RandomResultSetGenerator(numRows, Dialect.POSTGRESQL).generate()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("begin transaction");
@@ -232,7 +234,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from random"),
-            new RandomResultSetGenerator(numRows).generate()));
+            new RandomResultSetGenerator(numRows, Dialect.POSTGRESQL).generate()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("begin transaction");
@@ -301,7 +303,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
       mockSpanner.putStatementResult(
           StatementResult.query(
               Statement.of("select * from random"),
-              new RandomResultSetGenerator(numRows).generate()));
+              new RandomResultSetGenerator(numRows, Dialect.POSTGRESQL).generate()));
 
       int foundRows = 0;
       try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -325,7 +327,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from random"),
-            new RandomResultSetGenerator(numRows).generate()));
+            new RandomResultSetGenerator(numRows, Dialect.POSTGRESQL).generate()));
 
     int foundRows = 0;
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -357,7 +359,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
       mockSpanner.putStatementResult(
           StatementResult.query(
               Statement.of("select * from random"),
-              new RandomResultSetGenerator(numRows).generate()));
+              new RandomResultSetGenerator(numRows, Dialect.POSTGRESQL).generate()));
 
       int foundRows = 0;
       try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -459,7 +461,8 @@ public class CursorMockServerTest extends AbstractMockServerTest {
   public void testCommitAndRollbackClosesCursor() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of("select * from random"), new RandomResultSetGenerator(10).generate()));
+            Statement.of("select * from random"),
+            new RandomResultSetGenerator(10, Dialect.POSTGRESQL).generate()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
@@ -485,7 +488,8 @@ public class CursorMockServerTest extends AbstractMockServerTest {
   public void testClose() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of("select * from random"), new RandomResultSetGenerator(10).generate()));
+            Statement.of("select * from random"),
+            new RandomResultSetGenerator(10, Dialect.POSTGRESQL).generate()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);

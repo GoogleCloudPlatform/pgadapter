@@ -17,17 +17,23 @@ jobs:
           java-version: 17
       - name: Run JDBC Sample tests
         working-directory: ./samples/java/jdbc
-        run: mvn test -B
+        run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+      - name: Run R2DBC Sample tests
+        working-directory: ./samples/java/r2dbc
+        run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
       - name: Run Hibernate Sample tests
         working-directory: ./samples/java/hibernate
-        run: mvn test -B
+        run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+      - name: Run Spring Data JPA Sample tests
+        working-directory: ./samples/java/spring-data-jpa
+        run: mvn test -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
   go-samples:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.20.7'
+          go-version: '1.22.3'
       - run: go version
       - name: Run gorm Sample tests
         working-directory: ./samples/golang/gorm
@@ -35,13 +41,16 @@ jobs:
       - name: Run pgx Sample tests
         working-directory: ./samples/golang/pgx
         run: go test
+      - name: Run migrate Sample tests
+        working-directory: ./samples/golang/migrate
+        run: go test
   python-samples:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.12'
       - run: python --version
       - name: Install pip
         run: python -m pip install --upgrade pip
@@ -55,6 +64,16 @@ jobs:
         run: |
           pip install -r requirements.txt
           python run_sample.py
+      - name: Run Django Sample tests
+        working-directory: ./samples/python/django
+        run: |
+          pip install -r requirements.txt
+          python sample.py
+      - name: Run connectorx sample tests
+        working-directory: ./samples/python/connectorx
+        run: |
+          pip install -r requirements.txt
+          python connectorx_sample.py
   nodejs-samples:
     runs-on: ubuntu-latest
     steps:
@@ -68,3 +87,46 @@ jobs:
         run: |
           npm install
           npm start
+      - name: Run Sequelize Sample tests
+        working-directory: ./samples/nodejs/sequelize
+        run: |
+          npm install
+          npm start
+  ruby-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      - run: ruby --version
+      - name: Run Ruby on Rails ActiveRecord Sample tests
+        working-directory: ./samples/ruby/activerecord
+        run: |
+          bundle install
+          bundle exec rake run
+  dotnet-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run npgsql Sample tests
+        working-directory: ./samples/dotnet/npgsql-sample
+        run: dotnet run Program.cs
+  php-samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+      - run: php --version
+      - name: Run PDO Sample tests
+        working-directory: ./samples/php/pdo
+        run: |
+          composer install
+          php pdo_sample.php

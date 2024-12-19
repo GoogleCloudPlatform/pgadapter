@@ -133,6 +133,8 @@ public class ITPgx5Test implements IntegrationTest {
                 .to(true)
                 .set("col_bytea")
                 .to(ByteArray.copyFrom("test"))
+                .set("col_float4")
+                .to(3.14f)
                 .set("col_float8")
                 .to(3.14d)
                 .set("col_int")

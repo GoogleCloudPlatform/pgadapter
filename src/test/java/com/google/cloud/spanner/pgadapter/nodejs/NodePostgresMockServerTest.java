@@ -215,8 +215,8 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   public void testInsertAllTypes() throws IOException, InterruptedException {
     String sql =
         "INSERT INTO AllTypes "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -227,6 +227,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -246,18 +247,20 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("some random string"))
                 .bind("p4")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p5")
-                .to(100)
+                .to(3.14d)
                 .bind("p6")
-                .to(Value.pgNumeric("234.54235"))
+                .to(100)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-07-22T20:15:42.011+02:00"))
+                .to(Value.pgNumeric("234.54235"))
                 .bind("p8")
-                .to(Date.parseDate("2022-07-22"))
+                .to(Timestamp.parseTimestamp("2022-07-22T20:15:42.011+02:00"))
                 .bind("p9")
-                .to("some-random-string")
+                .to(Date.parseDate("2022-07-22"))
                 .bind("p10")
+                .to("some-random-string")
+                .bind("p11")
                 .to(Value.pgJsonb("{\"my_key\":\"my-value\"}"))
                 .build(),
             1L);
@@ -280,7 +283,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
-    assertEquals(10, executeRequest.getParamTypesCount());
+    assertEquals(11, executeRequest.getParamTypesCount());
     assertTrue(executeRequest.getTransaction().hasBegin());
     assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
     assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -290,8 +293,8 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   public void testInsertAllTypesNull() throws IOException, InterruptedException {
     String sql =
         "INSERT INTO AllTypes "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -314,6 +317,8 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to((Value) null)
                 .bind("p10")
+                .to((Value) null)
+                .bind("p11")
                 .to((Value) null)
                 .build(),
             1L));
@@ -339,8 +344,8 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   public void testInsertAllTypesPreparedStatement() throws IOException, InterruptedException {
     String sql =
         "INSERT INTO AllTypes "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -351,6 +356,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
+                            TypeCode.FLOAT32,
                             TypeCode.FLOAT64,
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
@@ -370,18 +376,20 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("some random string"))
                 .bind("p4")
-                .to(3.14d)
+                .to(3.14f)
                 .bind("p5")
-                .to(100)
+                .to(3.14d)
                 .bind("p6")
-                .to(Value.pgNumeric("234.54235"))
+                .to(100)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-07-22T20:15:42.011+02:00"))
+                .to(Value.pgNumeric("234.54235"))
                 .bind("p8")
-                .to(Date.parseDate("2022-07-22"))
+                .to(Timestamp.parseTimestamp("2022-07-22T20:15:42.011+02:00"))
                 .bind("p9")
-                .to("some-random-string")
+                .to(Date.parseDate("2022-07-22"))
                 .bind("p10")
+                .to("some-random-string")
+                .bind("p11")
                 .to(Value.pgJsonb("{\"my_key\":\"my-value\"}"))
                 .build(),
             1L);
@@ -398,18 +406,20 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to((ByteArray) null)
                 .bind("p4")
-                .to((Double) null)
+                .to((Float) null)
                 .bind("p5")
-                .to((Long) null)
+                .to((Double) null)
                 .bind("p6")
-                .to(Value.pgNumeric(null))
+                .to((Long) null)
                 .bind("p7")
-                .to((Timestamp) null)
+                .to(Value.pgNumeric(null))
                 .bind("p8")
-                .to((Date) null)
+                .to((Timestamp) null)
                 .bind("p9")
-                .to((String) null)
+                .to((Date) null)
                 .bind("p10")
+                .to((String) null)
+                .bind("p11")
                 .to(Value.pgJsonb(null))
                 .build(),
             1L));
@@ -445,7 +455,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
-    assertEquals(10, executeRequest.getParamTypesCount());
+    assertEquals(11, executeRequest.getParamTypesCount());
     assertTrue(executeRequest.getTransaction().hasBegin());
     assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
     assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -454,7 +464,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSelectAllTypes() throws IOException, InterruptedException {
     String sql =
-        "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "FROM AllTypes";
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("")));
@@ -466,6 +476,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":true,"
             + "\"col_bytea\":{\"type\":\"Buffer\",\"data\":[116,101,115,116]},"
+            + "\"col_float4\":3.14,"
             + "\"col_float8\":3.14,"
             + "\"col_int\":\"100\","
             + "\"col_numeric\":\"6.626\","
@@ -476,6 +487,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_array_bigint\":[\"1\",null,\"2\"],"
             + "\"col_array_bool\":[true,null,false],"
             + "\"col_array_bytea\":[{\"type\":\"Buffer\",\"data\":[98,121,116,101,115,49]},null,{\"type\":\"Buffer\",\"data\":[98,121,116,101,115,50]}],"
+            + "\"col_array_float4\":[3.14,null,-99.99],"
             + "\"col_array_float8\":[3.14,null,-99.99],"
             + "\"col_array_int\":[\"-100\",null,\"-200\"],"
             + "\"col_array_numeric\":[6.626,null,-3.14],"
@@ -494,7 +506,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSelectAllTypesNull() throws IOException, InterruptedException {
     String sql =
-        "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "FROM AllTypes";
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesNullResultSet("")));
@@ -506,6 +518,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_bigint\":null,"
             + "\"col_bool\":null,"
             + "\"col_bytea\":null,"
+            + "\"col_float4\":null,"
             + "\"col_float8\":null,"
             + "\"col_int\":null,"
             + "\"col_numeric\":null,"
@@ -516,6 +529,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_array_bigint\":null,"
             + "\"col_array_bool\":null,"
             + "\"col_array_bytea\":null,"
+            + "\"col_array_float4\":null,"
             + "\"col_array_float8\":null,"
             + "\"col_array_int\":null,"
             + "\"col_array_numeric\":null,"
@@ -604,9 +618,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
             + "{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t"
-            + "{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
+            + "{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
             + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
             + "{\"2023-02-20\",NULL,\"2000-01-01\"}\t"
             + "{\"string1\",NULL,\"string2\"}\t"
@@ -625,6 +639,56 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDmlBatch() throws Exception {
+    String sql = "INSERT INTO users(name) VALUES($1)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("bar").build(), 1L));
+
+    String output = runTest("testDmlBatch", getHost(), pgServer.getLocalPort());
+
+    assertEquals("executed dml batch\n", output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
+    assertEquals(sql, describeRequest.getSql());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+
+    List<ExecuteBatchDmlRequest> batchDmlRequests =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
+    assertEquals(1, batchDmlRequests.size());
+    ExecuteBatchDmlRequest request = batchDmlRequests.get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, request.getStatementsCount());
+    String[] expectedValues = new String[] {"foo", "bar"};
+    for (int i = 0; i < request.getStatementsCount(); i++) {
+      assertEquals(sql, request.getStatements(i).getSql());
+      assertEquals(1, request.getStatements(i).getParamTypesCount());
+      assertEquals(
+          expectedValues[i],
+          request.getStatements(i).getParams().getFieldsMap().get("p1").getStringValue());
+    }
+    // We get two commits, because PGAdapter auto-describes the DML statement in a separate
+    // transaction if the auto-describe happens during a DML batch.
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testDmlBatchInTransaction() throws Exception {
     String sql = "INSERT INTO users(name) VALUES($1)";
     mockSpanner.putStatementResult(
         StatementResult.query(

@@ -50,6 +50,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -58,6 +60,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -67,6 +70,7 @@ public class PgAdapterTestEnv {
   private static final int INIT_PROTOCOL = 80877103;
   private static final int OPTIONS_PROTOCOL = 196608;
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
+  private static final AtomicBoolean DELETED_STALE_DATABASES = new AtomicBoolean();
 
   // GCP credentials file should be set through the 'GOOGLE_APPLICATION_CREDENTIALS' environment
   // variable.
@@ -116,6 +120,7 @@ public class PgAdapterTestEnv {
               + "col_bigint bigint not null primary key, "
               + "col_bool bool, "
               + "col_bytea bytea, "
+              + "col_float4 float4, "
               + "col_float8 float8, "
               + "col_int int, "
               + "col_numeric numeric, "
@@ -126,6 +131,7 @@ public class PgAdapterTestEnv {
               + "col_array_bigint bigint[], "
               + "col_array_bool bool[], "
               + "col_array_bytea bytea[], "
+              + "col_array_float4 float4[], "
               + "col_array_float8 float8[], "
               + "col_array_int int[], "
               + "col_array_numeric numeric[], "
@@ -133,6 +139,10 @@ public class PgAdapterTestEnv {
               + "col_array_date date[], "
               + "col_array_varchar varchar(100)[], "
               + "col_array_jsonb jsonb[])");
+
+  //  public static boolean useFloat4InTests() {
+  //    return true;
+  //  }
 
   public static ImmutableList<String> getOnlyAllTypesDdl() {
     return DEFAULT_DATA_MODEL.subList(1, 2);
@@ -180,6 +190,26 @@ public class PgAdapterTestEnv {
     spannerHost = getSpannerUrl();
     logger.info("Using Spanner host: " + spannerHost);
     options = createSpannerOptions();
+    deleteStaleTestDatabases();
+  }
+
+  private void deleteStaleTestDatabases() {
+    if (isDropStaleTestDatabases() && DELETED_STALE_DATABASES.compareAndSet(false, true)) {
+      DatabaseAdminClient client = getSpanner().getDatabaseAdminClient();
+      long thresholdTime = Instant.now().getEpochSecond() - Duration.ofHours(6L).getSeconds();
+      for (Database database : client.listDatabases(getInstanceId()).iterateAll()) {
+        if ((database.getId().getDatabase().startsWith("testdb_")
+                || database.getId().getDatabase().startsWith(getDatabaseId()))
+            && database.getCreateTime().getSeconds() <= thresholdTime) {
+          logger.info("Dropping stale test database " + database.getId().getName());
+          database.drop();
+        }
+      }
+    }
+  }
+
+  private boolean isDropStaleTestDatabases() {
+    return Boolean.parseBoolean(System.getenv("PG_ADAPTER_DROP_STALE_DATABASES"));
   }
 
   public void startPGAdapterServer(Iterable<String> additionalPGAdapterOptions) {

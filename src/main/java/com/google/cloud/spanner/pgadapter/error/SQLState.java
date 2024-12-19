@@ -158,6 +158,9 @@ public enum SQLState {
   InFailedSqlTransaction("25P02"),
   IdleInTransactionSessionTimeout("25P03"),
 
+  // Class 26 - Invalid SQL statement name
+  InvalidSqlStatementName("26000"),
+
   // Class 34 - Cursor
   InvalidCursorName("34000"),
 
@@ -228,6 +231,7 @@ public enum SQLState {
     return code.equals(otherCode);
   }
 
+  @Override
   public String toString() {
     return this.code;
   }

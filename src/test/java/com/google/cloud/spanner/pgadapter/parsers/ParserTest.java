@@ -141,6 +141,36 @@ public class ParserTest {
   }
 
   @Test
+  public void testPositiveFloatParsing() {
+    float value = 1234.56789f;
+
+    byte[] byteResult = {68, -102, 82, 44};
+    byte[] stringResult = {'1', '2', '3', '4', '.', '5', '6', '7', '9'};
+
+    FloatParser parsedValue = new FloatParser(value);
+
+    validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.FLOAT4, value);
+    validateCreateText(stringResult, Oid.FLOAT4, value);
+  }
+
+  @Test
+  public void testNegativeFloatParsing() {
+    float value = -1234.56789f;
+    byte[] result = new byte[4];
+    ByteConverter.float4(result, 0, value);
+
+    byte[] byteResult = {-60, -102, 82, 44};
+    byte[] stringResult = {'-', '1', '2', '3', '4', '.', '5', '6', '7', '9'};
+
+    FloatParser parsedValue = new FloatParser(value);
+
+    validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.FLOAT4, value);
+    validateCreateText(stringResult, Oid.FLOAT4, value);
+  }
+
+  @Test
   public void testPositiveDoubleParsing() {
     double value = 1234.56789d;
     byte[] byteResult = {64, -109, 74, 69, -124, -12, -58, -25};
@@ -622,7 +652,7 @@ public class ParserTest {
     assertEquals(Type.date(), Parser.toType(Oid.DATE));
     assertEquals(Type.timestamp(), Parser.toType(Oid.TIMESTAMP));
     assertEquals(Type.timestamp(), Parser.toType(Oid.TIMESTAMPTZ));
-    assertEquals(Type.float64(), Parser.toType(Oid.FLOAT4));
+    assertEquals(Type.float32(), Parser.toType(Oid.FLOAT4));
     assertEquals(Type.float64(), Parser.toType(Oid.FLOAT8));
     assertEquals(Type.pgNumeric(), Parser.toType(Oid.NUMERIC));
     assertEquals(Type.string(), Parser.toType(Oid.VARCHAR));
@@ -638,7 +668,7 @@ public class ParserTest {
     assertEquals(Type.array(Type.date()), Parser.toType(Oid.DATE_ARRAY));
     assertEquals(Type.array(Type.timestamp()), Parser.toType(Oid.TIMESTAMP_ARRAY));
     assertEquals(Type.array(Type.timestamp()), Parser.toType(Oid.TIMESTAMPTZ_ARRAY));
-    assertEquals(Type.array(Type.float64()), Parser.toType(Oid.FLOAT4_ARRAY));
+    assertEquals(Type.array(Type.float32()), Parser.toType(Oid.FLOAT4_ARRAY));
     assertEquals(Type.array(Type.float64()), Parser.toType(Oid.FLOAT8_ARRAY));
     assertEquals(Type.array(Type.pgNumeric()), Parser.toType(Oid.NUMERIC_ARRAY));
     assertEquals(Type.array(Type.string()), Parser.toType(Oid.VARCHAR_ARRAY));

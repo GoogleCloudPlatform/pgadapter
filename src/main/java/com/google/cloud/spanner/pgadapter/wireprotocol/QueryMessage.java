@@ -29,6 +29,9 @@ public class QueryMessage extends ControlMessage {
   public static final String PREPARE = "PREPARE";
   public static final String EXECUTE = "EXECUTE";
   public static final String DEALLOCATE = "DEALLOCATE";
+  public static final String SHOW = "SHOW";
+  public static final String DISCARD = "DISCARD";
+  public static final String RESET = "RESET";
   public static final String VACUUM = "VACUUM";
   public static final String TRUNCATE = "TRUNCATE";
   public static final String SAVEPOINT = "SAVEPOINT";
@@ -38,8 +41,13 @@ public class QueryMessage extends ControlMessage {
   public static final String FETCH = "FETCH";
   public static final String MOVE = "MOVE";
   public static final String CLOSE = "CLOSE";
+  public static final String SHUTDOWN = "SHUTDOWN";
   public static final ImmutableList<String> SHOW_DATABASE_DDL =
       ImmutableList.of("SHOW", "DATABASE", "DDL");
+  public static final ImmutableList<String> SELECT_CURRENT_SETTING =
+      ImmutableList.of("SELECT", "CURRENT_SETTING");
+  public static final ImmutableList<String> SELECT_SET_CONFIG =
+      ImmutableList.of("SELECT", "SET_CONFIG");
   private final Statement originalStatement;
   private final SimpleQueryStatement simpleQueryStatement;
 

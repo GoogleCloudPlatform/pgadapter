@@ -33,6 +33,13 @@ The benchmark application accepts the following command line arguments:
 * --database: The fully qualified database name to use for the benchmark. Defaults to `projects/$GOOGLE_CLOUD_PROJECT/instances/$SPANNER_INSTANCE/databases/$SPANNER_DATABASE`.
 * --clients: The number of parallel clients that execute queries. Defaults to 16.
 * --operations: The number of operations (queries) that each client executes. Defaults to 1,000.
+* --transaction: The type of transaction to execute. Must be either READ_ONLY or READ_WRITE. Defaults to READ_ONLY.
+* --wait: The wait time in milliseconds between each operation. Defaults to 0.
+* --unix_domain_sockets: Also run the PostgreSQL benchmark using Unix Domain Sockets. Defaults to false.
+* --warmup_iterations: The number of warmup iterations to run before executing the actual benchmark. Java uses a
+  Just-in-Time compiler that compiles and optimizes code based on the actual usage pattern. Running a
+  warmup script before the actual benchmark is therefore recommended to get results that are comparable
+  to an actual application that runs for a longer period of time. Defaults to 12,000 per CPU core.
 
 ## Examples
 
@@ -40,4 +47,20 @@ Run a benchmark with 32 parallel clients each executing 5,000 operations:
 
 ```shell
 mvn clean compile exec:java -Dexec.args="--clients=32 --operations=5000"
+```
+
+
+Run a benchmark with 32 parallel clients each executing 1 query per second.
+Each client executes 100 queries:
+
+```shell
+mvn clean compile exec:java -Dexec.args="--clients=32 --operations=100 --wait 1000"
+```
+
+
+Run a benchmark with 32 parallel clients executing read/write transactions.
+Each client executes 1,000 transactions:
+
+```shell
+mvn clean compile exec:java -Dexec.args="--clients=32 --operations=1000 --transaction=read_write"
 ```

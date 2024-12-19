@@ -63,7 +63,7 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.integer :lock_version, null: false
     end
 
-    create_table :concerts, id: false, primary_key: :venue_id do |t|
+    create_table :concerts, id: false, primary_key: :concert_id do |t|
       t.string :concert_id, limit: 36, null: false, primary_key: true
       t.references :venue, foreign_key: {primary_key: :venue_id},
                    type: :string, limit: 36, index: false
@@ -76,6 +76,33 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.datetime :updated_at
       t.integer :lock_version, null: false
       t.check_constraint "end_time > start_time", name: :chk_end_time_after_start_time
+    end
+
+    # The ActiveRecord PostgreSQL provider does not know how to create a bit-reversed sequence.
+    # These sequences must therefore be created using a hand-written SQL script.
+    # Bit-reversed sequences can be used to create auto-generated primary key values that are
+    # safe from hot-spotting.
+    # See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
+    # for more information on choosing a good primary key.
+    execute "create sequence ticket_sale_seq
+             bit_reversed_positive
+             skip range 1 1000
+             start counter with 50000;"
+
+    # Create a table that uses a bit-reversed sequence to auto-generate primary key values.
+    # The 'id' column definition is specified using a SQL statement to ensure that we get
+    # a column with the right type, and with a default clause that selects a value from the
+    # sequence.
+    create_table :ticket_sales, id: false, primary_key: :id do |t|
+      t.column :id, "bigint not null primary key default nextval('ticket_sale_seq')"
+      t.references :concert, foreign_key: {primary_key: :concert_id},
+                   type: :string, limit: 36, index: false
+      t.string :customer_name
+      t.numeric :price
+      t.string :seats, array: true
+      t.datetime :created_at
+      t.datetime :updated_at
+      t.integer :lock_version, null: false
     end
 
   end

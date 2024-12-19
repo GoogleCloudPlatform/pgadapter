@@ -109,9 +109,9 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + "    ))\n"
               + "ORDER BY CASE\n"
               + "       WHEN typtype IN ('b', 'e', 'p') THEN 0           -- First base types, enums, pseudo-types\n"
-              + "       WHEN typtype = 'r' THEN 1                        -- Ranges after\n"
-              + "       WHEN typtype = 'm' THEN 2                        -- Multiranges after\n"
-              + "       WHEN typtype = 'c' THEN 3                        -- Composites after\n"
+              + "       WHEN typtype = 'c' THEN 1                        -- Composites after (fields loaded later in 2nd pass)\n"
+              + "       WHEN typtype = 'r' THEN 2                        -- Ranges after\n"
+              + "       WHEN typtype = 'm' THEN 3                        -- Multiranges after\n"
               + "       WHEN typtype = 'd' AND elemtyptype <> 'a' THEN 4 -- Domains over non-arrays after\n"
               + "       WHEN typtype = 'a' THEN 5                        -- Arrays after\n"
               + "       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 6  -- Domains over arrays last\n"
@@ -192,6 +192,15 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
                   .addValues(Value.newBuilder().setStringValue("int8").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
+                  .addValues(Value.newBuilder().setStringValue("float4").build())
                   .addValues(Value.newBuilder().setStringValue("b").build())
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -317,6 +326,16 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setStringValue("a").build())
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_float4").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
                   .build())
           .addRows(
               ListValue.newBuilder()

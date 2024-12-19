@@ -144,6 +144,8 @@ class CsvCopyParser implements CopyInParser {
             return Value.bool(recordValue == null ? null : BooleanParser.toBoolean(recordValue));
           case INT64:
             return Value.int64(recordValue == null ? null : Long.parseLong(recordValue));
+          case FLOAT32:
+            return Value.float32(recordValue == null ? null : Float.parseFloat(recordValue));
           case FLOAT64:
             return Value.float64(recordValue == null ? null : Double.parseDouble(recordValue));
           case PG_NUMERIC:
@@ -181,6 +183,11 @@ class CsvCopyParser implements CopyInParser {
               case INT64:
                 return Value.int64Array(
                     cast(ArrayParser.stringArrayToList(recordValue, Oid.INT8, sessionState, true)));
+              case FLOAT32:
+                return Value.float32Array(
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.FLOAT4, sessionState, true)));
               case FLOAT64:
                 return Value.float64Array(
                     cast(

@@ -15,6 +15,7 @@
 package com.google.cloud.postgres.models;
 
 import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,7 +23,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.hibernate.annotations.GenerationTime;
 import org.hibernate.annotations.GeneratorType;
 
@@ -50,6 +53,9 @@ public class Concerts {
   @ManyToOne
   @JoinColumn(name = "venue_id")
   private Venues venues;
+
+  @OneToMany(cascade = CascadeType.ALL, mappedBy = "concert")
+  private List<TicketSale> ticketSales;
 
   @Column(name = "created_at", columnDefinition = "timestamptz")
   private LocalDateTime createdAt;
@@ -104,6 +110,14 @@ public class Concerts {
 
   public void setVenues(Venues venues) {
     this.venues = venues;
+  }
+
+  public List<TicketSale> getTicketSales() {
+    return ticketSales;
+  }
+
+  public void setTicketSales(List<TicketSale> ticketSales) {
+    this.ticketSales = ticketSales;
   }
 
   public LocalDateTime getCreatedAt() {

@@ -8,20 +8,35 @@
 
 require_relative 'config/environment'
 require 'sinatra/activerecord/rake'
-require "docker"
+require "testcontainers"
 
 Bundler.require
 
-desc 'Runs a simple ActiveRecord tutorial for Google Cloud Spanner PostgreSQL.'
+desc 'Runs a simple ActiveRecord tutorial for Google Cloud Spanner PostgreSQL on the Spanner emulator.'
 task :run do
+  puts "Starting PGAdapter..."
+  container = create_pgadapter_and_emulator_container
+  # Set the port where PGAdapter is running.
+  ENV["PGPORT"] = container.mapped_port(5432).to_s
+  begin
+    sh 'rake db:migrate'
+    sh 'rake db:seed'
+    sh 'ruby application.rb'
+  ensure
+    container.stop!
+    container.remove
+  end
+end
+
+desc 'Runs a simple ActiveRecord tutorial for Google Cloud Spanner PostgreSQL.'
+task :run_prod do
   credentials = ENV["GOOGLE_APPLICATION_CREDENTIALS"]
   fail "You must set the environment variable GOOGLE_APPLICATION_CREDENTIALS before running the sample." if credentials.nil?
 
   container = create_pgadapter_container(credentials)
+  # Set the port where PGAdapter is running.
+  ENV["PGPORT"] = container.mapped_port(5432).to_s
   begin
-    puts "Starting PGAdapter..."
-    container.start!
-    sleep(2)
     sh 'rake db:migrate'
     sh 'rake db:seed'
     sh 'ruby application.rb'
@@ -32,21 +47,39 @@ task :run do
 end
 
 def create_pgadapter_container(credentials)
-  puts "Downloading PGAdapter image..."
-  Docker::Image.create "fromImage" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record"
   puts "Creating PGAdapter container..."
-  Docker::Container.create(
-    "Image" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record",
-    "ExposedPorts" => { "5432/tcp" => {} },
-    "HostConfig" => {
-      "PortBindings" => {
-        "5432/tcp" => [{ "HostPort" => ENV["PGPORT"] || "5432" }]
-      },
-      "Binds" => ["#{credentials}:/credentials.json:ro"],
-    },
-    "Volumes" => { "/credentials.json" => {}},
-    # Start PGAdapter with the given credentials and no default project, instance or database.
-    # This means that the fully qualified database name must be used in the database.yml file.
-    "Cmd" => ["-c", "/credentials.json", "-x"]
-  )
+  container = Testcontainers::DockerContainer
+                .new(image="gcr.io/cloud-spanner-pg-adapter/pgadapter",
+                     image_create_options: {
+                       pull: :always,
+                     })
+                .with_exposed_ports(5432)
+                .with_filesystem_binds("#{credentials}:/credentials.json:ro")
+                .with_command("-c /credentials.json -x")
+  puts "Pulling PGAdapter container image and starting container..."
+  container.start
+  puts "Waiting for PGAdapter to be ready..."
+  container.wait_for_tcp_port(5432)
+  puts "PGAdapter running on port #{container.mapped_port(5432)}"
+  # Sleep 2 seconds to be absolutely sure that PGAdapter has started.
+  sleep(2)
+  container
+end
+
+def create_pgadapter_and_emulator_container
+  puts "Creating PGAdapter+Emulator container..."
+  container = Testcontainers::DockerContainer
+                .new(image="gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator",
+                     image_create_options: {
+                       pull: :always,
+                     })
+                .with_exposed_ports(5432)
+  puts "Pulling PGAdapter+Emulator container image and starting container..."
+  container.start
+  puts "Waiting for PGAdapter to be ready..."
+  container.wait_for_tcp_port(5432)
+  puts "PGAdapter running on port #{container.mapped_port(5432)}"
+  # Sleep 2 seconds to be absolutely sure that PGAdapter has started.
+  sleep(2)
+  container
 end

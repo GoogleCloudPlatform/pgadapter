@@ -49,6 +49,10 @@ public interface PgxTest extends Library {
 
   String TestBatchExecutionError(GoString connString);
 
+  String TestDdlBatch(GoString connString);
+
+  String TestDdlBatchInTransaction(GoString connString);
+
   String TestWrongDialect(GoString connString);
 
   String TestCopyIn(GoString connString);
@@ -62,4 +66,6 @@ public interface PgxTest extends Library {
   String TestReadWriteTransactionIsolationLevelRepeatableRead(GoString connString);
 
   String TestReadOnlySerializableTransaction(GoString connString);
+
+  String TestDataBoost(GoString connString);
 }

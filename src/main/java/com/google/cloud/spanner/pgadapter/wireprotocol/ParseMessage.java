@@ -19,6 +19,7 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.CLOSE
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DEALLOCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DECLARE;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DISCARD;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.EXECUTE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.FETCH;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.MOVE;
@@ -26,7 +27,10 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.PREPA
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.RELEASE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.ROLLBACK;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SAVEPOINT;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SELECT_CURRENT_SETTING;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SELECT_SET_CONFIG;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW_DATABASE_DDL;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHUTDOWN;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.TRUNCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.VACUUM;
 
@@ -42,6 +46,7 @@ import com.google.cloud.spanner.pgadapter.statements.CloseStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.DeallocateStatement;
 import com.google.cloud.spanner.pgadapter.statements.DeclareStatement;
+import com.google.cloud.spanner.pgadapter.statements.DiscardStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExecuteStatement;
 import com.google.cloud.spanner.pgadapter.statements.FetchStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
@@ -51,7 +56,10 @@ import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
 import com.google.cloud.spanner.pgadapter.statements.ReleaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.RollbackToStatement;
 import com.google.cloud.spanner.pgadapter.statements.SavepointStatement;
+import com.google.cloud.spanner.pgadapter.statements.SelectCurrentSettingStatement;
+import com.google.cloud.spanner.pgadapter.statements.SelectSetConfigStatement;
 import com.google.cloud.spanner.pgadapter.statements.ShowDatabaseDdlStatement;
+import com.google.cloud.spanner.pgadapter.statements.ShutdownStatement;
 import com.google.cloud.spanner.pgadapter.statements.TruncateStatement;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
@@ -144,6 +152,13 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
             name,
             parsedStatement,
             originalStatement);
+      } else if (isCommand(DISCARD, originalStatement.getSql())) {
+        return new DiscardStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
       } else if (isCommand(DECLARE, originalStatement.getSql())) {
         return new DeclareStatement(
             connectionHandler,
@@ -217,6 +232,27 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
             name,
             parsedStatement,
             originalStatement);
+      } else if (isCommand(SELECT_CURRENT_SETTING, originalStatement.getSql())) {
+        return new SelectCurrentSettingStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(SELECT_SET_CONFIG, originalStatement.getSql())) {
+        return new SelectSetConfigStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(SHUTDOWN, originalStatement.getSql())) {
+        return new ShutdownStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
       } else {
         return new IntermediatePreparedStatement(
             connectionHandler,
@@ -238,11 +274,15 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   }
 
   @Override
-  void buffer(BackendConnection backendConnection) {
+  void buffer(BackendConnection backendConnection) throws Exception {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
       throw new IllegalStateException("Must close statement before reusing name.");
     }
-    this.connection.registerStatement(this.name, this.statement);
+    if (this.statement.hasException()) {
+      handleError(statement.getException());
+    } else {
+      this.connection.registerStatement(this.name, this.statement);
+    }
   }
 
   @Override

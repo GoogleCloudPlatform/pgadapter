@@ -23,6 +23,7 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.spanner.v1.TypeAnnotationCode;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import org.postgresql.core.Oid;
@@ -81,6 +82,7 @@ public abstract class Parser<T> {
       case Oid.INT4:
         return new IntegerParser(item, formatCode);
       case Oid.INT8:
+      case Oid.OID:
         return new LongParser(item, formatCode);
       case Oid.NUMERIC:
         return new NumericParser(item, formatCode);
@@ -103,6 +105,7 @@ public abstract class Parser<T> {
       case Oid.INT2_ARRAY:
       case Oid.INT4_ARRAY:
       case Oid.INT8_ARRAY:
+      case Oid.OID_ARRAY:
       case Oid.NUMERIC_ARRAY:
       case Oid.TEXT_ARRAY:
       case Oid.VARCHAR_ARRAY:
@@ -141,6 +144,8 @@ public abstract class Parser<T> {
         return Oid.INT4;
       case Oid.INT8_ARRAY:
         return Oid.INT8;
+      case Oid.OID_ARRAY:
+        return Oid.OID;
       case Oid.NUMERIC_ARRAY:
         return Oid.NUMERIC;
       case Oid.TEXT_ARRAY:
@@ -177,9 +182,12 @@ public abstract class Parser<T> {
         return new BinaryParser(result, columnarPosition);
       case DATE:
         return new DateParser(result, columnarPosition);
+      case FLOAT32:
+        return new FloatParser(result, columnarPosition);
       case FLOAT64:
         return new DoubleParser(result, columnarPosition);
       case INT64:
+      case PG_OID:
         return new LongParser(result, columnarPosition);
       case PG_NUMERIC:
         return new NumericParser(result, columnarPosition);
@@ -214,9 +222,12 @@ public abstract class Parser<T> {
         return new BinaryParser(result);
       case DATE:
         return new DateParser(result);
+      case FLOAT32:
+        return new FloatParser(result);
       case FLOAT64:
         return new DoubleParser(result);
       case INT64:
+      case PG_OID:
         return new LongParser(result);
       case PG_NUMERIC:
         return new NumericParser(result);
@@ -246,8 +257,12 @@ public abstract class Parser<T> {
         return Oid.BOOL;
       case INT64:
         return Oid.INT8;
+      case PG_OID:
+        return Oid.OID;
       case PG_NUMERIC:
         return Oid.NUMERIC;
+      case FLOAT32:
+        return Oid.FLOAT4;
       case FLOAT64:
         return Oid.FLOAT8;
       case STRING:
@@ -266,8 +281,12 @@ public abstract class Parser<T> {
             return Oid.BOOL_ARRAY;
           case INT64:
             return Oid.INT8_ARRAY;
+          case PG_OID:
+            return Oid.OID_ARRAY;
           case PG_NUMERIC:
             return Oid.NUMERIC_ARRAY;
+          case FLOAT32:
+            return Oid.FLOAT4_ARRAY;
           case FLOAT64:
             return Oid.FLOAT8_ARRAY;
           case STRING:
@@ -308,12 +327,15 @@ public abstract class Parser<T> {
       case Oid.DATE:
         return Type.date();
       case Oid.FLOAT4:
+        return Type.float32();
       case Oid.FLOAT8:
         return Type.float64();
       case Oid.INT2:
       case Oid.INT4:
       case Oid.INT8:
         return Type.int64();
+      case Oid.OID:
+        return Type.pgOid();
       case Oid.NUMERIC:
         return Type.pgNumeric();
       case Oid.TEXT:
@@ -334,6 +356,7 @@ public abstract class Parser<T> {
       case Oid.INT2_ARRAY:
       case Oid.INT4_ARRAY:
       case Oid.INT8_ARRAY:
+      case Oid.OID_ARRAY:
       case Oid.NUMERIC_ARRAY:
       case Oid.TEXT_ARRAY:
       case Oid.VARCHAR_ARRAY:
@@ -361,9 +384,14 @@ public abstract class Parser<T> {
       case BOOL:
         return Oid.BOOL;
       case INT64:
+        if (type.getTypeAnnotation() == TypeAnnotationCode.PG_OID) {
+          return Oid.OID;
+        }
         return Oid.INT8;
       case NUMERIC:
         return Oid.NUMERIC;
+      case FLOAT32:
+        return Oid.FLOAT4;
       case FLOAT64:
         return Oid.FLOAT8;
       case STRING:
@@ -381,9 +409,14 @@ public abstract class Parser<T> {
           case BOOL:
             return Oid.BOOL_ARRAY;
           case INT64:
+            if (type.getArrayElementType().getTypeAnnotation() == TypeAnnotationCode.PG_OID) {
+              return Oid.OID_ARRAY;
+            }
             return Oid.INT8_ARRAY;
           case NUMERIC:
             return Oid.NUMERIC_ARRAY;
+          case FLOAT32:
+            return Oid.FLOAT4_ARRAY;
           case FLOAT64:
             return Oid.FLOAT8_ARRAY;
           case STRING:

@@ -18,19 +18,20 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v4"
 )
 
-func RunPgxV4(database, sql string, numOperations, numClients int, host string, port int, useUnixSocket bool) ([]float64, error) {
+func RunPgxV4(database, sql string, readWrite bool, numOperations, numClients, wait int, host string, port int, useUnixSocket bool) ([]float64, error) {
 	ctx := context.Background()
 	var err error
 
 	// Connect to Cloud Spanner through PGAdapter.
 	var connString string
 	if useUnixSocket {
-		connString = fmt.Sprintf("host=%s port=%d database=%s", host, port, url.QueryEscape(database))
+		connString = fmt.Sprintf("host=%s port=%d database=%s", host, port, database)
 	} else {
 		connString = fmt.Sprintf("postgres://uid:pwd@%s:%d/%s?sslmode=disable", host, port, url.QueryEscape(database))
 	}
@@ -44,11 +45,20 @@ func RunPgxV4(database, sql string, numOperations, numClients int, host string, 
 	}
 
 	// Run one query to warm up.
-	if _, err := executePgxV4Query(ctx, conns[0], sql); err != nil {
-		return nil, err
+	if readWrite {
+		if _, err := executePgxV4Update(ctx, conns[0], sql); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := executePgxV4Query(ctx, conns[0], sql); err != nil {
+			return nil, err
+		}
 	}
 
-	runTimes := make([]float64, numOperations*numClients)
+	var ops atomic.Int64
+	var finished atomic.Bool
+	totalOps := numOperations * numClients
+	runTimes := make([]float64, totalOps)
 	wg := sync.WaitGroup{}
 	wg.Add(numClients)
 	for c := 0; c < numClients; c++ {
@@ -56,15 +66,24 @@ func RunPgxV4(database, sql string, numOperations, numClients int, host string, 
 		go func() error {
 			defer wg.Done()
 			for n := 0; n < numOperations; n++ {
-				runTimes[clientIndex*numOperations+n], err = executePgxV4Query(ctx, conns[clientIndex], sql)
+				randWait(wait)
+				if readWrite {
+					runTimes[clientIndex*numOperations+n], err = executePgxV4Update(ctx, conns[clientIndex], sql)
+				} else {
+					runTimes[clientIndex*numOperations+n], err = executePgxV4Query(ctx, conns[clientIndex], sql)
+				}
 				if err != nil {
 					return err
 				}
+				ops.Add(1)
 			}
 			return nil
 		}()
 	}
+	printProgress(&finished, &ops, totalOps)
 	wg.Wait()
+	finished.Store(true)
+	fmt.Printf("\r%d/%d\n\n", ops.Load(), totalOps)
 	return runTimes, nil
 }
 
@@ -82,6 +101,23 @@ func executePgxV4Query(ctx context.Context, conn *pgx.Conn, sql string) (float64
 		numNonNull++
 	} else {
 		numNull++
+	}
+	end := float64(time.Since(start).Microseconds()) / 1e3
+	return end, nil
+}
+
+func executePgxV4Update(ctx context.Context, conn *pgx.Conn, sql string) (float64, error) {
+	start := time.Now()
+
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx, sql, randString(), randId(100000)); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
 	}
 	end := float64(time.Since(start).Microseconds()) / 1e3
 	return end, nil

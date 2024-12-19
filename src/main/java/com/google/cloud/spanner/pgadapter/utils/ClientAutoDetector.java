@@ -28,6 +28,10 @@ import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectGolangMigrateAdvisoryLockStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectGolangMigrateAdvisoryUnlockStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryLockStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryUnlockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.StartTransactionIsolationLevelRepeatableRead;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
@@ -383,6 +387,20 @@ public class ClientAutoDetector {
                 || parseMessage.getName().startsWith("stmtcache_"));
       }
     },
+    PHP_PDO {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // The Php PDO driver does not send enough unique parameters for it to be auto-detected.
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
+        // The Php PDO driver uses a relatively unique naming scheme for prepared statements (and
+        // uses prepared statements for everything by default).
+        return parseMessage.getName() != null && (parseMessage.getName().startsWith("pdo_stmt_"));
+      }
+    },
     NPGSQL {
       final ImmutableList<QueryPartReplacer> functionReplacements =
           ImmutableList.of(
@@ -411,13 +429,12 @@ public class ClientAutoDetector {
         // The npgsql client always starts with sending a query that contains multiple statements
         // and that starts with the following prefix.
         return statements.size() == 1
+            && statements.get(0).getSql().contains("SELECT version();")
             && statements
                 .get(0)
                 .getSql()
-                .startsWith(
-                    "SELECT version();\n"
-                        + "\n"
-                        + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n");
+                .contains(
+                    "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid");
       }
 
       @Override
@@ -457,6 +474,93 @@ public class ClientAutoDetector {
       @Override
       public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
         return functionReplacements;
+      }
+    },
+    PRISMA {
+      final ImmutableMap<String, String> tableReplacements =
+          ImmutableMap.of("_prisma_migrations", "prisma_migrations");
+      private final ImmutableSet<String> checkPgCatalogPrefixes =
+          ImmutableSet.<String>builder()
+              .addAll(DEFAULT_CHECK_PG_CATALOG_PREFIXES)
+              .add("_prisma_migrations")
+              .build();
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // Prisma does not send any unique connection parameters, so the user has to set the
+        // client name in the connection string.
+        return false;
+      }
+
+      @Override
+      public ImmutableMap<String, String> getDefaultParameters(Map<String, String> parameters) {
+        return ImmutableMap.of("spanner.auto_add_limit_clause", "true");
+      }
+
+      @Override
+      public ImmutableSet<String> getPgCatalogCheckPrefixes() {
+        return checkPgCatalogPrefixes;
+      }
+
+      @Override
+      public ImmutableMap<String, String> getTableReplacements() {
+        return tableReplacements;
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(SelectPrismaAdvisoryLockStatement.INSTANCE)
+              .add(SelectPrismaAdvisoryUnlockStatement.INSTANCE)
+              .build();
+        }
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getDdlReplacements() {
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("(\\s+)_prisma_migrations"), "$1prisma_migrations"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])timestamp([\\s,()])", Pattern.CASE_INSENSITIVE),
+                "$1timestamptz$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])timestamptz\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1timestamptz$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])numeric\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1numeric$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("([\\s,()])decimal\\(.*\\)([\\s,])", Pattern.CASE_INSENSITIVE),
+                "$1numeric$2"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("CONSTRAINT\\s+.*\\s+PRIMARY KEY\\s*\\(", Pattern.CASE_INSENSITIVE),
+                "PRIMARY KEY ("),
+            RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+DELETE\\s+RESTRICT"), ""),
+            RegexQueryPartReplacer.replace(Pattern.compile("ON\\s+UPDATE\\s+CASCADE"), ""));
+      }
+    },
+    GOLANG_MIGRATE {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // Golang migrate can only be recognized if the name is set correctly.
+        return parameters.containsKey("application_name")
+            && parameters.get("application_name").equals("golang-migrate");
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(SelectGolangMigrateAdvisoryLockStatement.INSTANCE)
+              .add(SelectGolangMigrateAdvisoryUnlockStatement.INSTANCE)
+              .build();
+        }
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
       }
     },
     UNSPECIFIED {

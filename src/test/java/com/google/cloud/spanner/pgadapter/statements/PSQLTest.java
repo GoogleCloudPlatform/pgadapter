@@ -376,7 +376,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String expected =
-        "SELECT * FROM information_schema.tables WHERE LOWER(table_name) = LOWER('users')";
+        "SELECT * FROM information_schema.tables WHERE table_schema='public' AND LOWER(table_name) = LOWER('users')";
 
     assertEquals(expected, translate(sql));
   }
@@ -400,7 +400,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String expected =
-        "SELECT * FROM information_schema.tables WHERE LOWER(table_name) ="
+        "SELECT * FROM information_schema.tables WHERE table_schema='public' AND LOWER(table_name) ="
             + " LOWER('bobby''; DROP TABLE USERS; SELECT''')";
 
     assertEquals(expected, translate(sql));
@@ -456,7 +456,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String expected =
-        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) ="
+        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE table_schema='public' AND LOWER(index_name) ="
             + " LOWER('index')";
 
     assertEquals(expected, translate(sql));
@@ -484,7 +484,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String expected =
-        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) ="
+        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE table_schema='public' AND LOWER(index_name) ="
             + " LOWER('bobby''; DROP TABLE USERS; SELECT''')";
 
     assertEquals(expected, translate(sql));
@@ -617,7 +617,7 @@ public class PSQLTest {
             + "LIMIT 1000";
     String expected =
         "SELECT column_name AS quote_ident FROM information_schema.columns WHERE"
-            + " table_name = 'user' AND STARTS_WITH(LOWER(COLUMN_NAME), LOWER('age')) LIMIT 1000";
+            + " table_schema='public' AND table_name = 'user' AND STARTS_WITH(LOWER(COLUMN_NAME), LOWER('age')) LIMIT 1000";
 
     assertEquals(expected, translate(sql));
   }
@@ -681,7 +681,7 @@ public class PSQLTest {
             + "LIMIT 1000";
     String expected =
         "SELECT table_name AS quote_ident FROM INFORMATION_SCHEMA.TABLES WHERE"
-            + " STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000";
+            + " table_schema='public' AND STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000";
 
     assertEquals(expected, translate(sql));
   }
@@ -713,7 +713,7 @@ public class PSQLTest {
             + "LIMIT 1000";
     String expected =
         "SELECT index_name AS quote_ident FROM INFORMATION_SCHEMA.INDEXES WHERE"
-            + " STARTS_WITH(LOWER(index_name), LOWER('index')) LIMIT 1000";
+            + " table_schema='public' AND STARTS_WITH(LOWER(index_name), LOWER('index')) LIMIT 1000";
 
     assertEquals(expected, translate(sql));
   }

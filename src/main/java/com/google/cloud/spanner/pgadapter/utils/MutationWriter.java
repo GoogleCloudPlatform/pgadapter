@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory;
+
 import com.google.api.core.ApiFuture;
 import com.google.api.core.ApiFutures;
 import com.google.api.core.InternalApi;
@@ -26,6 +28,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
 import com.google.cloud.spanner.Options;
+import com.google.cloud.spanner.Options.TransactionOption;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
@@ -64,6 +67,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -97,6 +101,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
 
   private static final Logger logger = Logger.getLogger(MutationWriter.class.getName());
 
+  private static final ThreadFactory THREAD_FACTORY =
+      createVirtualOrPlatformDaemonThreadFactory("copy-worker", true);
+
   private final CopyTransactionMode transactionMode;
   private long rowCount;
   private final Connection connection;
@@ -106,6 +113,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final int nonAtomicBatchSize;
   private final long commitSizeLimitForBatching;
   private final CopySettings copySettings;
+  private final TransactionOption[] commitOptions;
   private final Format copyFormat;
   private final CSVFormat csvFormat;
   private final boolean hasHeader;
@@ -117,7 +125,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final AtomicBoolean rollback = new AtomicBoolean(false);
   private final CountDownLatch closedLatch = new CountDownLatch(1);
   private final ListeningExecutorService executorService =
-      MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
+      MoreExecutors.listeningDecorator(Executors.newCachedThreadPool(THREAD_FACTORY));
 
   private final Object lock = new Object();
 
@@ -140,6 +148,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     this.qualifiedTableName = qualifiedTableName;
     this.tableColumns = tableColumns;
     this.copySettings = new CopySettings(sessionState);
+    this.commitOptions = createCommitOptions(connection, copySettings);
     int atomicMutationLimit = copySettings.getMaxAtomicMutationsLimit();
     this.maxAtomicBatchSize =
         Math.max(atomicMutationLimit / (tableColumns.size() + indexedColumnsCount), 1);
@@ -152,6 +161,16 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     this.copyFormat = copyFormat;
     this.csvFormat = format;
     this.hasHeader = hasHeader;
+  }
+
+  static TransactionOption[] createCommitOptions(Connection connection, CopySettings copySettings) {
+    if (connection.getMaxCommitDelay() != null) {
+      return new TransactionOption[] {
+        Options.priority(copySettings.getCommitPriority()),
+        Options.maxCommitDelay(connection.getMaxCommitDelay())
+      };
+    }
+    return new TransactionOption[] {Options.priority(copySettings.getCommitPriority())};
   }
 
   /** @return number of rows copied into Spanner */
@@ -251,10 +270,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         }
         if (record.numColumns() != this.tableColumns.keySet().size()) {
           throw PGExceptionFactory.newPGException(
-              "Invalid COPY data: Row length mismatched. Expected "
-                  + this.tableColumns.keySet().size()
-                  + " columns, but only found "
-                  + record.numColumns(),
+              String.format(
+                  "Invalid COPY data: Row length mismatch. Expected %d values, but got %d.",
+                  this.tableColumns.keySet().size(), record.numColumns()),
               SQLState.DataException);
         }
 
@@ -411,10 +429,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                                       Duration.ofSeconds(copySettings.getCommitTimeoutSeconds()));
                             }
                           });
-              context.run(
-                  () ->
-                      dbClient.writeWithOptions(
-                          immutableMutations, Options.priority(copySettings.getCommitPriority())));
+              context.run(() -> dbClient.writeWithOptions(immutableMutations, commitOptions));
               return null;
             });
     Futures.addCallback(
@@ -451,6 +466,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         case BOOL:
           size++;
           break;
+        case FLOAT32:
+          size += 4;
+          break;
         case FLOAT64:
         case INT64:
           size += 8;
@@ -476,6 +494,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
           switch (value.getType().getArrayElementType().getCode()) {
             case BOOL:
               size += value.getBoolArray().size();
+              break;
+            case FLOAT32:
+              size += value.getFloat32Array().size() * 4;
               break;
             case FLOAT64:
               size += value.getFloat64Array().size() * 8;

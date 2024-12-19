@@ -17,9 +17,10 @@ package com.google.cloud.spanner.pgadapter.python.sqlalchemy;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
-import com.google.cloud.spanner.RandomResultSetGenerator;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
@@ -440,7 +441,8 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   public void testServerSideCursors() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of("select * from random"), new RandomResultSetGenerator(100).generate()));
+            Statement.of("select * from random"),
+            new RandomResultSetGenerator(100, Dialect.POSTGRESQL).generate()));
 
     String actualOutput = execute("server_side_cursor.py", host, pgServer.getLocalPort());
     String expectedOutput = "";

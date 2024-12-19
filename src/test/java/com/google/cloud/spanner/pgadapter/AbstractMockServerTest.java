@@ -16,10 +16,12 @@ package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PG_TYPE_CTE_EMULATED;
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.NoCredentials;
+import com.google.cloud.ServiceOptions;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
@@ -44,6 +46,8 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
+import com.google.rpc.Help;
+import com.google.rpc.Help.Link;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.v1.Partition;
 import com.google.spanner.v1.PartitionQueryRequest;
@@ -59,6 +63,7 @@ import com.google.spanner.v1.TypeCode;
 import io.grpc.Context;
 import io.grpc.Contexts;
 import io.grpc.Metadata;
+import io.grpc.Metadata.Key;
 import io.grpc.Server;
 import io.grpc.ServerCall;
 import io.grpc.ServerCall.Listener;
@@ -173,7 +178,7 @@ public abstract class AbstractMockServerTest {
       Statement.of(
           "with "
               + PG_TYPE_PREFIX
-              + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = 'jsonb'  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
+              + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = ('jsonb')  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
 
   protected static final ResultSet SELECT_JSONB_TYPE_BY_NAME_RESULT_SET =
       ResultSet.newBuilder()
@@ -363,6 +368,11 @@ public abstract class AbstractMockServerTest {
 
   protected static ResultSet createAllTypesResultSet(
       String id, String columnPrefix, boolean microsTimestamp) {
+    return createAllTypesResultSet(id, columnPrefix, microsTimestamp, true);
+  }
+
+  protected static ResultSet createAllTypesResultSet(
+      String id, String columnPrefix, boolean microsTimestamp, boolean nullValueInArrays) {
     return ResultSet.newBuilder()
         .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
         .addRows(
@@ -375,6 +385,7 @@ public abstract class AbstractMockServerTest {
                             Base64.getEncoder()
                                 .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
                         .build())
+                .addValues(Value.newBuilder().setNumberValue(3.14f).build())
                 .addValues(Value.newBuilder().setNumberValue(3.14d).build())
                 .addValues(Value.newBuilder().setStringValue("100").build())
                 .addValues(Value.newBuilder().setStringValue("6.626").build())
@@ -394,7 +405,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("1").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("1").build())
                                 .addValues(Value.newBuilder().setStringValue("2").build())
                                 .build()))
                 .addValues(
@@ -403,7 +418,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setBoolValue(true).build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setBoolValue(true).build())
                                 .addValues(Value.newBuilder().setBoolValue(false).build())
                                 .build()))
                 .addValues(
@@ -418,7 +437,16 @@ public abstract class AbstractMockServerTest {
                                                     "bytes1".getBytes(StandardCharsets.UTF_8)))
                                         .build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue(
+                                                Base64.getEncoder()
+                                                    .encodeToString(
+                                                        "bytes1".getBytes(StandardCharsets.UTF_8)))
+                                            .build())
                                 .addValues(
                                     Value.newBuilder()
                                         .setStringValue(
@@ -431,9 +459,26 @@ public abstract class AbstractMockServerTest {
                     Value.newBuilder()
                         .setListValue(
                             ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setNumberValue(3.14f).build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setNumberValue(3.14f).build())
+                                .addValues(Value.newBuilder().setNumberValue(-99.99f).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setNumberValue(3.14d).build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setNumberValue(3.14d).build())
                                 .addValues(Value.newBuilder().setNumberValue(-99.99).build())
                                 .build()))
                 .addValues(
@@ -442,7 +487,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("-100").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("-100").build())
                                 .addValues(Value.newBuilder().setStringValue("-200").build())
                                 .build()))
                 .addValues(
@@ -451,7 +500,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("6.626").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("6.626").build())
                                 .addValues(Value.newBuilder().setStringValue("-3.14").build())
                                 .build()))
                 .addValues(
@@ -466,7 +519,16 @@ public abstract class AbstractMockServerTest {
                                                 : "2022-02-16T16:18:02.123456789Z")
                                         .build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue(
+                                                microsTimestamp
+                                                    ? "2022-02-16T16:18:02.123456Z"
+                                                    : "2022-02-16T16:18:02.123456789Z")
+                                            .build())
                                 .addValues(
                                     Value.newBuilder()
                                         .setStringValue("2000-01-01T00:00:00Z")
@@ -478,7 +540,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("2023-02-20").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("2023-02-20").build())
                                 .addValues(Value.newBuilder().setStringValue("2000-01-01").build())
                                 .build()))
                 .addValues(
@@ -487,7 +553,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("string1").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("string1").build())
                                 .addValues(Value.newBuilder().setStringValue("string2").build())
                                 .build()))
                 .addValues(
@@ -499,7 +569,13 @@ public abstract class AbstractMockServerTest {
                                         .setStringValue("{\"key\": \"value1\"}")
                                         .build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue("{\"key\": \"value1\"}")
+                                            .build())
                                 .addValues(
                                     Value.newBuilder()
                                         .setStringValue("{\"key\": \"value2\"}")
@@ -667,7 +743,9 @@ public abstract class AbstractMockServerTest {
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 // Arrays
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -725,6 +803,10 @@ public abstract class AbstractMockServerTest {
                     Field.newBuilder()
                         .setName(columnPrefix + "col_bytea")
                         .setType(Type.newBuilder().setCode(TypeCode.BYTES).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_float4")
+                        .setType(Type.newBuilder().setCode(TypeCode.FLOAT32).build()))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_float8")
@@ -785,6 +867,14 @@ public abstract class AbstractMockServerTest {
                                 .setCode(TypeCode.ARRAY)
                                 .setArrayElementType(
                                     Type.newBuilder().setCode(TypeCode.BYTES).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_float4")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.FLOAT32).build())))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_array_float8")
@@ -1036,8 +1126,15 @@ public abstract class AbstractMockServerTest {
 
   protected static ResultSetMetadata createMetadata(
       ImmutableList<TypeCode> types, ImmutableList<String> names) {
+    return createMetadata(types, false, names);
+  }
+
+  protected static ResultSetMetadata createMetadata(
+      ImmutableList<TypeCode> types, boolean alsoAsArrays, ImmutableList<String> names) {
     Preconditions.checkArgument(
-        types.size() == names.size(), "Types and names must have same length");
+        (!alsoAsArrays && types.size() == names.size())
+            || (alsoAsArrays && 2 * types.size() == names.size()),
+        "Types and names must have same length");
     StructType.Builder builder = StructType.newBuilder();
     for (int index = 0; index < types.size(); index++) {
       builder.addFields(
@@ -1050,7 +1147,35 @@ public abstract class AbstractMockServerTest {
               .setName(names.get(index))
               .build());
     }
+    if (alsoAsArrays) {
+      for (int index = 0; index < types.size(); index++) {
+        builder.addFields(
+            Field.newBuilder()
+                .setType(
+                    Type.newBuilder()
+                        .setCode(TypeCode.ARRAY)
+                        .setArrayElementType(
+                            Type.newBuilder()
+                                .setCode(types.get(index))
+                                .setTypeAnnotation(getTypeAnnotationCode(types.get(index))))
+                        .build())
+                .setName(names.get(types.size() + index))
+                .build());
+      }
+    }
     return ResultSetMetadata.newBuilder().setRowType(builder.build()).build();
+  }
+
+  protected static ResultSetMetadata createMetadata(
+      ImmutableList<TypeCode> types,
+      boolean alsoAsArrays,
+      ImmutableList<String> names,
+      ImmutableList<TypeCode> parameterTypes) {
+    return createMetadata(types, alsoAsArrays, names)
+        .toBuilder()
+        .setUndeclaredParameters(
+            createParameterTypesMetadata(parameterTypes).getUndeclaredParameters())
+        .build();
   }
 
   static MockSpannerServiceImpl createMockSpannerThatReturnsOneQueryPartition() {
@@ -1071,7 +1196,7 @@ public abstract class AbstractMockServerTest {
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
         createMockSpannerThatReturnsOneQueryPartition(),
-        "d",
+        null,
         configurator -> {},
         OpenTelemetry.noop());
   }
@@ -1157,6 +1282,15 @@ public abstract class AbstractMockServerTest {
                                   "x-goog-api-client", Metadata.ASCII_STRING_MARSHALLER));
                       assertNotNull(userAgent);
                       assertTrue(userAgent.contains("pg-adapter"));
+                      assertTrue(
+                          userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
+
+                      String endToEndTracing =
+                          metadata.get(
+                              Metadata.Key.of(
+                                  "x-goog-spanner-end-to-end-tracing",
+                                  Metadata.ASCII_STRING_MARSHALLER));
+                      assertEquals("true", endToEndTracing);
                     }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
@@ -1168,13 +1302,14 @@ public abstract class AbstractMockServerTest {
     TestOptionsMetadataBuilder builder = new TestOptionsMetadataBuilder();
     builder.setProject("p").setInstance("i");
     if (defaultDatabase != null) {
-      builder.setDatabase("d");
+      builder.setDatabase(defaultDatabase);
     }
     builder
         .enableDebugMode()
         .setUsePlainText()
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
-        .setCredentials(NoCredentials.getInstance());
+        .setCredentials(NoCredentials.getInstance())
+        .setEnableEndToEndTracing(true);
     optionsConfigurator.accept(builder);
     pgServer = new ProxyServer(builder.build(), openTelemetry);
     pgServer.startServer();
@@ -1241,6 +1376,25 @@ public abstract class AbstractMockServerTest {
     if (!ignoreException) {
       throw exception;
     }
+  }
+
+  static StatusRuntimeException createTransactionMutationLimitExceededException() {
+    Metadata.Key<byte[]> key = Key.of("grpc-status-details-bin", Metadata.BINARY_BYTE_MARSHALLER);
+    Help help =
+        Help.newBuilder()
+            .addLinks(
+                Link.newBuilder()
+                    .setDescription("Cloud Spanner limits documentation.")
+                    .setUrl("https://cloud.google.com/spanner/docs/limits")
+                    .build())
+            .build();
+    com.google.rpc.Status status =
+        com.google.rpc.Status.newBuilder().addDetails(Any.pack(help)).build();
+    Metadata trailers = new Metadata();
+    trailers.put(key, status.toByteArray());
+    return io.grpc.Status.INVALID_ARGUMENT
+        .withDescription("The transaction contains too many mutations.")
+        .asRuntimeException(trailers);
   }
 
   @Before

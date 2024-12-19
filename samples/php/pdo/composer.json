@@ -1,0 +1,7 @@
+{
+  "require": {
+    "ext-pgsql": "*",
+    "ext-pdo": "*",
+    "testcontainers/testcontainers": "^0.2.0"
+  }
+}

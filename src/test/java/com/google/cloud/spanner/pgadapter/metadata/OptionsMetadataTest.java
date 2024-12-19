@@ -22,6 +22,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.OAuth2Credentials;
@@ -123,6 +124,12 @@ public class OptionsMetadataTest {
 
   @Test
   public void testBuildConnectionUrlWithFullPath() {
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME)
+            == null);
+
     assertEquals(
         "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;credentials=credentials.json",
         new OptionsMetadata(new String[] {"-c", "credentials.json"})
@@ -157,6 +164,12 @@ public class OptionsMetadataTest {
 
   @Test
   public void testBuildConnectionUrlWithDefaultProjectId() {
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME)
+            == null);
+
     OptionsMetadata useDefaultProjectIdOptions =
         new OptionsMetadata(new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
           @Override
@@ -182,6 +195,12 @@ public class OptionsMetadataTest {
 
   @Test
   public void testBuildConnectionUrlWithDefaultCredentials() {
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME)
+            == null);
+
     OptionsMetadata useDefaultCredentials =
         new OptionsMetadata(new String[] {"-p", "test-project", "-i", "test-instance"}) {
           @Override
@@ -299,6 +318,12 @@ public class OptionsMetadataTest {
 
   @Test
   public void testBuilder() {
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
+    assumeTrue(
+        System.getProperty(OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME)
+            == null);
+
     assertFalse(
         OptionsMetadata.newBuilder()
             .setProject("my-project")
@@ -398,6 +423,67 @@ public class OptionsMetadataTest {
             .build()
             .getPropertyMap()
             .get("usePlainText"));
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("useVirtualThreads"));
+    // Virtual threads should not be carried over to the underlying connection. Instead, this
+    // option only determines the type of thread that is used for a connection handler.
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .useVirtualThreads()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("useVirtualThreads"));
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("useVirtualGrpcTransportThreads"));
+    assertEquals(
+        "true",
+        OptionsMetadata.newBuilder()
+            .useVirtualGrpcTransportThreads()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("useVirtualGrpcTransportThreads"));
+    assertFalse(OptionsMetadata.newBuilder().build().isUseGrpcTransportVirtualThreads());
+    assertTrue(
+        OptionsMetadata.newBuilder()
+            .useVirtualGrpcTransportThreads()
+            .build()
+            .isUseGrpcTransportVirtualThreads());
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("enableEndToEndTracing"));
+    assertEquals(
+        "true",
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(true)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("enableEndToEndTracing"));
+    assertFalse(OptionsMetadata.newBuilder().build().isEnableEndToEndTracing());
+    assertTrue(
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(true)
+            .build()
+            .isEnableEndToEndTracing());
+    assertFalse(
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(false)
+            .build()
+            .isEnableEndToEndTracing());
+
     assertEquals(
         DdlTransactionMode.Batch,
         OptionsMetadata.newBuilder()
@@ -530,13 +616,13 @@ public class OptionsMetadataTest {
   @Test
   public void testBuildConnectionUrlWithEmulator() {
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter",
+        "cloudspanner://localhost:9010/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;usePlainText=true",
         OptionsMetadata.newBuilder()
             .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
             .build()
             .buildConnectionURL("projects/my-project/instances/my-instance/databases/my-database"));
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter",
+        "cloudspanner://localhost:9010/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;usePlainText=true",
         OptionsMetadata.newBuilder()
             .setRequireAuthentication()
             .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))

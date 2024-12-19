@@ -113,6 +113,7 @@ public class SampleApplication {
     }
   }
 
+  // [START start_pgadapter_in_process]
   /**
    * Starts PGAdapter in-process and returns a reference to the server. Use this reference to
    * gracefully shut down the server when your application shuts down.
@@ -138,6 +139,7 @@ public class SampleApplication {
 
     return new PGAdapter(server);
   }
+  // [END start_pgadapter_in_process]
 
   /** Starts a Docker container that contains both PGAdapter and the Cloud Spanner Emulator. */
   static Server startPGAdapterWithEmulator() {

@@ -25,11 +25,16 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Instance;
 import com.google.cloud.spanner.InstanceAdminClient;
 import com.google.cloud.spanner.InstanceNotFoundException;
+import com.google.cloud.spanner.PGAdapterSessionPoolOptionsHelper;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
@@ -59,6 +64,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -69,6 +75,7 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
@@ -85,7 +92,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -97,13 +103,13 @@ import javax.net.ssl.SSLSocketFactory;
  * representation {@link IntermediateStatement} that servers as a middle layer between Postgres and
  * Spanner.
  *
- * <p>Each {@link ConnectionHandler} is also a {@link Thread}. Although a TCP connection does not
- * necessarily need to have its own thread, this makes the implementation more straightforward.
+ * <p>Each {@link ConnectionHandler} is also a {@link Runnable} so it can be handed to a single
+ * handler thread. Although a TCP connection does not necessarily need to have its own thread, this
+ * makes the implementation more straightforward. The handler thread may be a virtual thread.
  */
 @InternalApi
-public class ConnectionHandler extends Thread {
+public class ConnectionHandler implements Runnable {
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
-  private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
   private final ProxyServer server;
@@ -119,6 +125,7 @@ public class ConnectionHandler extends Thread {
   private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
       new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
+  private Thread thread;
   private final int connectionId;
   private final int secret;
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
@@ -152,20 +159,37 @@ public class ConnectionHandler extends Thread {
   /** Constructor only for testing. */
   @VisibleForTesting
   ConnectionHandler(ProxyServer server, Socket socket, Connection spannerConnection) {
-    super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
     this.connectionId = incrementingConnectionId.incrementAndGet();
     CONNECTION_HANDLERS.put(this.connectionId, this);
-    setDaemon(true);
+    this.spannerConnection = spannerConnection;
+  }
+
+  void start() {
+    Preconditions.checkState(thread != null, "Cannot start a ConnectionHandler without a thread");
+    thread.start();
+  }
+
+  String getName() {
+    Preconditions.checkState(
+        thread != null, "Cannot get the name of a ConnectionHandler without a thread");
+    return thread.getName();
+  }
+
+  Thread getThread() {
+    return this.thread;
+  }
+
+  void setThread(Thread thread) {
+    this.thread = thread;
     logger.log(
         Level.INFO,
         () ->
             String.format(
                 "Connection handler with ID %s created for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
-    this.spannerConnection = spannerConnection;
   }
 
   void createSSLSocket() throws IOException {
@@ -178,6 +202,10 @@ public class ConnectionHandler extends Thread {
     OptionsMetadata options = getServer().getOptions();
     String uri = buildConnectionURL(database, options, getServer().getProperties());
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
+    connectionOptionsBuilder =
+        ConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
+            connectionOptionsBuilder, options.isLogGrpcMessages());
+    connectionOptionsBuilder = ConnectionOptionsHelper.useDirectExecutor(connectionOptionsBuilder);
     if (credentials != null) {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
@@ -186,9 +214,19 @@ public class ConnectionHandler extends Thread {
           ConnectionOptionsHelper.setCredentials(
               connectionOptionsBuilder, options.getCredentials());
     }
-    if (options.getSessionPoolOptions() != null) {
+    SessionPoolOptions sessionPoolOptions =
+        options.getSessionPoolOptions() == null
+            ? PGAdapterSessionPoolOptionsHelper.useMultiplexedSessions(
+                    SessionPoolOptions.newBuilder())
+                .build()
+            : PGAdapterSessionPoolOptionsHelper.useMultiplexedSessions(
+                    options.getSessionPoolOptions().toBuilder())
+                .build();
+    connectionOptionsBuilder.setSessionPoolOptions(sessionPoolOptions);
+    if (options.isEnableOpenTelemetryMetrics()) {
+      SpannerOptions.enableOpenTelemetryMetrics();
       connectionOptionsBuilder =
-          connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
+          connectionOptionsBuilder.setOpenTelemetry(server.getOpenTelemetry());
     }
     ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
     Connection spannerConnection = connectionOptions.getConnection();
@@ -213,7 +251,7 @@ public class ConnectionHandler extends Thread {
         // Include more information about the available databases if someone tried to connect using
         // psql.
         if (getWellKnownClient() == WellKnownClient.PSQL) {
-          Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+          Spanner spanner = spannerConnection.getSpanner();
           String availableDatabases =
               listDatabasesOrInstances(
                   notFoundException, getServer().getOptions().getDatabaseName(database), spanner);
@@ -273,13 +311,14 @@ public class ConnectionHandler extends Thread {
     return uri;
   }
 
-  private static String appendPropertiesToUrl(String url, Properties info) {
+  @VisibleForTesting
+  static String appendPropertiesToUrl(String url, Properties info) {
     if (info == null || info.isEmpty()) {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
     for (Entry<Object, Object> entry : info.entrySet()) {
-      if (entry.getValue() != null && !"".equals(entry.getValue())) {
+      if (!Strings.isNullOrEmpty((String) entry.getValue())) {
         result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
       }
     }
@@ -299,8 +338,8 @@ public class ConnectionHandler extends Thread {
             "Run",
             () ->
                 String.format(
-                    "Connection handler with ID %s starting for client %s",
-                    getName(), socket.getInetAddress().getHostAddress())));
+                    "Connection handler with ID %s starting for client %s with thread %s",
+                    getName(), socket.getInetAddress().getHostAddress(), thread.toString())));
     if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
       logger.log(
           Level.INFO,
@@ -424,13 +463,14 @@ public class ConnectionHandler extends Thread {
                   () ->
                       String.format(
                           "Exception while closing connection handler with ID %s", getName())));
+        } finally {
+          this.server.deregister(this);
+          logger.log(
+              Level.INFO,
+              Logging.format(
+                  "RunConnection",
+                  () -> String.format("Connection handler with ID %s closed", getName())));
         }
-        this.server.deregister(this);
-        logger.log(
-            Level.INFO,
-            Logging.format(
-                "RunConnection",
-                () -> String.format("Connection handler with ID %s closed", getName())));
       }
     }
     return result;
@@ -470,20 +510,44 @@ public class ConnectionHandler extends Thread {
     try {
       message.nextHandler();
       message.send();
-    } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-      this.handleError(
-          PGException.newBuilder(fatalException)
-              .setSeverity(Severity.FATAL)
-              .setSQLState(SQLState.InternalError)
-              .build());
+    } catch (IllegalArgumentException | IllegalStateException fatalException) {
+      handleFatalException(fatalException);
       // Only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode the mode will
       // switch to normal mode in these cases.
       if (this.status != ConnectionStatus.COPY_IN) {
         terminate();
       }
+    } catch (EOFException eofException) {
+      // Handle an EOFException as a normal connection termination. The TCP connection can break
+      // without the server receiving a Terminate (X) message if for example the application does
+      // not try-catch all exceptions.
+      // We only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode, this
+      // exception will cause the connection to leave COPY_IN mode, and return to normal operation.
+      if (this.status != ConnectionStatus.COPY_IN) {
+        terminate();
+      } else {
+        handleFatalException(eofException);
+      }
+    } catch (SocketException socketException) {
+      // Handle a SocketException when the socket has been closed as a normal connection
+      // termination. The TCP connection can break without the server receiving a Terminate (X)
+      // message if for example the application does not try-catch all exceptions.
+      if (socket.isClosed()) {
+        terminate();
+      } else {
+        this.handleError(PGExceptionFactory.toPGException(socketException));
+      }
     } catch (Exception exception) {
       this.handleError(PGExceptionFactory.toPGException(exception));
     }
+  }
+
+  private void handleFatalException(Exception fatalException) throws Exception {
+    this.handleError(
+        PGException.newBuilder(fatalException)
+            .setSeverity(Severity.FATAL)
+            .setSQLState(SQLState.InternalError)
+            .build());
   }
 
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
@@ -634,7 +698,7 @@ public class ConnectionHandler extends Thread {
     // otherwise)
     try {
       connectionToCancel.getSpannerConnection().cancel();
-      connectionToCancel.interrupt();
+      connectionToCancel.getThread().interrupt();
       return true;
     } catch (Throwable ignore) {
     }
@@ -644,7 +708,8 @@ public class ConnectionHandler extends Thread {
   public IntermediatePreparedStatement getStatement(String statementName) {
     if (!hasStatement(statementName)) {
       throw PGExceptionFactory.newPGException(
-          "prepared statement " + statementName + " does not exist");
+          "prepared statement " + statementName + " does not exist",
+          SQLState.InvalidSqlStatementName);
     }
     return this.statementsMap.get(statementName);
   }
@@ -797,6 +862,15 @@ public class ConnectionHandler extends Thread {
         setWellKnownClient(
             ClientAutoDetector.detectClient(
                 skippedAutoDetectParseMessages, ImmutableList.of(statement)));
+        if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+            && skippedAutoDetectParseMessages.size() < 10) {
+          ParsedStatement parsedStatement =
+              AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+          if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+            skippedAutoDetectParseMessages.add(new ParseMessage(this, parsedStatement, statement));
+            return;
+          }
+        }
       }
       maybeSetApplicationName();
       skippedAutoDetectParseMessages.clear();

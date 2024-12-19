@@ -21,7 +21,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <junixsocket.version>2.8.3</junixsocket.version>
+    <junixsocket.version>2.10.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -35,35 +35,59 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.7.1</version>
+    <version>1.12.2</version>
   </parent>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>26.52.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>1.45.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
-      <version>1.10.4</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.29.1</version>
+      <version>1.11.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-jdbc</artifactId>
-      <version>2.15.3</version>
       <exclusions>
         <exclusion>
-          <groupId>com.google.cloud</groupId>
-          <artifactId>google-cloud-spanner</artifactId>
+          <groupId>io.opentelemetry</groupId>
+          <artifactId>opentelemetry-api-incubator</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-spanner-pgadapter</artifactId>
+      <version>0.40.0</version>
+      <exclusions>
+        <exclusion>
+          <groupId>io.opentelemetry</groupId>
+          <artifactId>opentelemetry-api-incubator</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.1</version>
+      <version>42.7.4</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -80,7 +104,19 @@
     <dependency>
       <groupId>commons-cli</groupId>
       <artifactId>commons-cli</artifactId>
-      <version>1.6.0</version>
+      <version>1.9.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <version>3.48.3</version>
+    </dependency>
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
   <build>
@@ -88,7 +124,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>3.1.1</version>
+        <version>3.5.0</version>
         <configuration>
           <mainClass>com.google.cloud.spanner.pgadapter.latency.LatencyBenchmark</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>

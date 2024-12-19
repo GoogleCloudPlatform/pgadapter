@@ -19,14 +19,17 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.ThreadFactoryUtil;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -42,10 +45,13 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.newsclub.net.unix.AFUNIXServerSocket;
@@ -60,8 +66,9 @@ public class ProxyServer extends AbstractApiService {
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
   private final OpenTelemetry openTelemetry;
+  private final Metrics metrics;
   private final Properties properties;
-  private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
+  private final List<ConnectionHandler> handlers = new LinkedList<>();
 
   /**
    * Latch that is closed when the TCP server has started. We need this to know the exact port that
@@ -86,11 +93,42 @@ public class ProxyServer extends AbstractApiService {
 
   private final ExecutorService createConnectionHandlerExecutor =
       new ThreadPoolExecutor(
-          1,
+          /* corePoolSize = */ 1,
           Runtime.getRuntime().availableProcessors(),
-          20L,
+          /* keepAliveTime = */ 10L,
           TimeUnit.SECONDS,
           new LinkedBlockingQueue<>());
+  private final ThreadFactory threadFactory;
+
+  /**
+   * Shutdown mode determines how the server handles any open connections when the server is being
+   * terminated. These modes correspond with the <a
+   * href="https://www.postgresql.org/docs/current/server-shutdown.html">shutdown modes of
+   * PostgreSQL</a>.
+   */
+  public enum ShutdownMode {
+    /**
+     * Stop accepting incoming connections and wait for all existing connections to finish before
+     * shutting down.
+     */
+    SMART,
+
+    /** Actively terminate all existing connections and shut down the server. */
+    FAST,
+
+    /**
+     * Actively terminate all existing connections and shut down the server. There is currently no
+     * difference between FAST and IMMEDIATE, but this could change in the future.
+     */
+    IMMEDIATE,
+  }
+
+  private final AtomicReference<ShutdownHandler> shutdownHandler = new AtomicReference<>();
+
+  private final AtomicReference<ShutdownMode> shutdownMode = new AtomicReference<>();
+
+  private final AtomicReference<CountDownLatch> allHandlersTerminatedLatch =
+      new AtomicReference<>();
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -124,9 +162,16 @@ public class ProxyServer extends AbstractApiService {
       OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties) {
     this.options = optionsMetadata;
     this.openTelemetry = openTelemetry;
+    this.metrics =
+        optionsMetadata.isEnableOpenTelemetryMetrics()
+            ? new Metrics(openTelemetry)
+            : new Metrics(OpenTelemetry.noop());
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
+    this.threadFactory =
+        ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory(
+            "ConnectionHandler", optionsMetadata.isUseVirtualThreads());
     addConnectionProperties();
   }
 
@@ -210,6 +255,7 @@ public class ProxyServer extends AbstractApiService {
 
   @Override
   protected void doStop() {
+    logger.log(Level.INFO, "Stopping server using shutdown mode {0}", this.shutdownMode.get());
     for (ServerSocket serverSocket : this.serverSockets) {
       try {
         logger.log(
@@ -224,21 +270,80 @@ public class ProxyServer extends AbstractApiService {
             () -> String.format("Closing server socket %s failed: %s", serverSocket, exception));
       }
     }
-    for (ConnectionHandler handler : getConnectionHandlers()) {
-      handler.terminate();
+    if (this.shutdownMode.get() == ShutdownMode.SMART) {
+      try {
+        waitForAllConnectionsToTerminate();
+      } catch (InterruptedException interruptedException) {
+        logger.log(Level.WARNING, "Interrupted while waiting for all connections to be closed.");
+        // The waiting thread will be interrupted if a new shutdown request with mode FAST or
+        // IMMEDIATE comes in. In that case, we actively terminate all connection handlers.
+        terminateAllConnectionHandlers();
+      }
+    } else {
+      terminateAllConnectionHandlers();
     }
     try {
-      SpannerPool.closeSpannerPool();
+      // Do a shoot-and-forget close of the underlying Spanner pool.
+      ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
+      service.submit(SpannerPool::closeSpannerPool);
+      service.shutdown();
+      if (shutdownMode.get() != ShutdownMode.IMMEDIATE) {
+        if (!service.awaitTermination(1L, TimeUnit.SECONDS)) {
+          service.shutdownNow();
+          logger.log(Level.INFO, "SpannerPool was not closed after waiting for 1 second");
+        }
+      }
     } catch (Throwable ignore) {
     }
     createConnectionHandlerExecutor.shutdown();
+    if (openTelemetry instanceof Closeable) {
+      try {
+        ((Closeable) openTelemetry).close();
+      } catch (IOException ioException) {
+        logger.log(Level.WARNING, "Failed to close OpenTelemetry", ioException);
+      }
+    }
     notifyStopped();
   }
 
-  /** Safely stops the server (iff started), closing specific socket and cleaning up. */
+  private void terminateAllConnectionHandlers() {
+    logger.log(Level.INFO, "Terminating {0} connections", getNumberOfConnections());
+    for (ConnectionHandler handler : getConnectionHandlers()) {
+      handler.terminate();
+    }
+  }
+
+  private void waitForAllConnectionsToTerminate() throws InterruptedException {
+    logger.log(Level.INFO, "Waiting for {0} connections to terminate", getNumberOfConnections());
+    createConnectionHandlersTerminatedLatch();
+    this.allHandlersTerminatedLatch.get().await();
+  }
+
+  /**
+   * Stops the server using the FAST shutdown mode, terminating all existing connections and
+   * cleaning up.
+   */
   public void stopServer() {
+    stopServer(ShutdownMode.FAST);
+  }
+
+  /** Stops the server using the specified shutdown mode. */
+  public void stopServer(ShutdownMode shutdownMode) {
+    setShutdownMode(shutdownMode);
     stopAsync();
     awaitTerminated();
+  }
+
+  public synchronized ShutdownHandler getOrCreateShutdownHandler() {
+    if (this.shutdownHandler.get() == null) {
+      this.shutdownHandler.set(ShutdownHandler.createForServer(this));
+    }
+    return this.shutdownHandler.get();
+  }
+
+  void setShutdownMode(ShutdownMode shutdownMode) {
+    logger.log(Level.INFO, "Setting shutdown mode to {0}", shutdownMode);
+    this.shutdownMode.set(shutdownMode);
   }
 
   /**
@@ -328,18 +433,15 @@ public class ProxyServer extends AbstractApiService {
             });
       }
     } catch (SocketException e) {
-      // This is a normal exception, as this will occur when Server#stopServer() is called.
+      // This is a normal and expected exception when the server is shutting down.
       logger.log(
-          Level.INFO,
+          shutdownMode.get() == null ? Level.WARNING : Level.FINEST,
           () ->
               String.format(
                   "Socket exception on socket %s: %s. This is normal when the server is stopped.",
                   serverSocket, e));
     } finally {
       logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocket));
-      if (openTelemetry instanceof Closeable) {
-        ((Closeable) openTelemetry).close();
-      }
       stoppedLatch.countDown();
     }
   }
@@ -358,12 +460,22 @@ public class ProxyServer extends AbstractApiService {
     socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
+    Thread thread = threadFactory.newThread(handler);
+    handler.setThread(thread);
     handler.start();
   }
 
   /** Returns an immutable copy of the current connection handlers at this server. */
   ImmutableList<ConnectionHandler> getConnectionHandlers() {
-    return ImmutableList.copyOf(this.handlers);
+    synchronized (this.handlers) {
+      return ImmutableList.copyOf(this.handlers);
+    }
+  }
+
+  private void createConnectionHandlersTerminatedLatch() {
+    synchronized (this.handlers) {
+      this.allHandlersTerminatedLatch.set(new CountDownLatch(handlers.isEmpty() ? 0 : 1));
+    }
   }
 
   /**
@@ -372,7 +484,9 @@ public class ProxyServer extends AbstractApiService {
    * @param handler The handler currently in use.
    */
   private void register(ConnectionHandler handler) {
-    this.handlers.add(handler);
+    synchronized (this.handlers) {
+      this.handlers.add(handler);
+    }
   }
 
   /**
@@ -381,7 +495,12 @@ public class ProxyServer extends AbstractApiService {
    * @param handler The handler to revoke.
    */
   void deregister(ConnectionHandler handler) {
-    this.handlers.remove(handler);
+    synchronized (this.handlers) {
+      this.handlers.remove(handler);
+      if (this.handlers.isEmpty() && this.allHandlersTerminatedLatch.get() != null) {
+        this.allHandlersTerminatedLatch.get().countDown();
+      }
+    }
   }
 
   public OptionsMetadata getOptions() {
@@ -392,6 +511,16 @@ public class ProxyServer extends AbstractApiService {
     return this.openTelemetry;
   }
 
+  public Tracer getTracer(String name, String version) {
+    return getOptions().isEnableOpenTelemetry()
+        ? getOpenTelemetry().getTracer(name, version)
+        : OpenTelemetry.noop().getTracer(name, version);
+  }
+
+  public Metrics getMetrics() {
+    return this.metrics;
+  }
+
   /** @return the JDBC connection properties that are used by this server */
   public Properties getProperties() {
     return (Properties) this.properties.clone();
@@ -399,7 +528,9 @@ public class ProxyServer extends AbstractApiService {
 
   /** @return the current number of connections. */
   public int getNumberOfConnections() {
-    return this.handlers.size();
+    synchronized (this.handlers) {
+      return this.handlers.size();
+    }
   }
 
   /** @return the local TCP port that this server is using. */

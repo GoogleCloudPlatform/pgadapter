@@ -159,14 +159,14 @@ public class JdbcParametersMockServerTest extends AbstractMockServerTest {
     testParamTransfer(
         Oid.FLOAT4,
         new Value[] {
-          Value.float64(0f),
-          Value.float64(1f),
-          Value.float64(-1f),
-          Value.float64(3.14f),
-          Value.float64(-3.14f),
-          Value.float64(Float.MAX_VALUE),
-          Value.float64(Float.MIN_VALUE),
-          Value.float64(Float.MIN_NORMAL),
+          Value.float32(0f),
+          Value.float32(1f),
+          Value.float32(-1f),
+          Value.float32(3.14f),
+          Value.float32(-3.14f),
+          Value.float32(Float.MAX_VALUE),
+          Value.float32(Float.MIN_VALUE),
+          Value.float32(Float.MIN_NORMAL),
         },
         new Object[] {
           0f, 1f, -1f, 3.14f, -3.14f, Float.MAX_VALUE, Float.MIN_VALUE, Float.MIN_NORMAL,

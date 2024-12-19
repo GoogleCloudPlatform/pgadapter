@@ -175,6 +175,15 @@ public class IntermediateStatement {
         return -1L;
       case UPDATE:
         long res = this.statementResult.getUpdateCount();
+        // The Connection API returns update count -1 if DML statements that are executed during
+        // DML batches. PostgreSQL-drivers expect this update count to be >= 0.
+        if (res == -1L) {
+          // Sometimes the application that is executing DML statements in a batch want the driver
+          // to return a specific update count. E.g. Hibernate expects all insert statements to
+          // return an update count of 1. This can be achieved by setting the session variable
+          // spanner.dml_batch_update_count to 1.
+          return getDmlBatchUpdateCount();
+        }
         return Math.max(res, 0L);
       case CLIENT_SIDE:
       case DDL:
@@ -182,6 +191,15 @@ public class IntermediateStatement {
       default:
         return 0L;
     }
+  }
+
+  private long getDmlBatchUpdateCount() {
+    // This value comes from the session variable 'spanner.dml_batch_update_count'.
+    return getConnectionHandler()
+        .getExtendedQueryProtocolHandler()
+        .getBackendConnection()
+        .getSessionState()
+        .getDmlBatchUpdateCount();
   }
 
   /**

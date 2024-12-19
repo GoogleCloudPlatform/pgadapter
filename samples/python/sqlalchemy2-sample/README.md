@@ -96,7 +96,7 @@ Cloud Spanner supports the following data types in combination with `SQLAlchemy 
 | date                                   | Date                    |
 | bytea                                  | LargeBinary             |
 | jsonb                                  | JSONB                   |
-
+| Arrays                                 | Column()                |
 
 ## Limitations
 The following limitations are currently known:
@@ -106,7 +106,6 @@ The following limitations are currently known:
 | Creating and Dropping Tables   | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated creation of tables using `SQLAlchemy` is therefore not supported.                                                                                                                         |
 | metadata.reflect()             | Cloud Spanner does not support all PostgreSQL `pg_catalog` tables. Using `metadata.reflect()` to get the current objects in the database is therefore not supported.                                                                                                |
 | DDL Transactions               | Cloud Spanner does not support DDL statements in a transaction. Add `?options=-c spanner.ddl_transaction_mode=AutocommitExplicitTransaction` to your connection string to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). |
-| Generated primary keys         | Manually assign a value to the primary key column in your code. The recommended primary key type is a random UUID. Sequences / SERIAL / IDENTITY columns are currently not supported.                                                                               |
 | INSERT ... ON CONFLICT         | `INSERT ... ON CONFLICT` is not supported.                                                                                                                                                                                                                          |
 | SAVEPOINT                      | Rolling back to a `SAVEPOINT` can fail if the transaction contained at least one query that called a volatile function.                                                                                                                                             |
 | SELECT ... FOR UPDATE          | `SELECT ... FOR UPDATE` is not supported.                                                                                                                                                                                                                           |
@@ -117,21 +116,38 @@ The following limitations are currently known:
 | Other drivers than psycopg 3.x | PGAdapter does not support using SQLAlchemy 2.x with any other drivers than `psycopg 3.x`.                                                                                                                                                                          |
 
 ### Generated Primary Keys
-Generated primary keys are not supported and should be replaced with primary key definitions that
-are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
-for more information on choosing a good primary key. This sample uses random UUIDs that are generated
-by the client and stored as strings for primary keys.
+Generated primary keys can be used in combination with a bit-reversed sequence.
+
+The `TicketSale` model in this sample application uses an auto-generated primary key that is
+generated from a bit-reversed sequence:
+1. See [model.py](model.py) for the model definition.
+2. See [create_data_model.sql](create_data_model.sql) for the sequence and table definition.
+
+See https://cloud.google.com/spanner/docs/primary-key-default-value#bit-reversed-sequence for more
+information on bit-reversed sequences in Cloud Spanner.
+
+#### Example Mapping for Generated Primary Key using a Bit-Reversed Sequence
+
+Python model definition:
 
 ```python
-from uuid import uuid4
-
 class Singer(Base):
-  id = Column(String, primary_key=True)
+  id = Column(Integer, primary_key=True)
   name = Column(String(100))
 
-singer = Singer(
-  id="{}".format(uuid4()),
-  name="Alice")
+singer = Singer(name="Alice")
+session.add(singer)
+session.commit()
+```
+
+Sequence and table definition:
+
+```sql
+create sequence if not exists singers_seq bit_reversed_positive;
+create table if not exists singers (
+  id   bigint not null primary key default nextval('singers_seq'),
+  name varchar not null
+);
 ```
 
 ### ON CONFLICT Clauses

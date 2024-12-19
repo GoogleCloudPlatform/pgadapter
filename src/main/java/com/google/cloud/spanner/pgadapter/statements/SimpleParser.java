@@ -960,18 +960,22 @@ public class SimpleParser {
     return pos > startPos;
   }
 
+  @Nonnull
   QuotedString readSingleQuotedString() {
     return readQuotedString(SINGLE_QUOTE, false);
   }
 
+  @Nonnull
   QuotedString readDoubleQuotedString() {
     return readQuotedString(DOUBLE_QUOTE, false);
   }
 
+  @Nonnull
   QuotedString readQuotedString(char quote) {
     return readQuotedString(quote, false);
   }
 
+  @Nonnull
   QuotedString readQuotedString(char quote, boolean alwaysEscaped) {
     skipWhitespaces();
     if (pos >= sql.length()) {

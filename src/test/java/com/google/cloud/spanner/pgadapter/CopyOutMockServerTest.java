@@ -58,7 +58,9 @@ import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -70,6 +72,9 @@ import org.postgresql.core.BaseConnection;
 
 @RunWith(Parameterized.class)
 public class CopyOutMockServerTest extends AbstractMockServerTest {
+  private static final ConcurrentLinkedQueue<PartitionQueryRequest> PARTITION_QUERY_REQUESTS =
+      new ConcurrentLinkedQueue<>();
+
   @Parameter public boolean useDomainSocket;
 
   @Parameters(name = "useDomainSocket = {0}")
@@ -90,11 +95,18 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         createMockSpannerServiceWithQueryPartitions(), "d", builder -> {}, OpenTelemetry.noop());
   }
 
+  @After
+  public void clearPartitionQueryRequests() {
+    PARTITION_QUERY_REQUESTS.clear();
+  }
+
   private static MockSpannerServiceImpl createMockSpannerServiceWithQueryPartitions() {
     return new MockSpannerServiceImpl() {
       @Override
       public void partitionQuery(
           PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
+        PARTITION_QUERY_REQUESTS.add(request);
+
         // Only partition queries that use the random result generator.
         if (!request.getSql().equals("select * from random")) {
           responseObserver.onNext(
@@ -214,9 +226,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
 
       assertEquals(
-          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
+          "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
               + "{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t"
-              + "{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
+              + "{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
               + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
               + "{\"2023-02-20\",NULL,\"2000-01-01\"}\t"
               + "{\"string1\",NULL,\"string2\"}\t"
@@ -253,9 +265,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types (col_bigint, col_varchar) TO STDOUT", writer);
 
       assertEquals(
-          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
+          "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
               + "{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t"
-              + "{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
+              + "{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
               + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
               + "{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t"
               + "{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n",
@@ -291,9 +303,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "COPY all_types TO STDOUT (format csv, escape '~', delimiter '-')", writer);
 
       assertEquals(
-          "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-"
+          "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-"
               + "{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-"
-              + "\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-"
+              + "\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-"
               + "\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-"
               + "\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-"
               + "\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n",
@@ -320,10 +332,10 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "COPY all_types TO STDOUT (header, format csv, escape '~', delimiter '-')", writer);
 
       assertEquals(
-          "col_bigint-col_bool-col_bytea-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb-col_array_bigint-col_array_bool-col_array_bytea-col_array_float8-col_array_int-col_array_numeric-col_array_timestamptz-col_array_date-col_array_varchar-col_array_jsonb\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
-              + "-------------------\n",
+          "col_bigint-col_bool-col_bytea-col_float4-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb-col_array_bigint-col_array_bool-col_array_bytea-col_array_float4-col_array_float8-col_array_int-col_array_numeric-col_array_timestamptz-col_array_date-col_array_varchar-col_array_jsonb\n"
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
+              + "---------------------\n",
           writer.toString());
     }
   }
@@ -344,7 +356,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n",
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n",
           writer.toString());
     }
   }
@@ -364,10 +376,10 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           writer);
 
       assertEquals(
-          "col_bigint|col_bool|col_bytea|col_float8|col_int|col_numeric|col_timestamptz|col_date|col_varchar|col_jsonb|col_array_bigint|col_array_bool|col_array_bytea|col_array_float8|col_array_int|col_array_numeric|col_array_timestamptz|col_array_date|col_array_varchar|col_array_jsonb\n"
-              + "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
+          "col_bigint|col_bool|col_bytea|col_float4|col_float8|col_int|col_numeric|col_timestamptz|col_date|col_varchar|col_jsonb|col_array_bigint|col_array_bool|col_array_bytea|col_array_float4|col_array_float8|col_array_int|col_array_numeric|col_array_timestamptz|col_array_date|col_array_varchar|col_array_jsonb\n"
+              + "1|t|\"\\\\x74657374\"|3.14|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "{1,NULL,2}|{t,NULL,f}|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
-              + "{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
+              + "{3.14,NULL,-99.99}|{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
               + "\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\"|"
               + "\"{\\\"string1\\\",NULL,\\\"string2\\\"}\"|"
@@ -389,9 +401,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "COPY all_types TO STDOUT (format csv, escape '\\', delimiter '|', quote '\"')", writer);
 
       assertEquals(
-          "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
+          "1|t|\"\\\\x74657374\"|3.14|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "{1,NULL,2}|{t,NULL,f}|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
-              + "{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
+              + "{3.14,NULL,-99.99}|{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
               + "\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\"|"
               + "\"{\\\"string1\\\",NULL,\\\"string2\\\"}\"|"
@@ -414,10 +426,10 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           writer);
 
       assertEquals(
-          "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"100\"|\"6.626\"|"
+          "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"3.14\"|\"100\"|\"6.626\"|"
               + "\"2022-02-16 13:18:02.123456+00\"|\"2022-03-29\"|\"test\"|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "\"{1,NULL,2}\"|\"{t,NULL,f}\"|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
-              + "\"{3.14,NULL,-99.99}\"|\"{-100,NULL,-200}\"|\"{6.626,NULL,-3.14}\"|"
+              + "\"{3.14,NULL,-99.99}\"|\"{3.14,NULL,-99.99}\"|\"{-100,NULL,-200}\"|\"{6.626,NULL,-3.14}\"|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
               + "\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\"|"
               + "\"{\\\"string1\\\",NULL,\\\"string2\\\"}\"|"
@@ -457,7 +469,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
 
       assertEquals(
-          "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n",
+          "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n",
           writer.toString());
     }
   }
@@ -516,18 +528,20 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
     CopyRecord record = iterator.next();
     assertFalse(iterator.hasNext());
 
-    assertEquals(Value.int64(1L), record.getValue(Type.int64(), 0));
-    assertEquals(Value.bool(true), record.getValue(Type.bool(), 1));
-    assertEquals(Value.bytes(ByteArray.copyFrom("test")), record.getValue(Type.bytes(), 2));
-    assertEquals(Value.float64(3.14), record.getValue(Type.float64(), 3));
-    assertEquals(Value.int64(100L), record.getValue(Type.int64(), 4));
-    assertEquals(Value.pgNumeric("6.626"), record.getValue(Type.pgNumeric(), 5));
+    int index = -1;
+    assertEquals(Value.int64(1L), record.getValue(Type.int64(), ++index));
+    assertEquals(Value.bool(true), record.getValue(Type.bool(), ++index));
+    assertEquals(Value.bytes(ByteArray.copyFrom("test")), record.getValue(Type.bytes(), ++index));
+    assertEquals(Value.float32(3.14f), record.getValue(Type.float32(), ++index));
+    assertEquals(Value.float64(3.14), record.getValue(Type.float64(), ++index));
+    assertEquals(Value.int64(100L), record.getValue(Type.int64(), ++index));
+    assertEquals(Value.pgNumeric("6.626"), record.getValue(Type.pgNumeric(), ++index));
     // Note: The binary format truncates timestamptz value to microsecond precision.
     assertEquals(
         Value.timestamp(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z")),
-        record.getValue(Type.timestamp(), 6));
-    assertEquals(Value.date(Date.parseDate("2022-03-29")), record.getValue(Type.date(), 7));
-    assertEquals(Value.string("test"), record.getValue(Type.string(), 8));
+        record.getValue(Type.timestamp(), ++index));
+    assertEquals(Value.date(Date.parseDate("2022-03-29")), record.getValue(Type.date(), ++index));
+    assertEquals(Value.string("test"), record.getValue(Type.string(), ++index));
   }
 
   @Test
@@ -620,79 +634,114 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyOutPartitioned() throws SQLException, IOException {
-    for (int expectedRowCount : new int[] {0, 1, 2, 3, 5, BackendConnection.MAX_PARTITIONS, 100}) {
-      RandomResultSetGenerator randomResultSetGenerator =
-          new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
-      com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
-      mockSpanner.putStatementResult(
-          StatementResult.query(Statement.of("select * from random"), resultSet));
+    for (boolean usePartitioned : new boolean[] {true, false}) {
+      for (int expectedRowCount :
+          new int[] {0, 1, 2, 3, 5, BackendConnection.MAX_PARTITIONS, 100}) {
+        RandomResultSetGenerator randomResultSetGenerator =
+            new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
+        com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+        mockSpanner.putStatementResult(
+            StatementResult.query(Statement.of("select * from random"), resultSet));
 
-      String separator = useDomainSocket ? "&" : "?";
-      try (Connection connection =
-          DriverManager.getConnection(
-              createUrl()
-                  + separator
-                  + "options=-c spanner.read_only_staleness='read_timestamp 2023-06-12T14:27:00Z'")) {
-        CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-        StringWriter writer = new StringWriter();
-        long rows = copyManager.copyOut("COPY random TO STDOUT", writer);
+        String separator = useDomainSocket ? "&" : "?";
+        try (Connection connection =
+            DriverManager.getConnection(
+                createUrl()
+                    + separator
+                    + "options=-c spanner.read_only_staleness='read_timestamp 2023-06-12T14:27:00Z'")) {
+          connection
+              .createStatement()
+              .execute("set spanner.copy_partition_query=" + usePartitioned);
+          CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+          StringWriter writer = new StringWriter();
+          long rows = copyManager.copyOut("COPY random TO STDOUT", writer);
 
-        assertEquals(expectedRowCount, rows);
+          assertEquals(expectedRowCount, rows);
 
-        try (Scanner scanner = new Scanner(writer.toString())) {
-          int lineCount = 0;
-          while (scanner.hasNextLine()) {
-            lineCount++;
-            String line = scanner.nextLine();
-            String[] columns = line.split("\t");
-            int index = findIndex(resultSet, columns);
-            assertNotEquals(String.format("Row %d not found: %s", lineCount, line), -1, index);
+          try (Scanner scanner = new Scanner(writer.toString())) {
+            int lineCount = 0;
+            while (scanner.hasNextLine()) {
+              lineCount++;
+              String line = scanner.nextLine();
+              String[] columns = line.split("\t");
+              int index = findIndex(resultSet, columns);
+              assertNotEquals(String.format("Row %d not found: %s", lineCount, line), -1, index);
+            }
+            assertEquals(expectedRowCount, lineCount);
           }
-          assertEquals(expectedRowCount, lineCount);
+          if (usePartitioned) {
+            assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+            BeginTransactionRequest beginRequest =
+                mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+            assertTrue(beginRequest.hasOptions());
+            assertTrue(beginRequest.getOptions().hasReadOnly());
+            assertTrue(beginRequest.getOptions().getReadOnly().hasReadTimestamp());
+            assertEquals(
+                Timestamp.parseTimestamp("2023-06-12T14:27:00Z").toProto(),
+                beginRequest.getOptions().getReadOnly().getReadTimestamp());
+            assertEquals(1, PARTITION_QUERY_REQUESTS.size());
+          } else {
+            assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+            ExecuteSqlRequest executeRequest =
+                mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+            assertTrue(executeRequest.getTransaction().hasSingleUse());
+            assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
+            assertTrue(
+                executeRequest.getTransaction().getSingleUse().getReadOnly().hasReadTimestamp());
+            assertEquals(
+                Timestamp.parseTimestamp("2023-06-12T14:27:00Z").toProto(),
+                executeRequest.getTransaction().getSingleUse().getReadOnly().getReadTimestamp());
+            assertEquals(0, PARTITION_QUERY_REQUESTS.size());
+          }
+          mockSpanner.clearRequests();
+          PARTITION_QUERY_REQUESTS.clear();
         }
-        assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
-        BeginTransactionRequest beginRequest =
-            mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
-        assertTrue(beginRequest.hasOptions());
-        assertTrue(beginRequest.getOptions().hasReadOnly());
-        assertTrue(beginRequest.getOptions().getReadOnly().hasReadTimestamp());
-        assertEquals(
-            Timestamp.parseTimestamp("2023-06-12T14:27:00Z").toProto(),
-            beginRequest.getOptions().getReadOnly().getReadTimestamp());
-        mockSpanner.clearRequests();
       }
     }
   }
 
   @Test
   public void testCopyOutPartitionedBinary() throws SQLException, IOException {
-    for (int expectedRowCount : new int[] {0, 1, 2, 3, 5, BackendConnection.MAX_PARTITIONS, 100}) {
-      RandomResultSetGenerator randomResultSetGenerator =
-          new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
-      com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
-      mockSpanner.putStatementResult(
-          StatementResult.query(Statement.of("select * from random"), resultSet));
+    for (boolean usePartitioned : new boolean[] {true, false}) {
+      for (int expectedRowCount :
+          new int[] {0, 1, 2, 3, 5, BackendConnection.MAX_PARTITIONS, 100}) {
+        RandomResultSetGenerator randomResultSetGenerator =
+            new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
+        com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+        mockSpanner.putStatementResult(
+            StatementResult.query(Statement.of("select * from random"), resultSet));
 
-      try (Connection connection = DriverManager.getConnection(createUrl())) {
-        CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-        PipedOutputStream pipedOutputStream = new PipedOutputStream();
-        PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 20);
-        SessionState sessionState = mock(SessionState.class);
-        CopyInParser copyParser =
-            CopyInParser.create(sessionState, Format.BINARY, null, inputStream, false);
-        long rows = copyManager.copyOut("COPY random TO STDOUT (format binary)", pipedOutputStream);
+        String separator = useDomainSocket ? "&" : "?";
+        try (Connection connection =
+            DriverManager.getConnection(
+                createUrl()
+                    + separator
+                    + "options=-c spanner.copy_partition_query="
+                    + usePartitioned)) {
+          CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+          PipedOutputStream pipedOutputStream = new PipedOutputStream();
+          PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 20);
+          SessionState sessionState = mock(SessionState.class);
+          CopyInParser copyParser =
+              CopyInParser.create(sessionState, Format.BINARY, null, inputStream, false);
+          long rows =
+              copyManager.copyOut("COPY random TO STDOUT (format binary)", pipedOutputStream);
 
-        assertEquals(expectedRowCount, rows);
+          assertEquals(expectedRowCount, rows);
 
-        Iterator<CopyRecord> iterator = copyParser.iterator();
-        int recordCount = 0;
-        while (iterator.hasNext()) {
-          recordCount++;
-          CopyRecord record = iterator.next();
-          int index = findIndex(resultSet, record);
-          assertNotEquals(String.format("Row %d not found: %s", recordCount, record), -1, index);
+          Iterator<CopyRecord> iterator = copyParser.iterator();
+          int recordCount = 0;
+          while (iterator.hasNext()) {
+            recordCount++;
+            CopyRecord record = iterator.next();
+            int index = findIndex(resultSet, record);
+            assertNotEquals(String.format("Row %d not found: %s", recordCount, record), -1, index);
+          }
+          assertEquals(expectedRowCount, recordCount);
+          assertEquals(usePartitioned ? 1 : 0, PARTITION_QUERY_REQUESTS.size());
+          mockSpanner.clearRequests();
+          PARTITION_QUERY_REQUESTS.clear();
         }
-        assertEquals(expectedRowCount, recordCount);
       }
     }
   }

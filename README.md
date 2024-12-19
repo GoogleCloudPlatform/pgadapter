@@ -14,11 +14,14 @@ PGAdapter can be used with the following drivers and clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
 1. `IntelliJ`, `DataGrip` and other `JetBrains` IDEs. See [Connect Cloud Spanner PostgreSQL to JetBrains](docs/intellij.md) for more details.
 1. `JDBC`: Versions 42.x and higher are supported. See [JDBC support](docs/jdbc.md) for more details.
+1. `R2DBC`: Versions 1.0.7 and higher are supported. See [R2DBC sample](samples/java/r2dbc) for a small sample application.
 1. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 1. `psycopg2`: Version 2.9.3 and higher are supported. See [psycopg2](docs/psycopg2.md) for more details.
 1. `psycopg3`: Version 3.1.x and higher are supported. See [psycopg3 support](docs/psycopg3.md) for more details.
+1. `connectorx`: Version 0.3.3 and higher have experimental support. See [connectorx sample](samples/python/connectorx) for more details.
 1. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 1. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
+1. `PDO_PGSQL`: The PHP PDO driver has experimental support. See [PHP PDO](docs/pdo.md) for more details.
 1. `postgres_fdw`: The PostgreSQL foreign data wrapper has experimental support. See [Foreign Data Wrapper sample](samples/foreign-data-wrapper) for more details.
 
 ## ORMs, Frameworks and Tools
@@ -40,6 +43,8 @@ PGAdapter can be used with the following frameworks and tools:
    instructions in [PGAdapter - Ruby ActiveRecord Connection Options](docs/ruby-activerecord.md)
    carefully for how to set up ActiveRecord to work with PGAdapter.
 1. `Knex.js` query builder can be used with PGAdapter. See [Knex.js sample application](samples/nodejs/knex)
+   for a sample application.
+1. `Sequelize.js` ORM can be used with PGAdapter. See [Sequelize.js sample application](samples/nodejs/sequelize)
    for a sample application.
 
 ## FAQ
@@ -111,9 +116,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.29.1` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.42.0` with the version you want to download):
 ```shell
-VERSION=v0.29.1
+VERSION=v0.42.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -148,7 +153,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.29.1</version>
+  <version>0.42.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -267,6 +272,17 @@ The following list contains the most frequently used startup options for PGAdapt
     Use the -x switch to turn off the localhost check. This is required when running PGAdapter in a
     Docker container, as the connections from the host machine will not be seen as a connection from
     localhost in the container.
+
+--allow_shutdown_command
+  * Enables the use of the custom SQL command `SHUTDOWN [SMART | FAST | IMMEDIATE]`. This command can
+    be used to shut down PGAdapter by just sending it a SQL statement. This option should only be enabled
+    when PGAdapter runs in a trusted environment, for example as a side-car container. The default
+    shutdown mode is `FAST`, which terminates all existing connections and then shuts down PGAdapter.
+    Use shutdown mode `SMART` to instruct PGAdapter to wait until all existing connections have been
+    terminated by the client before shutting down. See also https://www.postgresql.org/docs/current/server-shutdown.html
+    for more information about shutdown modes.
+  * Note that `SHUTDOWN [SMART | FAST | IMMEDIATE]` only works on PGAdapter. This command is not
+    supported by PostgreSQL.
 ```
 
 * See [command line arguments](docs/command_line_arguments.md) for a list of all supported arguments.
@@ -355,8 +371,30 @@ PGAdapter has the following known limitations at this moment:
 
 ## Logging
 
-PGAdapter uses `java.util.logging` for logging. Create a `logging.properties` file to configure
-logging messages. See the following example for an example to get fine-grained logging.
+PGAdapter uses `java.util.logging` for logging.
+
+### Default Logging
+
+PGAdapter by default configures `java.util.logging` to do the following:
+1. Log messages of level WARNING and higher are logged to `stderr`.
+2. Log messages of level INFO are logged to `stdout`.
+3. Log messages of higher levels than INFO are not logged.
+
+You can supply your own logging configuration with the `-Djava.util.logging.config.file`
+System property. See the next section for an example.
+
+The default log configuration described in this section was introduced in version 0.33.0 of
+PGAdapter. Prior to that, PGAdapter used the default `java.util.logging` configuration, which
+logs everything to `stderr`.
+
+You can disable the default PGAdapter log configuration and go back to the standard
+`java.util.logging` configuration by starting PGAdapter with the command line argument
+`-legacy_logging`.
+
+### Custom Logging Configuration
+
+Create a `logging.properties` file to configure logging messages.
+See the following example for an example to get fine-grained logging.
 
 ```
 handlers=java.util.logging.ConsoleHandler,java.util.logging.FileHandler

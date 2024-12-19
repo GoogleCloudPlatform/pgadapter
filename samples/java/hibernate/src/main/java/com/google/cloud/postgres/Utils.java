@@ -17,6 +17,7 @@ package com.google.cloud.postgres;
 import com.google.cloud.postgres.models.Albums;
 import com.google.cloud.postgres.models.Concerts;
 import com.google.cloud.postgres.models.Singers;
+import com.google.cloud.postgres.models.TicketSale;
 import com.google.cloud.postgres.models.Tracks;
 import com.google.cloud.postgres.models.TracksId;
 import com.google.cloud.postgres.models.VenueDescription;
@@ -24,6 +25,9 @@ import com.google.cloud.postgres.models.Venues;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 public class Utils {
@@ -57,6 +61,16 @@ public class Utils {
     concerts.setName("Sunburn");
     concerts.setSingers(singers);
     concerts.setVenues(venues);
+
+    List<TicketSale> ticketSales = new ArrayList<>();
+    TicketSale ticketSale = new TicketSale();
+    ticketSale.setConcert(concerts);
+    ticketSale.setCustomerName("Alice");
+    ticketSale.setPrice(new BigDecimal("99.90"));
+    ticketSale.setSeats(Arrays.asList("A19", "A20", "A21"));
+    ticketSales.add(ticketSale);
+    concerts.setTicketSales(ticketSales);
+
     return concerts;
   }
 

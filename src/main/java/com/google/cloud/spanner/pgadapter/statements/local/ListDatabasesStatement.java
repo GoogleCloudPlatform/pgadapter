@@ -25,7 +25,6 @@ import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -70,7 +69,7 @@ public class ListDatabasesStatement implements LocalStatement {
   @Override
   public StatementResult execute(BackendConnection backendConnection) {
     Connection connection = backendConnection.getSpannerConnection();
-    Spanner spanner = ConnectionOptionsHelper.getSpanner(connection);
+    Spanner spanner = connection.getSpanner();
     InstanceId defaultInstanceId =
         connectionHandler.getServer().getOptions().getDefaultInstanceId();
     ResultSet resultSet =

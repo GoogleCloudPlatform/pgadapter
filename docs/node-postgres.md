@@ -70,6 +70,24 @@ This example uses the pre-built Docker image to run PGAdapter.
 See [README](../README.md) for more options for how to run PGAdapter.
 
 
+## Integer Values
+
+`node-postgres` by default returns `int8` / `bigint` values as strings. This is because Javascript
+does not support 64-bit integers. You can override this behavior and instruct `node-postgres` to
+return `int8` / `bigint` values as 32-bit Javascript integers by adding this configuration to your
+code:
+
+```javascript
+var types = require('pg').types
+
+// '20' on the following line is the PostgreSQL type code (OID) for `int8`.
+types.setTypeParser(20, function(val) {
+  return parseInt(val, 10)
+})
+```
+
+See https://github.com/brianc/node-pg-types for more information.
+
 ## Performance Considerations
 
 The following will give you the best possible performance when using node-postgres with PGAdapter.

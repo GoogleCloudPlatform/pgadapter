@@ -25,7 +25,6 @@ import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
@@ -116,7 +115,7 @@ public class ShowDatabaseDdlStatement extends IntermediatePortalStatement {
     // TODO: 'for postgresql' should also include Spanner-managed indexes for foreign key
     //       constraints.
     Connection connection = backendConnection.getSpannerConnection();
-    Spanner spanner = ConnectionOptionsHelper.getSpanner(connection);
+    Spanner spanner = connection.getSpanner();
     ResultSet resultSet =
         ClientSideResultSet.forRows(
             Type.struct(StructField.of("Statement", Type.string())),
