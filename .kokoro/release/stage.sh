@@ -15,9 +15,11 @@
 
 set -eo pipefail
 
+echo "Running stage.sh"
+
 # Start the releasetool reporter
-python3 -m pip install gcp-releasetool
-python3 -m releasetool publish-reporter-script > /tmp/publisher-script; source /tmp/publisher-script
+# python3 -m pip install gcp-releasetool
+# python3 -m releasetool publish-reporter-script > /tmp/publisher-script; source /tmp/publisher-script
 
 source $(dirname "$0")/common.sh
 source $(dirname "$0")/../common.sh
