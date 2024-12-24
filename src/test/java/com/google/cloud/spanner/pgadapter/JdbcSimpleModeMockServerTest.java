@@ -473,6 +473,49 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testStatementTagAsComment() throws SQLException {
+    String sql = "/*@statement_tag='my_tag'*/" + INSERT_STATEMENT.getSql();
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        Statement statement = connection.createStatement()) {
+      assertEquals(1, statement.executeUpdate(sql));
+      ExecuteSqlRequest executeRequest =
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
+              .findAny()
+              .orElseThrow(AssertionError::new);
+      assertEquals("my_tag", executeRequest.getRequestOptions().getRequestTag());
+    }
+  }
+
+  @Test
+  public void testTransactionTag() throws SQLException {
+    String sql = "/*@statement_tag='my_tag'*/" + INSERT_STATEMENT.getSql();
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        Statement statement = connection.createStatement()) {
+      connection.setAutoCommit(false);
+      statement.execute("set spanner.transaction_tag='my_transaction_tag'");
+      assertEquals(1, statement.executeUpdate(sql));
+      connection.commit();
+
+      ExecuteSqlRequest executeRequest =
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
+              .findAny()
+              .orElseThrow(AssertionError::new);
+      assertEquals("my_tag", executeRequest.getRequestOptions().getRequestTag());
+      assertEquals("my_transaction_tag", executeRequest.getRequestOptions().getTransactionTag());
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(
+          "my_transaction_tag",
+          mockSpanner
+              .getRequestsOfType(CommitRequest.class)
+              .get(0)
+              .getRequestOptions()
+              .getTransactionTag());
+    }
+  }
+
+  @Test
   public void testPrepareStatement() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
