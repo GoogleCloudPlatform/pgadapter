@@ -483,7 +483,6 @@ public class OptionsMetadata {
           || numChannels != null
           || databaseRole != null
           || autoConfigEmulator
-          || useVirtualThreads
           || useVirtualGrpcTransportThreads
           || enableEndToEndTracing) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
@@ -498,11 +497,6 @@ public class OptionsMetadata {
         }
         if (autoConfigEmulator) {
           jdbcOptionBuilder.append("autoConfigEmulator=true;");
-        }
-        if (useVirtualThreads) {
-          jdbcOptionBuilder
-              .append(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME)
-              .append("=true;");
         }
         if (useVirtualGrpcTransportThreads) {
           jdbcOptionBuilder
@@ -1041,8 +1035,7 @@ public class OptionsMetadata {
     // Note that Credentials here is the credentials file, not the actual credentials
     String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
-    if (!shouldAuthenticate()
-        && Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))) {
+    if (!shouldAuthenticate() && !usesEmulator()) {
       String credentials = buildCredentialsFile();
       if (!Strings.isNullOrEmpty(credentials)) {
         url = String.format("%s;credentials=%s", url, credentials);
@@ -1053,6 +1046,16 @@ public class OptionsMetadata {
     }
 
     return url;
+  }
+
+  private boolean isAutoConfigEmulator() {
+    return getPropertyMap() != null
+        && Boolean.parseBoolean(getPropertyMap().getOrDefault("autoConfigEmulator", "false"));
+  }
+
+  private boolean usesEmulator() {
+    return !Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))
+        || isAutoConfigEmulator();
   }
 
   /** Returns the fully qualified database name based on the given database id or name. */

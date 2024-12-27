@@ -32,7 +32,7 @@ do
     --volume=${KOKORO_GFILE_DIR}:${KOKORO_GFILE_DIR} \
     gcr.io/google.com/cloudsdktool/cloud-sdk \
     secrets versions access latest \
-    --project cloud-devrel-kokoro-resources \
+    --project cloud-sdk-release-custom-pool \
     --secret ${key} > \
     "${SECRET_LOCATION}/${key}"
   if [[ $? == 0 ]]; then

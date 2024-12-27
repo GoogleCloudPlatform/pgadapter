@@ -17,6 +17,10 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage.DATABASE_KEY;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage.createConnectionAndSendStartupMessage;
 
+import com.google.api.client.json.GenericJson;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.JsonObjectParser;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.PemReader;
 import com.google.api.client.util.PemReader.Section;
 import com.google.api.client.util.Strings;
@@ -38,6 +42,7 @@ import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * PGAdapter will convert a password message into gRPC authentication in the following ways:
@@ -89,7 +94,7 @@ public class PasswordMessage extends ControlMessage {
                   .setHints(
                       "PGAdapter expects credentials to be one of the following:\n"
                           + "1. Username contains the fixed string 'oauth2' and the password field contains a valid OAuth2 token.\n"
-                          + "2. Username contains any string and the password field contains the JSON payload of a credentials file (e.g. a service account file).\n"
+                          + "2. Username contains any string and the password field contains the JSON payload of a service account or user account credentials file. Note: Only user accounts and service accounts are supported.\n"
                           + "3. Username contains the email address of a service account and the password contains the corresponding private key for the service account.")
                   .setSQLState(SQLState.InvalidPassword)
                   .setSeverity(Severity.ERROR)
@@ -143,13 +148,30 @@ public class PasswordMessage extends ControlMessage {
 
     // Try to parse the password field as a JSON string that contains a credentials object.
     try {
-      return GoogleCredentials.fromStream(
-          new ByteArrayInputStream(password.getBytes(StandardCharsets.UTF_8)));
+      // Only try to parse credentials that we know and trust.
+      if (isValidCredentialsType(password)) {
+        return GoogleCredentials.fromStream(
+            new ByteArrayInputStream(password.getBytes(StandardCharsets.UTF_8)));
+      }
     } catch (IOException ioException) {
-      // Ignore and fallthrough..
+      // Ignore and fallthrough.
     }
 
     return null;
+  }
+
+  static boolean isValidCredentialsType(String credentials) throws IOException {
+    JsonFactory jsonFactory = GsonFactory.getDefaultInstance();
+    JsonObjectParser parser = new JsonObjectParser(jsonFactory);
+    GenericJson fileContents =
+        parser.parseAndClose(new StringReader(credentials), GenericJson.class);
+
+    String fileType = (String) fileContents.get("type");
+    if (fileType == null) {
+      throw new IOException("Error reading credentials from password, 'type' field not specified.");
+    }
+    return Objects.equals("authorized_user", fileType)
+        || Objects.equals("service_account", fileType);
   }
 
   @Override

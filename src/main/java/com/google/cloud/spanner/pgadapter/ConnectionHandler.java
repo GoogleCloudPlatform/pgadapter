@@ -205,6 +205,7 @@ public class ConnectionHandler implements Runnable {
     connectionOptionsBuilder =
         ConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
             connectionOptionsBuilder, options.isLogGrpcMessages());
+    connectionOptionsBuilder = ConnectionOptionsHelper.useDirectExecutor(connectionOptionsBuilder);
     if (credentials != null) {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);

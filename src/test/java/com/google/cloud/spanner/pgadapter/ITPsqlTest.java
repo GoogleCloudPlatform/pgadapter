@@ -934,6 +934,7 @@ public class ITPsqlTest implements IntegrationTest {
 
   private static final ImmutableSet<ZoneId> PROBLEMATIC_ZONE_IDS =
       ImmutableSet.of(
+          ZoneId.of("Atlantic/Azores"),
           // Mexico abolished DST in 2022, but not all databases contain this information.
           ZoneId.of("America/Chihuahua"),
           // Jordan abolished DST in 2022, but not all databases contain this information.

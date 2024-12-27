@@ -43,7 +43,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.41.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.42.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -55,7 +55,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.12.0</version>
+    <version>1.12.2</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -78,14 +78,14 @@
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.44.1</version>
+        <version>1.45.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.51.0</version>
+        <version>26.52.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -136,7 +136,7 @@
       <!-- Not managed by opentelemetry-bom -->
       <groupId>io.opentelemetry.semconv</groupId>
       <artifactId>opentelemetry-semconv</artifactId>
-      <version>1.28.0-alpha</version>
+      <version>1.29.0-alpha</version>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
@@ -202,7 +202,7 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-text</artifactId>
-      <version>1.12.0</version>
+      <version>1.13.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
@@ -237,7 +237,7 @@
     <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
-      <version>5.15.0</version>
+      <version>5.16.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>

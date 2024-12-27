@@ -15,7 +15,7 @@ jobs:
     # Add a PostgreSQL Docker container and the emulator.
     services:
       postgres:
-        image: postgres:14
+        image: postgres:17
         env:
           POSTGRES_PASSWORD: postgres
         # Set health checks to wait until postgres has started
@@ -63,8 +63,10 @@ jobs:
           bundler-cache: true
       - name: Setup psql
         run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends postgresql-client-14
+          sudo apt-get install --yes --no-install-recommends postgresql-client-17
       - name: Create PostgreSQL test database
         run: |
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
