@@ -669,6 +669,10 @@ func startDocker(ctx context.Context, config Config) (pgadapter *PGAdapter, err 
 		return pgadapter, err
 	}
 	pgadapter.port = mappedPort.Int()
+	// Wait for PGAdapter to start.
+	if err := waitForPort(pgadapter.port /* initialWait = */, 0, 50*time.Millisecond, 20); err != nil {
+		return nil, err
+	}
 	return pgadapter, nil
 }
 
