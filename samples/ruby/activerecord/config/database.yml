@@ -4,6 +4,8 @@ default: &default
   port: <%= ENV['PGPORT'] || "5432" %>
   database: <%= ENV['PGDATABASE'] || "projects/my-project/instances/my-instance/databases/my-database" %>
   pool: 5
+  # Schema dumping uses pg_catalog tables and functions that are not supported by Spanner.
+  schema_dump: false
   # Advisory locks are not supported by PGAdapter
   advisory_locks: false
   # These settings ensure that migrations and schema inspections work.
