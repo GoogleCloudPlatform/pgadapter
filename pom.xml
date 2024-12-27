@@ -43,7 +43,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.42.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.42.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -136,7 +136,7 @@
       <!-- Not managed by opentelemetry-bom -->
       <groupId>io.opentelemetry.semconv</groupId>
       <artifactId>opentelemetry-semconv</artifactId>
-      <version>1.28.0-alpha</version>
+      <version>1.29.0-alpha</version>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
@@ -237,7 +237,7 @@
     <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
-      <version>5.15.0</version>
+      <version>5.16.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>

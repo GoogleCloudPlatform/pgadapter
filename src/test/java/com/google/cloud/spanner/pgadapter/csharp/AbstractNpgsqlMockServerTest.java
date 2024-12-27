@@ -116,6 +116,69 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + "       WHEN typtype = 'a' THEN 5                        -- Arrays after\n"
               + "       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 6  -- Domains over arrays last\n"
               + "END");
+
+  private static final Statement SELECT_TYPES_NPGSQL_9 =
+      Statement.of(
+          "with pg_range as (\n"
+              + "select * from (select 0::bigint as rngtypid, 0::bigint as rngsubtype, 0::bigint as rngmultitypid, 0::bigint as rngcollation, 0::bigint as rngsubopc, ''::varchar as rngcanonical, ''::varchar as rngsubdiff\n"
+              + ") range where false),\n"
+              + PG_TYPE_PREFIX
+              + ",\n"
+              + EMULATED_PG_CLASS_PREFIX
+              + ",\n"
+              + "pg_proc as (\n"
+              + "select * from (select 0::bigint as oid, ''::varchar as proname, 0::bigint as pronamespace, 0::bigint as proowner, 0::bigint as prolang, 0.0::float8 as procost, 0.0::float8 as prorows, 0::bigint as provariadic, ''::varchar as prosupport, ''::varchar as prokind, false::bool as prosecdef, false::bool as proleakproof, false::bool as proisstrict, false::bool as proretset, ''::varchar as provolatile, ''::varchar as proparallel, 0::bigint as pronargs, 0::bigint as pronargdefaults, 0::bigint as prorettype, 0::bigint as proargtypes, '{}'::bigint[] as proallargtypes, '{}'::varchar[] as proargmodes, '{}'::text[] as proargnames, ''::varchar as proargdefaults, '{}'::bigint[] as protrftypes, ''::text as prosrc, ''::text as probin, ''::varchar as prosqlbody, '{}'::text[] as proconfig, '{}'::bigint[] as proacl\n"
+              + ") proc where false)\n"
+              + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"
+              + "FROM (\n"
+              + "    -- Arrays have typtype=b - this subquery identifies them by their typreceive and converts their typtype to a\n"
+              + "    -- We first do this for the type (innerest-most subquery), and then for its element type\n"
+              + "    -- This also returns the array element, range subtype and domain base type as elemtypoid\n"
+              + "    SELECT\n"
+              + "        typ.oid, typ.typnamespace, typ.typname, typ.typtype, typ.typrelid, typ.typnotnull, typ.relkind,\n"
+              + "        elemtyp.oid AS elemtypoid, elemtyp.typname AS elemtypname, elemcls.relkind AS elemrelkind,\n"
+              + "        CASE WHEN elemproc.proname='array_recv' THEN 'a' ELSE elemtyp.typtype END AS elemtyptype\n"
+              + "        , typ.typcategory\n"
+              + "    FROM (\n"
+              + "        SELECT typ.oid, typnamespace, typname, typrelid, typnotnull, relkind, typelem AS elemoid,\n"
+              + "            CASE WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype,\n"
+              + "            CASE\n"
+              + "                WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem\n"
+              + "                WHEN typ.typtype='r' THEN rngsubtype\n"
+              + "                WHEN typ.typtype='m' THEN (SELECT rngtypid FROM pg_range WHERE rngmultitypid = typ.oid)\n"
+              + "                WHEN typ.typtype='d' THEN typ.typbasetype\n"
+              + "            END AS elemtypoid\n"
+              + "            , typ.typcategory\n"
+              + "        FROM pg_type AS typ\n"
+              + "        LEFT JOIN pg_class AS cls ON (cls.oid = typ.typrelid)\n"
+              + "        LEFT JOIN pg_proc AS proc ON false\n"
+              + "        LEFT JOIN pg_range ON (pg_range.rngtypid = typ.oid)\n"
+              + "    ) AS typ\n"
+              + "    LEFT JOIN pg_type AS elemtyp ON elemtyp.oid = elemtypoid\n"
+              + "    LEFT JOIN pg_class AS elemcls ON (elemcls.oid = elemtyp.typrelid)\n"
+              + "    LEFT JOIN pg_proc AS elemproc ON false\n"
+              + ") AS t\n"
+              + "JOIN pg_namespace AS ns ON (ns.oid = typnamespace)\n"
+              + "WHERE\n"
+              + "    (\n"
+              + "    typtype IN ('b', 'r', 'm', 'e', 'd') OR -- Base, range, multirange, enum, domain\n"
+              + "    (typtype = 'c' AND relkind='c') OR -- User-defined free-standing composites (not table composites) by default\n"
+              + "    (typtype = 'p' AND typname IN ('record', 'void', 'unknown')) OR -- Some special supported pseudo-types\n"
+              + "    (typtype = 'a' AND (  -- Array of...\n"
+              + "        elemtyptype IN ('b', 'r', 'm', 'e', 'd') OR -- Array of base, range, multirange, enum, domain\n"
+              + "        (elemtyptype = 'p' AND elemtypname IN ('record', 'void')) OR -- Arrays of special supported pseudo-types\n"
+              + "        (elemtyptype = 'c' AND elemrelkind='c') -- Array of user-defined free-standing composites (not table composites) by default\n"
+              + "    )))\n"
+              + "ORDER BY CASE\n"
+              + "       WHEN typtype IN ('b', 'e', 'p') THEN 0           -- First base types, enums, pseudo-types\n"
+              + "       WHEN typtype = 'c' THEN 1                        -- Composites after (fields loaded later in 2nd pass)\n"
+              + "       WHEN typtype = 'r' THEN 2                        -- Ranges after\n"
+              + "       WHEN typtype = 'm' THEN 3                        -- Multiranges after\n"
+              + "       WHEN typtype = 'd' AND elemtyptype <> 'a' THEN 4 -- Domains over non-arrays after\n"
+              + "       WHEN typtype = 'a' THEN 5                        -- Arrays after\n"
+              + "       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 6  -- Domains over arrays last\n"
+              + "END");
+
   // ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid
   private static final ResultSetMetadata SELECT_TYPES_METADATA =
       ResultSetMetadata.newBuilder()
@@ -474,6 +537,27 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
               + "  attnum > 0 AND     -- Don't load system attributes\n"
               + "  NOT attisdropped\n"
               + "ORDER BY typ.oid, att.attnum");
+  private static final Statement SELECT_ATTRIBUTES_NPGSQL_9 =
+      Statement.of(
+          "with "
+              + PG_TYPE_PREFIX
+              + ",\n"
+              + EMULATED_PG_CLASS_PREFIX
+              + ",\n"
+              + EMULATED_PG_ATTRIBUTE_PREFIX
+              + "\n"
+              + "-- Load field definitions for (free-standing) composite types\n"
+              + "SELECT typ.oid, att.attname, att.atttypid\n"
+              + "FROM pg_type AS typ\n"
+              + "JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)\n"
+              + "JOIN pg_class AS cls ON (cls.oid = typ.typrelid)\n"
+              + "JOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)\n"
+              + "WHERE\n"
+              + "  (typ.typtype = 'c' AND cls.relkind='c') AND\n"
+              + "  \n"
+              + "  attnum > 0 AND     -- Don't load system attributes\n"
+              + "  NOT attisdropped\n"
+              + "ORDER BY typ.oid, att.attnum");
   private static final ResultSetMetadata SELECT_ATTRIBUTES_METADATA =
       ResultSetMetadata.newBuilder()
           .setRowType(
@@ -534,7 +618,11 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     mockSpanner.putStatementResult(
         StatementResult.query(SELECT_TYPES_14_1, SELECT_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_TYPES_NPGSQL_9, SELECT_TYPES_RESULTSET));
+    mockSpanner.putStatementResult(
         StatementResult.query(SELECT_ATTRIBUTES, SELECT_ATTRIBUTES_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_ATTRIBUTES_NPGSQL_9, SELECT_ATTRIBUTES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(SELECT_ENUM_LABELS_STATEMENT, SELECT_ENUM_LABELS_RESULTSET));
   }

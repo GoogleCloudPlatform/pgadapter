@@ -206,7 +206,10 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
       }
       // Initiate a fast shutdown.
       if (useSqlStatement) {
-        connection.createStatement().execute("shutdown fast");
+        try {
+          connection.createStatement().execute("shutdown fast");
+        } catch (SQLException ignore) {
+        }
       } else {
         shutdownHandler.shutdown(ShutdownMode.FAST);
       }
