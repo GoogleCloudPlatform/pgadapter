@@ -205,10 +205,12 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
         assertFalse(resultSet.next());
       }
       // Initiate a fast shutdown.
+      boolean failedDuringExecution = false;
       if (useSqlStatement) {
         try {
           connection.createStatement().execute("shutdown fast");
         } catch (SQLException ignore) {
+          failedDuringExecution = true;
         }
       } else {
         shutdownHandler.shutdown(ShutdownMode.FAST);
@@ -224,7 +226,11 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
       // Verify that existing connection has been invalidated.
       SQLException exception =
           assertThrows(SQLException.class, () -> connection.createStatement().executeQuery(sql));
-      assertEquals("An I/O error occurred while sending to the backend.", exception.getMessage());
+      if (failedDuringExecution) {
+        assertEquals("This connection has been closed.", exception.getMessage());
+      } else {
+        assertEquals("An I/O error occurred while sending to the backend.", exception.getMessage());
+      }
 
       // Verify that we cannot open a new connection.
       exception = assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl()));
@@ -284,7 +290,10 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
 
       // Now force the server to stop by initiating a fast shutdown.
       if (useSqlStatement) {
-        connection.createStatement().execute("shutdown fast");
+        try {
+          connection.createStatement().execute("shutdown fast");
+        } catch (SQLException ignore) {
+        }
       } else {
         shutdownHandler.shutdown(ShutdownMode.FAST);
       }
