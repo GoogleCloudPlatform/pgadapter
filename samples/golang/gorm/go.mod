@@ -5,7 +5,7 @@ go 1.22
 toolchain go1.23.4
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20241227183924-38506045c664
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20241227211000-a51da63fb02a
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgtype v1.14.4
 	github.com/shopspring/decimal v1.4.0
