@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.42.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.42.1...v0.42.2) (2025-01-05)
+
+
+### Bug Fixes
+
+* update secret project to new release kokoro release project ([#2666](https://github.com/GoogleCloudPlatform/pgadapter/issues/2666)) ([408d17e](https://github.com/GoogleCloudPlatform/pgadapter/commit/408d17ecc154773dd449eba2fd5fd2e34cb7e499))
+
+
+### Dependencies
+
+* update dependency activerecord to v8 ([#2524](https://github.com/GoogleCloudPlatform/pgadapter/issues/2524)) ([d1bf48b](https://github.com/GoogleCloudPlatform/pgadapter/commit/d1bf48b2027aefef7ba486a90b25e8ab0db63878))
+* update dependency coverlet.collector to 6.0.3 ([#2692](https://github.com/GoogleCloudPlatform/pgadapter/issues/2692)) ([b554b94](https://github.com/GoogleCloudPlatform/pgadapter/commit/b554b94f49f24e60d0a5dcab83e3c9050c8ec101))
+* update dependency net.java.dev.jna:jna to v5.16.0 ([#2673](https://github.com/GoogleCloudPlatform/pgadapter/issues/2673)) ([3b20021](https://github.com/GoogleCloudPlatform/pgadapter/commit/3b2002114236928390d0894293c4b2327b612f0c))
+* update dependency npgsql to v9 ([#2679](https://github.com/GoogleCloudPlatform/pgadapter/issues/2679)) ([b61d60b](https://github.com/GoogleCloudPlatform/pgadapter/commit/b61d60bc4d26a67211b17ceea65dc8c98ff3f519))
+* update dependency nunit to 4.3.1 ([#2669](https://github.com/GoogleCloudPlatform/pgadapter/issues/2669)) ([9296928](https://github.com/GoogleCloudPlatform/pgadapter/commit/9296928d5fe48f728b3d360168a7c22c45ea5331))
+* update dependency nunit to 4.3.2 ([#2690](https://github.com/GoogleCloudPlatform/pgadapter/issues/2690)) ([286f1e6](https://github.com/GoogleCloudPlatform/pgadapter/commit/286f1e68516aced8d98495b47307f61a2f346169))
+* update dependency nunit.analyzers to 4.5.0 ([#2674](https://github.com/GoogleCloudPlatform/pgadapter/issues/2674)) ([6d3fb82](https://github.com/GoogleCloudPlatform/pgadapter/commit/6d3fb82357e8d4fad16c96848215761fb13413e5))
+* update dependency org.checkerframework:checker-qual to v3.48.4 ([#2695](https://github.com/GoogleCloudPlatform/pgadapter/issues/2695)) ([8ecbd8e](https://github.com/GoogleCloudPlatform/pgadapter/commit/8ecbd8ecd18fcecaba0a1ed8e53cd3f12cb394ad))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 3850604 ([#2676](https://github.com/GoogleCloudPlatform/pgadapter/issues/2676)) ([a51da63](https://github.com/GoogleCloudPlatform/pgadapter/commit/a51da63fb02a21b84ca46074e83e37dfb449361a))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to a51da63 ([#2687](https://github.com/GoogleCloudPlatform/pgadapter/issues/2687)) ([62ff2db](https://github.com/GoogleCloudPlatform/pgadapter/commit/62ff2db68341eb3af178389b3906242c30e2aafb))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to b554b94 ([#2694](https://github.com/GoogleCloudPlatform/pgadapter/issues/2694)) ([77df07e](https://github.com/GoogleCloudPlatform/pgadapter/commit/77df07e00c7bb7b302d4f88f86d652c8ec642136))
+* update module github.com/jackc/pgx/v5 to v5.7.2 ([#2670](https://github.com/GoogleCloudPlatform/pgadapter/issues/2670)) ([3574b33](https://github.com/GoogleCloudPlatform/pgadapter/commit/3574b337f071bc3c05691b34e6e3b54070c3d473))
+* update module golang.org/x/oauth2 to v0.25.0 ([#2698](https://github.com/GoogleCloudPlatform/pgadapter/issues/2698)) ([d7ff9d4](https://github.com/GoogleCloudPlatform/pgadapter/commit/d7ff9d4078152f515df5d78b4fe16df9735ad3f2))
+* update module google.golang.org/api to v0.214.0 ([#2667](https://github.com/GoogleCloudPlatform/pgadapter/issues/2667)) ([b97b218](https://github.com/GoogleCloudPlatform/pgadapter/commit/b97b218ca70b752ac86b960a34cf88ebf661be0c))
+
+
+### Documentation
+
+* add example for setting statement tag as comment ([#2677](https://github.com/GoogleCloudPlatform/pgadapter/issues/2677)) ([3850604](https://github.com/GoogleCloudPlatform/pgadapter/commit/38506045c664029d584561469599bef791e64a63))
+
 ## [0.42.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.42.0...v0.42.1) (2024-12-19)
 
 
