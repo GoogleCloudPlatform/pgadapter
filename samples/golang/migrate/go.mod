@@ -3,7 +3,7 @@ module migrate
 go 1.22.3
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250101102758-b554b94f49f2
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250108132658-4d2510b15cdc
 	github.com/golang-migrate/migrate/v4 v4.18.1
 )
 
@@ -61,7 +61,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
+	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

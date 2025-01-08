@@ -5,7 +5,7 @@ go 1.22
 toolchain go1.23.4
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250101102758-b554b94f49f2
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250108132658-4d2510b15cdc
 	github.com/jackc/pgx/v5 v5.7.2
 )
 
@@ -63,7 +63,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
+	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
