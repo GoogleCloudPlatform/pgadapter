@@ -57,6 +57,10 @@ import java.util.logging.Logger;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
+import org.graalvm.nativeimage.IsolateThread;
+import org.graalvm.nativeimage.c.function.CEntryPoint;
+import org.graalvm.nativeimage.c.type.CCharPointer;
+import org.graalvm.nativeimage.c.type.CTypeConversion;
 
 /** Effectively this is the main class */
 public class Server {
@@ -80,6 +84,19 @@ public class Server {
       // terminate the server.
       Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
       registerSignalHandlers();
+    } catch (Exception e) {
+      printError(e, System.err, System.out);
+    }
+  }
+
+  @CEntryPoint(name = "start")
+  public static void start(IsolateThread thread, CCharPointer cArguments) {
+    String arguments = CTypeConversion.toJavaString(cArguments);
+    String[] args = arguments.split(" ");
+    try {
+      OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
+      ProxyServer proxyServer = new ProxyServer(optionsMetadata, OpenTelemetry.noop());
+      proxyServer.startServer();
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }
