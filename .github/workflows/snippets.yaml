@@ -80,3 +80,18 @@ jobs:
       - name: Run dotnet snippets
         working-directory: ./samples/snippets/dotnet-snippets
         run: dotnet test
+  php-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+      - run: php --version
+      - name: Install dependencies
+        working-directory: ./samples/snippets/php-snippets
+        run: composer install
+      - name: Run PHP snippets
+        working-directory: ./samples/snippets/php-snippets/test
+        run: ../vendor/bin/phpunit SamplesTest.php
