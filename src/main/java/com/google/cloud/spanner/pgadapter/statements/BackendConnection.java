@@ -415,7 +415,7 @@ public class BackendConnection {
           // We handle one very specific use case here to prevent unnecessary problems: If the user
           // has started a DML batch and is then analyzing an update statement (probably a prepared
           // statement), then we use a separate transaction for that.
-          if (spannerConnection.isDmlBatchActive()) {
+          if (spannerConnection.isDmlBatchActive() && !spannerConnection.isInTransaction()) {
             final Statement statementToAnalyze = statement;
             resultSet =
                 spannerConnection
