@@ -78,7 +78,7 @@
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.45.0</version>
+        <version>1.46.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -212,7 +212,7 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.79</version>
+      <version>1.80</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.mojo</groupId>
