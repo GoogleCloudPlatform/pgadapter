@@ -45,10 +45,18 @@ class JdbcMetadataStatementHelper {
     // with Spangres-compatible queries.
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_EXPORTED_IMPORTED_KEYS_PREFIX)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_EXPORTED_IMPORTED_KEYS_42_0_PREFIX)) {
-      return replaceImportedExportedKeysQuery(sql);
+      return replaceImportedExportedKeysQuery(
+          sql, PgJdbcCatalog.PG_JDBC_EXPORTED_IMPORTED_KEYS_REPLACEMENT, "KEY_SEQ");
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_EXPORTED_IMPORTED_KEYS_PREFIX_V42_7_5)) {
+      return replaceImportedExportedKeysQuery(
+          sql, PgJdbcCatalog.PG_JDBC_EXPORTED_IMPORTED_KEYS_REPLACEMENT_UPPER_CASE, "\"KEY_SEQ\"");
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SCHEMAS_PREFIX)) {
-      return replaceGetSchemasQuery(sql);
+      return replaceGetSchemasQuery(sql, PgJdbcCatalog.PG_JDBC_GET_SCHEMAS_REPLACEMENT);
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SCHEMAS_PREFIX_V42_7_5)) {
+      return replaceGetSchemasQuery(sql, PgJdbcCatalog.PG_JDBC_GET_SCHEMAS_REPLACEMENT_UPPER_CASE);
     }
     if (sql.contains(LiquibaseStatementHelper.TAG_STATEMENT_PART)) {
       return LiquibaseStatementHelper.replaceTagStatement(sql);
@@ -65,10 +73,16 @@ class JdbcMetadataStatementHelper {
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_5)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_6)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_7)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_8)) {
-      return replaceGetTablesQuery(sql);
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_8)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_9)) {
+      if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_9)) {
+        return replaceGetTablesQuery(sql, PgJdbcCatalog.PG_JDBC_GET_TABLES_REPLACEMENT_UPPER_CASE);
+      } else {
+        return replaceGetTablesQuery(sql, PgJdbcCatalog.PG_JDBC_GET_TABLES_REPLACEMENT);
+      }
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_1)
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_V42_7_5)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_2)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_3)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_4)
@@ -78,22 +92,26 @@ class JdbcMetadataStatementHelper {
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_4_1)) {
       return replaceGetColumnsQuery(sql);
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_1)
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_V42_7_5)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_2)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_3)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_1_1)) {
       return replaceGetIndexInfoQuery(sql);
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_PREFIX_1)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_PREFIX_2)) {
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_PREFIX_2)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_PREFIX_V42_7_5)) {
       return replaceGetPrimaryKeyQuery(sql);
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_1)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_2)) {
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_2)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_3)) {
       return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1_1)) {
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_V42_7_5)) {
       return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_BEST_ROW_IDENTIFIER_PREFIX)) {
@@ -101,16 +119,22 @@ class JdbcMetadataStatementHelper {
     }
 
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_WITH_FUNC_TYPE_PREFIX)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_WITHOUT_FUNC_TYPE_PREFIX)) {
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_WITHOUT_FUNC_TYPE_PREFIX)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_UPPER_CASE_PREFIX)) {
       return PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_REPLACEMENT;
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX)) {
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX_V42_7_5)) {
       return PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PROCEDURES_PREFIX)) {
       return PgJdbcCatalog.PG_JDBC_GET_PROCEDURES_REPLACEMENT;
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_UDTS_PREFIX)) {
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PROCEDURES_PREFIX_V42_7_5)) {
+      return PgJdbcCatalog.PG_JDBC_GET_PROCEDURES_REPLACEMENT;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_UDTS_PREFIX)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_UDTS_PREFIX_V42_7_5)) {
       return PgJdbcCatalog.PG_JDBC_GET_UDTS_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_MAX_NAME_LENGTH_PREFIX)) {
@@ -204,8 +228,7 @@ class JdbcMetadataStatementHelper {
     return replacedSql + whereClause + " ORDER BY ct.relname, pk_name, key_seq";
   }
 
-  private static String replaceGetSchemasQuery(String sql) {
-    String replacedSql = PgJdbcCatalog.PG_JDBC_GET_SCHEMAS_REPLACEMENT;
+  private static String replaceGetSchemasQuery(String sql, String replacedSql) {
     int startIndex;
     if (sql.contains(" AND nspname LIKE ")) {
       startIndex = sql.indexOf(" AND nspname LIKE ");
@@ -218,8 +241,7 @@ class JdbcMetadataStatementHelper {
         .replace(" ORDER BY TABLE_SCHEM", " ORDER BY schema_name");
   }
 
-  private static String replaceGetTablesQuery(String sql) {
-    String replacedSql = PgJdbcCatalog.PG_JDBC_GET_TABLES_REPLACEMENT;
+  private static String replaceGetTablesQuery(String sql, String replacedSql) {
     int startIndex;
     String wherePrefix = "WHERE c.relnamespace = n.oid";
     if (sql.contains(wherePrefix)) {
@@ -345,6 +367,9 @@ class JdbcMetadataStatementHelper {
         .replace(" AND ct.relname = ", " AND IDX.TABLE_NAME = ")
         .replace(" AND i.indisunique ", " AND IDX.IS_UNIQUE='YES' ")
         .replace(
+            ") AS tmp ORDER BY \"NON_UNIQUE\", \"TYPE\", \"INDEX_NAME\", \"ORDINAL_POSITION\"",
+            " ORDER BY IDX.TABLE_NAME, IS_UNIQUE DESC, IDX.INDEX_NAME, CASE WHEN ORDINAL_POSITION IS NULL THEN 0 ELSE ORDINAL_POSITION END")
+        .replace(
             ") AS tmp ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION",
             " ORDER BY IDX.TABLE_NAME, IS_UNIQUE DESC, IDX.INDEX_NAME, CASE WHEN ORDINAL_POSITION IS NULL THEN 0 ELSE ORDINAL_POSITION END")
         .replace(
@@ -364,6 +389,7 @@ class JdbcMetadataStatementHelper {
     replacedSql += " WHERE TRUE " + sql.substring(startIndex);
     return replacedSql
         .replace(") result where  result.A_ATTNUM = (result.KEYS).x", "")
+        .replace("AND result.KEY_SEQ <= KEY_COUNT", "")
         .replace(" AND n.nspname = ", " AND IDX.TABLE_SCHEMA = ")
         .replace(" AND ct.relname = ", " AND IDX.TABLE_NAME = ")
         .replace(" AND i.indisprimary ", " AND IDX.INDEX_TYPE='PRIMARY_KEY' ")
@@ -375,8 +401,8 @@ class JdbcMetadataStatementHelper {
             "ORDER BY COLS.TABLE_NAME, IDX.INDEX_NAME, COLS.ORDINAL_POSITION");
   }
 
-  private static String replaceImportedExportedKeysQuery(String sql) {
-    String replacedSql = PgJdbcCatalog.PG_JDBC_EXPORTED_IMPORTED_KEYS_REPLACEMENT;
+  private static String replaceImportedExportedKeysQuery(
+      String sql, String replacedSql, String keySeq) {
     int startIndex;
     if (sql.contains(" AND pkn.nspname = ")) {
       startIndex = sql.indexOf(" AND pkn.nspname = ");
@@ -397,9 +423,9 @@ class JdbcMetadataStatementHelper {
         .replace(" AND fkc.relname = ", " AND CHILD.TABLE_NAME = ")
         .replace(
             " ORDER BY fkn.nspname,fkc.relname,con.conname,pos.n",
-            " ORDER BY CHILD.TABLE_CATALOG, CHILD.TABLE_SCHEMA, CHILD.TABLE_NAME, KEY_SEQ")
+            " ORDER BY CHILD.TABLE_CATALOG, CHILD.TABLE_SCHEMA, CHILD.TABLE_NAME, " + keySeq)
         .replace(
             " ORDER BY pkn.nspname,pkc.relname, con.conname,pos.n",
-            " ORDER BY PARENT.TABLE_CATALOG, PARENT.TABLE_SCHEMA, PARENT.TABLE_NAME, KEY_SEQ");
+            " ORDER BY PARENT.TABLE_CATALOG, PARENT.TABLE_SCHEMA, PARENT.TABLE_NAME, " + keySeq);
   }
 }

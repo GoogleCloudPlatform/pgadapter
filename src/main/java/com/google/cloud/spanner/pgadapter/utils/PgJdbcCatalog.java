@@ -75,6 +75,8 @@ public class PgJdbcCatalog {
           + "FROM pg_catalog.pg_proc p "
           + "INNER JOIN pg_catalog.pg_namespace n ON p.pronamespace=n.oid "
           + "LEFT JOIN pg_catalog.pg_description d ON p.oid=d.objoid ";
+  public static final String PG_JDBC_GET_FUNCTIONS_UPPER_CASE_PREFIX =
+      "SELECT current_database() AS \"FUNCTION_CAT\",  n.nspname AS \"FUNCTION_SCHEM\", p.proname AS \"FUNCTION_NAME\",  d.description AS \"REMARKS\",";
   public static final String PG_JDBC_GET_FUNCTIONS_REPLACEMENT =
       "select * from (\n"
           + "\tselect ''::varchar as FUNCTION_CAT, ''::varchar as FUNCTION_SCHEM, ''::varchar as FUNCTION_NAME, ''::varchar as REMARKS, 0::bigint as FUNCTION_TYPE, ''::varchar as SPECIFIC_NAME\n"
@@ -91,6 +93,8 @@ public class PgJdbcCatalog {
           + " LEFT JOIN pg_catalog.pg_class c ON (d.classoid=c.oid AND c.relname='pg_proc') "
           + " LEFT JOIN pg_catalog.pg_namespace pn ON (c.relnamespace=pn.oid AND pn.nspname='pg_catalog') "
           + " WHERE p.pronamespace=n.oid ";
+  public static final String PG_JDBC_GET_PROCEDURES_PREFIX_V42_7_5 =
+      "SELECT current_database() AS \"PROCEDURE_CAT\",  n.nspname AS \"PROCEDURE_SCHEM\", p.proname AS \"PROCEDURE_NAME\", NULL, NULL, NULL, d.description AS \"REMARKS\", 2 AS \"PROCEDURE_TYPE\",";
   public static final String PG_JDBC_GET_PROCEDURES_REPLACEMENT =
       "select * from (\n"
           + "\tselect ''::varchar as PROCEDURE_CAT, ''::varchar as PROCEDURE_SCHEM, ''::varchar as PROCEDURE_NAME, ''::varchar as REMARKS, 0::bigint as PROCEDURE_TYPE, ''::varchar as SPECIFIC_NAME\n"
@@ -106,6 +110,8 @@ public class PgJdbcCatalog {
           + java.sql.Types.DISTINCT
           + " end as data_type, pg_catalog.obj_description(t.oid, 'pg_type')  "
           + "as remarks, CASE WHEN t.typtype = 'd' then  (select CASE";
+  public static final String PG_JDBC_GET_UDTS_PREFIX_V42_7_5 =
+      "select current_database() as \"TYPE_CAT\", n.nspname as \"TYPE_SCHEM\", t.typname as \"TYPE_NAME\", null as \"CLASS_NAME\", ";
   public static final String PG_JDBC_GET_UDTS_REPLACEMENT =
       "select * from (\n"
           + "\tselect ''::varchar as TYPE_CAT, ''::varchar as TYPE_SCHEM, ''::varchar as TYPE_NAME, ''::varchar as CLASS_NAME, 0::bigint as DATA_TYPE, ''::varchar as REMARKS, 0::bigint as BASE_TYPE\n"
@@ -117,6 +123,9 @@ public class PgJdbcCatalog {
           + " p.proargnames, p.proargmodes, p.proallargtypes, p.oid "
           + " FROM pg_catalog.pg_proc p, pg_catalog.pg_namespace n, pg_catalog.pg_type t "
           + " WHERE p.pronamespace=n.oid AND p.prorettype=t.oid ";
+  public static final String PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX_V42_7_5 =
+      "SELECT current_database(), n.nspname,p.proname,p.prorettype,p.proargtypes, t.typtype,t.typrelid, "
+          + " p.proargnames, p.proargmodes, p.proallargtypes, p.oid ";
   public static final String PG_JDBC_GET_FUNCTION_COLUMNS_REPLACEMENT =
       "select * from (\n"
           + "\tselect ''::varchar as FUNCTION_CAT, ''::varchar as FUNCTION_SCHEM, ''::varchar as FUNCTION_NAME, ''::varchar as COLUMN_NAME, 0::bigint as COLUMN_TYPE,\n"
@@ -130,8 +139,15 @@ public class PgJdbcCatalog {
           + " WHERE nspname <> 'pg_toast' AND (nspname !~ '^pg_temp_' "
           + " OR nspname = (pg_catalog.current_schemas(true))[1]) AND (nspname !~ '^pg_toast_temp_' "
           + " OR nspname = replace((pg_catalog.current_schemas(true))[1], 'pg_temp_', 'pg_toast_temp_')) ";
+  public static final String PG_JDBC_GET_SCHEMAS_PREFIX_V42_7_5 =
+      "SELECT nspname AS \"TABLE_SCHEM\", current_database() AS \"TABLE_CATALOG\" FROM pg_catalog.pg_namespace "
+          + " WHERE nspname <> 'pg_toast' AND (nspname !~ '^pg_temp_' "
+          + " OR nspname = (pg_catalog.current_schemas(true))[1]) AND (nspname !~ '^pg_toast_temp_' "
+          + " OR nspname = replace((pg_catalog.current_schemas(true))[1], 'pg_temp_', 'pg_toast_temp_')) ";
   public static final String PG_JDBC_GET_SCHEMAS_REPLACEMENT =
       "select schema_name as TABLE_SCHEM, catalog_name AS TABLE_CATALOG from information_schema.schemata WHERE true ";
+  public static final String PG_JDBC_GET_SCHEMAS_REPLACEMENT_UPPER_CASE =
+      "select schema_name as \"TABLE_SCHEM\", catalog_name AS \"TABLE_CATALOG\" from information_schema.schemata WHERE true ";
 
   public static final String PG_JDBC_GET_TABLES_PREFIX_1 =
       "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'PARTITIONED TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'P' then 'PARTITIONED INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS,  '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME, '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN (select * from (select 0 as objoid, 0 as classoid, 0 as objsubid, '' as description) pg_description where false) d ON (c.oid = d.objoid AND d.objsubid = 0  and d.classoid = 0)  WHERE c.relnamespace = n.oid";
@@ -149,14 +165,25 @@ public class PgJdbcCatalog {
       "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN pg_catalog.pg_description d ON (c.oid = d.objoid AND d.objsubid = 0)  LEFT JOIN pg_catalog.pg_class dc ON (d.classoid=dc.oid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dn.oid=dc.relnamespace AND dn.nspname='pg_catalog')  WHERE c.relnamespace = n.oid  ";
   public static final String PG_JDBC_GET_TABLES_PREFIX_8 =
       "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN pg_catalog.pg_description d ON (c.oid = d.objoid AND d.objsubid = 0)  LEFT JOIN pg_catalog.pg_class dc ON (d.classoid=dc.oid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dn.oid=dc.relnamespace AND dn.nspname='pg_catalog')  WHERE c.relnamespace = n.oid  ";
+  public static final String PG_JDBC_GET_TABLES_PREFIX_9 =
+      "SELECT current_database() AS \"TABLE_CAT\", n.nspname AS \"TABLE_SCHEM\", c.relname AS \"TABLE_NAME\",  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'PARTITIONED TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'P' then 'PARTITIONED INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS \"TABLE_TYPE\", d.description AS \"REMARKS\",  '' as \"TYPE_CAT\", '' as \"TYPE_SCHEM\", '' as \"TYPE_NAME\", '' AS \"SELF_REFERENCING_COL_NAME\", '' AS \"REF_GENERATION\"";
   public static final String PG_JDBC_GET_TABLES_REPLACEMENT =
       "SELECT TABLE_CATALOG AS TABLE_CAT, TABLE_SCHEMA AS TABLE_SCHEM, TABLE_NAME AS TABLE_NAME,\n"
           + "       CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END AS TABLE_TYPE,\n"
           + "       NULL AS REMARKS, NULL AS TYPE_CAT, NULL AS TYPE_SCHEM, NULL AS TYPE_NAME,\n"
           + "       NULL AS SELF_REFERENCING_COL_NAME, NULL AS REF_GENERATION\n"
           + "FROM INFORMATION_SCHEMA.TABLES AS T\n";
+  public static final String PG_JDBC_GET_TABLES_REPLACEMENT_UPPER_CASE =
+      "SELECT TABLE_CATALOG AS \"TABLE_CAT\", TABLE_SCHEMA AS \"TABLE_SCHEM\", TABLE_NAME AS \"TABLE_NAME\",\n"
+          + "       CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END AS \"TABLE_TYPE\",\n"
+          + "       NULL AS \"REMARKS\", NULL AS \"TYPE_CAT\", NULL AS \"TYPE_SCHEM\", NULL AS \"TYPE_NAME\",\n"
+          + "       NULL AS \"SELF_REFERENCING_COL_NAME\", NULL AS \"REF_GENERATION\"\n"
+          + "FROM INFORMATION_SCHEMA.TABLES AS T\n";
 
-  // This prefix is used for versions [42.3.2, ...).
+  // This prefix is used for versions [42.7.5, ...).
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_V42_7_5 =
+      "SELECT * FROM (SELECT current_database(), n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull  OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,row_number() OVER (PARTITION BY a.attrelid ORDER BY a.attnum) AS attnum, nullif(a.attidentity, '') as attidentity,nullif(a.attgenerated, '') as attgenerated,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  // This prefix is used for versions [42.3.2, 42.7.4].
   public static final String PG_JDBC_GET_COLUMNS_PREFIX_1 =
       "SELECT * FROM (SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,row_number() OVER (PARTITION BY a.attrelid ORDER BY a.attnum) AS attnum, nullif(a.attidentity, '') as attidentity,nullif(a.attgenerated, '') as attgenerated,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
   // This prefix is used for versions [42.2.9, 42.3.1].
@@ -211,7 +238,7 @@ public class PgJdbcCatalog {
       "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,a.attnum,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
 
   public static final String PG_JDBC_GET_COLUMNS_REPLACEMENT =
-      "SELECT TABLE_CATALOG AS \"TABLE_CAT\", TABLE_SCHEMA AS nspname, TABLE_NAME AS relname, COLUMN_NAME AS attname, '' as typtype,\n"
+      "SELECT TABLE_CATALOG as current_database, TABLE_CATALOG AS \"TABLE_CAT\", TABLE_SCHEMA AS nspname, TABLE_NAME AS relname, COLUMN_NAME AS attname, '' as typtype,\n"
           + "       CASE\n"
           + "           WHEN SPANNER_TYPE = 'boolean' THEN 16\n"
           + "           WHEN SPANNER_TYPE = 'boolean[]' THEN 1000\n"
@@ -288,6 +315,28 @@ public class PgJdbcCatalog {
           + "        END AS \"IS_GENERATEDCOLUMN\"\n"
           + "FROM INFORMATION_SCHEMA.COLUMNS C\n";
 
+  public static final String PG_JDBC_GET_INDEXES_PREFIX_V42_7_5 =
+      "SELECT"
+          + "     tmp.TABLE_CAT AS \"TABLE_CAT\","
+          + "     tmp.TABLE_SCHEM AS \"TABLE_SCHEM\","
+          + "     tmp.TABLE_NAME AS \"TABLE_NAME\","
+          + "     tmp.NON_UNIQUE AS \"NON_UNIQUE\","
+          + "     tmp.INDEX_QUALIFIER AS \"INDEX_QUALIFIER\","
+          + "     tmp.INDEX_NAME AS \"INDEX_NAME\","
+          + "     tmp.TYPE AS \"TYPE\","
+          + "     tmp.ORDINAL_POSITION AS \"ORDINAL_POSITION\","
+          + "     trim(both '\"' from pg_catalog.pg_get_indexdef(tmp.CI_OID, tmp.ORDINAL_POSITION, false)) AS \"COLUMN_NAME\","
+          + "   CASE tmp.AM_NAME"
+          + "     WHEN 'btree' THEN CASE tmp.I_INDOPTION[tmp.ORDINAL_POSITION - 1] & 1::smallint"
+          + "       WHEN 1 THEN 'D'"
+          + "       ELSE 'A'"
+          + "     END"
+          + "     ELSE NULL"
+          + "   END AS \"ASC_OR_DESC\","
+          + "     tmp.CARDINALITY AS \"CARDINALITY\","
+          + "     tmp.PAGES AS \"PAGES\","
+          + "     tmp.FILTER_CONDITION AS \"FILTER_CONDITION\""
+          + "FROM (";
   public static final String PG_JDBC_GET_INDEXES_PREFIX_1 =
       "SELECT "
           + "    tmp.TABLE_CAT, "
@@ -386,6 +435,8 @@ public class PgJdbcCatalog {
           + "                AND IDX.TABLE_NAME=COL.TABLE_NAME\n"
           + "                AND IDX.INDEX_NAME=COL.INDEX_NAME\n";
 
+  public static final String PG_JDBC_GET_PRIMARY_KEY_PREFIX_V42_7_5 =
+      "SELECT        result.TABLE_CAT AS \"TABLE_CAT\",        result.TABLE_SCHEM AS \"TABLE_SCHEM\",        result.TABLE_NAME AS \"TABLE_NAME\",        result.COLUMN_NAME AS \"COLUMN_NAME\",        result.KEY_SEQ AS \"KEY_SEQ\",        result.PK_NAME AS \"PK_NAME\"";
   public static final String PG_JDBC_GET_PRIMARY_KEY_PREFIX_1 =
       "SELECT        result.TABLE_CAT,        result.TABLE_SCHEM,        result.TABLE_NAME,        result.COLUMN_NAME,        result.KEY_SEQ,        result.PK_NAME FROM      (SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM,   ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME,   (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ, ci.relname AS PK_NAME,   information_schema._pg_expandarray(i.indkey) AS KEYS, a.attnum AS A_ATTNUM FROM pg_catalog.pg_class ct   JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)   JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)   JOIN pg_catalog.pg_index i ON ( a.attrelid = i.indrelid)   JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)";
   public static final String PG_JDBC_GET_PRIMARY_KEY_PREFIX_2 =
@@ -404,12 +455,16 @@ public class PgJdbcCatalog {
       "SELECT n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.relkind IN ('r','p'";
   public static final String PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_2 =
       "SELECT n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.relkind = 'r'";
+  public static final String PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_3 =
+      "SELECT current_database(), n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r ";
   public static final String PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT =
-      "select '' as nspname, '' as relname, '' as rolname, '' as relacl from (select 1) t where false";
+      "select '' as current_database, '' as nspname, '' as relname, '' as rolname, '' as relacl from (select 1) t where false";
   public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1 =
       "SELECT n.nspname,c.relname,r.rolname,c.relacl, a.attacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.oid = a.attrelid  AND c.relkind = 'r'  AND a.attnum > 0 AND NOT a.attisdropped";
   public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1_1 =
       "SELECT n.nspname,c.relname,r.rolname,c.relacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.oid = a.attrelid  AND c.relkind = 'r'  AND a.attnum > 0 AND NOT a.attisdropped";
+  public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_V42_7_5 =
+      "SELECT current_database(), n.nspname,c.relname,r.rolname,c.relacl, a.attacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a";
   public static final String PG_JDBC_GET_BEST_ROW_IDENTIFIER_REPLACEMENT =
       "select '' as attname, 0 as atttypid, -1 as atttypmod from (select 1) t where false";
 
@@ -562,6 +617,9 @@ public class PgJdbcCatalog {
           + " pg_catalog.pg_constraint con, "
           + " pg_catalog.generate_series(1, 32) pos(n), "
           + " pg_catalog.pg_class pkic";
+  public static final String PG_JDBC_EXPORTED_IMPORTED_KEYS_PREFIX_V42_7_5 =
+      "SELECT current_database() AS \"PKTABLE_CAT\", pkn.nspname AS \"PKTABLE_SCHEM\", pkc.relname AS \"PKTABLE_NAME\", pka.attname AS \"PKCOLUMN_NAME\", "
+          + "current_database() AS \"FKTABLE_CAT\", fkn.nspname AS \"FKTABLE_SCHEM\", fkc.relname AS \"FKTABLE_NAME\", fka.attname AS \"FKCOLUMN_NAME\", ";
   public static final String PG_JDBC_EXPORTED_IMPORTED_KEYS_REPLACEMENT =
       "SELECT PARENT.TABLE_CATALOG AS PKTABLE_CAT, PARENT.TABLE_SCHEMA AS PKTABLE_SCHEM, PARENT.TABLE_NAME AS PKTABLE_NAME,\n"
           + "       PARENT.COLUMN_NAME AS PKCOLUMN_NAME, CHILD.TABLE_CATALOG AS FKTABLE_CAT, CHILD.TABLE_SCHEMA AS FKTABLE_SCHEM,\n"
@@ -571,6 +629,19 @@ public class PgJdbcCatalog {
           + "       1 AS DELETE_RULE, -- 1 = importedKeyRestrict\n"
           + "       CONSTRAINTS.CONSTRAINT_NAME AS FK_NAME, CONSTRAINTS.UNIQUE_CONSTRAINT_NAME AS PK_NAME,\n"
           + "       7 AS DEFERRABILITY -- 7 = importedKeyNotDeferrable\n"
+          + "FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS CONSTRAINTS\n"
+          + "INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CHILD  ON COALESCE(CONSTRAINTS.CONSTRAINT_CATALOG, '')=COALESCE(CHILD.CONSTRAINT_CATALOG, '') AND CONSTRAINTS.CONSTRAINT_SCHEMA= CHILD.CONSTRAINT_SCHEMA AND CONSTRAINTS.CONSTRAINT_NAME= CHILD.CONSTRAINT_NAME\n"
+          + "INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE PARENT ON COALESCE(CONSTRAINTS.UNIQUE_CONSTRAINT_CATALOG, '')=COALESCE(PARENT.CONSTRAINT_CATALOG, '') AND CONSTRAINTS.UNIQUE_CONSTRAINT_SCHEMA=PARENT.CONSTRAINT_SCHEMA AND CONSTRAINTS.UNIQUE_CONSTRAINT_NAME=PARENT.CONSTRAINT_NAME AND PARENT.ORDINAL_POSITION=CHILD.POSITION_IN_UNIQUE_CONSTRAINT\n"
+          + "WHERE TRUE\n";
+  public static final String PG_JDBC_EXPORTED_IMPORTED_KEYS_REPLACEMENT_UPPER_CASE =
+      "SELECT PARENT.TABLE_CATALOG AS \"PKTABLE_CAT\", PARENT.TABLE_SCHEMA AS \"PKTABLE_SCHEM\", PARENT.TABLE_NAME AS \"PKTABLE_NAME\",\n"
+          + "       PARENT.COLUMN_NAME AS \"PKCOLUMN_NAME\", CHILD.TABLE_CATALOG AS \"FKTABLE_CAT\", CHILD.TABLE_SCHEMA AS \"FKTABLE_SCHEM\",\n"
+          + "       CHILD.TABLE_NAME AS \"FKTABLE_NAME\", CHILD.COLUMN_NAME AS \"FKCOLUMN_NAME\",\n"
+          + "       CHILD.ORDINAL_POSITION AS \"KEY_SEQ\",\n"
+          + "       1 AS \"UPDATE_RULE\", -- 1 = importedKeyRestrict\n"
+          + "       1 AS \"DELETE_RULE\", -- 1 = importedKeyRestrict\n"
+          + "       CONSTRAINTS.CONSTRAINT_NAME AS \"FK_NAME\", CONSTRAINTS.UNIQUE_CONSTRAINT_NAME AS \"PK_NAME\",\n"
+          + "       7 AS \"DEFERRABILITY\" -- 7 = importedKeyNotDeferrable\n"
           + "FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS CONSTRAINTS\n"
           + "INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CHILD  ON COALESCE(CONSTRAINTS.CONSTRAINT_CATALOG, '')=COALESCE(CHILD.CONSTRAINT_CATALOG, '') AND CONSTRAINTS.CONSTRAINT_SCHEMA= CHILD.CONSTRAINT_SCHEMA AND CONSTRAINTS.CONSTRAINT_NAME= CHILD.CONSTRAINT_NAME\n"
           + "INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE PARENT ON COALESCE(CONSTRAINTS.UNIQUE_CONSTRAINT_CATALOG, '')=COALESCE(PARENT.CONSTRAINT_CATALOG, '') AND CONSTRAINTS.UNIQUE_CONSTRAINT_SCHEMA=PARENT.CONSTRAINT_SCHEMA AND CONSTRAINTS.UNIQUE_CONSTRAINT_NAME=PARENT.CONSTRAINT_NAME AND PARENT.ORDINAL_POSITION=CHILD.POSITION_IN_UNIQUE_CONSTRAINT\n"
