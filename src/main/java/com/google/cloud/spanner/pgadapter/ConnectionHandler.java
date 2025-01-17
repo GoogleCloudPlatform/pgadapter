@@ -38,7 +38,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.connection.PGAdapterConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.SavepointSupport;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
@@ -203,15 +203,16 @@ public class ConnectionHandler implements Runnable {
     String uri = buildConnectionURL(database, options, getServer().getProperties());
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
     connectionOptionsBuilder =
-        ConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
+        PGAdapterConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
             connectionOptionsBuilder, options.isLogGrpcMessages());
-    connectionOptionsBuilder = ConnectionOptionsHelper.useDirectExecutor(connectionOptionsBuilder);
+    connectionOptionsBuilder =
+        PGAdapterConnectionOptionsHelper.useDirectExecutor(connectionOptionsBuilder);
     if (credentials != null) {
       connectionOptionsBuilder =
-          ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
+          PGAdapterConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
     } else if (options.getCredentials() != null) {
       connectionOptionsBuilder =
-          ConnectionOptionsHelper.setCredentials(
+          PGAdapterConnectionOptionsHelper.setCredentials(
               connectionOptionsBuilder, options.getCredentials());
     }
     SessionPoolOptions sessionPoolOptions =

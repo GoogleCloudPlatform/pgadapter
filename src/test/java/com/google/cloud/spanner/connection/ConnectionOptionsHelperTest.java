@@ -39,7 +39,7 @@ public class ConnectionOptionsHelperTest {
     ConnectionOptions.Builder builder = mock(ConnectionOptions.Builder.class);
     GoogleCredentials credentials = mock(GoogleCredentials.class);
 
-    ConnectionOptionsHelper.setCredentials(builder, credentials);
+    PGAdapterConnectionOptionsHelper.setCredentials(builder, credentials);
 
     verify(builder).setCredentials(credentials);
   }
