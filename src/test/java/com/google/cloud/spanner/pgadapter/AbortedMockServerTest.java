@@ -39,8 +39,14 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.Value;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
+import com.google.spanner.v1.StructType;
+import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
@@ -85,6 +91,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
     Class.forName("org.postgresql.Driver");
 
     addRandomResultResults();
+    JdbcMockServerTest.setupJsonbResults(mockSpanner);
     mockSpanner.setAbortProbability(0.2);
   }
 
@@ -237,8 +244,6 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testQueryWithParameters() throws SQLException {
-    JdbcMockServerTest.setupJsonbResults(mockSpanner);
-
     String jdbcSql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "from all_types "
@@ -914,19 +919,9 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
             while (resultSet.next()) {
               assertTrue(spannerResult.next());
               for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
-                // TODO: Remove once we have a replacement for pg_type, as the JDBC driver will
-                //       try to read type information from the backend when it hits an 'unknown'
-                //       type (jsonb is not one of the types that the JDBC driver will load
-                //       automatically).
-                final int jsonbColumnIndex = 6;
-                final int jsonbArrayColumnIndex = 16;
-                if (col == jsonbColumnIndex || col == jsonbArrayColumnIndex) {
-                  resultSet.getString(col + 1);
-                } else {
-                  resultSet.getObject(col + 1);
-                }
+                resultSet.getObject(col + 1);
               }
-              assertEqual(spannerResult, resultSet);
+              assertEqual(binary, spannerResult, resultSet);
               rowCount++;
             }
             assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
@@ -939,6 +934,74 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
       spannerResult.close();
       spanner.close();
     }
+  }
+
+  @Test
+  public void testBinaryDateYear100() throws SQLException {
+    String sql = "select dt from test";
+    Statement query = Statement.of(sql);
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            query,
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("dt")
+                                        .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("0100-02-19").build())
+                        .build())
+                .build()));
+
+    // Also get the random results using the normal Spanner client to compare the results with
+    // what is returned by PGAdapter.
+    Spanner spanner =
+        SpannerOptions.newBuilder()
+            .setProjectId("p")
+            .setHost(String.format("http://localhost:%d", spannerServer.getPort()))
+            .setCredentials(NoCredentials.getInstance())
+            .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+            .setClientLibToken("pg-adapter")
+            .setEnableEndToEndTracing(true)
+            .build()
+            .getService();
+    DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));
+    com.google.cloud.spanner.ResultSet spannerResult = client.singleUse().executeQuery(query);
+
+    String binaryTransferEnable =
+        "?binaryTransferEnable="
+            + ImmutableList.of(Oid.DATE).stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
+
+    final int fetchSize = 3;
+    try (Connection connection = createConnection(binaryTransferEnable)) {
+      connection.createStatement().execute("set time zone utc");
+      connection.setAutoCommit(false);
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        statement.setFetchSize(fetchSize);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          while (resultSet.next()) {
+            assertTrue(spannerResult.next());
+            assertEqual(/*binary=*/ true, spannerResult, resultSet);
+          }
+        }
+      }
+      connection.commit();
+    }
+
+    // Close the resources used by the normal Spanner client.
+    spannerResult.close();
+    spanner.close();
   }
 
   @Test
@@ -967,7 +1030,8 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  private void assertEqual(com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult)
+  private void assertEqual(
+      boolean binary, com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult)
       throws SQLException {
     assertEquals(spannerResult.getColumnCount(), pgResult.getMetaData().getColumnCount());
     for (int col = 0; col < spannerResult.getColumnCount(); col++) {
@@ -1018,7 +1082,10 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
             // are weird, as are potential intercalaris values.
             assertNotNull(pgResult.getDate(col + 1));
           } else {
-            assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());
+            assertEquals(
+                "Date comparison failed for format " + (binary ? "binary" : "text"),
+                expected,
+                pgResult.getObject(col + 1, LocalDate.class));
           }
           break;
         case PG_JSONB:
