@@ -286,6 +286,23 @@ function batch_dml($dsn): void
     $connection = null;
 }
 
+function batch_dml_in_transaction($dsn): void
+{
+    $connection = new PDO($dsn);
+    $connection->beginTransaction();
+    $connection->exec("START BATCH DML");
+    $statement = $connection->prepare("insert into my_table (id, value) values (:id, :value)");
+    $statement->execute(["id" => 1, "value" => "One"]);
+    $statement->execute(["id" => 2, "value" => "Two"]);
+    $connection->exec("RUN BATCH");
+    $connection->commit();
+
+    print("Inserted two rows\n");
+
+    $statement = null;
+    $connection = null;
+}
+
 function batch_ddl($dsn): void
 {
     $connection = new PDO($dsn);

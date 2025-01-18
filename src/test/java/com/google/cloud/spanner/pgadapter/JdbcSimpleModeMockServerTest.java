@@ -32,6 +32,7 @@ import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
@@ -871,6 +872,38 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
           assertFalse(resultSet.next());
         }
       }
+    }
+  }
+
+  @Test
+  public void testPrepareInDmlBatch() throws SQLException {
+    String sql = "insert into test (id, value) values ($1, $2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.getDefaultInstance())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            com.google.cloud.spanner.Statement.newBuilder(sql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to("one")
+                .build(),
+            1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        Statement statement = connection.createStatement()) {
+      statement.execute("begin");
+      statement.execute("start batch dml");
+      statement.execute("prepare foo as insert into test (id, value) values ($1, $2)");
+      statement.execute("execute foo (1, 'one')");
+      statement.execute("run batch");
+      statement.execute("commit");
     }
   }
 }
