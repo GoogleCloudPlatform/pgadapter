@@ -2,12 +2,12 @@ module golang-snippets
 
 go 1.22
 
-toolchain go1.23.4
+toolchain go1.23.5
 
 require (
-	github.com/docker/docker v27.4.1+incompatible
+	github.com/docker/docker v27.5.0+incompatible
 	github.com/jackc/pgx/v5 v5.7.2
-	github.com/testcontainers/testcontainers-go v0.34.0
+	github.com/testcontainers/testcontainers-go v0.35.0
 )
 
 require (

@@ -1,6 +1,6 @@
 # PGAdapter and Ruby ActiveRecord
 
-PGAdapter has experimental support for [ActiveRecord 7.x](https://guides.rubyonrails.org/active_record_basics.html).
+PGAdapter has experimental support for [ActiveRecord 8.x](https://guides.rubyonrails.org/active_record_basics.html).
 This document shows how to use this sample application, and lists the
 limitations when working with `ActiveRecord` with PGAdapter.
 
@@ -59,6 +59,7 @@ and Cloud Spanner. These options ensure that:
 2. `advisory_locks` are not used for migrations.
 3. DDL transactions are converted to DDL batches. See [DDL options](../../../docs/ddl.md) for more information.
 4. `pg_class` and related tables are emulated by PGAdapter.
+5. ActiveRecord schema dumps after migrations are disabled. This configuration is set in the `database.yml` file.
 
 ### Initialization
 The following initialization code makes sure that ActiveRecord will use `timestamptz` as the default
@@ -113,6 +114,8 @@ default: &default
   pool: 5
   # Advisory locks are not supported by PGAdapter
   advisory_locks: false
+  # Schema dumping uses pg_catalog tables and functions that are not supported by Spanner.
+  schema_dump: false
   # These settings ensure that migrations and schema inspections work.
   variables:
     "spanner.ddl_transaction_mode": "AutocommitExplicitTransaction"
@@ -143,7 +146,7 @@ The following limitations are currently known:
 
 ### Schema Dumper
 Dumping the schema of a database is not guaranteed to produce a complete result. There is currently
-no workaround for this limitation.
+no workaround for this limitation. It is recommended to disable automatic schema dumps after a migration.
 
 ### Generated Primary Keys
 The `serial` data type is currently not supported.

@@ -8,6 +8,5 @@
 
 # Model for a Track on an Album.
 class Track < ActiveRecord::Base
-  self.primary_keys = :album_id, :track_number
   belongs_to :album
 end
