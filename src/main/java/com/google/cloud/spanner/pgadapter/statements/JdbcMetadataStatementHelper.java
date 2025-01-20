@@ -251,6 +251,7 @@ class JdbcMetadataStatementHelper {
     }
     replacedSql += " WHERE TRUE " + sql.substring(startIndex);
     return replacedSql
+        .replaceFirst(" AND current_database\\(\\) = '.*?'", "")
         .replace(" AND n.nspname LIKE ", " AND TABLE_SCHEMA LIKE ")
         .replace(" AND c.relname LIKE ", " AND TABLE_NAME LIKE ")
         .replace(
