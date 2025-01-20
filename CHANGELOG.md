@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.42.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.42.2...v0.42.3) (2025-01-18)
+
+
+### Dependencies
+
+* update alpine docker tag to v3.21.1 ([#2704](https://github.com/GoogleCloudPlatform/pgadapter/issues/2704)) ([4d2510b](https://github.com/GoogleCloudPlatform/pgadapter/commit/4d2510b15cdcc989eb0bc447530004d59a44617f))
+* update alpine docker tag to v3.21.2 ([#2722](https://github.com/GoogleCloudPlatform/pgadapter/issues/2722)) ([536413c](https://github.com/GoogleCloudPlatform/pgadapter/commit/536413cda6b1f253ee36f1da39765c74dffe2a17))
+* update dependency django to v5.1.5 [security] ([#2755](https://github.com/GoogleCloudPlatform/pgadapter/issues/2755)) ([9dc5ece](https://github.com/GoogleCloudPlatform/pgadapter/commit/9dc5ecec0ebdc25349115915658a883921c0c520))
+* update dependency go to v1.23.5 ([#2771](https://github.com/GoogleCloudPlatform/pgadapter/issues/2771)) ([1bf2007](https://github.com/GoogleCloudPlatform/pgadapter/commit/1bf20076a8dafdac351537cfd945a9bba5ddcefd))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.46.0 ([#2739](https://github.com/GoogleCloudPlatform/pgadapter/issues/2739)) ([267c53e](https://github.com/GoogleCloudPlatform/pgadapter/commit/267c53e4b54f961be9aaa032c221c49f371b6988))
+* update dependency nunit.analyzers to 4.6.0 ([#2729](https://github.com/GoogleCloudPlatform/pgadapter/issues/2729)) ([402bf2d](https://github.com/GoogleCloudPlatform/pgadapter/commit/402bf2da33f78185e066e97ca192ae4cbac4c288))
+* update dependency org.apache.commons:commons-csv to v1.13.0 ([#2738](https://github.com/GoogleCloudPlatform/pgadapter/issues/2738)) ([3039967](https://github.com/GoogleCloudPlatform/pgadapter/commit/3039967f7281f91d5c2d29738ab5350314cbef12))
+* update dependency org.liquibase:liquibase-maven-plugin to v4.31.0 ([#2775](https://github.com/GoogleCloudPlatform/pgadapter/issues/2775)) ([9e5f7ad](https://github.com/GoogleCloudPlatform/pgadapter/commit/9e5f7ad2307b6fe477baa8b66752c174cb01f71a))
+* update dependency psycopg to v3.2.4 ([#2758](https://github.com/GoogleCloudPlatform/pgadapter/issues/2758)) ([6b73824](https://github.com/GoogleCloudPlatform/pgadapter/commit/6b73824ceb0e6b7485e1926130115e8704b45010))
+* update dependency psycopg-binary to v3.2.4 ([#2759](https://github.com/GoogleCloudPlatform/pgadapter/issues/2759)) ([44d28c7](https://github.com/GoogleCloudPlatform/pgadapter/commit/44d28c79560c81203b1572457d8ce83cf1275b77))
+* update dependency sqlalchemy to v2.0.37 ([#2730](https://github.com/GoogleCloudPlatform/pgadapter/issues/2730)) ([d585621](https://github.com/GoogleCloudPlatform/pgadapter/commit/d58562157c03a75d7cba62ca5c268e800def19e8))
+* update dependency typescript to v5.7.3 ([#2723](https://github.com/GoogleCloudPlatform/pgadapter/issues/2723)) ([c831073](https://github.com/GoogleCloudPlatform/pgadapter/commit/c8310736f03a2d05243788ecf052814c5dc3bef4))
+* update golang docker tag to v1.23.5 ([#2772](https://github.com/GoogleCloudPlatform/pgadapter/issues/2772)) ([76a4dc7](https://github.com/GoogleCloudPlatform/pgadapter/commit/76a4dc7d3241ea66cbafcca456bcf79f2e59de8e))
+* update module github.com/docker/docker to v27.5.0+incompatible ([#2744](https://github.com/GoogleCloudPlatform/pgadapter/issues/2744)) ([0e96f3c](https://github.com/GoogleCloudPlatform/pgadapter/commit/0e96f3c1b2b14fecefa8c12e39c54a8cb8a9aaea))
+* update module github.com/testcontainers/testcontainers-go to v0.35.0 ([#2732](https://github.com/GoogleCloudPlatform/pgadapter/issues/2732)) ([9065c73](https://github.com/GoogleCloudPlatform/pgadapter/commit/9065c73e9b999c44bf27764b39fd4942a909b0c7))
+* update module github.com/testcontainers/testcontainers-go/modules/postgres to v0.35.0 ([#2733](https://github.com/GoogleCloudPlatform/pgadapter/issues/2733)) ([3dda665](https://github.com/GoogleCloudPlatform/pgadapter/commit/3dda66527d11a22101dfec971c1c4ed2f69d7f2b))
+* update module google.golang.org/api to v0.215.0 ([#2705](https://github.com/GoogleCloudPlatform/pgadapter/issues/2705)) ([ded2638](https://github.com/GoogleCloudPlatform/pgadapter/commit/ded26385b926a5006295ecb247dd04f4cf3733f4))
+* update module google.golang.org/api to v0.216.0 ([#2726](https://github.com/GoogleCloudPlatform/pgadapter/issues/2726)) ([6948c4c](https://github.com/GoogleCloudPlatform/pgadapter/commit/6948c4c4d2bc99d2d93cfa46563dd162aa80ac8e))
+* update module google.golang.org/api to v0.217.0 ([#2776](https://github.com/GoogleCloudPlatform/pgadapter/issues/2776)) ([71d724b](https://github.com/GoogleCloudPlatform/pgadapter/commit/71d724b6fcc682406dd607bbb8896ace3005d165))
+
+
+### Documentation
+
+* add PHP snippets ([#2718](https://github.com/GoogleCloudPlatform/pgadapter/issues/2718)) ([a68ea20](https://github.com/GoogleCloudPlatform/pgadapter/commit/a68ea20bbd9a2240f805ac8a552efd09870bb093))
+* fix typo in allow_shutdown_statement documentation ([#2774](https://github.com/GoogleCloudPlatform/pgadapter/issues/2774)) ([4ae29f8](https://github.com/GoogleCloudPlatform/pgadapter/commit/4ae29f8ef44b4c48616427dda0ca96b43f6008ce)), closes [#2701](https://github.com/GoogleCloudPlatform/pgadapter/issues/2701)
+
 ## [0.42.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.42.1...v0.42.2) (2025-01-05)
 
 

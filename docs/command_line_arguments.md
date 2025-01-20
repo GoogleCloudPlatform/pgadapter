@@ -70,7 +70,7 @@
     Docker container, as the connections from the host machine will not be seen as a connection from
     localhost in the container.
 
---allow_shutdown_command
+--allow_shutdown_statement
   * Enables the use of the custom SQL command `SHUTDOWN [SMART | FAST | IMMEDIATE]`. This command can
     be used to shut down PGAdapter by just sending it a SQL statement. This option should only be enabled
     when PGAdapter runs in a trusted environment, for example as a side-car container. The default

@@ -1,4 +1,4 @@
-psycopg[binary]~=3.2.3
+psycopg[binary]~=3.2.4
 testcontainers~=4.9.0
 requests==2.32.3
 google~=3.0.0

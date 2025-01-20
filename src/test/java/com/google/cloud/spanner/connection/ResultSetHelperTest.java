@@ -14,7 +14,7 @@
 
 package com.google.cloud.spanner.connection;
 
-import static com.google.cloud.spanner.connection.ResultSetHelper.toDirectExecuteResultSet;
+import static com.google.cloud.spanner.connection.PGAdapterResultSetHelper.toDirectExecuteResultSet;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;

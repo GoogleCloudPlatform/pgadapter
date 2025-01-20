@@ -48,7 +48,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ResultSetHelper;
+import com.google.cloud.spanner.connection.PGAdapterResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.connection.TransactionRetryListener;
@@ -374,7 +374,7 @@ public class BackendConnection {
           try {
             result.set(
                 new QueryResult(
-                    ResultSetHelper.toDirectExecuteResultSet(
+                    PGAdapterResultSetHelper.toDirectExecuteResultSet(
                         spannerConnection
                             .getDatabaseClient()
                             .singleUse()

@@ -24,9 +24,9 @@ import java.util.logging.Level;
 
 /** Simple helper class to get access to a package-private method in the ConnectionOptions. */
 @InternalApi
-public class ConnectionOptionsHelper {
+public class PGAdapterConnectionOptionsHelper {
   /** Private constructor to prevent instantiation. */
-  private ConnectionOptionsHelper() {}
+  private PGAdapterConnectionOptionsHelper() {}
 
   // TODO: Remove when Builder.setCredentials(..) has been made public.
   public static Builder setCredentials(Builder connectionOptionsBuilder, Credentials credentials) {
