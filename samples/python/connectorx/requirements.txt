@@ -1,4 +1,4 @@
-connectorx==0.4.0
+connectorx==0.4.1
 pandas==2.2.3
 testcontainers~=4.9.0
 requests==2.32.3
