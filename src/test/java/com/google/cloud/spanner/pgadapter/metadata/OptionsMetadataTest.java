@@ -629,4 +629,12 @@ public class OptionsMetadataTest {
             .build()
             .buildConnectionURL("projects/my-project/instances/my-instance/databases/my-database"));
   }
+
+  @Test
+  public void testUseClientCertParameters() {
+    OptionsMetadata options =
+        OptionsMetadata.newBuilder().useClientCert("client.crt", "client.key").build();
+    assertEquals("client.crt", options.getPropertyMap().get("clientCertificate"));
+    assertEquals("client.key", options.getPropertyMap().get("clientKey"));
+  }
 }

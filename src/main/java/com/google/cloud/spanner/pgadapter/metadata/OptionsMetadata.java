@@ -33,6 +33,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.DatabaseName;
+import io.grpc.ExperimentalApi;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -108,6 +109,8 @@ public class OptionsMetadata {
     private String endpoint;
     private boolean usePlainText;
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
+    private String clientCertificate;
+    private String clientKey;
 
     Builder() {}
 
@@ -413,6 +416,20 @@ public class OptionsMetadata {
       return this;
     }
 
+    /**
+     * Configures mTLS authentication using the provided client certificate and key files. mTLS is
+     * only supported for external spanner hosts.
+     *
+     * @param clientCertificate Path to the client certificate file.
+     * @param clientKey Path to the client private key file.
+     */
+    @ExperimentalApi("https://github.com/googleapis/java-spanner/pull/3574")
+    Builder useClientCert(String clientCertificate, String clientKey) {
+      this.clientCertificate = clientCertificate;
+      this.clientKey = clientKey;
+      return this;
+    }
+
     public OptionsMetadata build() {
       if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
         throw SpannerExceptionFactory.newSpannerException(
@@ -484,7 +501,8 @@ public class OptionsMetadata {
           || databaseRole != null
           || autoConfigEmulator
           || useVirtualGrpcTransportThreads
-          || enableEndToEndTracing) {
+          || enableEndToEndTracing
+          || (clientKey != null && clientCertificate != null)) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -505,6 +523,10 @@ public class OptionsMetadata {
         }
         if (enableEndToEndTracing) {
           jdbcOptionBuilder.append(ENABLE_END_TO_END_TRACING_PROPERTY_NAME).append("=true;");
+        }
+        if (clientKey != null && clientCertificate != null) {
+          jdbcOptionBuilder.append("clientCertificate=").append(clientCertificate).append(";");
+          jdbcOptionBuilder.append("clientKey=").append(clientKey).append(";");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
