@@ -2,7 +2,7 @@ module github.com/GoogleCloudPlatform/pgadapter/wrappers/golang
 
 go 1.22
 
-toolchain go1.23.5
+toolchain go1.23.6
 
 require (
 	github.com/docker/docker v27.5.1+incompatible
