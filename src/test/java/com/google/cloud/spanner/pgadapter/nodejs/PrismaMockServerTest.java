@@ -1732,6 +1732,6 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   }
 
   static ResultSet createAllTypesResultSetWithoutNullsInArrays() {
-    return createAllTypesResultSet("1", "", false, false);
+    return createAllTypesResultSet("1", "", false, false, false);
   }
 }

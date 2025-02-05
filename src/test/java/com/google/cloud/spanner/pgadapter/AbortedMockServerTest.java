@@ -31,6 +31,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Spanner;
@@ -75,6 +76,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PGInterval;
 import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
@@ -92,6 +94,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
     addRandomResultResults();
     JdbcMockServerTest.setupJsonbResults(mockSpanner);
+    JdbcMockServerTest.setupIntervalResults(mockSpanner);
     mockSpanner.setAbortProbability(0.2);
   }
 
@@ -245,7 +248,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -254,11 +257,12 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
             + "and col_float8=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
+            + "and col_interval=? "
             + "and col_date=? "
             + "and col_varchar=? "
             + "and col_jsonb=?";
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=$1 "
             + "and col_bool=$2 "
@@ -267,9 +271,10 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
             + "and col_float8=$5 "
             + "and col_numeric=$6 "
             + "and col_timestamptz=$7 "
-            + "and col_date=$8 "
-            + "and col_varchar=$9 "
-            + "and col_jsonb=$10";
+            + "and col_interval=$8 "
+            + "and col_date=$9 "
+            + "and col_varchar=$10 "
+            + "and col_jsonb=$11";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -289,10 +294,12 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
                 .bind("p7")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p8")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .bind("p9")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p10")
+                .to("test")
+                .bind("p11")
                 .to("{\"key\": \"value\"}")
                 .build(),
             ALL_TYPES_RESULTSET));
@@ -318,6 +325,8 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
           preparedStatement.setDouble(++index, 3.14d);
           preparedStatement.setBigDecimal(++index, new BigDecimal("6.626"));
           preparedStatement.setObject(++index, offsetDateTime);
+          preparedStatement.setObject(
+              ++index, new PGInterval("1 year 2 mons 3 days 4 hours 5 mins 6.789 secs"));
           preparedStatement.setObject(++index, LocalDate.of(2022, 3, 29));
           preparedStatement.setString(++index, "test");
           preparedStatement.setString(++index, "{\"key\": \"value\"}");
@@ -333,6 +342,9 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
             assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
             assertEquals(
                 truncatedOffsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
+            assertEquals(
+                new PGInterval("14 mons 3 days 4 hours 5 mins 6.789 secs"),
+                resultSet.getObject(++index, PGInterval.class));
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
             assertEquals("test", resultSet.getString(++index));
             assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
@@ -367,6 +379,9 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
                   Timestamp.parseTimestamp("2000-01-01T00:00:00Z").toSqlTimestamp()
                 },
                 (java.sql.Timestamp[]) resultSet.getArray(++index).getArray());
+            assertArrayEquals(
+                new String[] {"-100mons0days34:17:36.789000", null, "12mons0days00:00:0.000000"},
+                (String[]) resultSet.getArray(++index).getArray());
             assertArrayEquals(
                 new java.sql.Date[] {
                   new java.sql.Date(2023 - 1900, 1, 20), null, new java.sql.Date(2000 - 1900, 0, 1)
@@ -902,7 +917,8 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
                       Oid.FLOAT8,
                       Oid.INT8,
                       Oid.DATE,
-                      Oid.TIMESTAMPTZ)
+                      Oid.TIMESTAMPTZ,
+                      Oid.INTERVAL)
                   .stream()
                   .map(String::valueOf)
                   .collect(Collectors.joining(","));

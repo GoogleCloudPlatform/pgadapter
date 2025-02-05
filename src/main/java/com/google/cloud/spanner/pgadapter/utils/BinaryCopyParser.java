@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
 import com.google.cloud.spanner.pgadapter.parsers.FloatParser;
+import com.google.cloud.spanner.pgadapter.parsers.IntervalParser;
 import com.google.cloud.spanner.pgadapter.parsers.JsonbParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
@@ -284,6 +285,8 @@ class BinaryCopyParser implements CopyInParser {
         case TIMESTAMP:
           return Value.timestamp(
               field.data == null ? null : TimestampParser.toTimestamp(field.data));
+        case INTERVAL:
+          return Value.interval(field.data == null ? null : IntervalParser.toInterval(field.data));
         case DATE:
           return Value.date(field.data == null ? null : DateParser.toDate(field.data));
         case ARRAY:
@@ -308,6 +311,8 @@ class BinaryCopyParser implements CopyInParser {
               return Value.dateArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case TIMESTAMP:
               return Value.timestampArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case INTERVAL:
+              return Value.intervalArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
           }
         case STRUCT:
         case NUMERIC:

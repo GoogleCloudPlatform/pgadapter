@@ -28,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
 import com.google.cloud.spanner.pgadapter.parsers.FloatParser;
+import com.google.cloud.spanner.pgadapter.parsers.IntervalParser;
 import com.google.cloud.spanner.pgadapter.parsers.JsonbParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
@@ -175,6 +176,8 @@ public class Converter implements AutoCloseable {
         return StringParser.convertToPG(sessionState, outputStream, result, position);
       case TIMESTAMP:
         return TimestampParser.convertToPG(result, position, format, sessionState.getTimezone());
+      case INTERVAL:
+        return IntervalParser.convertToPG(result, position, format);
       case PG_JSONB:
         return JsonbParser.convertToPG(sessionState, outputStream, result, position, format);
       case ARRAY:

@@ -140,6 +140,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	var intValue int
 	var numericValue pgtype.Numeric // pgx by default maps numeric to string
 	var timestamptzValue time.Time
+	var intervalValue string
 	var dateValue time.Time
 	var varcharValue string
 	var jsonbValue string
@@ -157,11 +158,11 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 			formats[o] = conn.ConnInfo().ResultFormatCodeForOID(o)
 		}
 		formats[uint32(oid)] = format
-		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1", formats)
+		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1", formats)
 	} else {
-		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1")
+		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1")
 	}
-	var arrayBigint, arrayBool, arrayBytea, arrayFloat4, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
+	var arrayBigint, arrayBool, arrayBytea, arrayFloat4, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayInterval, arrayDate, arrayVarchar, arrayJsonb interface{}
 	err = row.Scan(
 		&bigintValue,
 		&boolValue,
@@ -171,6 +172,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		&intValue,
 		&numericValue,
 		&timestamptzValue,
+		&intervalValue,
 		&dateValue,
 		&varcharValue,
 		&jsonbValue,
@@ -182,6 +184,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		&arrayInt,
 		&arrayNumeric,
 		&arrayTimestamptz,
+		&arrayInterval,
 		&arrayDate,
 		&arrayVarchar,
 		&arrayJsonb,
@@ -429,10 +432,11 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 	var intValue int
 	var numericValue pgtype.Numeric // pgx by default maps numeric to string
 	var timestamptzValue time.Time
+	var intervalValue string
 	var dateValue time.Time
 	var varcharValue string
 	var jsonbValue string
-	var arrayBigint, arrayBool, arrayBytea, arrayFloat4, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
+	var arrayBigint, arrayBool, arrayBytea, arrayFloat4, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayInterval, arrayDate, arrayVarchar, arrayJsonb interface{}
 
 	err = row.Scan(
 		&bigintValue,
@@ -443,6 +447,7 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 		&intValue,
 		&numericValue,
 		&timestamptzValue,
+		&intervalValue,
 		&dateValue,
 		&varcharValue,
 		&jsonbValue,
@@ -454,6 +459,7 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 		&arrayInt,
 		&arrayNumeric,
 		&arrayTimestamptz,
+		&arrayInterval,
 		&arrayDate,
 		&arrayVarchar,
 		&arrayJsonb,
