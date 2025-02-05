@@ -7,7 +7,7 @@ toolchain go1.23.5
 require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/testcontainers/testcontainers-go v0.35.0
-	golang.org/x/oauth2 v0.25.0
+	golang.org/x/oauth2 v0.26.0
 )
 
 require (
