@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
@@ -41,7 +42,6 @@ import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.semconv.SemanticAttributes;
 import java.util.List;
 
 /**
@@ -137,14 +137,12 @@ public class SimpleQueryStatement {
   static ParsedStatement translatePotentialMetadataCommand(
       ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
     Tracer tracer = connectionHandler.getExtendedQueryProtocolHandler().getTracer();
-    // Ignore deprecation for now, as there is no alternative offered (yet?).
-    //noinspection deprecation
     Span span =
         tracer
             .spanBuilder("translatePotentialMetadataCommand")
             .setAttribute(
                 "pgadapter.connection_id", connectionHandler.getTraceConnectionId().toString())
-            .setAttribute(SemanticAttributes.DB_STATEMENT, parsedStatement.getSqlWithoutComments())
+            .setAttribute(DB_STATEMENT, parsedStatement.getSqlWithoutComments())
             .startSpan();
     try (Scope ignore = span.makeCurrent()) {
       for (Command currentCommand :

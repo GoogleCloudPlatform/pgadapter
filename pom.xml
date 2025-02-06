@@ -133,12 +133,6 @@
       <artifactId>opentelemetry-exporter-logging</artifactId>
     </dependency>
     <dependency>
-      <!-- Not managed by opentelemetry-bom -->
-      <groupId>io.opentelemetry.semconv</groupId>
-      <artifactId>opentelemetry-semconv</artifactId>
-      <version>1.29.0-alpha</version>
-    </dependency>
-    <dependency>
       <groupId>io.opentelemetry</groupId>
       <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>
     </dependency>

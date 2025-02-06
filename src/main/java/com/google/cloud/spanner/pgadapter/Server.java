@@ -14,8 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static io.opentelemetry.semconv.ServiceAttributes.SERVICE_NAME;
-
 import com.google.auth.Credentials;
 import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
@@ -28,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.devtools.cloudtrace.v2.AttributeValue;
 import com.google.devtools.cloudtrace.v2.TruncatableString;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
@@ -246,7 +245,7 @@ public class Server {
         }
         builder.setFixedAttributes(
             ImmutableMap.of(
-                SERVICE_NAME.getKey(),
+                "service.name",
                 AttributeValue.newBuilder()
                     .setStringValue(TruncatableString.newBuilder().setValue(serviceName).build())
                     .build()));
@@ -278,7 +277,9 @@ public class Server {
         openTelemetryBuilder.addMeterProviderCustomizer(
             (sdkMeterProviderBuilder, configProperties) ->
                 sdkMeterProviderBuilder
-                    .addResource(Resource.create(Attributes.of(SERVICE_NAME, serviceName)))
+                    .addResource(
+                        Resource.create(
+                            Attributes.of(AttributeKey.stringKey("service.name"), serviceName)))
                     .registerMetricReader(
                         PeriodicMetricReader.builder(cloudMonitoringExporter).build()));
       }

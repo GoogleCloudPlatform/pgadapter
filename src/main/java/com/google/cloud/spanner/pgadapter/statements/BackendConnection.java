@@ -82,6 +82,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
@@ -89,7 +90,6 @@ import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -123,6 +123,8 @@ import javax.annotation.Nullable;
 @InternalApi
 public class BackendConnection {
   private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
+
+  public static final AttributeKey<String> DB_STATEMENT = AttributeKey.stringKey("db.statement");
 
   private final Tracer tracer;
 
@@ -945,9 +947,7 @@ public class BackendConnection {
     SpanBuilder builder =
         tracer.spanBuilder(name).setAttribute("pgadapter.connection_id", connectionId);
     if (statement != null) {
-      // Ignore deprecation for now, as there is no alternative offered (yet?).
-      //noinspection deprecation
-      builder.setAttribute(SemanticAttributes.DB_STATEMENT, statement.getSql());
+      builder.setAttribute(DB_STATEMENT, statement.getSql());
     }
     if (currentTransactionId != null) {
       builder.setAttribute("pgadapter.transaction_id", currentTransactionId.toString());
