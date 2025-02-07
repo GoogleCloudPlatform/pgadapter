@@ -637,4 +637,40 @@ public class OptionsMetadataTest {
     assertEquals("client.crt", options.getPropertyMap().get("clientCertificate"));
     assertEquals("client.key", options.getPropertyMap().get("clientKey"));
   }
+
+  @Test
+  public void testExternalHostConfigurations() {
+    OptionsMetadata options =
+        new OptionsMetadata(new String[] {"-d", "test_db", "-e", "localhost:8000"});
+    assertEquals(DatabaseId.of("default", "default", "test_db"), options.getDefaultDatabaseId());
+    SpannerException spannerException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                new OptionsMetadata(
+                    new String[] {"-d", "test_db", "-e", "spanner.googleapis.com:443"}));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+    spannerException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                OptionsMetadata.newBuilder()
+                    .setEndpoint("spanner.googleapis.com")
+                    .setDatabase("test_db")
+                    .build());
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+    options =
+        OptionsMetadata.newBuilder().setEndpoint("localhost:8000").setDatabase("test_db").build();
+    assertEquals(DatabaseId.of("default", "default", "test_db"), options.getDefaultDatabaseId());
+    spannerException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                OptionsMetadata.newBuilder()
+                    .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
+                    .setEndpoint("localhost:8000")
+                    .setDatabase("test_db")
+                    .build());
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+  }
 }
