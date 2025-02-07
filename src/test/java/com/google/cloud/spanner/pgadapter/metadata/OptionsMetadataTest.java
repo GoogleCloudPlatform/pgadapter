@@ -642,8 +642,7 @@ public class OptionsMetadataTest {
   public void testExternalHostConfigurations() {
     assertEquals(
         DatabaseId.of("default", "default", "test_db"),
-        (new OptionsMetadata(
-                new String[] {"-d", "test_db", "-e", "localhost:8000", "-c", "credentials.json"}))
+        (new OptionsMetadata(new String[] {"-d", "test_db", "-e", "localhost:8000"}))
             .getDefaultDatabaseId());
     SpannerException spannerException =
         assertThrows(

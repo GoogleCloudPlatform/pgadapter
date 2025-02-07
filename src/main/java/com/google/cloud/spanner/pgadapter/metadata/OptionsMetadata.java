@@ -1016,7 +1016,7 @@ public class OptionsMetadata {
    */
   public String buildCredentialsFile() {
     // Skip if a com.google.auth.Credentials instance has been set.
-    if (credentials != null) {
+    if (isExternalHost() || credentials != null) {
       return null;
     }
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
