@@ -640,9 +640,10 @@ public class OptionsMetadataTest {
 
   @Test
   public void testExternalHostConfigurations() {
-    OptionsMetadata options =
-        new OptionsMetadata(new String[] {"-d", "test_db", "-e", "localhost:8000"});
-    assertEquals(DatabaseId.of("default", "default", "test_db"), options.getDefaultDatabaseId());
+    assertEquals(
+        DatabaseId.of("default", "default", "test_db"),
+        (new OptionsMetadata(new String[] {"-d", "test_db", "-e", "localhost:8000"}))
+            .getDefaultDatabaseId());
     SpannerException spannerException =
         assertThrows(
             SpannerException.class,
@@ -650,6 +651,13 @@ public class OptionsMetadataTest {
                 new OptionsMetadata(
                     new String[] {"-d", "test_db", "-e", "spanner.googleapis.com:443"}));
     assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+    assertEquals(
+        DatabaseId.of("default", "default", "test_db"),
+        OptionsMetadata.newBuilder()
+            .setEndpoint("localhost:8000")
+            .setDatabase("test_db")
+            .build()
+            .getDefaultDatabaseId());
     spannerException =
         assertThrows(
             SpannerException.class,
@@ -659,9 +667,6 @@ public class OptionsMetadataTest {
                     .setDatabase("test_db")
                     .build());
     assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
-    options =
-        OptionsMetadata.newBuilder().setEndpoint("localhost:8000").setDatabase("test_db").build();
-    assertEquals(DatabaseId.of("default", "default", "test_db"), options.getDefaultDatabaseId());
     spannerException =
         assertThrows(
             SpannerException.class,
