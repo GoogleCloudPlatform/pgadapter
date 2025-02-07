@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -64,6 +65,12 @@ public class OptionsMetadata {
   private static final String SPANNER_EMULATOR_HOST_ENV_VAR = "SPANNER_EMULATOR_HOST";
 
   static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
+  private static final String CLOUD_SPANNER_HOST_FORMAT = ".*\\.googleapis\\.com.*";
+  private static final Pattern CLOUD_SPANNER_HOST_PATTERN =
+      Pattern.compile(CLOUD_SPANNER_HOST_FORMAT);
+
+  private static final String EXTERNAL_HOST_PROJECT = "default";
+  private static final String EXTERNAL_HOST_INSTANCE = "default";
 
   /**
    * Builder class for creating an instance of {@link OptionsMetadata}.
@@ -403,6 +410,13 @@ public class OptionsMetadata {
 
     Builder setEndpoint(String endpoint) {
       this.endpoint = endpoint;
+      if (Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))
+          && !this.autoConfigEmulator
+          && endpoint != null
+          && !CLOUD_SPANNER_HOST_PATTERN.matcher(endpoint).matches()) {
+        setProject(EXTERNAL_HOST_PROJECT);
+        setInstance(EXTERNAL_HOST_INSTANCE);
+      }
       return this;
     }
 
@@ -738,6 +752,7 @@ public class OptionsMetadata {
               + "OR use -c to set the credentials in PGAdapter and use these credentials for all connections.");
     }
     if (this.commandLine.hasOption(OPTION_DATABASE_NAME)
+        && !isExternalHost()
         && !(this.commandLine.hasOption(OPTION_PROJECT_ID)
             && this.commandLine.hasOption(OPTION_INSTANCE_ID))) {
       throw SpannerExceptionFactory.newSpannerException(
@@ -746,8 +761,9 @@ public class OptionsMetadata {
               + "Use the options -p <project-id> -i <instance-id> -d <database-id> to specify the "
               + "database that all connections to this instance of PGAdapter should use.");
     }
-    if (this.commandLine.hasOption(OPTION_PROJECT_ID)
-        && this.commandLine.hasOption(OPTION_INSTANCE_ID)
+    if ((isExternalHost()
+            || (this.commandLine.hasOption(OPTION_PROJECT_ID)
+                && this.commandLine.hasOption(OPTION_INSTANCE_ID)))
         && this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
       this.defaultConnectionUrl =
           buildConnectionURL(this.commandLine.getOptionValue(OPTION_DATABASE_NAME));
@@ -1080,6 +1096,14 @@ public class OptionsMetadata {
         || isAutoConfigEmulator();
   }
 
+  private boolean isExternalHost() {
+    return !usesEmulator()
+        && commandLine.hasOption(OPTION_SPANNER_ENDPOINT)
+        && !CLOUD_SPANNER_HOST_PATTERN
+            .matcher(commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT))
+            .matches();
+  }
+
   /** Returns the fully qualified database name based on the given database id or name. */
   public DatabaseName getDatabaseName(String database) {
     DatabaseName databaseName;
@@ -1089,6 +1113,8 @@ public class OptionsMetadata {
       String projectId;
       if (commandLine.hasOption(OPTION_PROJECT_ID)) {
         projectId = commandLine.getOptionValue(OPTION_PROJECT_ID);
+      } else if (isExternalHost()) {
+        projectId = EXTERNAL_HOST_PROJECT;
       } else {
         projectId = getDefaultProjectId();
       }
@@ -1102,6 +1128,8 @@ public class OptionsMetadata {
       String instanceId;
       if (commandLine.hasOption(OPTION_INSTANCE_ID)) {
         instanceId = commandLine.getOptionValue(OPTION_INSTANCE_ID);
+      } else if (isExternalHost()) {
+        instanceId = EXTERNAL_HOST_INSTANCE;
       } else {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.FAILED_PRECONDITION,
@@ -1519,23 +1547,30 @@ public class OptionsMetadata {
   public DatabaseId getDefaultDatabaseId() {
     return this.hasDefaultConnectionUrl()
         ? DatabaseId.of(
-            commandLine.getOptionValue(OPTION_PROJECT_ID),
-            commandLine.getOptionValue(OPTION_INSTANCE_ID),
+            isExternalHost()
+                ? EXTERNAL_HOST_PROJECT
+                : commandLine.getOptionValue(OPTION_PROJECT_ID),
+            isExternalHost()
+                ? EXTERNAL_HOST_INSTANCE
+                : commandLine.getOptionValue(OPTION_INSTANCE_ID),
             commandLine.getOptionValue(OPTION_DATABASE_NAME))
         : null;
   }
 
   /** Returns true if these options contain a default instance id. */
   public boolean hasDefaultInstanceId() {
-    return commandLine.hasOption(OPTION_PROJECT_ID) && commandLine.hasOption(OPTION_INSTANCE_ID);
+    return isExternalHost()
+        || (commandLine.hasOption(OPTION_PROJECT_ID) && commandLine.hasOption(OPTION_INSTANCE_ID));
   }
 
   /** Returns the id of the default instance or null if no default has been selected. */
   public InstanceId getDefaultInstanceId() {
     if (hasDefaultInstanceId()) {
       return InstanceId.of(
-          commandLine.getOptionValue(OPTION_PROJECT_ID),
-          commandLine.getOptionValue(OPTION_INSTANCE_ID));
+          isExternalHost() ? EXTERNAL_HOST_PROJECT : commandLine.getOptionValue(OPTION_PROJECT_ID),
+          isExternalHost()
+              ? EXTERNAL_HOST_INSTANCE
+              : commandLine.getOptionValue(OPTION_INSTANCE_ID));
     }
     return null;
   }
