@@ -642,14 +642,17 @@ public class OptionsMetadataTest {
   public void testExternalHostConfigurations() {
     assertEquals(
         DatabaseId.of("default", "default", "test_db"),
-        (new OptionsMetadata(new String[] {"-d", "test_db", "-e", "localhost:8000"}))
+        (new OptionsMetadata(
+                new String[] {"-d", "test_db", "-e", "localhost:8000", "-c", "credentials.json"}))
             .getDefaultDatabaseId());
     SpannerException spannerException =
         assertThrows(
             SpannerException.class,
             () ->
                 new OptionsMetadata(
-                    new String[] {"-d", "test_db", "-e", "spanner.googleapis.com:443"}));
+                    new String[] {
+                      "-d", "test_db", "-e", "spanner.googleapis.com:443", "-c", "credentials.json"
+                    }));
     assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
     assertEquals(
         DatabaseId.of("default", "default", "test_db"),
