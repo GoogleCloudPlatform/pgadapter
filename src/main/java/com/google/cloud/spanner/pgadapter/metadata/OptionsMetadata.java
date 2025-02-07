@@ -414,8 +414,8 @@ public class OptionsMetadata {
           && !this.autoConfigEmulator
           && endpoint != null
           && !CLOUD_SPANNER_HOST_PATTERN.matcher(endpoint).matches()) {
-        setProject(EXTERNAL_HOST_PROJECT);
-        setInstance(EXTERNAL_HOST_INSTANCE);
+        if (this.project == null) setProject(EXTERNAL_HOST_PROJECT);
+        if (this.instance == null) setInstance(EXTERNAL_HOST_INSTANCE);
       }
       return this;
     }
@@ -1547,10 +1547,10 @@ public class OptionsMetadata {
   public DatabaseId getDefaultDatabaseId() {
     return this.hasDefaultConnectionUrl()
         ? DatabaseId.of(
-            isExternalHost()
+            !commandLine.hasOption(OPTION_PROJECT_ID) && isExternalHost()
                 ? EXTERNAL_HOST_PROJECT
                 : commandLine.getOptionValue(OPTION_PROJECT_ID),
-            isExternalHost()
+            !commandLine.hasOption(OPTION_INSTANCE_ID) && isExternalHost()
                 ? EXTERNAL_HOST_INSTANCE
                 : commandLine.getOptionValue(OPTION_INSTANCE_ID),
             commandLine.getOptionValue(OPTION_DATABASE_NAME))
@@ -1567,8 +1567,10 @@ public class OptionsMetadata {
   public InstanceId getDefaultInstanceId() {
     if (hasDefaultInstanceId()) {
       return InstanceId.of(
-          isExternalHost() ? EXTERNAL_HOST_PROJECT : commandLine.getOptionValue(OPTION_PROJECT_ID),
-          isExternalHost()
+          !commandLine.hasOption(OPTION_PROJECT_ID) && isExternalHost()
+              ? EXTERNAL_HOST_PROJECT
+              : commandLine.getOptionValue(OPTION_PROJECT_ID),
+          !commandLine.hasOption(OPTION_INSTANCE_ID) && isExternalHost()
               ? EXTERNAL_HOST_INSTANCE
               : commandLine.getOptionValue(OPTION_INSTANCE_ID));
     }
