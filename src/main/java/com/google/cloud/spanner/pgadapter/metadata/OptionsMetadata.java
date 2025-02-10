@@ -410,13 +410,6 @@ public class OptionsMetadata {
 
     Builder setEndpoint(String endpoint) {
       this.endpoint = endpoint;
-      if (Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))
-          && !this.autoConfigEmulator
-          && endpoint != null
-          && !CLOUD_SPANNER_HOST_PATTERN.matcher(endpoint).matches()) {
-        if (this.project == null) setProject(EXTERNAL_HOST_PROJECT);
-        if (this.instance == null) setInstance(EXTERNAL_HOST_INSTANCE);
-      }
       return this;
     }
 
@@ -449,11 +442,6 @@ public class OptionsMetadata {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT,
             "You must also specify a project if you specify an instance that PGAdapter should connect to.");
-      }
-      if (Strings.isNullOrEmpty(instance) && !Strings.isNullOrEmpty(database)) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "You must also specify an instance if you specify a database that PGAdapter should connect to.");
       }
       if (!(Strings.isNullOrEmpty(credentialsFile)
               && (credentials == null || NoCredentials.getInstance().equals(credentials)))
@@ -736,9 +724,15 @@ public class OptionsMetadata {
       @Nullable Credentials credentials,
       @Nullable SessionPoolOptions sessionPoolOptions,
       Duration startupTimeout) {
-    this.environment = Preconditions.checkNotNull(environment);
+    CommandLine commandLine = buildOptions(args);
+    Map<String, String> propertyMap =
+        parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
+    boolean usesExternalHost =
+        isExternalHost(Preconditions.checkNotNull(environment), commandLine, propertyMap);
+
+    this.environment = environment;
     this.osName = osName;
-    this.commandLine = buildOptions(args);
+    this.commandLine = commandLine;
     this.credentials = credentials;
     this.sessionPoolOptions = sessionPoolOptions;
     this.commandMetadataParser = new CommandMetadataParser();
@@ -752,7 +746,7 @@ public class OptionsMetadata {
               + "OR use -c to set the credentials in PGAdapter and use these credentials for all connections.");
     }
     if (this.commandLine.hasOption(OPTION_DATABASE_NAME)
-        && !isExternalHost()
+        && !usesExternalHost
         && !(this.commandLine.hasOption(OPTION_PROJECT_ID)
             && this.commandLine.hasOption(OPTION_INSTANCE_ID))) {
       throw SpannerExceptionFactory.newSpannerException(
@@ -761,7 +755,7 @@ public class OptionsMetadata {
               + "Use the options -p <project-id> -i <instance-id> -d <database-id> to specify the "
               + "database that all connections to this instance of PGAdapter should use.");
     }
-    if ((isExternalHost()
+    if ((usesExternalHost
             || (this.commandLine.hasOption(OPTION_PROJECT_ID)
                 && this.commandLine.hasOption(OPTION_INSTANCE_ID)))
         && this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
@@ -794,7 +788,7 @@ public class OptionsMetadata {
         parseDdlTransactionMode(commandLine.getOptionValue(OPTION_DDL_TRANSACTION_MODE));
     this.replaceJdbcMetadataQueries = commandLine.hasOption(OPTION_JDBC_MODE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
-    this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
+    this.propertyMap = propertyMap;
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
@@ -1087,8 +1081,12 @@ public class OptionsMetadata {
   }
 
   private boolean isAutoConfigEmulator() {
-    return getPropertyMap() != null
-        && Boolean.parseBoolean(getPropertyMap().getOrDefault("autoConfigEmulator", "false"));
+    return isAutoConfigEmulator(getPropertyMap());
+  }
+
+  private static boolean isAutoConfigEmulator(Map<String, String> propertyMap) {
+    return propertyMap != null
+        && Boolean.parseBoolean(propertyMap.getOrDefault("autoConfigEmulator", "false"));
   }
 
   private boolean usesEmulator() {
@@ -1096,8 +1094,19 @@ public class OptionsMetadata {
         || isAutoConfigEmulator();
   }
 
+  private static boolean usesEmulator(
+      Map<String, String> environment, Map<String, String> propertyMap) {
+    return !Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))
+        || isAutoConfigEmulator(propertyMap);
+  }
+
   private boolean isExternalHost() {
-    return !usesEmulator()
+    return isExternalHost(this.environment, this.commandLine, this.propertyMap);
+  }
+
+  private static boolean isExternalHost(
+      Map<String, String> environment, CommandLine commandLine, Map<String, String> propertyMap) {
+    return !usesEmulator(environment, propertyMap)
         && commandLine.hasOption(OPTION_SPANNER_ENDPOINT)
         && !CLOUD_SPANNER_HOST_PATTERN
             .matcher(commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT))
