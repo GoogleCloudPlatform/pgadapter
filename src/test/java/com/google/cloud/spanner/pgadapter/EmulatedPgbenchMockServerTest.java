@@ -31,11 +31,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.postgresql.PGProperty;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLWarning;
 
@@ -48,17 +48,23 @@ public class EmulatedPgbenchMockServerTest extends AbstractMockServerTest {
     Class.forName("org.postgresql.Driver");
   }
 
+  @BeforeClass
+  public static void setDetectClient() {
+    ClientAutoDetector.FORCE_DETECT_CLIENT.set(WellKnownClient.PGBENCH);
+  }
+
+  @AfterClass
+  public static void clearDetectClient() {
+    ClientAutoDetector.FORCE_DETECT_CLIENT.set(null);
+  }
+
   /**
    * Creates a JDBC connection string that instructs the PG JDBC driver to use the default simple
-   * mode. It also adds 'pgbench' as the application name, which will make PGAdapter automatically
-   * recognize the connection as a pgbench connection.
+   * mode.
    */
   private String createUrl() {
     return String.format(
-        "jdbc:postgresql://localhost:%d/db?preferQueryMode=simple&%s=pgbench&%s=090000",
-        pgServer.getLocalPort(),
-        PGProperty.APPLICATION_NAME.getName(),
-        PGProperty.ASSUME_MIN_SERVER_VERSION.getName());
+        "jdbc:postgresql://localhost:%d/db?preferQueryMode=simple", pgServer.getLocalPort());
   }
 
   @Test

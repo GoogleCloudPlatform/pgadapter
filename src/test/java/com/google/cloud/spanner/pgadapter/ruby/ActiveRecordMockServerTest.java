@@ -25,6 +25,8 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ListValue;
@@ -200,6 +202,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
   @Test
   public void testErrorHints() throws SQLException {
     // Emulate an ActiveRecord connection.
+    ClientAutoDetector.FORCE_DETECT_CLIENT.set(WellKnownClient.RAILS);
     String url =
         String.format(
             "jdbc:postgresql://localhost:%d/db?%s=rails&%s=090000",
@@ -250,6 +253,8 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
           exception.getServerErrorMessage().getMessage(),
           "Table foo not found - Statement: 'SELECT * FROM foo'");
       assertNull(exception.getServerErrorMessage().getHint());
+    } finally {
+      ClientAutoDetector.FORCE_DETECT_CLIENT.set(null);
     }
   }
 

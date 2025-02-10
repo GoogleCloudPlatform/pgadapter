@@ -122,7 +122,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   private static final Statement SELECT_RANDOM = Statement.of("select * from random_table");
   private static final ImmutableList<String> JDBC_STARTUP_STATEMENTS =
       ImmutableList.of(
-          "SET extra_float_digits = 3", "SET application_name = 'PostgreSQL JDBC Driver'");
+          "SET extra_float_digits = 2",
+          "SET extra_float_digits = 3",
+          "SET application_name = 'PostgreSQL JDBC Driver'");
 
   @Parameter public String pgVersion;
 
@@ -403,7 +405,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   private String getExpectedInitialApplicationName() {
-    return "PostgreSQL JDBC Driver";
+    return pgVersion.equals("1.0") ? "jdbc" : "PostgreSQL JDBC Driver";
   }
 
   @Test
@@ -522,7 +524,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                     + "  /* Preferably, this should use information_schema.information_schema_catalog_name, but that does not exist on the emulator. */\n"
                     + "  from (select distinct catalog_name from information_schema.schemata) catalogs\n"
                     + ")\n"
-                    + "SELECT datname AS TABLE_CAT FROM pg_database WHERE datallowconn = true ORDER BY datname"),
+                    + "SELECT datname AS \"TABLE_CAT\" FROM pg_database WHERE datallowconn = true ORDER BY datname"),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(
                     ResultSetMetadata.newBuilder()
@@ -3863,7 +3865,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("show application_name ")) {
         assertTrue(resultSet.next());
-        assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
+        assertNull(resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -4162,7 +4164,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       connection.createStatement().execute("reset all");
 
-      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
+      verifySettingIsNull(connection, "application_name");
       verifySettingValue(connection, "search_path", "public");
       verifySettingValue(connection, "spanner.autocommit_dml_mode", "TRANSACTIONAL");
     }
@@ -4171,6 +4173,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSetToDefault() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
+
       connection.createStatement().execute("set application_name to 'my-app'");
       connection.createStatement().execute("set search_path to 'my_schema'");
       verifySettingValue(connection, "application_name", "my-app");
@@ -4179,7 +4183,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       connection.createStatement().execute("set application_name to default");
       connection.createStatement().execute("set search_path to default");
 
-      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
+      verifySettingIsNull(connection, "application_name");
       verifySettingValue(connection, "search_path", "public");
     }
   }

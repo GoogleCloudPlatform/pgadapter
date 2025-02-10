@@ -37,5 +37,6 @@ samples/**/ruby/**/Gemfile.lock
 
 samples/**/vendor
 samples/**/composer.lock
+samples/**/.phpunit.result.cache
 src/test/**/vendor
 src/test/**/composer.lock

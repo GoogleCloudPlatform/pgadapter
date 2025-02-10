@@ -1112,7 +1112,7 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(resultSet.next());
         originalDateStyle = resultSet.getString("setting");
         assertTrue(
-            originalDateStyle,
+            "Original value: " + originalDateStyle,
             "ISO".equals(originalDateStyle) || "ISO, MDY".equals(originalDateStyle));
         assertFalse(resultSet.next());
       }
@@ -1171,6 +1171,23 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(originalDateStyle, resultSet.getString("setting"));
         assertFalse(resultSet.next());
       }
+
+      // Verify that we can get all pg_settings and that the number of setting is equal to the
+      // expected value.
+      int numExpectedSettings = 30;
+      int rowCount = 0;
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from pg_settings order by name")) {
+        while (resultSet.next()) {
+          for (int col = 1; col <= resultSet.getMetaData().getColumnCount(); col++) {
+            // Just verify that we can get the value.
+            resultSet.getObject(col);
+          }
+          assertNotNull(resultSet.getString("name"));
+          rowCount++;
+        }
+      }
+      assertEquals(numExpectedSettings, rowCount);
     }
   }
 
