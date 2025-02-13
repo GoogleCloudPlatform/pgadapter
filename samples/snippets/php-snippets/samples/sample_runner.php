@@ -1,25 +1,30 @@
 <?php
 
-require 'create_tables.php';
-
 /**
- * @throws Exception if the number of command line arguments is not equal to 4
+ * @throws Exception if the number of command line arguments is not equal to 2 or 4
  */
 function parse_arguments(): array {
     global $argc, $argv;
-    
-    if (!$argc == 4) {
-        throw new Exception(sprintf("Invalid number of arguments: %d\nExpected: 4", $argc));
+
+    if (!($argc == 2 || $argc == 4)) {
+        throw new Exception(sprintf("Invalid number of arguments: %d\nExpected: 2 or 4", $argc));
     }
-    $host = $argv[1];
-    $port = $argv[2];
-    $database = $argv[3];
+    $database = $argv[1];
+    if ($argc == 4) {
+        $host = $argv[2];
+        $port = $argv[3];
+    } else {
+        $host = "localhost";
+        $port = 5432;
+    }
     return [$host, $port, $database];
 }
 
-try {
-    [$host, $port, $database] = parse_arguments();
-    create_tables($host, $port, $database);
-} catch (Exception $e) {
-    printf("Failed to run sample: %s\n", $e);
+function run_sample($sample): void {
+    try {
+        [$host, $port, $database] = parse_arguments();
+        $sample($host, $port, $database);
+    } catch (Exception $e) {
+        printf("Failed to run sample: %s\n", $e);
+    }
 }

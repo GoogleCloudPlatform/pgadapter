@@ -43,3 +43,9 @@ function create_tables(string $host, string $port, string $database): void
     $connection = null;
 }
 // [END spanner_create_database]
+
+require "./sample_runner.php";
+$sample = function (string $host, string $port, string $database): void {
+    create_tables($host, $port, $database);
+};
+run_sample($sample);

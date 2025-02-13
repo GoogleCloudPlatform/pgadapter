@@ -71,3 +71,9 @@ function update_data_with_transaction(string $host, string $port, string $databa
     $connection = null;
 }
 // [END spanner_dml_getting_started_update]
+
+require "./sample_runner.php";
+$sample = function (string $host, string $port, string $database): void {
+    update_data_with_transaction($host, $port, $database);
+};
+run_sample($sample);

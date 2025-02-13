@@ -40,3 +40,9 @@ function data_boost(string $host, string $port, string $database): void
     $connection = null;
 }
 // [END spanner_data_boost]
+
+require "./sample_runner.php";
+$sample = function (string $host, string $port, string $database): void {
+    data_boost($host, $port, $database);
+};
+run_sample($sample);

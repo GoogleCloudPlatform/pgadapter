@@ -59,3 +59,9 @@ function read_only_transaction(string $host, string $port, string $database): vo
     $connection = null;
 }
 // [END spanner_read_only_transaction]
+
+require "./sample_runner.php";
+$sample = function (string $host, string $port, string $database): void {
+    read_only_transaction($host, $port, $database);
+};
+run_sample($sample);
