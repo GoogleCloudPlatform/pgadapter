@@ -49,8 +49,10 @@ function query_with_timeout(string $host, string $port, string $database): void
 }
 // [END spanner_statement_timeout]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    query_with_timeout($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        query_with_timeout($host, $port, $database);
+    };
+    run_sample($sample);
+}

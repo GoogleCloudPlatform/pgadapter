@@ -41,8 +41,10 @@ function data_boost(string $host, string $port, string $database): void
 }
 // [END spanner_data_boost]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    data_boost($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        data_boost($host, $port, $database);
+    };
+    run_sample($sample);
+}

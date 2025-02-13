@@ -44,8 +44,10 @@ function create_tables(string $host, string $port, string $database): void
 }
 // [END spanner_create_database]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    create_tables($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        create_tables($host, $port, $database);
+    };
+    run_sample($sample);
+}

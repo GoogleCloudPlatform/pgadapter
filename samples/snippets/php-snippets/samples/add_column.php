@@ -27,8 +27,10 @@ function add_column(string $host, string $port, string $database): void
 }
 // [END spanner_add_column]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    add_column($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        add_column($host, $port, $database);
+    };
+    run_sample($sample);
+}

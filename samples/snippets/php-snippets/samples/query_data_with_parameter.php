@@ -37,8 +37,10 @@ function query_data_with_parameter(string $host, string $port, string $database)
 }
 // [END spanner_query_with_parameter]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    query_data_with_parameter($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        query_data_with_parameter($host, $port, $database);
+    };
+    run_sample($sample);
+}

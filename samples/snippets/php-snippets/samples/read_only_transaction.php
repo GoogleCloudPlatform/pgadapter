@@ -60,8 +60,10 @@ function read_only_transaction(string $host, string $port, string $database): vo
 }
 // [END spanner_read_only_transaction]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    read_only_transaction($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        read_only_transaction($host, $port, $database);
+    };
+    run_sample($sample);
+}

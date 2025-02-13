@@ -47,8 +47,10 @@ function ddl_batch(string $host, string $port, string $database): void
 }
 // [END spanner_ddl_batch]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    ddl_batch($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        ddl_batch($host, $port, $database);
+    };
+    run_sample($sample);
+}

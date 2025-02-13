@@ -39,8 +39,10 @@ function execute_partitioned_dml(string $host, string $port, string $database): 
 }
 // [END spanner_partitioned_dml]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    execute_partitioned_dml($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        execute_partitioned_dml($host, $port, $database);
+    };
+    run_sample($sample);
+}

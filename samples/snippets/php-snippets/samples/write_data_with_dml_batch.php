@@ -44,8 +44,10 @@ function write_data_with_dml_batch(string $host, string $port, string $database)
 }
 // [END spanner_dml_batch]
 
-require "./sample_runner.php";
-$sample = function (string $host, string $port, string $database): void {
-    write_data_with_dml_batch($host, $port, $database);
-};
-run_sample($sample);
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        write_data_with_dml_batch($host, $port, $database);
+    };
+    run_sample($sample);
+}
