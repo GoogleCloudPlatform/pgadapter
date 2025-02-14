@@ -3,7 +3,7 @@ module migrate
 go 1.22.3
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250206133704-08cb84e31b7f
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250214130447-0bb9b9ee047b
 	github.com/golang-migrate/migrate/v4 v4.18.2
 )
 
