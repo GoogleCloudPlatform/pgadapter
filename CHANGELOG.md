@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.44.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.43.0...v0.44.0) (2025-02-14)
+
+
+### Features
+
+* default setting for project and instance for external hosts ([#2856](https://github.com/GoogleCloudPlatform/pgadapter/issues/2856)) ([99cd564](https://github.com/GoogleCloudPlatform/pgadapter/commit/99cd564e518259693f156a80fc1dcca30ca06229))
+
+
+### Bug Fixes
+
+* query replacement for JDBC getColumns() ([#2855](https://github.com/GoogleCloudPlatform/pgadapter/issues/2855)) ([b1c4338](https://github.com/GoogleCloudPlatform/pgadapter/commit/b1c433805a3dbacdb4412d57bd671c97c66da398))
+
+
+### Performance Improvements
+
+* withstand connect storms ([#1414](https://github.com/GoogleCloudPlatform/pgadapter/issues/1414)) ([aa8513f](https://github.com/GoogleCloudPlatform/pgadapter/commit/aa8513f5c47add4f04b5ea8ba6e0c5856a63bd14))
+
+
+### Dependencies
+
+* update dependency go to v1.24.0 ([#2867](https://github.com/GoogleCloudPlatform/pgadapter/issues/2867)) ([053150f](https://github.com/GoogleCloudPlatform/pgadapter/commit/053150f3f456214513770149768501687f13965f))
+* update dependency io.hypersistence:hypersistence-utils-hibernate-63 to v3.9.2 ([#2875](https://github.com/GoogleCloudPlatform/pgadapter/issues/2875)) ([fa6939d](https://github.com/GoogleCloudPlatform/pgadapter/commit/fa6939dd284406d0069ab9e50b4a18f50bda1950))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.47.0 ([#2858](https://github.com/GoogleCloudPlatform/pgadapter/issues/2858)) ([caa5b0e](https://github.com/GoogleCloudPlatform/pgadapter/commit/caa5b0e0d9fc890b1456e9838f9e72c5e147af34))
+* update dependency microsoft.net.test.sdk to 17.13.0 ([#2861](https://github.com/GoogleCloudPlatform/pgadapter/issues/2861)) ([bb17532](https://github.com/GoogleCloudPlatform/pgadapter/commit/bb17532a93e051eb286a2b222a15b181fdf7d15e))
+* update dependency nunit3testadapter to v5 ([#2857](https://github.com/GoogleCloudPlatform/pgadapter/issues/2857)) ([5984399](https://github.com/GoogleCloudPlatform/pgadapter/commit/59843990027b0417941ee6fcff98249568b2705f))
+* update dependency org.hibernate.orm:hibernate-core to v6.6.7.final ([#2863](https://github.com/GoogleCloudPlatform/pgadapter/issues/2863)) ([fdf9668](https://github.com/GoogleCloudPlatform/pgadapter/commit/fdf9668542ca115675965408aed5789d07d161fe))
+* update dependency phpunit/phpunit to v12 ([#2854](https://github.com/GoogleCloudPlatform/pgadapter/issues/2854)) ([c16c69a](https://github.com/GoogleCloudPlatform/pgadapter/commit/c16c69ac1e8955ac6ee64e43ac49688f8fc2ffd4))
+* update dependency sqlalchemy to v2.0.38 ([#2853](https://github.com/GoogleCloudPlatform/pgadapter/issues/2853)) ([a94a81f](https://github.com/GoogleCloudPlatform/pgadapter/commit/a94a81f886e5795958558b83db3fb9b8c51f1b68))
+* update dependency testcontainers to 4.2.0 ([#2866](https://github.com/GoogleCloudPlatform/pgadapter/issues/2866)) ([b85b2e0](https://github.com/GoogleCloudPlatform/pgadapter/commit/b85b2e07541fca4b3844b280fdcf7329bc10c534))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 08cb84e ([#2828](https://github.com/GoogleCloudPlatform/pgadapter/issues/2828)) ([1a5cd81](https://github.com/GoogleCloudPlatform/pgadapter/commit/1a5cd81bccdd1a070fd48c256345a1b4b2fa1f6c))
+* update golang docker tag ([#2871](https://github.com/GoogleCloudPlatform/pgadapter/issues/2871)) ([0bb9b9e](https://github.com/GoogleCloudPlatform/pgadapter/commit/0bb9b9ee047b6099d940d95c9a1e47b85386b09c))
+* update module google.golang.org/api to v0.221.0 ([#2872](https://github.com/GoogleCloudPlatform/pgadapter/issues/2872)) ([c834802](https://github.com/GoogleCloudPlatform/pgadapter/commit/c8348023b8a6292888b5dca62872951fed124dd1))
+
+
+### Documentation
+
+* add PHP snippets sample runner ([#2874](https://github.com/GoogleCloudPlatform/pgadapter/issues/2874)) ([0ab9be5](https://github.com/GoogleCloudPlatform/pgadapter/commit/0ab9be57358307d9e48bdc36f8200041aa00bd3c))
+
 ## [0.43.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.42.3...v0.43.0) (2025-02-06)
 
 
