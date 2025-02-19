@@ -361,7 +361,7 @@ public class BackendConnection {
                   ? pgCatalog.get().replacePgCatalogTables(updatedStatement, sqlLowerCase)
                   : updatedStatement;
           // TODO: Remove the check for isDelayBeginTransactionStartUntilFirstWrite when that
-          //       feature is able to detect the LOCK_SCANNED_RANGES=exclusive hint as a write.
+          //       feature is able to detect FOR UPDATE clauses as a write.
           if (sessionState.isReplaceForUpdateClause()
               && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
             updatedStatement = replaceForUpdate(updatedStatement, sqlLowerCase);
