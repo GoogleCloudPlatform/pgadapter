@@ -25,6 +25,8 @@ github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250206133704-0
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250206133704-08cb84e31b7f/go.mod h1:ehCaLrAyj+62ZAVeYSoXfiRQaERaA/ofktbRgn/gNPw=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250214130447-0bb9b9ee047b h1:UYs9cxXLPhupER7xI8uDY0L68uujne0Y0dPMOZt2Ivw=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250214130447-0bb9b9ee047b/go.mod h1:1jd2NY4m1fw1LPghtKvwNieGBQUshFnC7xs9LaJ+BJk=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250221152920-77dd07df0bcc h1:uEvWV3MBwdKYuZwSJiHmtjRnswyDsQvMbvZpWgRpjCk=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250221152920-77dd07df0bcc/go.mod h1:VHZUR4AvvwnupvfjiCb+VYuscj3wjjeD36+vMxXanF4=
 github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
@@ -56,6 +58,8 @@ github.com/docker/docker v27.4.1+incompatible h1:ZJvcY7gfwHn1JF48PfbyXg7Jyt9ZCWD
 github.com/docker/docker v27.4.1+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker v27.5.1+incompatible h1:4PYU5dnBYqRQi0294d1FBECqT9ECWeQAIfE8q4YnPY8=
 github.com/docker/docker v27.5.1+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v28.0.0+incompatible h1:Olh0KS820sJ7nPsBKChVhk5pzqcwDR15fumfAd/p9hM=
+github.com/docker/docker v28.0.0+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/go-connections v0.5.0 h1:USnMq7hx7gwdVZq1L49hLXaFtUdTADjXGp+uj1Br63c=
 github.com/docker/go-connections v0.5.0/go.mod h1:ov60Kzw0kKElRwhNs9UlUHAE/F9Fe6GLaXnqyDdmEXc=
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=
