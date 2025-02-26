@@ -6,7 +6,7 @@ toolchain go1.24.0
 
 require (
 	cloud.google.com/go/spanner v1.76.1
-	github.com/docker/docker v28.0.0+incompatible
+	github.com/docker/docker v28.0.1+incompatible
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/montanaflynn/stats v0.7.0

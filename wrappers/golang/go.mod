@@ -5,7 +5,7 @@ go 1.22
 toolchain go1.24.0
 
 require (
-	github.com/docker/docker v28.0.0+incompatible
+	github.com/docker/docker v28.0.1+incompatible
 	github.com/testcontainers/testcontainers-go v0.35.0
 	golang.org/x/oauth2 v0.26.0
 )
