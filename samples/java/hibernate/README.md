@@ -52,10 +52,10 @@ Cloud Spanner supports the following data types in combination with `Hibernate`.
 ## Limitations
 The following limitations are currently known:
 
-| Limitation             | Workaround                                                                                                                                                                                                                                                                   |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Schema updates         | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated schema updates using `hibernate` are therefore not supported. It is recommended to set the option `hibernate.hbm2ddl.auto=none` (or `spring.jpa.hibernate.ddl-auto=none` if you are using Spring). |
-| Pessimistic Locking    | Cloud Spanner does not support `LockMode.UPGRADE` and `LockMode.UPGRADE_NOWAIT` lock modes.                                                                                                                                                                                  |
+| Limitation             | Workaround                                                                                                                                                                                                                                                             |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Schema updates         | Spanner does not support the full PostgreSQL DDL dialect. Automated schema updates using `hibernate` are therefore not supported. It is recommended to set the option `hibernate.hbm2ddl.auto=none` (or `spring.jpa.hibernate.ddl-auto=none` if you are using Spring). |
+| Pessimistic Locking    | Spanner only supports `FOR UPDATE` clauses without any additional options. `FOR UPDATE NOWAIT` and  `FOR UPDATE SKIP LOCKED` are not supported.                                                                                                                        |
 
 
 ### Schema Updates
