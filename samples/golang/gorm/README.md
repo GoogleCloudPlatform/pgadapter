@@ -73,12 +73,12 @@ Cloud Spanner supports the following data types in combination with `gorm`.
 ## Limitations
 The following limitations are currently known:
 
-| Limitation             | Workaround                                                                                                                                                                                                                                                         |
-|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Migrations             | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated migrations using `gorm` are therefore not supported.                                                                                                                                     |
-| OnConflict             | OnConflict clauses are not supported                                                                                                                                                                                                                               |
-| Locking                | Lock clauses (e.g. `clause.Locking{Strength: "UPDATE"}`) are not supported. These are generally speaking also not required, as the default isolation level that is used by Cloud Spanner is serializable.                                                          |
-| Auto-save associations | Auto saved associations are not supported, as these will automatically use an OnConflict clause                                                                                                                                                                    |
+| Limitation             | Workaround                                                                                                                           |
+|------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| Migrations             | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated migrations using `gorm` are therefore not supported.       |
+| OnConflict             | OnConflict clauses are not supported                                                                                                 |
+| Locking                | Only `clause.Locking{Strength: "UPDATE"}` is supported. Additional lock options, like `NOWAIT` or  `SKIP LOCKED`, are not supported. |
+| Auto-save associations | Auto saved associations are not supported, as these will automatically use an OnConflict clause                                      |
 
 ### Migrations
 Migrations are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect.

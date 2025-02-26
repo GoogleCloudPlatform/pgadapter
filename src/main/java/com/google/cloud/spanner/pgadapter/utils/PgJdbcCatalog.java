@@ -238,7 +238,7 @@ public class PgJdbcCatalog {
       "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,a.attnum,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
 
   public static final String PG_JDBC_GET_COLUMNS_REPLACEMENT =
-      "SELECT TABLE_CATALOG as current_database, TABLE_CATALOG AS \"TABLE_CAT\", TABLE_SCHEMA AS nspname, TABLE_NAME AS relname, COLUMN_NAME AS attname, '' as typtype,\n"
+      "SELECT TABLE_CATALOG as current_database, TABLE_SCHEMA AS nspname, TABLE_NAME AS relname, COLUMN_NAME AS attname, '' as typtype,\n"
           + "       CASE\n"
           + "           WHEN SPANNER_TYPE = 'boolean' THEN 16\n"
           + "           WHEN SPANNER_TYPE = 'boolean[]' THEN 1000\n"

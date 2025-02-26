@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.ITJdbcMetadataTest.getDdlStatements;
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -31,7 +32,6 @@ import com.google.common.collect.Iterables;
 import com.google.devtools.cloudtrace.v1.ListTracesRequest;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -105,9 +105,7 @@ public class ITOpenTelemetryTest implements IntegrationTest {
             client.listTraces(
                 ListTracesRequest.newBuilder()
                     .setProjectId(testEnv.getProjectId())
-                    // Ignore deprecation for now, as there is no alternative offered (yet?).
-                    //noinspection deprecation
-                    .setFilter(SemanticAttributes.DB_STATEMENT + ":\"" + sql + "\"")
+                    .setFilter(DB_STATEMENT + ":\"" + sql + "\"")
                     .build());
         int size = Iterables.size(response.iterateAll());
         if (size != 0) {

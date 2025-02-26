@@ -162,9 +162,8 @@ volatile function or if the underlying data that has been accessed by the transa
 modified by another transaction.
 
 ### Locking - SELECT ... FOR UPDATE
-Locking clauses, like `SELECT ... FOR UPDATE`, are not supported (see also https://docs.sqlalchemy.org/en/20/orm/queryguide/query.html#sqlalchemy.orm.Query.with_for_update).
-These are normally also not required, as Cloud Spanner uses isolation level `serializable` for
-read/write transactions.
+Only `SELECT ... FOR UPDATE` without any additional options is supported. The `NOWAIT` and
+`SKIP LOCKED` options are not supported.
 
 ## Performance Considerations
 

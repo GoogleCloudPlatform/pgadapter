@@ -37,3 +37,11 @@ function update_data_with_copy(string $host, string $port, string $database): vo
     $connection = null;
 }
 // [END spanner_update_data]
+
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        update_data_with_copy($host, $port, $database);
+    };
+    run_sample($sample);
+}

@@ -38,3 +38,11 @@ function write_data_with_copy(string $host, string $port, string $database): voi
     $connection = null;
 }
 // [END spanner_copy_from_stdin]
+
+if (!count(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS))) {
+    require dirname(__FILE__) . "/sample_runner.php";
+    $sample = function (string $host, string $port, string $database): void {
+        write_data_with_copy($host, $port, $database);
+    };
+    run_sample($sample);
+}

@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
+
 import com.google.api.core.InternalApi;
 import com.google.api.gax.grpc.GrpcCallContext;
 import com.google.api.gax.rpc.ApiCallContext;
@@ -58,7 +60,6 @@ import io.grpc.MethodDescriptor;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -317,13 +318,11 @@ public abstract class ControlMessage extends WireMessage {
   SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
     Tracer tracer = connection.getExtendedQueryProtocolHandler().getTracer();
-    // Ignore deprecation for now, as there is no alternative offered (yet?).
-    //noinspection deprecation
     Span span =
         tracer
             .spanBuilder("send_result_set")
             .setAttribute("pgadapter.connection_id", connection.getTraceConnectionId().toString())
-            .setAttribute(SemanticAttributes.DB_STATEMENT, describedResult.getSql())
+            .setAttribute(DB_STATEMENT, describedResult.getSql())
             .startSpan();
     try (Scope ignore = span.makeCurrent()) {
       StatementResult statementResult = describedResult.getStatementResult();
