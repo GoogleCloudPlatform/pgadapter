@@ -60,6 +60,14 @@ public class ITDdlTest implements IntegrationTest {
   }
 
   @Test
+  public void createTableWithSerial() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl());
+        Statement statement = connection.createStatement()) {
+      statement.execute("create table serial_test (id serial primary key, value varchar)");
+    }
+  }
+
+  @Test
   public void testDropTableWithIndex() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       // First create a table with a secondary index.

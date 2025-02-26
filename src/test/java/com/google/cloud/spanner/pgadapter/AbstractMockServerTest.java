@@ -1416,6 +1416,20 @@ public abstract class AbstractMockServerTest {
             .build());
   }
 
+  protected void addDdlErrorResponse(com.google.rpc.Status error) {
+    mockDatabaseAdmin.addResponse(
+        Operation.newBuilder()
+            .setMetadata(
+                Any.pack(
+                    UpdateDatabaseDdlMetadata.newBuilder()
+                        .setDatabase("projects/proj/instances/inst/databases/db")
+                        .build()))
+            .setName("projects/proj/instances/inst/databases/db/operations/1")
+            .setDone(true)
+            .setError(error)
+            .build());
+  }
+
   protected void addDdlExceptionToSpannerAdmin() {
     mockDatabaseAdmin.addException(
         Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException());
