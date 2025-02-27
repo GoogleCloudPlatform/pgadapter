@@ -226,8 +226,9 @@ public class SimpleParser {
   }
 
   /**
-   * Replaces any 'for update' clause with a LOCK_SCANNED_RANGES=exclusive hint. This method only
-   * replaces the 'for update' clause if it fulfills these criteria:
+   * Replaces any 'for update' clause with a LOCK_SCANNED_RANGES=exclusive hint and/or removes any
+   * 'of table1[, table2[,...]]' clauses. This method only replaces the 'for update' clause if it
+   * fulfills these criteria:
    *
    * <ol>
    *   <li>The 'for update' clause is on the outermost expression
@@ -237,7 +238,8 @@ public class SimpleParser {
    *
    * Any 'OF table_name[, ...]' clauses in the expression are ignored.
    */
-  static Statement replaceForUpdate(Statement statement, String lowerCaseSql) {
+  static Statement replaceForUpdate(
+      Statement statement, String lowerCaseSql, boolean replaceWithHint) {
     // If there is no 'for' clause, then we know that we don't have to analyze any further.
     if (!lowerCaseSql.contains("for")) {
       return statement;
@@ -249,6 +251,9 @@ public class SimpleParser {
     }
     int startPos = parser.pos;
     if (parser.eatKeyword("for") && parser.eatKeyword("update")) {
+      if (!replaceWithHint) {
+        startPos = parser.pos;
+      }
       int endPos = parser.pos;
       // Skip 'of table1[, table2[, ...]] clauses
       if (parser.eatKeyword("of")) {
@@ -257,6 +262,9 @@ public class SimpleParser {
           return statement;
         }
         endPos = parser.pos;
+      } else if (!replaceWithHint) {
+        // Stop here if the statement does not contain an 'of table' clause.
+        return statement;
       }
       // 'nowait' and 'skip locked' clauses are not supported.
       if (parser.eatKeyword("nowait") || parser.eatKeyword("skip")) {
@@ -266,11 +274,16 @@ public class SimpleParser {
         return statement;
       }
       // This is a simple 'for update' clause. Replace it with a 'LOCK_SCANNED_RANGES=exclusive'
-      // hint.
-      return Statement.of(
-          "/*@ LOCK_SCANNED_RANGES=exclusive */"
-              + statement.getSql().substring(0, startPos)
-              + statement.getSql().substring(endPos));
+      // hint and/or remove the 'of table' clause.
+      if (replaceWithHint) {
+        return Statement.of(
+            "/*@ LOCK_SCANNED_RANGES=exclusive */"
+                + statement.getSql().substring(0, startPos)
+                + statement.getSql().substring(endPos));
+      } else {
+        return Statement.of(
+            statement.getSql().substring(0, startPos) + statement.getSql().substring(endPos));
+      }
     }
     return statement;
   }
