@@ -40,6 +40,20 @@ class JdbcMetadataStatementHelper {
         || sql.contains("databasechangelog");
   }
 
+  public static boolean isPotentialLSpannerQueryModification(String sql) {
+    // Identifies if a SQL query contains a LIKE ESCAPE pattern
+    return sql.matches("(?i).*(LIKE\\s+([^\\s]+))\\s+(ESCAPE\\s+'([^']*)'?).*");
+  }
+
+  public static String applySpannerQueryTransformations(String sql) {
+    // Transforms SQL to remove LIKE ESCAPE clause while preserving query intent
+    if (sql.matches("(?i).*(LIKE\\s+([^\\s]+))\\s+(ESCAPE\\s+'([^']*)'?).*")) {
+      // Removes ESCAPE clause from all LIKE statements
+      sql = sql.replaceAll("(?i)\\s+ESCAPE\\s+'[^']*'", "");
+    }
+    return sql;
+  }
+
   static String replaceJdbcMetadataStatement(String sql) {
     // First we look for a number of fixed query prefixes for queries that are completely replaced
     // with Spangres-compatible queries.
