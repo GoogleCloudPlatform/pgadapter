@@ -462,6 +462,11 @@ public class SessionState {
     return getBoolSetting("spanner", "replace_for_update", false);
   }
 
+  /** Returns whether LIKE ... ESCAPE '\' clauses are removed. */
+  public boolean isRemoveDefaultEscapeClause() {
+    return getBoolSetting("spanner", "remove_default_escape", true);
+  }
+
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
   public boolean isReplacePgCatalogTables() {
     PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);

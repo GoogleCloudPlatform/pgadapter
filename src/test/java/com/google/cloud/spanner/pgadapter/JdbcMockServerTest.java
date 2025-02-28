@@ -5248,6 +5248,24 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testRemoveEscapeClause() throws SQLException {
+    String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(expectedSql), SELECT1_RESULTSET));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '\\' AND city LIKE 'NY%' ESCAPE '\\'")) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testEmulatePgClass() throws SQLException {
     String withEmulation = "with " + EMULATED_PG_CLASS_PREFIX + "\nselect 1 from pg_class";
     mockSpanner.putStatementResult(

@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
+import static com.google.cloud.spanner.pgadapter.statements.EscapeClauseParser.removeDefaultEscapeClauses;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
@@ -365,6 +366,9 @@ public class BackendConnection {
           if (sessionState.isReplaceForUpdateClause()
               && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
             updatedStatement = replaceForUpdate(updatedStatement, sqlLowerCase);
+          }
+          if (sessionState.isRemoveDefaultEscapeClause()) {
+            updatedStatement = removeDefaultEscapeClauses(updatedStatement, sqlLowerCase);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));

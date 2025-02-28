@@ -114,21 +114,15 @@ public class SimpleQueryStatement {
   /** Replaces any known unsupported query (e.g. JDBC metadata queries). */
   static ParsedStatement replaceKnownUnsupportedQueries(
       WellKnownClient client, OptionsMetadata options, ParsedStatement parsedStatement) {
-    String sql = parsedStatement.getSqlWithoutComments();
-    // Check if SQL contains LIKE ESCAPE and needs transformation.
-    if (JdbcMetadataStatementHelper.isPotentialLSpannerQueryModification(sql)) {
-      sql = JdbcMetadataStatementHelper.applySpannerQueryTransformations(sql);
+    if ((options.isReplaceJdbcMetadataQueries() || client == WellKnownClient.JDBC)
+        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
+            parsedStatement.getSqlWithoutComments())) {
+      return PARSER.parse(
+          Statement.of(
+              JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(
+                  parsedStatement.getSqlWithoutComments())));
     }
-    // Check if SQL is a JDBC metadata query and requires replacement.
-    if (options.isReplaceJdbcMetadataQueries() || client == WellKnownClient.JDBC) {
-      if (JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
-        sql = JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql);
-      }
-    }
-    // If no changes were made, return the original statement; otherwise, reparse the modified SQL.
-    return sql.equals(parsedStatement.getSqlWithoutComments())
-        ? parsedStatement
-        : PARSER.parse(Statement.of(sql));
+    return parsedStatement;
   }
 
   /**
