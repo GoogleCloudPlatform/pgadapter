@@ -364,7 +364,11 @@ public class BackendConnection {
           //       feature is able to detect FOR UPDATE clauses as a write.
           if (sessionState.isReplaceForUpdateClause()
               && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
-            updatedStatement = replaceForUpdate(updatedStatement, sqlLowerCase);
+            updatedStatement =
+                replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ true);
+          } else {
+            updatedStatement =
+                replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ false);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));

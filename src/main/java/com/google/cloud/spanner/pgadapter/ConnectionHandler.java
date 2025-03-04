@@ -273,6 +273,13 @@ public class ConnectionHandler implements Runnable {
     this.spannerConnection = spannerConnection;
     this.databaseId = connectionOptions.getDatabaseId();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
+    // TODO: Remove when the emulator supports FOR UPDATE clauses.
+    if (Boolean.parseBoolean(server.getProperties().getProperty("autoConfigEmulator", "false"))) {
+      this.extendedQueryProtocolHandler
+          .getBackendConnection()
+          .getSessionState()
+          .setConnectionStartupValue("spanner", "replace_for_update", "true");
+    }
   }
 
   @VisibleForTesting

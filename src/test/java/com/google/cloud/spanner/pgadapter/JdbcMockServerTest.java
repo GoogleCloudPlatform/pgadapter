@@ -738,6 +738,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals(sql, request.getSql());
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+      assertFalse(request.getLastStatement());
     }
   }
 
@@ -888,6 +889,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertFalse(statement.getMoreResults());
     }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql + "\nRETURNING *", request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatement());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -905,6 +913,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertFalse(statement.getMoreResults());
     }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatement());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -1011,6 +1026,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertFalse(statement.getMoreResults());
     }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql + "\nRETURNING *", request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatement());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -1148,6 +1170,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertFalse(statement.getMoreResults());
     }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql + "\nRETURNING *", request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatement());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -1356,6 +1385,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
     assertTrue(request.getTransaction().hasBegin());
     assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatements());
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
@@ -1517,6 +1547,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
     assertEquals(sql, executeRequest.getSql());
+    assertFalse(executeRequest.getLastStatement());
   }
 
   @Test
@@ -1650,6 +1681,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       ExecuteSqlRequest executeRequest = requests.get(requests.size() - 1);
       assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
       assertEquals(pgSql, executeRequest.getSql());
+      assertFalse(executeRequest.getLastStatement());
 
       Map<String, Value> params = executeRequest.getParams().getFieldsMap();
       Map<String, Type> types = executeRequest.getParamTypesMap();
@@ -1946,6 +1978,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         }
       }
     }
+    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
+      assertFalse(request.getLastStatement());
+    }
   }
 
   @Test
@@ -2006,6 +2041,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // End of retry.
     assertEquals(SELECT1.getSql(), requests.get(10).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(10).getQueryMode());
+
+    for (ExecuteSqlRequest request : requests) {
+      assertFalse(request.getLastStatement());
+    }
   }
 
   @Test
@@ -2061,6 +2100,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(1, requests.size());
     assertEquals(pgSql, requests.get(0).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(0).getQueryMode());
+    assertTrue(requests.get(0).getLastStatement());
   }
 
   @Test
@@ -2335,6 +2375,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+    assertTrue(request.getLastStatements());
   }
 
   @Test
@@ -2357,6 +2398,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertTrue(request.getLastStatements());
   }
 
   @Test
@@ -2402,6 +2444,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+    assertTrue(request.getLastStatements());
   }
 
   @Test
@@ -2512,6 +2555,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
     assertEquals(10, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
     assertEquals(20, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (ExecuteBatchDmlRequest request :
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class)) {
+      assertFalse(request.getLastStatements());
+    }
+    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
+      assertFalse(request.getLastStatement());
+    }
   }
 
   @Test

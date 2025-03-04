@@ -43,7 +43,7 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.55.0</version>
+        <version>26.56.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -76,7 +76,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.44.0</version>
+      <version>0.45.0</version>
       <exclusions>
         <exclusion>
           <groupId>io.opentelemetry</groupId>
@@ -114,7 +114,7 @@
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.49.0</version>
+      <version>3.49.1</version>
     </dependency>
 
     <dependency>
