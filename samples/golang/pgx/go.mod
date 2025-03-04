@@ -2,7 +2,7 @@ module pgadapter-pgx-sample
 
 go 1.23.0
 
-toolchain go1.24.0
+toolchain go1.24.1
 
 require (
 	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250227072443-02e2fa03c944
