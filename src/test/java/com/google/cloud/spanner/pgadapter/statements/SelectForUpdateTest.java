@@ -67,14 +67,35 @@ public class SelectForUpdateTest {
             "select col1 from my_table for update of my_table, /*comment*/ my_other_table"));
   }
 
+  @Test
+  public void testReplaceForUpdateOf() {
+    assertEquals(
+        Statement.of("select col1 from foo for update"),
+        internalReplaceForUpdate("select col1 from foo for update", false));
+    assertEquals(
+        Statement.of("select col1 from foo for update"),
+        internalReplaceForUpdate("select col1 from foo for update of foo", false));
+    assertEquals(
+        Statement.of("select col1 from foo for update"),
+        internalReplaceForUpdate("select col1 from foo for update of foo, bar", false));
+    assertEquals(
+        Statement.of("select col1 from foo for update"),
+        internalReplaceForUpdate("select col1 from foo for update of foo, bar, \"baz\"", false));
+  }
+
   private void assertSameAfterRemoveForUpdate(String sql) {
     Statement statement = Statement.of(sql);
     assertSame(
-        statement, replaceForUpdate(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+        statement,
+        replaceForUpdate(statement, statement.getSql().toLowerCase(Locale.ENGLISH), true));
   }
 
   private Statement internalReplaceForUpdate(String sql) {
-    return replaceForUpdate(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH));
+    return internalReplaceForUpdate(sql, true);
+  }
+
+  private Statement internalReplaceForUpdate(String sql, boolean replaceWithHint) {
+    return replaceForUpdate(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH), replaceWithHint);
   }
 
   @Test

@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.45.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.44.0...v0.45.0) (2025-02-27)
+
+
+### Features
+
+* support SELECT .. FOR UPDATE statements ([#2894](https://github.com/GoogleCloudPlatform/pgadapter/issues/2894)) ([f77690b](https://github.com/GoogleCloudPlatform/pgadapter/commit/f77690b150360bf08614d7a149dd7ab81d55bd7c))
+
+
+### Bug Fixes
+
+* ignore unrecognized portal name in Close messages ([#2897](https://github.com/GoogleCloudPlatform/pgadapter/issues/2897)) ([f5bc3a6](https://github.com/GoogleCloudPlatform/pgadapter/commit/f5bc3a6980dbe6b2a614f88719c3ec423561818e))
+
+
+### Performance Improvements
+
+* use last_statement optimization ([#2876](https://github.com/GoogleCloudPlatform/pgadapter/issues/2876)) ([366d1c8](https://github.com/GoogleCloudPlatform/pgadapter/commit/366d1c8a7e1dc34b6b09f36c48a4d5e05c587531))
+
+
+### Dependencies
+
+* update alpine docker tag to v3.21.3 ([#2887](https://github.com/GoogleCloudPlatform/pgadapter/issues/2887)) ([e2b7ae0](https://github.com/GoogleCloudPlatform/pgadapter/commit/e2b7ae067c810d588f1d7f05e7004bbcc1c0b56c))
+* update dependency connectorx to v0.4.2 ([#2888](https://github.com/GoogleCloudPlatform/pgadapter/issues/2888)) ([d213ef9](https://github.com/GoogleCloudPlatform/pgadapter/commit/d213ef953f07c87860ef549b8d0735038b463f70))
+* update dependency npgsql to 9.0.3 ([#2930](https://github.com/GoogleCloudPlatform/pgadapter/issues/2930)) ([6661606](https://github.com/GoogleCloudPlatform/pgadapter/commit/66616067c47eb15157f6d120c3e79b571187de97))
+* update dependency org.hibernate.orm:hibernate-core to v6.6.8.final ([#2889](https://github.com/GoogleCloudPlatform/pgadapter/issues/2889)) ([6ad67e4](https://github.com/GoogleCloudPlatform/pgadapter/commit/6ad67e463bcceb6f8fca1980ee4c258b2c97dfdd))
+* update dependency org.hibernate.orm:hibernate-core to v6.6.9.final ([#2919](https://github.com/GoogleCloudPlatform/pgadapter/issues/2919)) ([3c001e2](https://github.com/GoogleCloudPlatform/pgadapter/commit/3c001e2b699f79c12da9efe0d178b1feca9152cb))
+* update dependency org.liquibase:liquibase-maven-plugin to v4.31.1 ([#2891](https://github.com/GoogleCloudPlatform/pgadapter/issues/2891)) ([4de7c34](https://github.com/GoogleCloudPlatform/pgadapter/commit/4de7c34d24c1d31230a60bad9f40934db539500f))
+* update dependency org.postgresql:postgresql to v42.7.5 ([#2754](https://github.com/GoogleCloudPlatform/pgadapter/issues/2754)) ([ef7c337](https://github.com/GoogleCloudPlatform/pgadapter/commit/ef7c337535632b87a9fdcae107a22cd364af349f))
+* update dependency org.springframework.boot:spring-boot-dependencies to v3.4.3 ([#2906](https://github.com/GoogleCloudPlatform/pgadapter/issues/2906)) ([db09360](https://github.com/GoogleCloudPlatform/pgadapter/commit/db0936000848a2da9393552a4446a74bcae3ce10))
+* update dependency org.springframework.boot:spring-boot-starter-parent to v3.4.3 ([#2907](https://github.com/GoogleCloudPlatform/pgadapter/issues/2907)) ([6f5c9ab](https://github.com/GoogleCloudPlatform/pgadapter/commit/6f5c9ab1c9b3fe0748f4dc985194d6233efd5408))
+* update dependency org.testcontainers:testcontainers to v1.20.5 ([#2911](https://github.com/GoogleCloudPlatform/pgadapter/issues/2911)) ([b4cd799](https://github.com/GoogleCloudPlatform/pgadapter/commit/b4cd799f1f217eda5a9eb39acc2ffeeeb4573ebd))
+* update dependency org.testcontainers:testcontainers-bom to v1.20.5 ([#2900](https://github.com/GoogleCloudPlatform/pgadapter/issues/2900)) ([65205a0](https://github.com/GoogleCloudPlatform/pgadapter/commit/65205a08f117c43f8715534579aba81831557edb))
+* update dependency psycopg to v3.2.5 ([#2917](https://github.com/GoogleCloudPlatform/pgadapter/issues/2917)) ([ff25fe8](https://github.com/GoogleCloudPlatform/pgadapter/commit/ff25fe83c7313e5a16bdc9a0bc7402d958261017))
+* update dependency psycopg-binary to v3.2.5 ([#2918](https://github.com/GoogleCloudPlatform/pgadapter/issues/2918)) ([7d31958](https://github.com/GoogleCloudPlatform/pgadapter/commit/7d31958204723e608a05d3a5f2a31796e3ec0fa8))
+* update dependency testcontainers to 4.3.0 ([#2933](https://github.com/GoogleCloudPlatform/pgadapter/issues/2933)) ([fe1f360](https://github.com/GoogleCloudPlatform/pgadapter/commit/fe1f360b1fcf06edb17a894ca403c632075123fa))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 0bb9b9e ([#2873](https://github.com/GoogleCloudPlatform/pgadapter/issues/2873)) ([bfe737e](https://github.com/GoogleCloudPlatform/pgadapter/commit/bfe737e3e2eb475409d03cceb128ddd8cdbd4f2a))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 6661606 ([#2938](https://github.com/GoogleCloudPlatform/pgadapter/issues/2938)) ([02e2fa0](https://github.com/GoogleCloudPlatform/pgadapter/commit/02e2fa03c9449da6669c8ab4a22a86621bba6c75))
+* update module cloud.google.com/go/spanner to v1.76.1 ([#2910](https://github.com/GoogleCloudPlatform/pgadapter/issues/2910)) ([d02d5a5](https://github.com/GoogleCloudPlatform/pgadapter/commit/d02d5a594794f61b827cf604fed1e96741513650))
+* update module github.com/docker/docker to v28 ([#2901](https://github.com/GoogleCloudPlatform/pgadapter/issues/2901)) ([ea48db2](https://github.com/GoogleCloudPlatform/pgadapter/commit/ea48db2d2374848c80b6e949edd5c605cb51bba4))
+* update module github.com/docker/docker to v28.0.1+incompatible ([#2939](https://github.com/GoogleCloudPlatform/pgadapter/issues/2939)) ([f184638](https://github.com/GoogleCloudPlatform/pgadapter/commit/f18463839f23136d475cf32a72d9c46cb5d838d8))
+* update module golang.org/x/oauth2 to v0.27.0 ([#2928](https://github.com/GoogleCloudPlatform/pgadapter/issues/2928)) ([b280e2b](https://github.com/GoogleCloudPlatform/pgadapter/commit/b280e2b052491b2b8c0c1c020cbcb1303b4ed223))
+* update module google.golang.org/api to v0.222.0 ([#2898](https://github.com/GoogleCloudPlatform/pgadapter/issues/2898)) ([bded61c](https://github.com/GoogleCloudPlatform/pgadapter/commit/bded61cfa8c0f63e54bdc0e3db403b319a8e72bb))
+* update module google.golang.org/api to v0.223.0 ([#2936](https://github.com/GoogleCloudPlatform/pgadapter/issues/2936)) ([e84b00e](https://github.com/GoogleCloudPlatform/pgadapter/commit/e84b00e7d59572ffeba3c51d32bfa234fd2199ac))
+* update spring-boot.version to v3.4.3 ([#2908](https://github.com/GoogleCloudPlatform/pgadapter/issues/2908)) ([5bb5d2f](https://github.com/GoogleCloudPlatform/pgadapter/commit/5bb5d2f5e9a4e09495a826970bd511401ef5f351))
+
 ## [0.44.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.43.0...v0.44.0) (2025-02-14)
 
 
