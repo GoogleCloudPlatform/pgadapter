@@ -72,20 +72,4 @@ public class LikeEscapeTest {
   private Statement internalRemoveEscape(String sql) {
     return removeDefaultEscapeClauses(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH));
   }
-
-//  @Test
-//  public void testRemoveEscapeWithEmptyString() {
-//    String inputSql = "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '//' AND city LIKE 'NY%' ESCAPE '//'";
-//    String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
-//
-//    // Apply escape removal logic
-//    Statement modifiedStatement = removeDefaultEscapeClauses(Statement.of(inputSql));
-//
-//    // Debug output
-//    System.out.println("Input SQL: " + inputSql);
-//    System.out.println("Modified SQL: " + modifiedStatement.getSql());
-//
-//    // Assertion: ESCAPE '' should be removed
-//    assertEquals(expectedSql, modifiedStatement.getSql(), "ESCAPE '' should be removed from the query");
-//  }
 }
