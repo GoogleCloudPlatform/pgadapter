@@ -56,6 +56,10 @@ public class LikeEscapeTest {
             "select col1 from foo where bar in (select val from t where id like $1) and id=1"),
         internalRemoveEscape(
             "select col1 from foo where bar in (select val from t where id like $1 escape '\\') and id=1"));
+    assertEquals(
+        Statement.of("select col1 from foo where bar like 'test' and baz like 'test'"),
+        internalRemoveEscape(
+            "select col1 from foo where bar like 'test' escape '' and baz like 'test' escape ''"));
   }
 
   private void assertSameAfterRemoveEscape(String sql) {
@@ -68,4 +72,20 @@ public class LikeEscapeTest {
   private Statement internalRemoveEscape(String sql) {
     return removeDefaultEscapeClauses(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH));
   }
+
+//  @Test
+//  public void testRemoveEscapeWithEmptyString() {
+//    String inputSql = "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '//' AND city LIKE 'NY%' ESCAPE '//'";
+//    String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
+//
+//    // Apply escape removal logic
+//    Statement modifiedStatement = removeDefaultEscapeClauses(Statement.of(inputSql));
+//
+//    // Debug output
+//    System.out.println("Input SQL: " + inputSql);
+//    System.out.println("Modified SQL: " + modifiedStatement.getSql());
+//
+//    // Assertion: ESCAPE '' should be removed
+//    assertEquals(expectedSql, modifiedStatement.getSql(), "ESCAPE '' should be removed from the query");
+//  }
 }
