@@ -689,7 +689,7 @@ public class ConnectionHandlerTest {
     // Enable the autoConfigEmulator flag through the options builder.
     OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;autoConfigEmulator=true;dialect=postgresql",
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;autoConfigEmulator=true;defaultSequenceKind=bit_reversed_positive;dialect=postgresql",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             emulatorOptions,
@@ -769,7 +769,7 @@ public class ConnectionHandlerTest {
           OptionsMetadata optionsWithSystemProperty =
               OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
           assertEquals(
-              "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;useVirtualGrpcTransportThreads=true;defaultSequenceKind=bit_reversed_positive;dialect=postgresql",
+              "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualGrpcTransportThreads=true;dialect=postgresql",
               buildConnectionURL(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   optionsWithSystemProperty,
