@@ -26,6 +26,8 @@ github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250226183639-6
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250226183639-66616067c47e/go.mod h1:Vg9+Rv+MGz05IDrVv69bqN4NNrkQN+HshsXYXVoe/NY=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250227072443-02e2fa03c944 h1:G7HCACDYhoikWpPZz7A7jTrkRtUNQoko/UEAp2XIkDM=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250227072443-02e2fa03c944/go.mod h1:Vg9+Rv+MGz05IDrVv69bqN4NNrkQN+HshsXYXVoe/NY=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250304202610-d5bfeb84ec7a h1:wfNRcvpyDvpEIGl+AqjrWlMync+Yk1eitWVrSo4qTYk=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250304202610-d5bfeb84ec7a/go.mod h1:Vg9+Rv+MGz05IDrVv69bqN4NNrkQN+HshsXYXVoe/NY=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=

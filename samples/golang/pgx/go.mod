@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.0
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250227072443-02e2fa03c944
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250304202610-d5bfeb84ec7a
 	github.com/jackc/pgx/v5 v5.7.2
 )
 
