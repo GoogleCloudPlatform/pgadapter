@@ -79,13 +79,14 @@ import java.net.SocketException;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -325,9 +326,12 @@ public class ConnectionHandler implements Runnable {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
-    for (Entry<Object, Object> entry : info.entrySet()) {
-      if (!Strings.isNullOrEmpty((String) entry.getValue())) {
-        result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
+    List<Object> keys = new ArrayList<>(info.keySet());
+    keys.sort(Comparator.comparing(Object::toString));
+    for (Object key : keys) {
+      String value = (String) info.get(key);
+      if (!Strings.isNullOrEmpty(value)) {
+        result.append(";").append(key).append("=").append(value);
       }
     }
     return result.toString();

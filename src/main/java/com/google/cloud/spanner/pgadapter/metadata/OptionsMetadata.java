@@ -727,6 +727,10 @@ public class OptionsMetadata {
     CommandLine commandLine = buildOptions(args);
     Map<String, String> propertyMap =
         parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
+    // Set a default_sequence_kind if none has been set by the user.
+    if (!propertyMap.containsKey("defaultSequenceKind")) {
+      propertyMap.put("defaultSequenceKind", "bit_reversed_positive");
+    }
     boolean usesExternalHost =
         isExternalHost(Preconditions.checkNotNull(environment), commandLine, propertyMap);
 
@@ -882,7 +886,12 @@ public class OptionsMetadata {
         if (keyValue.length == 2) {
           properties.put(keyValue[0], keyValue[1]);
         } else {
-          throw new IllegalArgumentException("Invalid JDBC property specified: " + propertyOptions);
+          if (propertyList[i].endsWith("=")) {
+            properties.put(keyValue[0], "");
+          } else {
+            throw new IllegalArgumentException(
+                "Invalid JDBC property specified: " + propertyOptions);
+          }
         }
       }
     }
