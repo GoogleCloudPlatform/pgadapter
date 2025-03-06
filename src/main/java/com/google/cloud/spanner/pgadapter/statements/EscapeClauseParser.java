@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.session.RemoveEscapeClauseEnum;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -30,20 +31,21 @@ class EscapeClauseParser {
           .build();
 
   /** Removes LIKE ... ESCAPE '\' clauses from the statement. */
-  static Statement removeDefaultEscapeClauses(Statement statement, String lowerCaseSql) {
+  static Statement removeEscapeClauses(
+      Statement statement, String lowerCaseSql, RemoveEscapeClauseEnum setting) {
     // If there is no 'escape' clause, then we know that we don't have to analyze any further.
     if (!lowerCaseSql.contains("escape")) {
       return statement;
     }
     try {
       return REMOVED_ESCAPE_CLAUSES_CACHE.get(
-          statement.getSql(), () -> removeDefaultEscapeClauses(statement));
+          setting.name() + statement.getSql(), () -> removeEscapeClauses(statement, setting));
     } catch (ExecutionException executionException) {
       throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
     }
   }
 
-  static Statement removeDefaultEscapeClauses(Statement statement) {
+  static Statement removeEscapeClauses(Statement statement, RemoveEscapeClauseEnum setting) {
     SimpleParser parser = new SimpleParser(statement.getSql());
     while (parser.getPos() < parser.getSql().length()) {
       parser.parseExpressionUntilKeyword(ImmutableList.of("escape"), false, false, false);
@@ -53,7 +55,7 @@ class EscapeClauseParser {
       int pos = parser.getPos();
       if (parser.eatKeyword("escape")) {
         QuotedString escape = parser.readSingleQuotedString();
-        if ("\\".equals(escape.getValue())) {
+        if ("\\".equals(escape.getValue()) || setting == RemoveEscapeClauseEnum.ALL) {
           int endPos = parser.getPos();
           statement =
               Statement.of(

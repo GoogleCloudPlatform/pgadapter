@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
-import static com.google.cloud.spanner.pgadapter.statements.EscapeClauseParser.removeDefaultEscapeClauses;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.PARSER;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
@@ -58,6 +57,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.session.RemoveEscapeClauseEnum;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -367,8 +367,11 @@ public class BackendConnection {
               && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
             updatedStatement = replaceForUpdate(updatedStatement, sqlLowerCase);
           }
-          if (sessionState.isRemoveDefaultEscapeClause()) {
-            updatedStatement = removeDefaultEscapeClauses(updatedStatement, sqlLowerCase);
+          RemoveEscapeClauseEnum removeEscapeClauseEnum = sessionState.getRemoveEscapeClause();
+          if (removeEscapeClauseEnum != RemoveEscapeClauseEnum.NONE) {
+            updatedStatement =
+                EscapeClauseParser.removeEscapeClauses(
+                    updatedStatement, sqlLowerCase, removeEscapeClauseEnum);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));

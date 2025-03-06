@@ -462,9 +462,21 @@ public class SessionState {
     return getBoolSetting("spanner", "replace_for_update", false);
   }
 
-  /** Returns whether LIKE ... ESCAPE '\' clauses are removed. */
-  public boolean isRemoveDefaultEscapeClause() {
-    return getBoolSetting("spanner", "remove_default_escape", true);
+  /** Returns whether LIKE ... ESCAPE clauses are removed. */
+  public RemoveEscapeClauseEnum getRemoveEscapeClause() {
+    PGSetting setting = internalGet(toKey("spanner", "remove_escape_clause"), false);
+    if (setting == null) {
+      return RemoveEscapeClauseEnum.DEFAULT;
+    }
+    return tryGetFirstNonNull(
+        RemoveEscapeClauseEnum.DEFAULT,
+        () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getSetting())),
+        () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getResetVal())),
+        () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getBootVal())));
+  }
+
+  private static String upper(String s) {
+    return s == null ? null : s.toUpperCase(Locale.ENGLISH);
   }
 
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */

@@ -4195,7 +4195,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(361, count);
+        assertEquals(362, count);
       }
     }
   }
@@ -5248,7 +5248,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testRemoveEscapeClause() throws SQLException {
+  public void testRemoveDefaultEscapeClause() throws SQLException {
     String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(expectedSql), SELECT1_RESULTSET));
@@ -5258,6 +5258,25 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               .createStatement()
               .executeQuery(
                   "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '\\' AND city LIKE 'NY%' ESCAPE '\\'")) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testRemoveAllEscapeClauses() throws SQLException {
+    String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(expectedSql), SELECT1_RESULTSET));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.remove_escape_clause=all");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '%' AND city LIKE 'NY%' ESCAPE 'Y'")) {
         assertTrue(resultSet.next());
         assertEquals(1, resultSet.getInt(1));
         assertFalse(resultSet.next());

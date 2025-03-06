@@ -14,11 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.statements.EscapeClauseParser.removeDefaultEscapeClauses;
+import static com.google.cloud.spanner.pgadapter.statements.EscapeClauseParser.removeEscapeClauses;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.session.RemoveEscapeClauseEnum;
 import java.util.Locale;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -28,48 +29,81 @@ import org.junit.runners.JUnit4;
 public class LikeEscapeTest {
 
   @Test
-  public void testRemoveEscapeClauses() {
-    assertSameAfterRemoveEscape("select 1");
-    assertSameAfterRemoveEscape("select col1, col2 from my_table where bar like 'one'");
-    assertSameAfterRemoveEscape("update my_table set bar=1 where foo like 'two'");
-    assertSameAfterRemoveEscape("select col1 from my_table");
+  public void testRemoveDefaultEscapeClauses() {
+    assertSameAfterRemoveEscape("select 1", RemoveEscapeClauseEnum.DEFAULT);
     assertSameAfterRemoveEscape(
-        "select col1 from foo where test=1 /* and test like 'one' escape '\\' */");
-    assertSameAfterRemoveEscape("select col1, col2 from my_table where bar like 'one' escape '*'");
+        "select col1, col2 from my_table where bar like 'one'", RemoveEscapeClauseEnum.DEFAULT);
+    assertSameAfterRemoveEscape(
+        "update my_table set bar=1 where foo like 'two'", RemoveEscapeClauseEnum.DEFAULT);
+    assertSameAfterRemoveEscape("select col1 from my_table", RemoveEscapeClauseEnum.DEFAULT);
+    assertSameAfterRemoveEscape(
+        "select col1 from foo where test=1 /* and test like 'one' escape '\\' */",
+        RemoveEscapeClauseEnum.DEFAULT);
+    assertSameAfterRemoveEscape(
+        "select col1, col2 from my_table where bar like 'one' escape '*'",
+        RemoveEscapeClauseEnum.DEFAULT);
 
     assertEquals(
         Statement.of("select col1 from foo where bar like 'test'"),
-        internalRemoveEscape("select col1 from foo where bar like 'test' escape '\\'"));
+        internalRemoveEscape(
+            "select col1 from foo where bar like 'test' escape '\\'",
+            RemoveEscapeClauseEnum.DEFAULT));
     assertEquals(
         Statement.of("select col1 from foo where bar like 'test' and baz like 'test' escape '*'"),
         internalRemoveEscape(
-            "select col1 from foo where bar like 'test' escape '\\' and baz like 'test' escape '*'"));
+            "select col1 from foo where bar like 'test' escape '\\' and baz like 'test' escape '*'",
+            RemoveEscapeClauseEnum.DEFAULT));
     assertEquals(
         Statement.of("select col1 from foo where bar like 'test' and baz like 'test'"),
         internalRemoveEscape(
-            "select col1 from foo where bar like 'test' escape '\\' and baz like 'test' escape '\\'"));
+            "select col1 from foo where bar like 'test' escape '\\' and baz like 'test' escape '\\'",
+            RemoveEscapeClauseEnum.DEFAULT));
     assertEquals(
         Statement.of("select col1 from foo where bar like $1"),
-        internalRemoveEscape("select col1 from foo where bar like $1 escape '\\'"));
+        internalRemoveEscape(
+            "select col1 from foo where bar like $1 escape '\\'", RemoveEscapeClauseEnum.DEFAULT));
     assertEquals(
         Statement.of(
             "select col1 from foo where bar in (select val from t where id like $1) and id=1"),
         internalRemoveEscape(
-            "select col1 from foo where bar in (select val from t where id like $1 escape '\\') and id=1"));
+            "select col1 from foo where bar in (select val from t where id like $1 escape '\\') and id=1",
+            RemoveEscapeClauseEnum.DEFAULT));
+    assertEquals(
+        Statement.of(
+            "select col1 from foo where bar like 'test' escape '' and baz like 'test' escape ''"),
+        internalRemoveEscape(
+            "select col1 from foo where bar like 'test' escape '' and baz like 'test' escape ''",
+            RemoveEscapeClauseEnum.DEFAULT));
+  }
+
+  @Test
+  public void testRemoveAllEscapeClauses() {
+    assertSameAfterRemoveEscape("select 1", RemoveEscapeClauseEnum.ALL);
+    assertSameAfterRemoveEscape(
+        "select col1, col2 from my_table where bar like 'one'", RemoveEscapeClauseEnum.ALL);
+    assertSameAfterRemoveEscape(
+        "update my_table set bar=1 where foo like 'two'", RemoveEscapeClauseEnum.ALL);
+    assertSameAfterRemoveEscape("select col1 from my_table", RemoveEscapeClauseEnum.ALL);
     assertEquals(
         Statement.of("select col1 from foo where bar like 'test' and baz like 'test'"),
         internalRemoveEscape(
-            "select col1 from foo where bar like 'test' escape '' and baz like 'test' escape ''"));
+            "select col1 from foo where bar like 'test' escape '' and baz like 'test' escape ''",
+            RemoveEscapeClauseEnum.ALL));
+    assertEquals(
+        Statement.of("select col1 from foo where bar like 'test' and baz like 'test'"),
+        internalRemoveEscape(
+            "select col1 from foo where bar like 'test' escape '\\' and baz like 'test' escape '&'",
+            RemoveEscapeClauseEnum.ALL));
   }
 
-  private void assertSameAfterRemoveEscape(String sql) {
+  private void assertSameAfterRemoveEscape(String sql, RemoveEscapeClauseEnum setting) {
     Statement statement = Statement.of(sql);
     assertSame(
         statement,
-        removeDefaultEscapeClauses(statement, statement.getSql().toLowerCase(Locale.ENGLISH)));
+        removeEscapeClauses(statement, statement.getSql().toLowerCase(Locale.ENGLISH), setting));
   }
 
-  private Statement internalRemoveEscape(String sql) {
-    return removeDefaultEscapeClauses(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH));
+  private Statement internalRemoveEscape(String sql, RemoveEscapeClauseEnum setting) {
+    return removeEscapeClauses(Statement.of(sql), sql.toLowerCase(Locale.ENGLISH), setting);
   }
 }
