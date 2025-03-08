@@ -81,8 +81,6 @@ The following limitations are currently known:
 | Creating and Dropping Tables | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated creation of tables using `SQLAlchemy` is therefore not supported.                                                                                                                         |
 | metadata.reflect()           | Cloud Spanner does not support all PostgreSQL `pg_catalog` tables. Using `metadata.reflect()` to get the current objects in the database is therefore not supported.                                                                                                |
 | DDL Transactions             | Cloud Spanner does not support DDL statements in a transaction. Add `?options=-c spanner.ddl_transaction_mode=AutocommitExplicitTransaction` to your connection string to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). |
-| Generated primary keys       | Manually assign a value to the primary key column in your code. The recommended primary key type is a random UUID. Sequences / SERIAL / IDENTITY columns are currently not supported.                                                                               |
-| INSERT ... ON CONFLICT       | `INSERT ... ON CONFLICT` is not supported.                                                                                                                                                                                                                          |
 | SAVEPOINT                    | Rolling back to a `SAVEPOINT` can fail if the transaction contained at least one query that called a volatile function.                                                                                                                                             |
 | SELECT ... FOR UPDATE        | Only `SELECT ... FOR UPDATE` without any additional options is supported. The `NOWAIT` and `SKIP LOCKED` options are not supported.                                                                                                                                 |
 | Server side cursors          | Server side cursors are currently not supported.                                                                                                                                                                                                                    |
@@ -91,39 +89,14 @@ The following limitations are currently known:
 | User defined functions       | Cloud Spanner does not support User Defined Functions.                                                                                                                                                                                                              |
 | Other drivers than psycopg2  | PGAdapter does not support using SQLAlchemy with any other drivers than `psycopg2`.                                                                                                                                                                                 |
 
-### Generated Primary Keys
-Generated primary keys are not supported and should be replaced with primary key definitions that
-are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
-for more information on choosing a good primary key. This sample uses random UUIDs that are generated
-by the client and stored as strings for primary keys.
-
-```python
-from uuid import uuid4
-
-class Singer(Base):
-  id = Column(String, primary_key=True)
-  name = Column(String(100))
-
-singer = Singer(
-  id="{}".format(uuid4()),
-  name="Alice")
-```
-
-### ON CONFLICT Clauses
-`INSERT ... ON CONFLICT ...` are not supported by Cloud Spanner and should not be used. Trying to
-use https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
-or https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_nothing
-will fail.
-
 ### SAVEPOINT - Nested transactions
 Rolling back to a `SAVEPOINT` can fail if the transaction contained at least one query that called a
 volatile function or if the underlying data that has been accessed by the transaction has been
 modified by another transaction.
 
 ### Locking - SELECT ... FOR UPDATE
-Locking clauses, like `SELECT ... FOR UPDATE`, are not supported (see also https://docs.sqlalchemy.org/en/20/orm/queryguide/query.html#sqlalchemy.orm.Query.with_for_update).
-These are normally also not required, as Cloud Spanner uses isolation level `serializable` for
-read/write transactions.
+`SELECT ... FOR UPDATE` is only supported without any additional options. The `NOWAIT` and
+`SKIP LOCKED` options are not supported.
 
 ## Performance Considerations
 
