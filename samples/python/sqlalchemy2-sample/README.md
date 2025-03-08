@@ -116,17 +116,22 @@ The following limitations are currently known:
 | Other drivers than psycopg 3.x | PGAdapter does not support using SQLAlchemy 2.x with any other drivers than `psycopg 3.x`.                                                                                                                                                                          |
 
 ### Generated Primary Keys
-Generated primary keys can be used in combination with a bit-reversed sequence.
+Spanner supports the `serial` data type. Columns with this data type use a backing bit-reversed
+sequence to generate unique values that are safe to use as primary key values in Spanner. The values
+are not monotonically increasing.
 
-The `TicketSale` model in this sample application uses an auto-generated primary key that is
-generated from a bit-reversed sequence:
+You must set a `default_sequence_kind` for your database before you can create a column with data
+type `serial`. The [create_data_model.sql](create_data_model.sql) file includes a statement to set
+the default.
+
+The `TicketSale` model in this sample application uses a `serial` for auto-generated primary keys:
 1. See [model.py](model.py) for the model definition.
-2. See [create_data_model.sql](create_data_model.sql) for the sequence and table definition.
+2. See [create_data_model.sql](create_data_model.sql) for the table definition.
 
-See https://cloud.google.com/spanner/docs/primary-key-default-value#bit-reversed-sequence for more
-information on bit-reversed sequences in Cloud Spanner.
+See https://cloud.google.com/spanner/docs/primary-key-default-value#serial-auto-increment for more
+information on the `serial` data type in Spanner.
 
-#### Example Mapping for Generated Primary Key using a Bit-Reversed Sequence
+#### Example Mapping for Generated Primary Key using serial
 
 Python model definition:
 
@@ -140,12 +145,12 @@ session.add(singer)
 session.commit()
 ```
 
-Sequence and table definition:
+Database option and table definition:
 
 ```sql
-create sequence if not exists singers_seq bit_reversed_positive;
+alter database db set spanner.default_sequence_kind='bit_reversed_positive';
 create table if not exists singers (
-  id   bigint not null primary key default nextval('singers_seq'),
+  id   serial primary key,
   name varchar not null
 );
 ```
