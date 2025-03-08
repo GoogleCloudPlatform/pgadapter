@@ -57,6 +57,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.session.RemoveEscapeClauseEnum;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -369,6 +370,12 @@ public class BackendConnection {
           } else {
             updatedStatement =
                 replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ false);
+          }
+          RemoveEscapeClauseEnum removeEscapeClauseEnum = sessionState.getRemoveEscapeClause();
+          if (removeEscapeClauseEnum != RemoveEscapeClauseEnum.NONE) {
+            updatedStatement =
+                EscapeClauseParser.removeEscapeClauses(
+                    updatedStatement, sqlLowerCase, removeEscapeClauseEnum);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));
