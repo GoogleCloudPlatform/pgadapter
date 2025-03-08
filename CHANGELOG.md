@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.46.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.45.0...v0.46.0) (2025-03-08)
+
+
+### Features
+
+* automatically set default_sequence_kind to bit_reversed_positive ([#2937](https://github.com/GoogleCloudPlatform/pgadapter/issues/2937)) ([a311663](https://github.com/GoogleCloudPlatform/pgadapter/commit/a3116631616131f5948659e03f65c3d5ccb6425b))
+* remove default like escape clauses ([#2956](https://github.com/GoogleCloudPlatform/pgadapter/issues/2956)) ([533c1d0](https://github.com/GoogleCloudPlatform/pgadapter/commit/533c1d0a977f7b887125c0c0db18268ee096aac8))
+
+
+### Bug Fixes
+
+* remove 'for update of' clauses ([#2949](https://github.com/GoogleCloudPlatform/pgadapter/issues/2949)) ([6337ba1](https://github.com/GoogleCloudPlatform/pgadapter/commit/6337ba13e70b0a0d4ba79c42fb629fe3bb1a2f37))
+* replace FOR UPDATE clauses on the emulator ([#2950](https://github.com/GoogleCloudPlatform/pgadapter/issues/2950)) ([a6f8b43](https://github.com/GoogleCloudPlatform/pgadapter/commit/a6f8b43ac9e1da3c4743baa306d9f28dce3c18c0))
+
+
+### Dependencies
+
+* update dependency com.fasterxml.jackson.core:jackson-databind to v2.18.3 ([#2962](https://github.com/GoogleCloudPlatform/pgadapter/issues/2962)) ([f390304](https://github.com/GoogleCloudPlatform/pgadapter/commit/f39030420dfee768407f79a93f899c1f4fc4c877))
+* update dependency django to v5.1.7 [security] ([#2990](https://github.com/GoogleCloudPlatform/pgadapter/issues/2990)) ([ee0bb8c](https://github.com/GoogleCloudPlatform/pgadapter/commit/ee0bb8c2f63f085a30c97c109d71deaf51eefbb5))
+* update dependency go to v1.24.1 ([#2978](https://github.com/GoogleCloudPlatform/pgadapter/issues/2978)) ([12be602](https://github.com/GoogleCloudPlatform/pgadapter/commit/12be602b03574f5c3857cb993068c489c7474556))
+* update dependency io.hypersistence:hypersistence-utils-hibernate-63 to v3.9.3 ([#2994](https://github.com/GoogleCloudPlatform/pgadapter/issues/2994)) ([f0f63ed](https://github.com/GoogleCloudPlatform/pgadapter/commit/f0f63ed0520e08f6e7e880410a3e223d4016fb53))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.48.0 ([#2995](https://github.com/GoogleCloudPlatform/pgadapter/issues/2995)) ([11e89cf](https://github.com/GoogleCloudPlatform/pgadapter/commit/11e89cf10f961968599a1e22705f7eef95cec5d0))
+* update dependency org.checkerframework:checker-qual to v3.49.1 ([#2970](https://github.com/GoogleCloudPlatform/pgadapter/issues/2970)) ([5c33333](https://github.com/GoogleCloudPlatform/pgadapter/commit/5c33333d5495f2a0274f1d3968bd69c9b0a979e8))
+* update dependency org.testcontainers:testcontainers to v1.20.6 ([#2980](https://github.com/GoogleCloudPlatform/pgadapter/issues/2980)) ([51d44bc](https://github.com/GoogleCloudPlatform/pgadapter/commit/51d44bc6675ceca218f01beb52c445d962ee6f04))
+* update dependency org.testcontainers:testcontainers-bom to v1.20.6 ([#2979](https://github.com/GoogleCloudPlatform/pgadapter/issues/2979)) ([6d65945](https://github.com/GoogleCloudPlatform/pgadapter/commit/6d65945529911a4174bf967547e913954adaeb9e))
+* update dependency testcontainers to v4.9.2 ([#2984](https://github.com/GoogleCloudPlatform/pgadapter/issues/2984)) ([3ab20cd](https://github.com/GoogleCloudPlatform/pgadapter/commit/3ab20cd9bec699a5952c454fed685acf14a6fb3e))
+* update dependency testcontainers/testcontainers to v1 ([#2972](https://github.com/GoogleCloudPlatform/pgadapter/issues/2972)) ([dd36dc8](https://github.com/GoogleCloudPlatform/pgadapter/commit/dd36dc8d32860ab0d4c8e080dfb5608174fc92ed))
+* update dependency typescript to v5.8.2 ([#2960](https://github.com/GoogleCloudPlatform/pgadapter/issues/2960)) ([7af30df](https://github.com/GoogleCloudPlatform/pgadapter/commit/7af30dfd3bb0baccd7875854e0f3648ae4b95d6d))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 02e2fa0 ([#2944](https://github.com/GoogleCloudPlatform/pgadapter/issues/2944)) ([7ab0c6f](https://github.com/GoogleCloudPlatform/pgadapter/commit/7ab0c6fd34e487753ca1bc8234900fb10ff71255))
+* update golang docker tag to v1.24.1 ([#2981](https://github.com/GoogleCloudPlatform/pgadapter/issues/2981)) ([243dd8a](https://github.com/GoogleCloudPlatform/pgadapter/commit/243dd8a28d58cfc4e15c1c012d5dbeb038b90be3))
+* update module cloud.google.com/go/spanner to v1.77.0 ([#2991](https://github.com/GoogleCloudPlatform/pgadapter/issues/2991)) ([2017845](https://github.com/GoogleCloudPlatform/pgadapter/commit/20178450f34f90514a96f114c9385fefe86c6ad6))
+* update module golang.org/x/oauth2 to v0.28.0 ([#2983](https://github.com/GoogleCloudPlatform/pgadapter/issues/2983)) ([dd20df9](https://github.com/GoogleCloudPlatform/pgadapter/commit/dd20df95737cf6cc6d40dc581e7c8ef06e784002))
+* update module google.golang.org/api to v0.224.0 ([#2988](https://github.com/GoogleCloudPlatform/pgadapter/issues/2988)) ([22ea9ff](https://github.com/GoogleCloudPlatform/pgadapter/commit/22ea9ff9917fd096a70c34e4fb4c6ba7fc12a1e6))
+
+
+### Documentation
+
+* remove some outdated limitations for SQLAlchemy 1.4 ([#2993](https://github.com/GoogleCloudPlatform/pgadapter/issues/2993)) ([4b151a9](https://github.com/GoogleCloudPlatform/pgadapter/commit/4b151a9c39751f4cdf921fe9b79a8042a467354a))
+* update SQLAlchemy2 sample to use serial ([#2992](https://github.com/GoogleCloudPlatform/pgadapter/issues/2992)) ([956882a](https://github.com/GoogleCloudPlatform/pgadapter/commit/956882a9424cecbae4abb00e2645041adf9cf6f9))
+* use 'serial' for primary key generation in gorm sample ([#2945](https://github.com/GoogleCloudPlatform/pgadapter/issues/2945)) ([5989f8c](https://github.com/GoogleCloudPlatform/pgadapter/commit/5989f8c48a6af3d808e84013429dec5eec04a8e8))
+
 ## [0.45.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.44.0...v0.45.0) (2025-02-27)
 
 
