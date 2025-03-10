@@ -78,23 +78,14 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.check_constraint "end_time > start_time", name: :chk_end_time_after_start_time
     end
 
-    # The ActiveRecord PostgreSQL provider does not know how to create a bit-reversed sequence.
-    # These sequences must therefore be created using a hand-written SQL script.
-    # Bit-reversed sequences can be used to create auto-generated primary key values that are
-    # safe from hot-spotting.
-    # See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
-    # for more information on choosing a good primary key.
-    execute "create sequence ticket_sale_seq
-             bit_reversed_positive
-             skip range 1 1000
-             start counter with 50000;"
+    # You must set a default_sequence_kind before creating a column with type 'serial'.
+    # If you fail to do so in your create script, PGAdapter will automatically set it
+    # for you.
+    execute "alter database db set spanner.default_sequence_kind='bit_reversed_positive';"
 
-    # Create a table that uses a bit-reversed sequence to auto-generate primary key values.
-    # The 'id' column definition is specified using a SQL statement to ensure that we get
-    # a column with the right type, and with a default clause that selects a value from the
-    # sequence.
-    create_table :ticket_sales, id: false, primary_key: :id do |t|
-      t.column :id, "bigint not null primary key default nextval('ticket_sale_seq')"
+    # Create a table that uses a standard primary key. Ruby ActiveRecord then generates a serial
+    # column. This will use a backing bit-reversed sequence to auto-generate primary key values.
+    create_table :ticket_sales do |t|
       t.references :concert, foreign_key: {primary_key: :concert_id},
                    type: :string, limit: 36, index: false
       t.string :customer_name
