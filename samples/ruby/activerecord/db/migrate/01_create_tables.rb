@@ -41,7 +41,6 @@ class CreateTables < ActiveRecord::Migration[7.0]
     # The ActiveRecord PostgreSQL provider does not know how to create an interleaved table.
     # These tables must therefore be created using a hand-written SQL script.
     # Note that interleaved tables require you to use a composite primary key.
-    # This also requires "gem 'composite_primary_keys', '~> 14'" to be part of your project.
     execute "create table tracks (
         album_id     varchar(36) not null,
         track_number bigint not null,
