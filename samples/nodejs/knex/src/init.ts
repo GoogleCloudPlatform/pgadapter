@@ -95,17 +95,12 @@ export async function createDataModel(knex: Knex) {
                 constraint chk_end_time_after_start_time check (end_time > start_time)
               );
 
-              -- Create a bit-reversed sequence that will be used to generate identifiers for the ticket_sales table.
-              -- See also https://cloud.google.com/spanner/docs/reference/postgresql/data-definition-language#create_sequence
-              -- Note that the 'bit_reversed_positive' keyword is required for Spanner,
-              -- and is automatically skipped for open-source PostgreSQL.
-              create sequence if not exists ticket_sale_seq
-                bit_reversed_positive
-                skip range 1 1000
-                start counter with 50000;
+              -- We must set a default_sequence_kind for the database before we can use the serial
+              -- data type. Currently, 'bit_reversed_positive' is the only supported option.
+              alter database db set spanner.default_sequence_kind='bit_reversed_positive';
 
               create table if not exists ticket_sales (
-                id bigint not null primary key default nextval('ticket_sale_seq'),
+                id               serial primary key,
                 concert_id       varchar not null,
                 customer_name    varchar not null,
                 price            decimal not null,
