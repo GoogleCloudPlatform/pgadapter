@@ -46,7 +46,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -89,6 +91,13 @@ public class ProxyServer extends AbstractApiService {
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
+  private final ExecutorService createConnectionHandlerExecutor =
+      new ThreadPoolExecutor(
+          /* corePoolSize = */ 1,
+          Runtime.getRuntime().availableProcessors(),
+          /* keepAliveTime = */ 10L,
+          TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>());
   private final ThreadFactory threadFactory;
 
   /**
@@ -286,6 +295,7 @@ public class ProxyServer extends AbstractApiService {
       }
     } catch (Throwable ignore) {
     }
+    createConnectionHandlerExecutor.shutdown();
     if (openTelemetry instanceof Closeable) {
       try {
         ((Closeable) openTelemetry).close();
@@ -403,7 +413,24 @@ public class ProxyServer extends AbstractApiService {
     awaitRunning();
     try {
       while (isRunning()) {
-        createConnectionHandler(serverSocket.accept());
+        Socket socket = serverSocket.accept();
+        // Hand off the creation of the connection handler to a worker thread to ensure that we
+        // continue to listen for new incoming connection requests as quickly as possible.
+        // This prevents connection timeouts if there is a large 'connect storm' (i.e. a client
+        // sends a large number of connection requests at the same time).
+        createConnectionHandlerExecutor.submit(
+            () -> {
+              try {
+                createConnectionHandler(socket);
+              } catch (SocketException socketException) {
+                logger.log(
+                    Level.WARNING,
+                    () ->
+                        String.format(
+                            "Failed to create connection on socket %s: %s.",
+                            socket, socketException));
+              }
+            });
       }
     } catch (SocketException e) {
       // This is a normal and expected exception when the server is shutting down.

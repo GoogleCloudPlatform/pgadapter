@@ -18,10 +18,10 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 
 @InternalApi
-public class ResultSetHelper {
+public class PGAdapterResultSetHelper {
 
   /** Private constructor to prevent instantiation. */
-  private ResultSetHelper() {}
+  private PGAdapterResultSetHelper() {}
 
   /**
    * Converts the given {@link ResultSet} to a {@link DirectExecuteResultSet}. A {@link

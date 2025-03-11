@@ -944,6 +944,7 @@ public class ITPsqlTest implements IntegrationTest {
           ZoneId.of("Asia/Tehran"),
           // Changed the use of DST multiple times. Changed offset on 2024-02-29.
           ZoneId.of("Asia/Almaty"),
+          ZoneId.of("Asia/Choibalsan"),
           ZoneId.of("Asia/Qostanay"),
           // Rankin_Inlet and Resolute did not observe DST in 1970-1979, but not all databases
           // agree.

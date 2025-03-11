@@ -116,9 +116,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.42.2` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.46.0` with the version you want to download):
 ```shell
-VERSION=v0.42.2
+VERSION=v0.46.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -153,7 +153,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.42.2</version>
+  <version>0.46.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -273,7 +273,7 @@ The following list contains the most frequently used startup options for PGAdapt
     Docker container, as the connections from the host machine will not be seen as a connection from
     localhost in the container.
 
---allow_shutdown_command
+--allow_shutdown_statement
   * Enables the use of the custom SQL command `SHUTDOWN [SMART | FAST | IMMEDIATE]`. This command can
     be used to shut down PGAdapter by just sending it a SQL statement. This option should only be enabled
     when PGAdapter runs in a trusted environment, for example as a side-car container. The default

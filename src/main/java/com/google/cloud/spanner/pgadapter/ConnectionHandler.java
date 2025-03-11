@@ -38,7 +38,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.connection.PGAdapterConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.SavepointSupport;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
@@ -79,13 +79,14 @@ import java.net.SocketException;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -203,15 +204,16 @@ public class ConnectionHandler implements Runnable {
     String uri = buildConnectionURL(database, options, getServer().getProperties());
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
     connectionOptionsBuilder =
-        ConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
+        PGAdapterConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
             connectionOptionsBuilder, options.isLogGrpcMessages());
-    connectionOptionsBuilder = ConnectionOptionsHelper.useDirectExecutor(connectionOptionsBuilder);
+    connectionOptionsBuilder =
+        PGAdapterConnectionOptionsHelper.useDirectExecutor(connectionOptionsBuilder);
     if (credentials != null) {
       connectionOptionsBuilder =
-          ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
+          PGAdapterConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
     } else if (options.getCredentials() != null) {
       connectionOptionsBuilder =
-          ConnectionOptionsHelper.setCredentials(
+          PGAdapterConnectionOptionsHelper.setCredentials(
               connectionOptionsBuilder, options.getCredentials());
     }
     SessionPoolOptions sessionPoolOptions =
@@ -272,6 +274,13 @@ public class ConnectionHandler implements Runnable {
     this.spannerConnection = spannerConnection;
     this.databaseId = connectionOptions.getDatabaseId();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
+    // TODO: Remove when the emulator supports FOR UPDATE clauses.
+    if (Boolean.parseBoolean(server.getProperties().getProperty("autoConfigEmulator", "false"))) {
+      this.extendedQueryProtocolHandler
+          .getBackendConnection()
+          .getSessionState()
+          .setConnectionStartupValue("spanner", "replace_for_update", "true");
+    }
   }
 
   @VisibleForTesting
@@ -317,9 +326,12 @@ public class ConnectionHandler implements Runnable {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
-    for (Entry<Object, Object> entry : info.entrySet()) {
-      if (!Strings.isNullOrEmpty((String) entry.getValue())) {
-        result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
+    List<Object> keys = new ArrayList<>(info.keySet());
+    keys.sort(Comparator.comparing(Object::toString));
+    for (Object key : keys) {
+      String value = (String) info.get(key);
+      if (!Strings.isNullOrEmpty(value)) {
+        result.append(";").append(key).append("=").append(value);
       }
     }
     return result.toString();
@@ -437,7 +449,11 @@ public class ConnectionHandler implements Runnable {
           () ->
               String.format(
                   "Exception on connection handler with ID %s for client %s: %s",
-                  getName(), socket.getInetAddress().getHostAddress(), e));
+                  getName(),
+                  socket == null || socket.getInetAddress() == null
+                      ? "(none)"
+                      : socket.getInetAddress().getHostAddress(),
+                  e));
     } finally {
       if (result != RunConnectionState.RESTART_WITH_SSL) {
         logger.log(

@@ -122,7 +122,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   private static final Statement SELECT_RANDOM = Statement.of("select * from random_table");
   private static final ImmutableList<String> JDBC_STARTUP_STATEMENTS =
       ImmutableList.of(
-          "SET extra_float_digits = 3", "SET application_name = 'PostgreSQL JDBC Driver'");
+          "SET extra_float_digits = 2",
+          "SET extra_float_digits = 3",
+          "SET application_name = 'PostgreSQL JDBC Driver'");
 
   @Parameter public String pgVersion;
 
@@ -403,7 +405,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   private String getExpectedInitialApplicationName() {
-    return "PostgreSQL JDBC Driver";
+    return pgVersion.equals("1.0") ? "jdbc" : "PostgreSQL JDBC Driver";
   }
 
   @Test
@@ -430,6 +432,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals(sql, request.getSql());
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+      assertFalse(request.getLastStatement());
     }
   }
 
@@ -522,7 +525,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                     + "  /* Preferably, this should use information_schema.information_schema_catalog_name, but that does not exist on the emulator. */\n"
                     + "  from (select distinct catalog_name from information_schema.schemata) catalogs\n"
                     + ")\n"
-                    + "SELECT datname AS TABLE_CAT FROM pg_database WHERE datallowconn = true ORDER BY datname"),
+                    + "SELECT datname AS \"TABLE_CAT\" FROM pg_database WHERE datallowconn = true ORDER BY datname"),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(
                     ResultSetMetadata.newBuilder()
@@ -580,6 +583,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertFalse(statement.getMoreResults());
     }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql + "\nRETURNING *", request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatement());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -597,6 +607,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertFalse(statement.getMoreResults());
     }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatement());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -703,6 +720,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertFalse(statement.getMoreResults());
     }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql + "\nRETURNING *", request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatement());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -840,6 +864,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertFalse(statement.getMoreResults());
     }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql + "\nRETURNING *", request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatement());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -1048,6 +1079,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
     assertTrue(request.getTransaction().hasBegin());
     assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertTrue(request.getLastStatements());
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
@@ -1209,6 +1241,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
     assertEquals(sql, executeRequest.getSql());
+    assertFalse(executeRequest.getLastStatement());
   }
 
   @Test
@@ -1332,6 +1365,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       ExecuteSqlRequest executeRequest = requests.get(requests.size() - 1);
       assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
       assertEquals(pgSql, executeRequest.getSql());
+      assertFalse(executeRequest.getLastStatement());
 
       Map<String, Value> params = executeRequest.getParams().getFieldsMap();
       Map<String, Type> types = executeRequest.getParamTypesMap();
@@ -1626,6 +1660,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         }
       }
     }
+    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
+      assertFalse(request.getLastStatement());
+    }
   }
 
   @Test
@@ -1686,6 +1723,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // End of retry.
     assertEquals(SELECT1.getSql(), requests.get(10).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(10).getQueryMode());
+
+    for (ExecuteSqlRequest request : requests) {
+      assertFalse(request.getLastStatement());
+    }
   }
 
   @Test
@@ -1741,6 +1782,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(1, requests.size());
     assertEquals(pgSql, requests.get(0).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(0).getQueryMode());
+    assertTrue(requests.get(0).getLastStatement());
   }
 
   @Test
@@ -2015,6 +2057,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+    assertTrue(request.getLastStatements());
   }
 
   @Test
@@ -2037,6 +2080,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertTrue(request.getLastStatements());
   }
 
   @Test
@@ -2082,6 +2126,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+    assertTrue(request.getLastStatements());
   }
 
   @Test
@@ -2192,6 +2237,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
     assertEquals(10, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
     assertEquals(20, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (ExecuteBatchDmlRequest request :
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class)) {
+      assertFalse(request.getLastStatements());
+    }
+    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
+      assertFalse(request.getLastStatement());
+    }
   }
 
   @Test
@@ -3863,7 +3915,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("show application_name ")) {
         assertTrue(resultSet.next());
-        assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
+        assertNull(resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -4143,7 +4195,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(361, count);
+        assertEquals(362, count);
       }
     }
   }
@@ -4162,7 +4214,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       connection.createStatement().execute("reset all");
 
-      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
+      verifySettingIsNull(connection, "application_name");
       verifySettingValue(connection, "search_path", "public");
       verifySettingValue(connection, "spanner.autocommit_dml_mode", "TRANSACTIONAL");
     }
@@ -4171,6 +4223,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSetToDefault() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
+
       connection.createStatement().execute("set application_name to 'my-app'");
       connection.createStatement().execute("set search_path to 'my_schema'");
       verifySettingValue(connection, "application_name", "my-app");
@@ -4179,7 +4233,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       connection.createStatement().execute("set application_name to default");
       connection.createStatement().execute("set search_path to default");
 
-      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
+      verifySettingIsNull(connection, "application_name");
       verifySettingValue(connection, "search_path", "public");
     }
   }
@@ -5161,25 +5215,24 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet =
           connection
               .createStatement()
-              // This 'for update' clause will be replaced with a lock_scanned_ranges hint.
-              .executeQuery("select 1 from my_table where id=1 for update")) {
-        assertTrue(resultSet.next());
-        assertEquals(1, resultSet.getInt(1));
-        assertFalse(resultSet.next());
-      }
-      connection.createStatement().execute("set spanner.replace_for_update to off");
-      try (ResultSet resultSet =
-          connection
-              .createStatement()
+              // This 'for update' clause will not be replaced with a lock_scanned_ranges hint.
               .executeQuery("select 2 from my_table where id=1 for update")) {
         assertTrue(resultSet.next());
         assertEquals(2, resultSet.getInt(1));
         assertFalse(resultSet.next());
       }
+      connection.createStatement().execute("set spanner.replace_for_update to on");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select 1 from my_table where id=1 for update")) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
 
       // FOR UPDATE is not removed if 'delay transaction start' is enabled. This prevents unexpected
       // behavior if the SELECT ... FOR UPDATE statement is executed without a transaction.
-      connection.createStatement().execute("set spanner.replace_for_update to on");
       connection
           .createStatement()
           .execute("set spanner.delay_transaction_start_until_first_write=true");
@@ -5189,6 +5242,43 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               .executeQuery("select 2 from my_table where id=1 for update")) {
         assertTrue(resultSet.next());
         assertEquals(2, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testRemoveDefaultEscapeClause() throws SQLException {
+    String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(expectedSql), SELECT1_RESULTSET));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '\\' AND city LIKE 'NY%' ESCAPE '\\'")) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testRemoveAllEscapeClauses() throws SQLException {
+    String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(expectedSql), SELECT1_RESULTSET));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.remove_escape_clause=all");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '%' AND city LIKE 'NY%' ESCAPE 'Y'")) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
         assertFalse(resultSet.next());
       }
     }

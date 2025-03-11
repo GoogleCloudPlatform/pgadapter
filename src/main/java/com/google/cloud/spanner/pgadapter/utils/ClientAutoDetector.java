@@ -46,7 +46,9 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -70,6 +72,11 @@ public class ClientAutoDetector {
       ImmutableSet.of("pg_", "information_schema.");
   public static final String PGBENCH_USAGE_HINT =
       "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/docs/pgbench.md for how to use pgbench with PGAdapter";
+
+  /** Force the detector to return this client. This should only be used for testing. */
+  @VisibleForTesting
+  public static final AtomicReference<WellKnownClient> FORCE_DETECT_CLIENT =
+      new AtomicReference<>();
 
   public enum WellKnownClient {
     PSQL {
@@ -665,6 +672,9 @@ public class ClientAutoDetector {
   public static @Nonnull WellKnownClient detectClient(
       List<String> orderParameterKeys, Map<String, String> parameters) {
     for (WellKnownClient client : WellKnownClient.values()) {
+      if (Objects.equals(client, FORCE_DETECT_CLIENT.get())) {
+        return client;
+      }
       if (client.isClient(orderParameterKeys, parameters)) {
         return client;
       }

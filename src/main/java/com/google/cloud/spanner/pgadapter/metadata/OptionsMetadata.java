@@ -33,6 +33,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.DatabaseName;
+import io.grpc.ExperimentalApi;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -42,6 +43,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -63,6 +65,12 @@ public class OptionsMetadata {
   private static final String SPANNER_EMULATOR_HOST_ENV_VAR = "SPANNER_EMULATOR_HOST";
 
   static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
+  private static final String CLOUD_SPANNER_HOST_FORMAT = ".*\\.googleapis\\.com.*";
+  private static final Pattern CLOUD_SPANNER_HOST_PATTERN =
+      Pattern.compile(CLOUD_SPANNER_HOST_FORMAT);
+
+  private static final String EXTERNAL_HOST_PROJECT = "default";
+  private static final String EXTERNAL_HOST_INSTANCE = "default";
 
   /**
    * Builder class for creating an instance of {@link OptionsMetadata}.
@@ -108,6 +116,8 @@ public class OptionsMetadata {
     private String endpoint;
     private boolean usePlainText;
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
+    private String clientCertificate;
+    private String clientKey;
 
     Builder() {}
 
@@ -413,16 +423,25 @@ public class OptionsMetadata {
       return this;
     }
 
+    /**
+     * Configures mTLS authentication using the provided client certificate and key files. mTLS is
+     * only supported for external spanner hosts.
+     *
+     * @param clientCertificate Path to the client certificate file.
+     * @param clientKey Path to the client private key file.
+     */
+    @ExperimentalApi("https://github.com/googleapis/java-spanner/pull/3574")
+    Builder useClientCert(String clientCertificate, String clientKey) {
+      this.clientCertificate = clientCertificate;
+      this.clientKey = clientKey;
+      return this;
+    }
+
     public OptionsMetadata build() {
       if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT,
             "You must also specify a project if you specify an instance that PGAdapter should connect to.");
-      }
-      if (Strings.isNullOrEmpty(instance) && !Strings.isNullOrEmpty(database)) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "You must also specify an instance if you specify a database that PGAdapter should connect to.");
       }
       if (!(Strings.isNullOrEmpty(credentialsFile)
               && (credentials == null || NoCredentials.getInstance().equals(credentials)))
@@ -484,7 +503,8 @@ public class OptionsMetadata {
           || databaseRole != null
           || autoConfigEmulator
           || useVirtualGrpcTransportThreads
-          || enableEndToEndTracing) {
+          || enableEndToEndTracing
+          || (clientKey != null && clientCertificate != null)) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -505,6 +525,10 @@ public class OptionsMetadata {
         }
         if (enableEndToEndTracing) {
           jdbcOptionBuilder.append(ENABLE_END_TO_END_TRACING_PROPERTY_NAME).append("=true;");
+        }
+        if (clientKey != null && clientCertificate != null) {
+          jdbcOptionBuilder.append("clientCertificate=").append(clientCertificate).append(";");
+          jdbcOptionBuilder.append("clientKey=").append(clientKey).append(";");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
@@ -700,9 +724,19 @@ public class OptionsMetadata {
       @Nullable Credentials credentials,
       @Nullable SessionPoolOptions sessionPoolOptions,
       Duration startupTimeout) {
-    this.environment = Preconditions.checkNotNull(environment);
+    CommandLine commandLine = buildOptions(args);
+    Map<String, String> propertyMap =
+        parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
+    // Set a default_sequence_kind if none has been set by the user.
+    if (!propertyMap.containsKey("defaultSequenceKind")) {
+      propertyMap.put("defaultSequenceKind", "bit_reversed_positive");
+    }
+    boolean usesExternalHost =
+        isExternalHost(Preconditions.checkNotNull(environment), commandLine, propertyMap);
+
+    this.environment = environment;
     this.osName = osName;
-    this.commandLine = buildOptions(args);
+    this.commandLine = commandLine;
     this.credentials = credentials;
     this.sessionPoolOptions = sessionPoolOptions;
     this.commandMetadataParser = new CommandMetadataParser();
@@ -716,6 +750,7 @@ public class OptionsMetadata {
               + "OR use -c to set the credentials in PGAdapter and use these credentials for all connections.");
     }
     if (this.commandLine.hasOption(OPTION_DATABASE_NAME)
+        && !usesExternalHost
         && !(this.commandLine.hasOption(OPTION_PROJECT_ID)
             && this.commandLine.hasOption(OPTION_INSTANCE_ID))) {
       throw SpannerExceptionFactory.newSpannerException(
@@ -724,8 +759,9 @@ public class OptionsMetadata {
               + "Use the options -p <project-id> -i <instance-id> -d <database-id> to specify the "
               + "database that all connections to this instance of PGAdapter should use.");
     }
-    if (this.commandLine.hasOption(OPTION_PROJECT_ID)
-        && this.commandLine.hasOption(OPTION_INSTANCE_ID)
+    if ((usesExternalHost
+            || (this.commandLine.hasOption(OPTION_PROJECT_ID)
+                && this.commandLine.hasOption(OPTION_INSTANCE_ID)))
         && this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
       this.defaultConnectionUrl =
           buildConnectionURL(this.commandLine.getOptionValue(OPTION_DATABASE_NAME));
@@ -756,7 +792,7 @@ public class OptionsMetadata {
         parseDdlTransactionMode(commandLine.getOptionValue(OPTION_DDL_TRANSACTION_MODE));
     this.replaceJdbcMetadataQueries = commandLine.hasOption(OPTION_JDBC_MODE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
-    this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
+    this.propertyMap = propertyMap;
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
@@ -850,7 +886,12 @@ public class OptionsMetadata {
         if (keyValue.length == 2) {
           properties.put(keyValue[0], keyValue[1]);
         } else {
-          throw new IllegalArgumentException("Invalid JDBC property specified: " + propertyOptions);
+          if (propertyList[i].endsWith("=")) {
+            properties.put(keyValue[0], "");
+          } else {
+            throw new IllegalArgumentException(
+                "Invalid JDBC property specified: " + propertyOptions);
+          }
         }
       }
     }
@@ -978,7 +1019,7 @@ public class OptionsMetadata {
    */
   public String buildCredentialsFile() {
     // Skip if a com.google.auth.Credentials instance has been set.
-    if (credentials != null) {
+    if (isExternalHost() || credentials != null) {
       return null;
     }
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
@@ -1049,13 +1090,36 @@ public class OptionsMetadata {
   }
 
   private boolean isAutoConfigEmulator() {
-    return getPropertyMap() != null
-        && Boolean.parseBoolean(getPropertyMap().getOrDefault("autoConfigEmulator", "false"));
+    return isAutoConfigEmulator(getPropertyMap());
+  }
+
+  private static boolean isAutoConfigEmulator(Map<String, String> propertyMap) {
+    return propertyMap != null
+        && Boolean.parseBoolean(propertyMap.getOrDefault("autoConfigEmulator", "false"));
   }
 
   private boolean usesEmulator() {
     return !Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))
         || isAutoConfigEmulator();
+  }
+
+  private static boolean usesEmulator(
+      Map<String, String> environment, Map<String, String> propertyMap) {
+    return !Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))
+        || isAutoConfigEmulator(propertyMap);
+  }
+
+  private boolean isExternalHost() {
+    return isExternalHost(this.environment, this.commandLine, this.propertyMap);
+  }
+
+  private static boolean isExternalHost(
+      Map<String, String> environment, CommandLine commandLine, Map<String, String> propertyMap) {
+    return !usesEmulator(environment, propertyMap)
+        && commandLine.hasOption(OPTION_SPANNER_ENDPOINT)
+        && !CLOUD_SPANNER_HOST_PATTERN
+            .matcher(commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT))
+            .matches();
   }
 
   /** Returns the fully qualified database name based on the given database id or name. */
@@ -1067,6 +1131,8 @@ public class OptionsMetadata {
       String projectId;
       if (commandLine.hasOption(OPTION_PROJECT_ID)) {
         projectId = commandLine.getOptionValue(OPTION_PROJECT_ID);
+      } else if (isExternalHost()) {
+        projectId = EXTERNAL_HOST_PROJECT;
       } else {
         projectId = getDefaultProjectId();
       }
@@ -1080,6 +1146,8 @@ public class OptionsMetadata {
       String instanceId;
       if (commandLine.hasOption(OPTION_INSTANCE_ID)) {
         instanceId = commandLine.getOptionValue(OPTION_INSTANCE_ID);
+      } else if (isExternalHost()) {
+        instanceId = EXTERNAL_HOST_INSTANCE;
       } else {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.FAILED_PRECONDITION,
@@ -1497,23 +1565,32 @@ public class OptionsMetadata {
   public DatabaseId getDefaultDatabaseId() {
     return this.hasDefaultConnectionUrl()
         ? DatabaseId.of(
-            commandLine.getOptionValue(OPTION_PROJECT_ID),
-            commandLine.getOptionValue(OPTION_INSTANCE_ID),
+            !commandLine.hasOption(OPTION_PROJECT_ID) && isExternalHost()
+                ? EXTERNAL_HOST_PROJECT
+                : commandLine.getOptionValue(OPTION_PROJECT_ID),
+            !commandLine.hasOption(OPTION_INSTANCE_ID) && isExternalHost()
+                ? EXTERNAL_HOST_INSTANCE
+                : commandLine.getOptionValue(OPTION_INSTANCE_ID),
             commandLine.getOptionValue(OPTION_DATABASE_NAME))
         : null;
   }
 
   /** Returns true if these options contain a default instance id. */
   public boolean hasDefaultInstanceId() {
-    return commandLine.hasOption(OPTION_PROJECT_ID) && commandLine.hasOption(OPTION_INSTANCE_ID);
+    return isExternalHost()
+        || (commandLine.hasOption(OPTION_PROJECT_ID) && commandLine.hasOption(OPTION_INSTANCE_ID));
   }
 
   /** Returns the id of the default instance or null if no default has been selected. */
   public InstanceId getDefaultInstanceId() {
     if (hasDefaultInstanceId()) {
       return InstanceId.of(
-          commandLine.getOptionValue(OPTION_PROJECT_ID),
-          commandLine.getOptionValue(OPTION_INSTANCE_ID));
+          !commandLine.hasOption(OPTION_PROJECT_ID) && isExternalHost()
+              ? EXTERNAL_HOST_PROJECT
+              : commandLine.getOptionValue(OPTION_PROJECT_ID),
+          !commandLine.hasOption(OPTION_INSTANCE_ID) && isExternalHost()
+              ? EXTERNAL_HOST_INSTANCE
+              : commandLine.getOptionValue(OPTION_INSTANCE_ID));
     }
     return null;
   }

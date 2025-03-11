@@ -816,6 +816,34 @@ public class PdoMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testBatchDmlInTransaction() throws Exception {
+    String sql = "insert into my_table (id, value) values ($1, $2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.getDefaultInstance())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql).bind("p1").to(1L).bind("p2").to("One").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql).bind("p1").to(2L).bind("p2").to("Two").build(), 1L));
+
+    String actualOutput = execute("batch_dml_in_transaction");
+    String expectedOutput = "Inserted two rows\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+  }
+
+  @Test
   public void testBatchDdl() throws Exception {
     addDdlResponseToSpannerAdmin();
 

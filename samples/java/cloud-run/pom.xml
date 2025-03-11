@@ -36,7 +36,7 @@
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
-        <version>3.4.1</version>
+        <version>3.4.3</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -47,13 +47,13 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.4</version>
+      <version>42.7.5</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.40.0</version>
+      <version>0.46.0</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>

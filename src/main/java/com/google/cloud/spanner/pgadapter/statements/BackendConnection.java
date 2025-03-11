@@ -48,7 +48,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ResultSetHelper;
+import com.google.cloud.spanner.connection.PGAdapterResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.connection.TransactionRetryListener;
@@ -57,6 +57,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.session.RemoveEscapeClauseEnum;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -82,6 +83,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
@@ -89,7 +91,6 @@ import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -123,6 +124,8 @@ import javax.annotation.Nullable;
 @InternalApi
 public class BackendConnection {
   private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
+
+  public static final AttributeKey<String> DB_STATEMENT = AttributeKey.stringKey("db.statement");
 
   private final Tracer tracer;
 
@@ -359,10 +362,20 @@ public class BackendConnection {
                   ? pgCatalog.get().replacePgCatalogTables(updatedStatement, sqlLowerCase)
                   : updatedStatement;
           // TODO: Remove the check for isDelayBeginTransactionStartUntilFirstWrite when that
-          //       feature is able to detect the LOCK_SCANNED_RANGES=exclusive hint as a write.
+          //       feature is able to detect FOR UPDATE clauses as a write.
           if (sessionState.isReplaceForUpdateClause()
               && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
-            updatedStatement = replaceForUpdate(updatedStatement, sqlLowerCase);
+            updatedStatement =
+                replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ true);
+          } else {
+            updatedStatement =
+                replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ false);
+          }
+          RemoveEscapeClauseEnum removeEscapeClauseEnum = sessionState.getRemoveEscapeClause();
+          if (removeEscapeClauseEnum != RemoveEscapeClauseEnum.NONE) {
+            updatedStatement =
+                EscapeClauseParser.removeEscapeClauses(
+                    updatedStatement, sqlLowerCase, removeEscapeClauseEnum);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));
@@ -374,7 +387,7 @@ public class BackendConnection {
           try {
             result.set(
                 new QueryResult(
-                    ResultSetHelper.toDirectExecuteResultSet(
+                    PGAdapterResultSetHelper.toDirectExecuteResultSet(
                         spannerConnection
                             .getDatabaseClient()
                             .singleUse()
@@ -415,7 +428,7 @@ public class BackendConnection {
           // We handle one very specific use case here to prevent unnecessary problems: If the user
           // has started a DML batch and is then analyzing an update statement (probably a prepared
           // statement), then we use a separate transaction for that.
-          if (spannerConnection.isDmlBatchActive()) {
+          if (spannerConnection.isDmlBatchActive() && !spannerConnection.isInTransaction()) {
             final Statement statementToAnalyze = statement;
             resultSet =
                 spannerConnection
@@ -945,9 +958,7 @@ public class BackendConnection {
     SpanBuilder builder =
         tracer.spanBuilder(name).setAttribute("pgadapter.connection_id", connectionId);
     if (statement != null) {
-      // Ignore deprecation for now, as there is no alternative offered (yet?).
-      //noinspection deprecation
-      builder.setAttribute(SemanticAttributes.DB_STATEMENT, statement.getSql());
+      builder.setAttribute(DB_STATEMENT, statement.getSql());
     }
     if (currentTransactionId != null) {
       builder.setAttribute("pgadapter.transaction_id", currentTransactionId.toString());
