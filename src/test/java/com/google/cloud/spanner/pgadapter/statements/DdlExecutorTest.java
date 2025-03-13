@@ -177,9 +177,20 @@ public class DdlExecutorTest {
     assertEquals(
         ImmutableList.of(
             Statement.of("drop dependent indexes of foo"),
+            Statement.of("drop table if exists foo")),
+        ddlExecutor.getDependentStatements(Statement.of("drop table if exists foo")));
+    assertEquals(
+        ImmutableList.of(
+            Statement.of("drop dependent indexes of foo"),
             Statement.of("drop dependent foreign keys of foo"),
             Statement.of("drop table foo")),
         ddlExecutor.getDependentStatements(Statement.of("drop table foo cascade")));
+    assertEquals(
+        ImmutableList.of(
+            Statement.of("drop dependent indexes of foo"),
+            Statement.of("drop dependent foreign keys of foo"),
+            Statement.of("drop table if exists foo")),
+        ddlExecutor.getDependentStatements(Statement.of("drop table if exists foo cascade")));
     assertEquals(
         ImmutableList.of(
             Statement.of("drop all indexes in schema foo"),
@@ -187,6 +198,13 @@ public class DdlExecutorTest {
             Statement.of("drop all views in schema foo"),
             Statement.of("drop all tables in schema foo")),
         ddlExecutor.getDependentStatements(Statement.of("drop schema foo cascade")));
+    assertEquals(
+        ImmutableList.of(
+            Statement.of("drop all indexes in schema foo"),
+            Statement.of("drop all foreign keys in schema foo"),
+            Statement.of("drop all views in schema foo"),
+            Statement.of("drop all tables in schema foo")),
+        ddlExecutor.getDependentStatements(Statement.of("drop schema if exists foo cascade")));
   }
 
   private void assertGetDependentStatementsReturnsSame(
