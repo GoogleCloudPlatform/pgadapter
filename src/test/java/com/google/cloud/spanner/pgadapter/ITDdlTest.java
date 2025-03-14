@@ -101,7 +101,28 @@ public class ITDdlTest implements IntegrationTest {
         connection.createStatement().execute("set spanner.support_drop_cascade to on");
         // Dropping the table should now work.
         assertEquals(0, connection.createStatement().executeUpdate(dropStatement));
+        // Verify that the table was really dropped.
+        PSQLException psqlException =
+            assertThrows(
+                PSQLException.class,
+                () ->
+                    connection
+                        .createStatement()
+                        .execute("update " + tableName + " set value='' where true"));
+        assertEquals(SQLState.UndefinedTable.toString(), psqlException.getSQLState());
       }
+      // Dropping a table that does not exist with an 'if exists' clause also succeeds.
+      connection.createStatement().execute("set spanner.support_drop_cascade to on");
+      assertEquals(
+          0,
+          connection
+              .createStatement()
+              .executeUpdate("drop table if exists this_table_does_not_exist"));
+      assertEquals(
+          0,
+          connection
+              .createStatement()
+              .executeUpdate("drop table if exists this_table_does_not_exist cascade"));
     }
   }
 
