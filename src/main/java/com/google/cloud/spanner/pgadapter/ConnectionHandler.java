@@ -295,7 +295,7 @@ public class ConnectionHandler implements Runnable {
     // 'autoConfigEmulator=true' has also been set in the connection URL. This dialect property is
     // only used to determine what dialect the database should have that is being created on the
     // emulator when 'autoConfigEmulator=true'.
-    uri = uri + ";dialect=postgresql";
+    uri = uri + ";dialect=postgresql;userAgent=pgadapter-test";
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
           uri

@@ -661,13 +661,13 @@ public class ConnectionHandlerTest {
     // Check that the dialect is included in the connection URL. This is required to support the
     // 'autoConfigEmulator' property.
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql;userAgent=pgadapter-test",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
             buildProperties(ImmutableMap.of())));
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;key1=value1;dialect=postgresql",
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;key1=value1;dialect=postgresql;userAgent=pgadapter-test",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
@@ -676,7 +676,7 @@ public class ConnectionHandlerTest {
     // If the options contain a full database specification, then the database in the connection
     // request is ignored.
     assertEquals(
-        "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;dialect=postgresql",
+        "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;dialect=postgresql;userAgent=pgadapter-test",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             OptionsMetadata.newBuilder()
@@ -689,7 +689,7 @@ public class ConnectionHandlerTest {
     // Enable the autoConfigEmulator flag through the options builder.
     OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;autoConfigEmulator=true;defaultSequenceKind=bit_reversed_positive;dialect=postgresql",
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;autoConfigEmulator=true;defaultSequenceKind=bit_reversed_positive;dialect=postgresql;userAgent=pgadapter-test",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             emulatorOptions,
@@ -701,10 +701,7 @@ public class ConnectionHandlerTest {
     try {
       System.setProperty("CHANNEL_PROVIDER", TestChannelProvider.class.getName());
       assertEquals(
-          "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database"
-              + ";userAgent=pg-adapter;dialect=postgresql"
-              + ";channelProvider=com.google.cloud.spanner.connection.TestChannelProvider"
-              + ";usePlainText=true",
+          "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql;userAgent=pgadapter-test;channelProvider=com.google.cloud.spanner.connection.TestChannelProvider;usePlainText=true",
           buildConnectionURL(
               "projects/my-project/instances/my-instance/databases/my-database",
               options,
@@ -737,13 +734,13 @@ public class ConnectionHandlerTest {
 
     // Verify that the virtual threads properties are carried over to the connection URL.
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;useVirtualThreads=true;dialect=postgresql",
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;useVirtualThreads=true;dialect=postgresql;userAgent=pgadapter-test",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
             buildProperties(ImmutableMap.of("useVirtualThreads", "true"))));
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;useVirtualGrpcTransportThreads=true;dialect=postgresql",
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;useVirtualGrpcTransportThreads=true;dialect=postgresql;userAgent=pgadapter-test",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
@@ -756,7 +753,7 @@ public class ConnectionHandlerTest {
           OptionsMetadata optionsWithSystemProperty =
               OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
           assertEquals(
-              "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualThreads=true;dialect=postgresql",
+              "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualThreads=true;dialect=postgresql;userAgent=pgadapter-test",
               buildConnectionURL(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   optionsWithSystemProperty,
@@ -769,7 +766,7 @@ public class ConnectionHandlerTest {
           OptionsMetadata optionsWithSystemProperty =
               OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
           assertEquals(
-              "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualGrpcTransportThreads=true;dialect=postgresql",
+              "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualGrpcTransportThreads=true;dialect=postgresql;userAgent=pgadapter-test",
               buildConnectionURL(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   optionsWithSystemProperty,
