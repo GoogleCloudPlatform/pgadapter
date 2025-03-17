@@ -202,8 +202,8 @@ class DdlExecutor {
     if (!parser.eatKeyword("drop")) {
       return defaultResult;
     }
-    parser.eatKeyword("if", "exists");
     if (parser.eatKeyword("table")) {
+      parser.eatKeyword("if", "exists");
       TableOrIndexName tableName = parser.readTableOrIndexName();
       if (tableName == null) {
         return defaultResult;
@@ -228,6 +228,7 @@ class DdlExecutor {
       builder.add(cascade ? Statement.of(sqlWithoutCascade) : statement);
       return builder.build();
     } else if (parser.eatKeyword("schema")) {
+      parser.eatKeyword("if", "exists");
       TableOrIndexName schemaName = parser.readTableOrIndexName();
       if (schemaName == null || schemaName.schema != null) {
         return defaultResult;
