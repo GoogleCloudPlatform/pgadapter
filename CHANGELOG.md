@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.46.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.46.0...v0.46.1) (2025-03-21)
+
+
+### Bug Fixes
+
+* drop table if exists .. cascade did not work ([#3033](https://github.com/GoogleCloudPlatform/pgadapter/issues/3033)) ([fc9059d](https://github.com/GoogleCloudPlatform/pgadapter/commit/fc9059dcae91d393025959dad42ebdb9765714f8))
+
+
+### Dependencies
+
+* pin psycopg dependencies for tests ([#3035](https://github.com/GoogleCloudPlatform/pgadapter/issues/3035)) ([293926b](https://github.com/GoogleCloudPlatform/pgadapter/commit/293926be1e7294dcd797f277b96d8f37f557edfa))
+* update dependency com.google.cloud.tools:jib-maven-plugin to v3.4.5 ([#3046](https://github.com/GoogleCloudPlatform/pgadapter/issues/3046)) ([de7b638](https://github.com/GoogleCloudPlatform/pgadapter/commit/de7b6389cd65d607f921f89dcaaeab6f172aeae4))
+* update dependency go to v1.24.1 ([#3015](https://github.com/GoogleCloudPlatform/pgadapter/issues/3015)) ([d011f7c](https://github.com/GoogleCloudPlatform/pgadapter/commit/d011f7cf1150341273574103e38ac120567eee50))
+* update dependency io.hypersistence:hypersistence-utils-hibernate-63 to v3.9.4 ([#3018](https://github.com/GoogleCloudPlatform/pgadapter/issues/3018)) ([78d7525](https://github.com/GoogleCloudPlatform/pgadapter/commit/78d7525b2aaed541455cb6e8c001008aa7d19725))
+* update dependency io.hypersistence:hypersistence-utils-hibernate-63 to v3.9.5 ([#3024](https://github.com/GoogleCloudPlatform/pgadapter/issues/3024)) ([3e6e769](https://github.com/GoogleCloudPlatform/pgadapter/commit/3e6e769a16e6ff781af3f17a8d079a37f2bf9e7b))
+* update dependency net.java.dev.jna:jna to v5.17.0 ([#3043](https://github.com/GoogleCloudPlatform/pgadapter/issues/3043)) ([8d7cc0c](https://github.com/GoogleCloudPlatform/pgadapter/commit/8d7cc0c93ddc54af4305c0275d32d9f37a47a64d))
+* update dependency org.apache.commons:commons-csv to v1.14.0 ([#3053](https://github.com/GoogleCloudPlatform/pgadapter/issues/3053)) ([b966429](https://github.com/GoogleCloudPlatform/pgadapter/commit/b9664299822c77cfef5fe214e55c8963b8ab5cdc))
+* update dependency org.hibernate.orm:hibernate-core to v6.6.10.final ([#3003](https://github.com/GoogleCloudPlatform/pgadapter/issues/3003)) ([175ab4d](https://github.com/GoogleCloudPlatform/pgadapter/commit/175ab4db05d1e63ac031db77762c643031534f8d))
+* update dependency org.hibernate.orm:hibernate-core to v6.6.11.final ([#3044](https://github.com/GoogleCloudPlatform/pgadapter/issues/3044)) ([3e8b429](https://github.com/GoogleCloudPlatform/pgadapter/commit/3e8b4293e6a06e452f0ce1f7986eab7604fed9dc))
+* update dependency org.springframework.boot:spring-boot-dependencies to v3.4.4 ([#3058](https://github.com/GoogleCloudPlatform/pgadapter/issues/3058)) ([86576c9](https://github.com/GoogleCloudPlatform/pgadapter/commit/86576c9dc028bc4afcae2495078ed32bcbdbebec))
+* update dependency org.springframework.boot:spring-boot-starter-parent to v3.4.4 ([#3059](https://github.com/GoogleCloudPlatform/pgadapter/issues/3059)) ([44b36bc](https://github.com/GoogleCloudPlatform/pgadapter/commit/44b36bcc680ef33593d7d0491ea7d653442d6e88))
+* update dependency psycopg to v3.2.6 ([#3038](https://github.com/GoogleCloudPlatform/pgadapter/issues/3038)) ([a65d4c1](https://github.com/GoogleCloudPlatform/pgadapter/commit/a65d4c14ec24a48b55dbbfef6dd1a147d49e3555))
+* update dependency psycopg-binary to v3.2.6 ([#3039](https://github.com/GoogleCloudPlatform/pgadapter/issues/3039)) ([4f778b2](https://github.com/GoogleCloudPlatform/pgadapter/commit/4f778b2985e442a23d6f690597f0ea2491ef0115))
+* update dependency sqlalchemy to v2.0.39 ([#3022](https://github.com/GoogleCloudPlatform/pgadapter/issues/3022)) ([d6602e7](https://github.com/GoogleCloudPlatform/pgadapter/commit/d6602e7b8dd26e82e64a1d9db318de76fc38d09c))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 00b7134 ([#2999](https://github.com/GoogleCloudPlatform/pgadapter/issues/2999)) ([92d0d98](https://github.com/GoogleCloudPlatform/pgadapter/commit/92d0d98e901037d8fd7dc1f0b2de97c345cf3acf))
+* update module github.com/docker/docker to v28.0.2+incompatible ([#3052](https://github.com/GoogleCloudPlatform/pgadapter/issues/3052)) ([87431db](https://github.com/GoogleCloudPlatform/pgadapter/commit/87431db6459a858fe01b8c0baa49badf9f565514))
+* update module google.golang.org/api to v0.225.0 ([#3021](https://github.com/GoogleCloudPlatform/pgadapter/issues/3021)) ([580bbbe](https://github.com/GoogleCloudPlatform/pgadapter/commit/580bbbe18b0e33f47d5461fecab237253ac7ae27))
+* update module google.golang.org/api to v0.226.0 ([#3040](https://github.com/GoogleCloudPlatform/pgadapter/issues/3040)) ([d07c8be](https://github.com/GoogleCloudPlatform/pgadapter/commit/d07c8be36900bdd7528c3145269e3a7861ee7a6a))
+* update module google.golang.org/api to v0.227.0 ([#3054](https://github.com/GoogleCloudPlatform/pgadapter/issues/3054)) ([cdad0ab](https://github.com/GoogleCloudPlatform/pgadapter/commit/cdad0ab960c637cadefd060a39e79d3673816165))
+* update opentelemetry.exporter.version to v0.34.0 ([#3048](https://github.com/GoogleCloudPlatform/pgadapter/issues/3048)) ([de1fbf1](https://github.com/GoogleCloudPlatform/pgadapter/commit/de1fbf1871daf65c0bd134faf101903f61a0976d))
+* update spring-boot.version to v3.4.4 ([#3061](https://github.com/GoogleCloudPlatform/pgadapter/issues/3061)) ([e491874](https://github.com/GoogleCloudPlatform/pgadapter/commit/e4918747d1caceeacc371c539d15c6f1e0c1627b))
+
+
+### Documentation
+
+* add readiness probe to GKE example ([#3042](https://github.com/GoogleCloudPlatform/pgadapter/issues/3042)) ([1a17bcc](https://github.com/GoogleCloudPlatform/pgadapter/commit/1a17bcc69813ded3d3ca90d8e92b40062fddcf25))
+* document serial/identity use with Hibernate ([#3007](https://github.com/GoogleCloudPlatform/pgadapter/issues/3007)) ([091d8cf](https://github.com/GoogleCloudPlatform/pgadapter/commit/091d8cfa3fe6659c005ca4671d4bbd71b96171fb))
+* remove composite primary key dependency from Ruby sample ([#3010](https://github.com/GoogleCloudPlatform/pgadapter/issues/3010)) ([a00eb13](https://github.com/GoogleCloudPlatform/pgadapter/commit/a00eb13fc98eaa63146abad77655fcbb1aeefe47))
+* update Ruby on Rails sample to use 'serial' ([#3009](https://github.com/GoogleCloudPlatform/pgadapter/issues/3009)) ([dec7f55](https://github.com/GoogleCloudPlatform/pgadapter/commit/dec7f55cf81144e5c8a3ecbc44914f70810b5edc))
+* use serial for primary key generation for Node.js samples ([#3008](https://github.com/GoogleCloudPlatform/pgadapter/issues/3008)) ([90f9d30](https://github.com/GoogleCloudPlatform/pgadapter/commit/90f9d30a6c182e9a039e6c05c8a011d176d2f453))
+* use standard startsWith query for JPA sample ([#3005](https://github.com/GoogleCloudPlatform/pgadapter/issues/3005)) ([fffacdc](https://github.com/GoogleCloudPlatform/pgadapter/commit/fffacdc0107a140d49510e6dcccb52e841ed36c4)), closes [#1386](https://github.com/GoogleCloudPlatform/pgadapter/issues/1386)
+
 ## [0.46.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.45.0...v0.46.0) (2025-03-08)
 
 
