@@ -26,12 +26,17 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
@@ -46,8 +51,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -473,6 +481,49 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testStatementTagAsComment() throws SQLException {
+    String sql = "/*@statement_tag='my_tag'*/" + INSERT_STATEMENT.getSql();
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        Statement statement = connection.createStatement()) {
+      assertEquals(1, statement.executeUpdate(sql));
+      ExecuteSqlRequest executeRequest =
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
+              .findAny()
+              .orElseThrow(AssertionError::new);
+      assertEquals("my_tag", executeRequest.getRequestOptions().getRequestTag());
+    }
+  }
+
+  @Test
+  public void testTransactionTag() throws SQLException {
+    String sql = "/*@statement_tag='my_tag'*/" + INSERT_STATEMENT.getSql();
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        Statement statement = connection.createStatement()) {
+      connection.setAutoCommit(false);
+      statement.execute("set spanner.transaction_tag='my_transaction_tag'");
+      assertEquals(1, statement.executeUpdate(sql));
+      connection.commit();
+
+      ExecuteSqlRequest executeRequest =
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
+              .findAny()
+              .orElseThrow(AssertionError::new);
+      assertEquals("my_tag", executeRequest.getRequestOptions().getRequestTag());
+      assertEquals("my_transaction_tag", executeRequest.getRequestOptions().getTransactionTag());
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(
+          "my_transaction_tag",
+          mockSpanner
+              .getRequestsOfType(CommitRequest.class)
+              .get(0)
+              .getRequestOptions()
+              .getTransactionTag());
+    }
+  }
+
+  @Test
   public void testPrepareStatement() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
@@ -828,6 +879,61 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
           assertFalse(resultSet.next());
         }
       }
+    }
+  }
+
+  @Test
+  public void testConnectStorm() throws Exception {
+    int numThreads = Runtime.getRuntime().availableProcessors() * 10;
+    ListeningExecutorService service =
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numThreads));
+    List<ListenableFuture<Void>> futures = new ArrayList<>(numThreads);
+    for (int n = 0; n < numThreads; n++) {
+      futures.add(service.submit(new ConnectCallable()));
+    }
+    assertEquals(numThreads, Futures.allAsList(futures).get().size());
+  }
+
+  class ConnectCallable implements Callable<Void> {
+
+    @Override
+    public Void call() throws Exception {
+      try (Connection ignore = DriverManager.getConnection(createUrl())) {
+        // Just connect and disconnect.
+        return null;
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareInDmlBatch() throws SQLException {
+    String sql = "insert into test (id, value) values ($1, $2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.getDefaultInstance())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            com.google.cloud.spanner.Statement.newBuilder(sql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to("one")
+                .build(),
+            1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        Statement statement = connection.createStatement()) {
+      statement.execute("begin");
+      statement.execute("start batch dml");
+      statement.execute("prepare foo as insert into test (id, value) values ($1, $2)");
+      statement.execute("execute foo (1, 'one')");
+      statement.execute("run batch");
+      statement.execute("commit");
     }
   }
 }

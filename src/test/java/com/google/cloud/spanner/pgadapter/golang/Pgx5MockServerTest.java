@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -98,10 +97,11 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
 
   private GoString createConnString() {
     if (useDomainSocket) {
-      return new GoString(String.format("host=/tmp port=%d", pgServer.getLocalPort()));
+      return new GoString(String.format("host=/tmp port=%d database=d", pgServer.getLocalPort()));
     }
     return new GoString(
-        String.format("postgres://uid:pwd@localhost:%d/?sslmode=disable", pgServer.getLocalPort()));
+        String.format(
+            "postgres://uid:pwd@localhost:%d/d?sslmode=disable", pgServer.getLocalPort()));
   }
 
   @Test
@@ -432,9 +432,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .build(),
             1L));
 
-    String res =
-        pgxTest.TestInsertAllDataTypes(
-            createConnString(), useFloat4InTests() ? Oid.FLOAT4 : Oid.FLOAT8);
+    String res = pgxTest.TestInsertAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);

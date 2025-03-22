@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PG_TYPE_CTE_EMULATED;
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -45,6 +46,8 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
+import com.google.rpc.Help;
+import com.google.rpc.Help.Link;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.v1.Partition;
 import com.google.spanner.v1.PartitionQueryRequest;
@@ -60,6 +63,7 @@ import com.google.spanner.v1.TypeCode;
 import io.grpc.Context;
 import io.grpc.Contexts;
 import io.grpc.Metadata;
+import io.grpc.Metadata.Key;
 import io.grpc.Server;
 import io.grpc.ServerCall;
 import io.grpc.ServerCall.Listener;
@@ -1192,7 +1196,7 @@ public abstract class AbstractMockServerTest {
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
         createMockSpannerThatReturnsOneQueryPartition(),
-        "d",
+        null,
         configurator -> {},
         OpenTelemetry.noop());
   }
@@ -1280,6 +1284,13 @@ public abstract class AbstractMockServerTest {
                       assertTrue(userAgent.contains("pg-adapter"));
                       assertTrue(
                           userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
+
+                      String endToEndTracing =
+                          metadata.get(
+                              Metadata.Key.of(
+                                  "x-goog-spanner-end-to-end-tracing",
+                                  Metadata.ASCII_STRING_MARSHALLER));
+                      assertEquals("true", endToEndTracing);
                     }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
@@ -1291,13 +1302,14 @@ public abstract class AbstractMockServerTest {
     TestOptionsMetadataBuilder builder = new TestOptionsMetadataBuilder();
     builder.setProject("p").setInstance("i");
     if (defaultDatabase != null) {
-      builder.setDatabase("d");
+      builder.setDatabase(defaultDatabase);
     }
     builder
         .enableDebugMode()
         .setUsePlainText()
         .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
-        .setCredentials(NoCredentials.getInstance());
+        .setCredentials(NoCredentials.getInstance())
+        .setEnableEndToEndTracing(true);
     optionsConfigurator.accept(builder);
     pgServer = new ProxyServer(builder.build(), openTelemetry);
     pgServer.startServer();
@@ -1366,6 +1378,25 @@ public abstract class AbstractMockServerTest {
     }
   }
 
+  static StatusRuntimeException createTransactionMutationLimitExceededException() {
+    Metadata.Key<byte[]> key = Key.of("grpc-status-details-bin", Metadata.BINARY_BYTE_MARSHALLER);
+    Help help =
+        Help.newBuilder()
+            .addLinks(
+                Link.newBuilder()
+                    .setDescription("Cloud Spanner limits documentation.")
+                    .setUrl("https://cloud.google.com/spanner/docs/limits")
+                    .build())
+            .build();
+    com.google.rpc.Status status =
+        com.google.rpc.Status.newBuilder().addDetails(Any.pack(help)).build();
+    Metadata trailers = new Metadata();
+    trailers.put(key, status.toByteArray());
+    return io.grpc.Status.INVALID_ARGUMENT
+        .withDescription("The transaction contains too many mutations.")
+        .asRuntimeException(trailers);
+  }
+
   @Before
   public void clearRequests() {
     mockSpanner.clearRequests();
@@ -1382,6 +1413,20 @@ public abstract class AbstractMockServerTest {
             .setDone(true)
             .setResponse(Any.pack(Empty.getDefaultInstance()))
             .setMetadata(Any.pack(UpdateDatabaseDdlMetadata.getDefaultInstance()))
+            .build());
+  }
+
+  protected void addDdlErrorResponse(com.google.rpc.Status error) {
+    mockDatabaseAdmin.addResponse(
+        Operation.newBuilder()
+            .setMetadata(
+                Any.pack(
+                    UpdateDatabaseDdlMetadata.newBuilder()
+                        .setDatabase("projects/proj/instances/inst/databases/db")
+                        .build()))
+            .setName("projects/proj/instances/inst/databases/db/operations/1")
+            .setDone(true)
+            .setError(error)
             .build());
   }
 

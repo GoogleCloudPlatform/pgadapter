@@ -80,7 +80,9 @@ public class ITLiquibaseTest {
           String.format(
               "changeLogFile: dbchangelog.xml\n"
                   + "url: jdbc:postgresql://localhost:%d/%s"
-                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
+                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n"
+                  + "username: ignored\n"
+                  + "password: ignored\n",
               testEnv.getPGAdapterPort(), database.getId().getDatabase());
       LOGGER.info("Using Liquibase properties:\n" + properties);
       writer.write(properties);
@@ -170,6 +172,18 @@ public class ITLiquibaseTest {
               .executeQuery("select count(*) from singers where address is null")) {
         assertTrue(resultSet.next());
         assertEquals(5L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      // Manually add a tag to the database.
+      runLiquibaseCommand(
+          "liquibase:tag", "-Dliquibase.tag=tag-set-with-command", "-Dliquibase.verbose=true");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select tag from databasechangelog where id='23 - remove all addresses'")) {
+        assertTrue(resultSet.next());
+        assertEquals("tag-set-with-command", resultSet.getString(1));
         assertFalse(resultSet.next());
       }
 

@@ -28,6 +28,8 @@ import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectGolangMigrateAdvisoryLockStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectGolangMigrateAdvisoryUnlockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryLockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectPrismaAdvisoryUnlockStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
@@ -44,7 +46,9 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -68,6 +72,11 @@ public class ClientAutoDetector {
       ImmutableSet.of("pg_", "information_schema.");
   public static final String PGBENCH_USAGE_HINT =
       "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/docs/pgbench.md for how to use pgbench with PGAdapter";
+
+  /** Force the detector to return this client. This should only be used for testing. */
+  @VisibleForTesting
+  public static final AtomicReference<WellKnownClient> FORCE_DETECT_CLIENT =
+      new AtomicReference<>();
 
   public enum WellKnownClient {
     PSQL {
@@ -385,6 +394,20 @@ public class ClientAutoDetector {
                 || parseMessage.getName().startsWith("stmtcache_"));
       }
     },
+    PHP_PDO {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // The Php PDO driver does not send enough unique parameters for it to be auto-detected.
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
+        // The Php PDO driver uses a relatively unique naming scheme for prepared statements (and
+        // uses prepared statements for everything by default).
+        return parseMessage.getName() != null && (parseMessage.getName().startsWith("pdo_stmt_"));
+      }
+    },
     NPGSQL {
       final ImmutableList<QueryPartReplacer> functionReplacements =
           ImmutableList.of(
@@ -536,6 +559,26 @@ public class ClientAutoDetector {
                 "SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name"));
       }
     },
+    GOLANG_MIGRATE {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // Golang migrate can only be recognized if the name is set correctly.
+        return parameters.containsKey("application_name")
+            && parameters.get("application_name").equals("golang-migrate");
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(SelectGolangMigrateAdvisoryLockStatement.INSTANCE)
+              .add(SelectGolangMigrateAdvisoryUnlockStatement.INSTANCE)
+              .build();
+        }
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+    },
     UNSPECIFIED {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -638,6 +681,9 @@ public class ClientAutoDetector {
   public static @Nonnull WellKnownClient detectClient(
       List<String> orderParameterKeys, Map<String, String> parameters) {
     for (WellKnownClient client : WellKnownClient.values()) {
+      if (Objects.equals(client, FORCE_DETECT_CLIENT.get())) {
+        return client;
+      }
       if (client.isClient(orderParameterKeys, parameters)) {
         return client;
       }

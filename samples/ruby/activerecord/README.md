@@ -1,6 +1,6 @@
 # PGAdapter and Ruby ActiveRecord
 
-PGAdapter has experimental support for [ActiveRecord 7.x](https://guides.rubyonrails.org/active_record_basics.html).
+PGAdapter has experimental support for [ActiveRecord 8.x](https://guides.rubyonrails.org/active_record_basics.html).
 This document shows how to use this sample application, and lists the
 limitations when working with `ActiveRecord` with PGAdapter.
 
@@ -59,6 +59,7 @@ and Cloud Spanner. These options ensure that:
 2. `advisory_locks` are not used for migrations.
 3. DDL transactions are converted to DDL batches. See [DDL options](../../../docs/ddl.md) for more information.
 4. `pg_class` and related tables are emulated by PGAdapter.
+5. ActiveRecord schema dumps after migrations are disabled. This configuration is set in the `database.yml` file.
 
 ### Initialization
 The following initialization code makes sure that ActiveRecord will use `timestamptz` as the default
@@ -113,6 +114,8 @@ default: &default
   pool: 5
   # Advisory locks are not supported by PGAdapter
   advisory_locks: false
+  # Schema dumping uses pg_catalog tables and functions that are not supported by Spanner.
+  schema_dump: false
   # These settings ensure that migrations and schema inspections work.
   variables:
     "spanner.ddl_transaction_mode": "AutocommitExplicitTransaction"
@@ -132,22 +135,22 @@ You can drop the data model again using the `drop_data_model.sql` script in this
 ## Limitations
 The following limitations are currently known:
 
-| Limitation                     | Workaround                                                                                                                                                                                                                                                                                                                                               |
-|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Schema Dumper                  | Cloud Spanner does not support all PostgreSQL `pg_catalog` tables. Using `ActiveRecord::SchemaDumper` to get export the current schema is not guaranteed to include all objects in the database.                                                                                                                                                         |
-| DDL Transactions               | Cloud Spanner does not support DDL statements in a transaction. Add `"spanner.ddl_transaction_mode": "AutocommitExplicitTransaction"` to the `variables` section in your `database.yml` file to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). See [config/database.yml](config/database.yml) for an example. |
-| Generated primary keys         | The `serial` data type is not supported. Use bit-reversed sequences to auto-generate primary keys.                                                                                                                                                                                                                                                       |
-| Upsert                         | `upsert` and `upsert_all` are not supported.                                                                                                                                                                                                                                                                                                             |
-| SELECT ... FOR UPDATE          | Pessimistic locking / `SELECT ... FOR UPDATE` is not supported.                                                                                                                                                                                                                                                                                          |
-| Transaction isolation level    | Only isolation level `:serializable` is supported.                                                                                                                                                                                                                                                                                                       |
+| Limitation                     | Workaround                                                                                                                                                                                                                                                                                                                                         |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Schema Dumper                  | Spanner does not support all PostgreSQL `pg_catalog` tables. Using `ActiveRecord::SchemaDumper` to get export the current schema is not guaranteed to include all objects in the database.                                                                                                                                                         |
+| DDL Transactions               | Spanner does not support DDL statements in a transaction. Add `"spanner.ddl_transaction_mode": "AutocommitExplicitTransaction"` to the `variables` section in your `database.yml` file to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). See [config/database.yml](config/database.yml) for an example. |
+| Generated primary keys         | The `serial` data type is supported, but generates non-monotonically increasing values.                                                                                                                                                                                                                                                            |
+| Upsert                         | `upsert` and `upsert_all` are not supported.                                                                                                                                                                                                                                                                                                       |
+| SELECT ... FOR UPDATE          | Only `SELECT ... FOR UPDATE` without any additional options is supported. The `NOWAIT` and `SKIP LOCKED` options are not supported.                                                                                                                                                                                                                |
+| Transaction isolation level    | Only isolation level `:serializable` is supported.                                                                                                                                                                                                                                                                                                 |
 
 ### Schema Dumper
 Dumping the schema of a database is not guaranteed to produce a complete result. There is currently
-no workaround for this limitation.
+no workaround for this limitation. It is recommended to disable automatic schema dumps after a migration.
 
 ### Generated Primary Keys
-The `serial` data type is currently not supported.
-Generated primary keys can however be used in combination with bit-reversed sequences.
+The `serial` data type is supported, but uses a backing bit-reversed sequence. This means that the
+values that are generated are non-monotonically increasing.
 
 The [TicketSale](models/ticket_sale.rb) model in this sample uses an auto-generated primary key.
 The [table definition](db/migrate/01_create_tables.rb) for this model looks like this:

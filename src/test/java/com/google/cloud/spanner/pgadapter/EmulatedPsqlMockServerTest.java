@@ -26,6 +26,8 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -57,12 +59,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.postgresql.PGProperty;
 import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
@@ -75,6 +77,16 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
   public static void loadPgJdbcDriver() throws Exception {
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
+  }
+
+  @BeforeClass
+  public static void setDetectClient() {
+    ClientAutoDetector.FORCE_DETECT_CLIENT.set(WellKnownClient.PSQL);
+  }
+
+  @AfterClass
+  public static void clearDetectClient() {
+    ClientAutoDetector.FORCE_DETECT_CLIENT.set(null);
   }
 
   @BeforeClass
@@ -95,21 +107,12 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
   /**
    * Creates a JDBC connection string that instructs the PG JDBC driver to use the default simple
    * mode for queries and DML statements. This makes the JDBC driver behave in (much) the same way
-   * as psql. It also adds 'psql' as the application name, which will make PGAdapter automatically
-   * recognize the connection as a psql connection.
+   * as psql.
    */
   private String createUrl(String database) {
-    return createUrl(database, "psql");
-  }
-
-  private String createUrl(String database, String applicationName) {
     return String.format(
-        "jdbc:postgresql://localhost:%d/%s?preferQueryMode=simple&%s=%s&%s=090000",
-        pgServer.getLocalPort(),
-        database,
-        PGProperty.APPLICATION_NAME.getName(),
-        applicationName,
-        PGProperty.ASSUME_MIN_SERVER_VERSION.getName());
+        "jdbc:postgresql://localhost:%d/%s?preferQueryMode=simple",
+        pgServer.getLocalPort(), database);
   }
 
   @Test
@@ -202,21 +205,14 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testShowApplicationName() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
-      try (ResultSet resultSet =
-          connection.createStatement().executeQuery("show application_name")) {
-        assertTrue(resultSet.next());
-        assertEquals("psql", resultSet.getString(1));
-        assertFalse(resultSet.next());
-      }
-    }
-  }
-
-  @Test
   public void testConnectToNonExistingInstance() {
-    for (String appName : new String[] {"psql", "other-app"}) {
+    for (boolean isPsql : new boolean[] {true, false}) {
       try {
+        if (isPsql) {
+          setDetectClient();
+        } else {
+          clearDetectClient();
+        }
         mockSpanner.setExecuteStreamingSqlExecutionTime(
             SimulatedExecutionTime.ofStickyException(
                 newStatusResourceNotFoundException(
@@ -241,10 +237,9 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
         SQLException exception =
             assertThrows(
                 SQLException.class,
-                () -> DriverManager.getConnection(createUrl("non-existing-db", appName)));
+                () -> DriverManager.getConnection(createUrl("non-existing-db")));
         assertTrue(exception.getMessage(), exception.getMessage().contains("NOT_FOUND"));
 
-        boolean isPsql = "psql".equals(appName);
         assertEquals(
             exception.getMessage(),
             isPsql,
@@ -255,6 +250,7 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
             exception.getMessage().contains("\tprojects/p/instances/i\n"));
       } finally {
         closeSpannerPool(true);
+        setDetectClient();
       }
     }
   }

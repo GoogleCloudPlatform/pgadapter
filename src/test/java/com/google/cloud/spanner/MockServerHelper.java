@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.connection;
+package com.google.cloud.spanner;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ResultSet;
+import com.google.spanner.v1.Session;
 
+/** This file will be removed in the future. */
 @InternalApi
-public class ResultSetHelper {
+public class MockServerHelper {
 
-  /** Private constructor to prevent instantiation. */
-  private ResultSetHelper() {}
+  private MockServerHelper() {}
 
-  /**
-   * Converts the given {@link ResultSet} to a {@link DirectExecuteResultSet}. A {@link
-   * DirectExecuteResultSet} does not defer the execution of the query to the first {@link
-   * ResultSet#next()} call.
-   */
-  public static ResultSet toDirectExecuteResultSet(ResultSet delegate) {
-    return DirectExecuteResultSet.ofResultSet(delegate);
+  @InternalApi
+  public static Session getSession(MockSpannerServiceImpl server, String sessionName) {
+    return server.getSession(sessionName);
   }
 }

@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import static com.google.cloud.spanner.connection.ConnectionOptions.ENABLE_END_TO_END_TRACING_PROPERTY_NAME;
+
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
@@ -31,6 +33,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.DatabaseName;
+import io.grpc.ExperimentalApi;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,6 +43,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -61,6 +65,12 @@ public class OptionsMetadata {
   private static final String SPANNER_EMULATOR_HOST_ENV_VAR = "SPANNER_EMULATOR_HOST";
 
   static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
+  private static final String CLOUD_SPANNER_HOST_FORMAT = ".*\\.googleapis\\.com.*";
+  private static final Pattern CLOUD_SPANNER_HOST_PATTERN =
+      Pattern.compile(CLOUD_SPANNER_HOST_FORMAT);
+
+  private static final String EXTERNAL_HOST_PROJECT = "default";
+  private static final String EXTERNAL_HOST_INSTANCE = "default";
 
   /**
    * Builder class for creating an instance of {@link OptionsMetadata}.
@@ -92,6 +102,7 @@ public class OptionsMetadata {
     private boolean enableOpenTelemetry;
     private boolean enableOpenTelemetryMetrics;
     private Double openTelemetryTraceRatio;
+    private boolean enableEndToEndTracing;
     private boolean skipLocalhostCheck;
     private boolean useVirtualThreads;
     private boolean useVirtualGrpcTransportThreads;
@@ -99,10 +110,14 @@ public class OptionsMetadata {
     private int port;
     private String unixDomainSocketDirectory;
     private boolean autoConfigEmulator;
+    private boolean logGrpcMessages;
+    private boolean allowShutdownStatement;
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
+    private String clientCertificate;
+    private String clientKey;
 
     Builder() {}
 
@@ -265,6 +280,17 @@ public class OptionsMetadata {
     }
 
     /**
+     * Enables end-to-end tracing for RPCs on Spanner. This generates traces for both the time that
+     * is spent in the client and time that is spent in the Spanner server. Server side traces can
+     * only be exported to Google Cloud Trace, so to see end-to-end traces, the application should
+     * configure an exporter that exports the traces to Google Cloud Trace.
+     */
+    public Builder setEnableEndToEndTracing(boolean enableEndToEndTracing) {
+      this.enableEndToEndTracing = enableEndToEndTracing;
+      return this;
+    }
+
+    /**
      * PGAdapter by default only allows connections from localhost. Call this method to disable this
      * check. You should only allow connections from private networks, unless you are also using SSL
      * and require clients to authenticate.
@@ -359,6 +385,24 @@ public class OptionsMetadata {
       return this.setCredentials(NoCredentials.getInstance());
     }
 
+    /**
+     * Enables logging of all gRPC messages that are sent by PGAdapter to Spanner. Only enable this
+     * for debugging purposes.
+     */
+    public Builder setLogGrpcMessages(boolean logGrpcMessages) {
+      this.logGrpcMessages = logGrpcMessages;
+      return this;
+    }
+
+    /**
+     * Enables the use of the SHUTDOWN [SMART | FAST | IMMEDIATE] statement to shutdown the proxy
+     * server.
+     */
+    public Builder setAllowShutdownStatement(boolean allowShutdownStatement) {
+      this.allowShutdownStatement = allowShutdownStatement;
+      return this;
+    }
+
     Builder enableDebugMode() {
       this.debugMode = true;
       return this;
@@ -379,16 +423,25 @@ public class OptionsMetadata {
       return this;
     }
 
+    /**
+     * Configures mTLS authentication using the provided client certificate and key files. mTLS is
+     * only supported for external spanner hosts.
+     *
+     * @param clientCertificate Path to the client certificate file.
+     * @param clientKey Path to the client private key file.
+     */
+    @ExperimentalApi("https://github.com/googleapis/java-spanner/pull/3574")
+    Builder useClientCert(String clientCertificate, String clientKey) {
+      this.clientCertificate = clientCertificate;
+      this.clientKey = clientKey;
+      return this;
+    }
+
     public OptionsMetadata build() {
       if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT,
             "You must also specify a project if you specify an instance that PGAdapter should connect to.");
-      }
-      if (Strings.isNullOrEmpty(instance) && !Strings.isNullOrEmpty(database)) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "You must also specify an instance if you specify a database that PGAdapter should connect to.");
       }
       if (!(Strings.isNullOrEmpty(credentialsFile)
               && (credentials == null || NoCredentials.getInstance().equals(credentials)))
@@ -427,6 +480,9 @@ public class OptionsMetadata {
         addLongOption(
             args, OPTION_OPEN_TELEMETRY_TRACE_RATIO, String.valueOf(openTelemetryTraceRatio));
       }
+      if (enableEndToEndTracing) {
+        addOption(args, OPTION_ENABLE_END_TO_END_TRACING);
+      }
       if (skipLocalhostCheck) {
         addOption(args, OPTION_DISABLE_LOCALHOST_CHECK);
       }
@@ -446,8 +502,9 @@ public class OptionsMetadata {
           || numChannels != null
           || databaseRole != null
           || autoConfigEmulator
-          || useVirtualThreads
-          || useVirtualGrpcTransportThreads) {
+          || useVirtualGrpcTransportThreads
+          || enableEndToEndTracing
+          || (clientKey != null && clientCertificate != null)) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -461,17 +518,25 @@ public class OptionsMetadata {
         if (autoConfigEmulator) {
           jdbcOptionBuilder.append("autoConfigEmulator=true;");
         }
-        if (useVirtualThreads) {
-          jdbcOptionBuilder
-              .append(ConnectionOptions.USE_VIRTUAL_THREADS_PROPERTY_NAME)
-              .append("=true;");
-        }
         if (useVirtualGrpcTransportThreads) {
           jdbcOptionBuilder
               .append(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME)
               .append("=true;");
         }
+        if (enableEndToEndTracing) {
+          jdbcOptionBuilder.append(ENABLE_END_TO_END_TRACING_PROPERTY_NAME).append("=true;");
+        }
+        if (clientKey != null && clientCertificate != null) {
+          jdbcOptionBuilder.append("clientCertificate=").append(clientCertificate).append(";");
+          jdbcOptionBuilder.append("clientKey=").append(clientKey).append(";");
+        }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
+      }
+      if (logGrpcMessages) {
+        addOption(args, OPTION_LOG_GRPC_MESSAGES);
+      }
+      if (allowShutdownStatement) {
+        addOption(args, OPTION_ALLOW_SHUTDOWN_STATEMENT);
       }
       if (debugMode) {
         addOption(args, OPTION_INTERNAL_DEBUG_MODE);
@@ -562,6 +627,7 @@ public class OptionsMetadata {
   private static final String OPTION_ENABLE_OPEN_TELEMETRY = "enable_otel";
   private static final String OPTION_ENABLE_OPEN_TELEMETRY_METRICS = "enable_otel_metrics";
   private static final String OPTION_OPEN_TELEMETRY_TRACE_RATIO = "otel_trace_ratio";
+  private static final String OPTION_ENABLE_END_TO_END_TRACING = "enable_end_to_end_tracing";
   private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
@@ -590,6 +656,8 @@ public class OptionsMetadata {
       "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
   private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
+  private static final String OPTION_LOG_GRPC_MESSAGES = "log_grpc_messages";
+  private static final String OPTION_ALLOW_SHUTDOWN_STATEMENT = "allow_shutdown_statement";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -607,6 +675,7 @@ public class OptionsMetadata {
   private final boolean enableOpenTelemetry;
   private final boolean enableOpenTelemetryMetrics;
   private final Double openTelemetryTraceRatio;
+  private final boolean enableEndToEndTracing;
   private final SslMode sslMode;
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
@@ -620,6 +689,8 @@ public class OptionsMetadata {
   private final String serverVersion;
   private final boolean debugMode;
   private final Duration startupTimeout;
+  private final boolean logGrpcMessages;
+  private final boolean allowShutdownStatement;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -653,9 +724,19 @@ public class OptionsMetadata {
       @Nullable Credentials credentials,
       @Nullable SessionPoolOptions sessionPoolOptions,
       Duration startupTimeout) {
-    this.environment = Preconditions.checkNotNull(environment);
+    CommandLine commandLine = buildOptions(args);
+    Map<String, String> propertyMap =
+        parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
+    // Set a default_sequence_kind if none has been set by the user.
+    if (!propertyMap.containsKey("defaultSequenceKind")) {
+      propertyMap.put("defaultSequenceKind", "bit_reversed_positive");
+    }
+    boolean usesExternalHost =
+        isExternalHost(Preconditions.checkNotNull(environment), commandLine, propertyMap);
+
+    this.environment = environment;
     this.osName = osName;
-    this.commandLine = buildOptions(args);
+    this.commandLine = commandLine;
     this.credentials = credentials;
     this.sessionPoolOptions = sessionPoolOptions;
     this.commandMetadataParser = new CommandMetadataParser();
@@ -669,6 +750,7 @@ public class OptionsMetadata {
               + "OR use -c to set the credentials in PGAdapter and use these credentials for all connections.");
     }
     if (this.commandLine.hasOption(OPTION_DATABASE_NAME)
+        && !usesExternalHost
         && !(this.commandLine.hasOption(OPTION_PROJECT_ID)
             && this.commandLine.hasOption(OPTION_INSTANCE_ID))) {
       throw SpannerExceptionFactory.newSpannerException(
@@ -677,8 +759,9 @@ public class OptionsMetadata {
               + "Use the options -p <project-id> -i <instance-id> -d <database-id> to specify the "
               + "database that all connections to this instance of PGAdapter should use.");
     }
-    if (this.commandLine.hasOption(OPTION_PROJECT_ID)
-        && this.commandLine.hasOption(OPTION_INSTANCE_ID)
+    if ((usesExternalHost
+            || (this.commandLine.hasOption(OPTION_PROJECT_ID)
+                && this.commandLine.hasOption(OPTION_INSTANCE_ID)))
         && this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
       this.defaultConnectionUrl =
           buildConnectionURL(this.commandLine.getOptionValue(OPTION_DATABASE_NAME));
@@ -695,6 +778,7 @@ public class OptionsMetadata {
     this.enableOpenTelemetryMetrics = commandLine.hasOption(OPTION_ENABLE_OPEN_TELEMETRY_METRICS);
     this.openTelemetryTraceRatio =
         parseOpenTelemetryTraceRatio(commandLine.getOptionValue(OPTION_OPEN_TELEMETRY_TRACE_RATIO));
+    this.enableEndToEndTracing = commandLine.hasOption(OPTION_ENABLE_END_TO_END_TRACING);
     this.sslMode = parseSslMode(commandLine.getOptionValue(OPTION_SSL));
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.disableDefaultLocalStatements =
@@ -708,10 +792,12 @@ public class OptionsMetadata {
         parseDdlTransactionMode(commandLine.getOptionValue(OPTION_DDL_TRANSACTION_MODE));
     this.replaceJdbcMetadataQueries = commandLine.hasOption(OPTION_JDBC_MODE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
-    this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
+    this.propertyMap = propertyMap;
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
+    this.logGrpcMessages = commandLine.hasOption(OPTION_LOG_GRPC_MESSAGES);
+    this.allowShutdownStatement = commandLine.hasOption(OPTION_ALLOW_SHUTDOWN_STATEMENT);
     this.startupTimeout = startupTimeout;
   }
 
@@ -773,6 +859,7 @@ public class OptionsMetadata {
     this.enableOpenTelemetry = false;
     this.enableOpenTelemetryMetrics = false;
     this.openTelemetryTraceRatio = null;
+    this.enableEndToEndTracing = false;
     this.sslMode = SslMode.Disable;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
@@ -785,6 +872,8 @@ public class OptionsMetadata {
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
+    this.logGrpcMessages = false;
+    this.allowShutdownStatement = false;
     this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
@@ -797,7 +886,12 @@ public class OptionsMetadata {
         if (keyValue.length == 2) {
           properties.put(keyValue[0], keyValue[1]);
         } else {
-          throw new IllegalArgumentException("Invalid JDBC property specified: " + propertyOptions);
+          if (propertyList[i].endsWith("=")) {
+            properties.put(keyValue[0], "");
+          } else {
+            throw new IllegalArgumentException(
+                "Invalid JDBC property specified: " + propertyOptions);
+          }
         }
       }
     }
@@ -925,7 +1019,7 @@ public class OptionsMetadata {
    */
   public String buildCredentialsFile() {
     // Skip if a com.google.auth.Credentials instance has been set.
-    if (credentials != null) {
+    if (isExternalHost() || credentials != null) {
       return null;
     }
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
@@ -982,8 +1076,7 @@ public class OptionsMetadata {
     // Note that Credentials here is the credentials file, not the actual credentials
     String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
-    if (!shouldAuthenticate()
-        && Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))) {
+    if (!shouldAuthenticate() && !usesEmulator()) {
       String credentials = buildCredentialsFile();
       if (!Strings.isNullOrEmpty(credentials)) {
         url = String.format("%s;credentials=%s", url, credentials);
@@ -996,6 +1089,39 @@ public class OptionsMetadata {
     return url;
   }
 
+  private boolean isAutoConfigEmulator() {
+    return isAutoConfigEmulator(getPropertyMap());
+  }
+
+  private static boolean isAutoConfigEmulator(Map<String, String> propertyMap) {
+    return propertyMap != null
+        && Boolean.parseBoolean(propertyMap.getOrDefault("autoConfigEmulator", "false"));
+  }
+
+  private boolean usesEmulator() {
+    return !Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))
+        || isAutoConfigEmulator();
+  }
+
+  private static boolean usesEmulator(
+      Map<String, String> environment, Map<String, String> propertyMap) {
+    return !Strings.isNullOrEmpty(environment.get(SPANNER_EMULATOR_HOST_ENV_VAR))
+        || isAutoConfigEmulator(propertyMap);
+  }
+
+  private boolean isExternalHost() {
+    return isExternalHost(this.environment, this.commandLine, this.propertyMap);
+  }
+
+  private static boolean isExternalHost(
+      Map<String, String> environment, CommandLine commandLine, Map<String, String> propertyMap) {
+    return !usesEmulator(environment, propertyMap)
+        && commandLine.hasOption(OPTION_SPANNER_ENDPOINT)
+        && !CLOUD_SPANNER_HOST_PATTERN
+            .matcher(commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT))
+            .matches();
+  }
+
   /** Returns the fully qualified database name based on the given database id or name. */
   public DatabaseName getDatabaseName(String database) {
     DatabaseName databaseName;
@@ -1005,6 +1131,8 @@ public class OptionsMetadata {
       String projectId;
       if (commandLine.hasOption(OPTION_PROJECT_ID)) {
         projectId = commandLine.getOptionValue(OPTION_PROJECT_ID);
+      } else if (isExternalHost()) {
+        projectId = EXTERNAL_HOST_PROJECT;
       } else {
         projectId = getDefaultProjectId();
       }
@@ -1018,6 +1146,8 @@ public class OptionsMetadata {
       String instanceId;
       if (commandLine.hasOption(OPTION_INSTANCE_ID)) {
         instanceId = commandLine.getOptionValue(OPTION_INSTANCE_ID);
+      } else if (isExternalHost()) {
+        instanceId = EXTERNAL_HOST_INSTANCE;
       } else {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.FAILED_PRECONDITION,
@@ -1147,6 +1277,14 @@ public class OptionsMetadata {
         true,
         "OpenTelemetry trace sampling ration. Value must be in the range [0.0, 1.0].");
     options.addOption(
+        null,
+        OPTION_ENABLE_END_TO_END_TRACING,
+        false,
+        "Enable end-to-end tracing (true/false) to generate traces for both the time "
+            + "that is spent in the client, as well as time that is spent in the Spanner server. "
+            + "Server side traces can only be exported to Google Cloud Trace, so to see end to end traces, "
+            + "the application should configure an exporter that exports the traces to Google Cloud Trace.");
+    options.addOption(
         OPTION_SSL,
         "sslmode",
         true,
@@ -1269,6 +1407,18 @@ public class OptionsMetadata {
             + "the value of this option could cause a client or driver to alter its behavior and cause unexpected "
             + "errors when used with PGAdapter.");
     options.addOption(
+        OPTION_LOG_GRPC_MESSAGES,
+        "log-grpc-messages",
+        false,
+        "Logs all gRPC messages that are sent by PGAdapter to Spanner to the default log handler (stdout).\n"
+            + "This option should only be enabled to debug problems and/or to determine exactly which gRPC messages\n"
+            + "are being sent to Spanner. Enabling this in production will cause a large number of messages to be logged.");
+    options.addOption(
+        OPTION_ALLOW_SHUTDOWN_STATEMENT,
+        "allow-shutdown-statement",
+        false,
+        "Allows the proxy server to be shutdown by executing the SHUTDOWN [SMART | FAST | IMMEDIATE] statement.");
+    options.addOption(
         OPTION_INTERNAL_DEBUG_MODE,
         "internal-debug-mode",
         false,
@@ -1364,6 +1514,14 @@ public class OptionsMetadata {
     return this.binaryFormat;
   }
 
+  public boolean isLogGrpcMessages() {
+    return this.logGrpcMessages;
+  }
+
+  public boolean isAllowShutdownStatement() {
+    return this.allowShutdownStatement;
+  }
+
   public boolean isDebugMode() {
     return this.debugMode;
   }
@@ -1407,23 +1565,32 @@ public class OptionsMetadata {
   public DatabaseId getDefaultDatabaseId() {
     return this.hasDefaultConnectionUrl()
         ? DatabaseId.of(
-            commandLine.getOptionValue(OPTION_PROJECT_ID),
-            commandLine.getOptionValue(OPTION_INSTANCE_ID),
+            !commandLine.hasOption(OPTION_PROJECT_ID) && isExternalHost()
+                ? EXTERNAL_HOST_PROJECT
+                : commandLine.getOptionValue(OPTION_PROJECT_ID),
+            !commandLine.hasOption(OPTION_INSTANCE_ID) && isExternalHost()
+                ? EXTERNAL_HOST_INSTANCE
+                : commandLine.getOptionValue(OPTION_INSTANCE_ID),
             commandLine.getOptionValue(OPTION_DATABASE_NAME))
         : null;
   }
 
   /** Returns true if these options contain a default instance id. */
   public boolean hasDefaultInstanceId() {
-    return commandLine.hasOption(OPTION_PROJECT_ID) && commandLine.hasOption(OPTION_INSTANCE_ID);
+    return isExternalHost()
+        || (commandLine.hasOption(OPTION_PROJECT_ID) && commandLine.hasOption(OPTION_INSTANCE_ID));
   }
 
   /** Returns the id of the default instance or null if no default has been selected. */
   public InstanceId getDefaultInstanceId() {
     if (hasDefaultInstanceId()) {
       return InstanceId.of(
-          commandLine.getOptionValue(OPTION_PROJECT_ID),
-          commandLine.getOptionValue(OPTION_INSTANCE_ID));
+          !commandLine.hasOption(OPTION_PROJECT_ID) && isExternalHost()
+              ? EXTERNAL_HOST_PROJECT
+              : commandLine.getOptionValue(OPTION_PROJECT_ID),
+          !commandLine.hasOption(OPTION_INSTANCE_ID) && isExternalHost()
+              ? EXTERNAL_HOST_INSTANCE
+              : commandLine.getOptionValue(OPTION_INSTANCE_ID));
     }
     return null;
   }
@@ -1493,6 +1660,10 @@ public class OptionsMetadata {
 
   public Double getOpenTelemetryTraceRatio() {
     return this.openTelemetryTraceRatio;
+  }
+
+  public boolean isEnableEndToEndTracing() {
+    return this.enableEndToEndTracing;
   }
 
   public SslMode getSslMode() {

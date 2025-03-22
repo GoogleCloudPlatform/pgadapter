@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.connection;
 
-import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,19 +39,8 @@ public class ConnectionOptionsHelperTest {
     ConnectionOptions.Builder builder = mock(ConnectionOptions.Builder.class);
     GoogleCredentials credentials = mock(GoogleCredentials.class);
 
-    ConnectionOptionsHelper.setCredentials(builder, credentials);
+    PGAdapterConnectionOptionsHelper.setCredentials(builder, credentials);
 
     verify(builder).setCredentials(credentials);
-  }
-
-  @Test
-  public void testGetSpanner() {
-    ConnectionImpl connection = mock(ConnectionImpl.class);
-    Spanner expected = mock(Spanner.class);
-    when(connection.getSpanner()).thenReturn(expected);
-
-    Spanner got = ConnectionOptionsHelper.getSpanner(connection);
-
-    assertSame(expected, got);
   }
 }

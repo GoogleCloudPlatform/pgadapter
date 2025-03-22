@@ -25,16 +25,20 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Instance;
 import com.google.cloud.spanner.InstanceAdminClient;
 import com.google.cloud.spanner.InstanceNotFoundException;
+import com.google.cloud.spanner.PGAdapterSessionPoolOptionsHelper;
+import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.connection.PGAdapterConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.SavepointSupport;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
@@ -71,16 +75,18 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -197,18 +203,28 @@ public class ConnectionHandler implements Runnable {
     OptionsMetadata options = getServer().getOptions();
     String uri = buildConnectionURL(database, options, getServer().getProperties());
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
+    connectionOptionsBuilder =
+        PGAdapterConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
+            connectionOptionsBuilder, options.isLogGrpcMessages());
+    connectionOptionsBuilder =
+        PGAdapterConnectionOptionsHelper.useDirectExecutor(connectionOptionsBuilder);
     if (credentials != null) {
       connectionOptionsBuilder =
-          ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
+          PGAdapterConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
     } else if (options.getCredentials() != null) {
       connectionOptionsBuilder =
-          ConnectionOptionsHelper.setCredentials(
+          PGAdapterConnectionOptionsHelper.setCredentials(
               connectionOptionsBuilder, options.getCredentials());
     }
-    if (options.getSessionPoolOptions() != null) {
-      connectionOptionsBuilder =
-          connectionOptionsBuilder.setSessionPoolOptions(options.getSessionPoolOptions());
-    }
+    SessionPoolOptions sessionPoolOptions =
+        options.getSessionPoolOptions() == null
+            ? PGAdapterSessionPoolOptionsHelper.useMultiplexedSessions(
+                    SessionPoolOptions.newBuilder())
+                .build()
+            : PGAdapterSessionPoolOptionsHelper.useMultiplexedSessions(
+                    options.getSessionPoolOptions().toBuilder())
+                .build();
+    connectionOptionsBuilder.setSessionPoolOptions(sessionPoolOptions);
     if (options.isEnableOpenTelemetryMetrics()) {
       SpannerOptions.enableOpenTelemetryMetrics();
       connectionOptionsBuilder =
@@ -237,7 +253,7 @@ public class ConnectionHandler implements Runnable {
         // Include more information about the available databases if someone tried to connect using
         // psql.
         if (getWellKnownClient() == WellKnownClient.PSQL) {
-          Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+          Spanner spanner = spannerConnection.getSpanner();
           String availableDatabases =
               listDatabasesOrInstances(
                   notFoundException, getServer().getOptions().getDatabaseName(database), spanner);
@@ -303,9 +319,12 @@ public class ConnectionHandler implements Runnable {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
-    for (Entry<Object, Object> entry : info.entrySet()) {
-      if (!Strings.isNullOrEmpty((String) entry.getValue())) {
-        result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
+    List<Object> keys = new ArrayList<>(info.keySet());
+    keys.sort(Comparator.comparing(Object::toString));
+    for (Object key : keys) {
+      String value = (String) info.get(key);
+      if (!Strings.isNullOrEmpty(value)) {
+        result.append(";").append(key).append("=").append(value);
       }
     }
     return result.toString();
@@ -423,7 +442,11 @@ public class ConnectionHandler implements Runnable {
           () ->
               String.format(
                   "Exception on connection handler with ID %s for client %s: %s",
-                  getName(), socket.getInetAddress().getHostAddress(), e));
+                  getName(),
+                  socket == null || socket.getInetAddress() == null
+                      ? "(none)"
+                      : socket.getInetAddress().getHostAddress(),
+                  e));
     } finally {
       if (result != RunConnectionState.RESTART_WITH_SSL) {
         logger.log(
@@ -445,13 +468,14 @@ public class ConnectionHandler implements Runnable {
                   () ->
                       String.format(
                           "Exception while closing connection handler with ID %s", getName())));
+        } finally {
+          this.server.deregister(this);
+          logger.log(
+              Level.INFO,
+              Logging.format(
+                  "RunConnection",
+                  () -> String.format("Connection handler with ID %s closed", getName())));
         }
-        this.server.deregister(this);
-        logger.log(
-            Level.INFO,
-            Logging.format(
-                "RunConnection",
-                () -> String.format("Connection handler with ID %s closed", getName())));
       }
     }
     return result;
@@ -491,20 +515,44 @@ public class ConnectionHandler implements Runnable {
     try {
       message.nextHandler();
       message.send();
-    } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-      this.handleError(
-          PGException.newBuilder(fatalException)
-              .setSeverity(Severity.FATAL)
-              .setSQLState(SQLState.InternalError)
-              .build());
+    } catch (IllegalArgumentException | IllegalStateException fatalException) {
+      handleFatalException(fatalException);
       // Only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode the mode will
       // switch to normal mode in these cases.
       if (this.status != ConnectionStatus.COPY_IN) {
         terminate();
       }
+    } catch (EOFException eofException) {
+      // Handle an EOFException as a normal connection termination. The TCP connection can break
+      // without the server receiving a Terminate (X) message if for example the application does
+      // not try-catch all exceptions.
+      // We only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode, this
+      // exception will cause the connection to leave COPY_IN mode, and return to normal operation.
+      if (this.status != ConnectionStatus.COPY_IN) {
+        terminate();
+      } else {
+        handleFatalException(eofException);
+      }
+    } catch (SocketException socketException) {
+      // Handle a SocketException when the socket has been closed as a normal connection
+      // termination. The TCP connection can break without the server receiving a Terminate (X)
+      // message if for example the application does not try-catch all exceptions.
+      if (socket.isClosed()) {
+        terminate();
+      } else {
+        this.handleError(PGExceptionFactory.toPGException(socketException));
+      }
     } catch (Exception exception) {
       this.handleError(PGExceptionFactory.toPGException(exception));
     }
+  }
+
+  private void handleFatalException(Exception fatalException) throws Exception {
+    this.handleError(
+        PGException.newBuilder(fatalException)
+            .setSeverity(Severity.FATAL)
+            .setSQLState(SQLState.InternalError)
+            .build());
   }
 
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
@@ -819,6 +867,15 @@ public class ConnectionHandler implements Runnable {
         setWellKnownClient(
             ClientAutoDetector.detectClient(
                 skippedAutoDetectParseMessages, ImmutableList.of(statement)));
+        if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+            && skippedAutoDetectParseMessages.size() < 10) {
+          ParsedStatement parsedStatement =
+              AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+          if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+            skippedAutoDetectParseMessages.add(new ParseMessage(this, parsedStatement, statement));
+            return;
+          }
+        }
       }
       maybeSetApplicationName();
       skippedAutoDetectParseMessages.clear();

@@ -2,6 +2,12 @@
   "require": {
     "ext-pgsql": "*",
     "ext-pdo": "*",
-    "shyim/testcontainer": "^0.1.2"
+    "testcontainers/testcontainers": "^1.0.0",
+    "symfony/http-client": "^7.2"
+  },
+  "config": {
+    "allow-plugins": {
+      "php-http/discovery": true
+    }
   }
 }

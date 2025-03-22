@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
+
 import com.google.api.core.InternalApi;
 import com.google.api.gax.grpc.GrpcCallContext;
 import com.google.api.gax.rpc.ApiCallContext;
@@ -26,7 +28,6 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
@@ -59,7 +60,6 @@ import io.grpc.MethodDescriptor;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -318,13 +318,11 @@ public abstract class ControlMessage extends WireMessage {
   SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
     Tracer tracer = connection.getExtendedQueryProtocolHandler().getTracer();
-    // Ignore deprecation for now, as there is no alternative offered (yet?).
-    //noinspection deprecation
     Span span =
         tracer
             .spanBuilder("send_result_set")
             .setAttribute("pgadapter.connection_id", connection.getTraceConnectionId().toString())
-            .setAttribute(SemanticAttributes.DB_STATEMENT, describedResult.getSql())
+            .setAttribute(DB_STATEMENT, describedResult.getSql())
             .startSpan();
     try (Scope ignore = span.makeCurrent()) {
       StatementResult statementResult = describedResult.getStatementResult();
@@ -344,6 +342,7 @@ public abstract class ControlMessage extends WireMessage {
                 mode,
                 partitionQueryResult.getBatchTransactionId(),
                 partitionQueryResult.getPartitions());
+        partitionQueryResult.cleanup();
       } else {
         hasData = describedResult.isHasMoreData();
         ResultSet resultSet = describedResult.getStatementResult().getResultSet();
@@ -386,7 +385,7 @@ public abstract class ControlMessage extends WireMessage {
                 Math.min(8 * Runtime.getRuntime().availableProcessors(), partitions.size())));
     List<ListenableFuture<Long>> futures = new ArrayList<>(partitions.size());
     Connection spannerConnection = connection.getSpannerConnection();
-    Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+    Spanner spanner = spannerConnection.getSpanner();
     BatchClient batchClient = spanner.getBatchClient(connection.getDatabaseId());
     BatchReadOnlyTransaction batchReadOnlyTransaction =
         batchClient.batchReadOnlyTransaction(batchTransactionId);

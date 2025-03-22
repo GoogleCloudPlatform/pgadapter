@@ -28,6 +28,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
 import com.google.cloud.spanner.Options;
+import com.google.cloud.spanner.Options.TransactionOption;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
@@ -112,6 +113,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final int nonAtomicBatchSize;
   private final long commitSizeLimitForBatching;
   private final CopySettings copySettings;
+  private final TransactionOption[] commitOptions;
   private final Format copyFormat;
   private final CSVFormat csvFormat;
   private final boolean hasHeader;
@@ -146,6 +148,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     this.qualifiedTableName = qualifiedTableName;
     this.tableColumns = tableColumns;
     this.copySettings = new CopySettings(sessionState);
+    this.commitOptions = createCommitOptions(connection, copySettings);
     int atomicMutationLimit = copySettings.getMaxAtomicMutationsLimit();
     this.maxAtomicBatchSize =
         Math.max(atomicMutationLimit / (tableColumns.size() + indexedColumnsCount), 1);
@@ -158,6 +161,16 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     this.copyFormat = copyFormat;
     this.csvFormat = format;
     this.hasHeader = hasHeader;
+  }
+
+  static TransactionOption[] createCommitOptions(Connection connection, CopySettings copySettings) {
+    if (connection.getMaxCommitDelay() != null) {
+      return new TransactionOption[] {
+        Options.priority(copySettings.getCommitPriority()),
+        Options.maxCommitDelay(connection.getMaxCommitDelay())
+      };
+    }
+    return new TransactionOption[] {Options.priority(copySettings.getCommitPriority())};
   }
 
   /** @return number of rows copied into Spanner */
@@ -416,10 +429,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                                       Duration.ofSeconds(copySettings.getCommitTimeoutSeconds()));
                             }
                           });
-              context.run(
-                  () ->
-                      dbClient.writeWithOptions(
-                          immutableMutations, Options.priority(copySettings.getCommitPriority())));
+              context.run(() -> dbClient.writeWithOptions(immutableMutations, commitOptions));
               return null;
             });
     Futures.addCallback(

@@ -323,7 +323,10 @@ func Start(ctx context.Context, config Config) (pgadapter *PGAdapter, err error)
 	autoDetect := config.ExecutionEnvironment == nil
 	if config.ConnectToEmulator {
 		if isDockerAvailable() {
-			config.ExecutionEnvironment = &Docker{}
+			_, ok := config.ExecutionEnvironment.(*Docker)
+			if !ok {
+				config.ExecutionEnvironment = &Docker{}
+			}
 		} else {
 			return nil, fmt.Errorf("PGAdapter with the Emulator requires Docker to be installed on the local system")
 		}
@@ -666,6 +669,10 @@ func startDocker(ctx context.Context, config Config) (pgadapter *PGAdapter, err 
 		return pgadapter, err
 	}
 	pgadapter.port = mappedPort.Int()
+	// Wait for PGAdapter to start.
+	if err := waitForPort(pgadapter.port /* initialWait = */, 0, 50*time.Millisecond, 20); err != nil {
+		return nil, err
+	}
 	return pgadapter, nil
 }
 

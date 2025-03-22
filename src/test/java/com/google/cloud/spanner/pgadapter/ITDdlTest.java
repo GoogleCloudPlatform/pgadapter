@@ -60,29 +60,69 @@ public class ITDdlTest implements IntegrationTest {
   }
 
   @Test
+  public void createTableWithSerial() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl());
+        Statement statement = connection.createStatement()) {
+      statement.execute("create table serial_test (id serial primary key, value varchar)");
+    }
+  }
+
+  @Test
   public void testDropTableWithIndex() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       // First create a table with a secondary index.
       try (Statement statement = connection.createStatement()) {
-        statement.addBatch("create table test (id bigint primary key, value varchar)");
-        statement.addBatch("create index idx_text on test (value)");
-        assertArrayEquals(new int[] {0, 0}, statement.executeBatch());
+        statement.addBatch("create table test1 (id bigint primary key, value varchar)");
+        statement.addBatch("create table test2 (id bigint primary key, value varchar)");
+        statement.addBatch("create index idx_text1 on test1 (value)");
+        statement.addBatch("create index idx_text2 on test2 (value)");
+        assertArrayEquals(new int[] {0, 0, 0, 0}, statement.executeBatch());
       }
 
-      // Try to drop the table with an index. This will fail.
-      PSQLException exception =
-          assertThrows(
-              PSQLException.class, () -> connection.createStatement().execute("drop table test"));
-      assertEquals(SQLState.FeatureNotSupported.toString(), exception.getSQLState());
-      assertNotNull(exception.getServerErrorMessage());
-      assertEquals(
-          "Execute 'set spanner.support_drop_cascade=true' to enable dropping tables with indices",
-          exception.getServerErrorMessage().getHint());
+      for (int index = 1; index <= 2; index++) {
+        connection.createStatement().execute("set spanner.support_drop_cascade to off");
 
-      // Now enable drop_cascade.
+        String tableName = "test" + index;
+        boolean useIfExists = index == 2;
+        String dropStatement = "drop table " + (useIfExists ? "if exists " : "") + tableName;
+        // Try to drop the table with an index. This will fail.
+        PSQLException exception =
+            assertThrows(
+                dropStatement,
+                PSQLException.class,
+                () -> connection.createStatement().execute(dropStatement));
+        assertEquals(SQLState.FeatureNotSupported.toString(), exception.getSQLState());
+        assertNotNull(exception.getServerErrorMessage());
+        assertEquals(
+            "Execute 'set spanner.support_drop_cascade=true' to enable dropping tables with indices",
+            exception.getServerErrorMessage().getHint());
+
+        // Now enable drop_cascade.
+        connection.createStatement().execute("set spanner.support_drop_cascade to on");
+        // Dropping the table should now work.
+        assertEquals(0, connection.createStatement().executeUpdate(dropStatement));
+        // Verify that the table was really dropped.
+        PSQLException psqlException =
+            assertThrows(
+                PSQLException.class,
+                () ->
+                    connection
+                        .createStatement()
+                        .execute("update " + tableName + " set value='' where true"));
+        assertEquals(SQLState.UndefinedTable.toString(), psqlException.getSQLState());
+      }
+      // Dropping a table that does not exist with an 'if exists' clause also succeeds.
       connection.createStatement().execute("set spanner.support_drop_cascade to on");
-      // Dropping the table should now work.
-      assertEquals(0, connection.createStatement().executeUpdate("drop table test"));
+      assertEquals(
+          0,
+          connection
+              .createStatement()
+              .executeUpdate("drop table if exists this_table_does_not_exist"));
+      assertEquals(
+          0,
+          connection
+              .createStatement()
+              .executeUpdate("drop table if exists this_table_does_not_exist cascade"));
     }
   }
 

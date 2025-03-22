@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.Server.getVersion;
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
 
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
@@ -33,7 +34,6 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.semconv.SemanticAttributes;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -66,9 +66,7 @@ public class ExtendedQueryProtocolHandler {
                 .getServer()
                 .getTracer(ConnectionHandler.class.getName(), getVersion()),
             connectionHandler.getServer().getMetrics(),
-            createMetricAttributes(
-                connectionHandler.getDatabaseId(),
-                connectionHandler.getTraceConnectionId().toString()),
+            createMetricAttributes(connectionHandler.getDatabaseId()),
             connectionHandler.getTraceConnectionId().toString(),
             connectionHandler::closeAllPortals,
             connectionHandler.getDatabaseId(),
@@ -97,9 +95,8 @@ public class ExtendedQueryProtocolHandler {
   }
 
   @VisibleForTesting
-  static Attributes createMetricAttributes(DatabaseId databaseId, String connectionId) {
+  static Attributes createMetricAttributes(DatabaseId databaseId) {
     AttributesBuilder attributesBuilder = Attributes.builder();
-    attributesBuilder.put("pgadapter.connection_id", connectionId);
     attributesBuilder.put("database", databaseId.getDatabase());
     attributesBuilder.put("instance_id", databaseId.getInstanceId().getInstance());
     attributesBuilder.put("project_id", databaseId.getInstanceId().getProject());
@@ -141,11 +138,9 @@ public class ExtendedQueryProtocolHandler {
    * received.
    */
   public void buffer(AbstractQueryProtocolMessage message) {
-    // Ignore deprecation for now, as there is no alternative offered (yet?).
-    //noinspection deprecation
     addEvent(
         "Received message: '" + message.getIdentifier() + "'",
-        Attributes.of(SemanticAttributes.DB_STATEMENT, message.getSql()));
+        Attributes.of(DB_STATEMENT, message.getSql()));
     messages.add(message);
   }
 

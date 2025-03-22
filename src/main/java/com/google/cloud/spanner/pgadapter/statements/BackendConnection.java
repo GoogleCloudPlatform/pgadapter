@@ -19,7 +19,6 @@ import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatemen
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.replaceForUpdate;
-import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.ROLLBACK;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW;
 
 import com.google.api.core.InternalApi;
@@ -49,8 +48,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
-import com.google.cloud.spanner.connection.ResultSetHelper;
+import com.google.cloud.spanner.connection.PGAdapterResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.connection.TransactionRetryListener;
@@ -59,6 +57,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.session.RemoveEscapeClauseEnum;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -84,6 +83,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
@@ -91,7 +91,6 @@ import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.semconv.SemanticAttributes;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -125,6 +124,8 @@ import javax.annotation.Nullable;
 @InternalApi
 public class BackendConnection {
   private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
+
+  public static final AttributeKey<String> DB_STATEMENT = AttributeKey.stringKey("db.statement");
 
   private final Tracer tracer;
 
@@ -287,7 +288,7 @@ public class BackendConnection {
 
     @Override
     boolean isBatchingPossible() {
-      return !analyze;
+      return !analyze && !this.parsedStatement.hasReturningClause();
     }
 
     @Override
@@ -361,10 +362,20 @@ public class BackendConnection {
                   ? pgCatalog.get().replacePgCatalogTables(updatedStatement, sqlLowerCase)
                   : updatedStatement;
           // TODO: Remove the check for isDelayBeginTransactionStartUntilFirstWrite when that
-          //       feature is able to detect the LOCK_SCANNED_RANGES=exclusive hint as a write.
+          //       feature is able to detect FOR UPDATE clauses as a write.
           if (sessionState.isReplaceForUpdateClause()
               && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
-            updatedStatement = replaceForUpdate(updatedStatement, sqlLowerCase);
+            updatedStatement =
+                replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ true);
+          } else {
+            updatedStatement =
+                replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ false);
+          }
+          RemoveEscapeClauseEnum removeEscapeClauseEnum = sessionState.getRemoveEscapeClause();
+          if (removeEscapeClauseEnum != RemoveEscapeClauseEnum.NONE) {
+            updatedStatement =
+                EscapeClauseParser.removeEscapeClauses(
+                    updatedStatement, sqlLowerCase, removeEscapeClauseEnum);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));
@@ -376,7 +387,7 @@ public class BackendConnection {
           try {
             result.set(
                 new QueryResult(
-                    ResultSetHelper.toDirectExecuteResultSet(
+                    PGAdapterResultSetHelper.toDirectExecuteResultSet(
                         spannerConnection
                             .getDatabaseClient()
                             .singleUse()
@@ -417,7 +428,7 @@ public class BackendConnection {
           // We handle one very specific use case here to prevent unnecessary problems: If the user
           // has started a DML batch and is then analyzing an update statement (probably a prepared
           // statement), then we use a separate transaction for that.
-          if (spannerConnection.isDmlBatchActive()) {
+          if (spannerConnection.isDmlBatchActive() && !spannerConnection.isInTransaction()) {
             final Statement statementToAnalyze = statement;
             resultSet =
                 spannerConnection
@@ -555,10 +566,10 @@ public class BackendConnection {
     void doExecute() {
       checkConnectionState();
       try {
-        if (transactionMode != TransactionMode.IMPLICIT) {
+        if (transactionMode != TransactionMode.IMPLICIT || !sessionState.isCopyPartitionQuery()) {
           result.set(spannerConnection.execute(statement));
         } else {
-          Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+          Spanner spanner = spannerConnection.getSpanner();
           BatchClient batchClient = spanner.getBatchClient(databaseId);
           BatchReadOnlyTransaction batchReadOnlyTransaction =
               batchClient.batchReadOnlyTransaction(spannerConnection.getReadOnlyStaleness());
@@ -576,9 +587,7 @@ public class BackendConnection {
                   spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
               result.set(
                   new PartitionQueryResult(
-                      batchReadOnlyTransaction.getBatchTransactionId(),
-                      partitions,
-                      metadataResultSet));
+                      batchReadOnlyTransaction, partitions, metadataResultSet));
             }
           } catch (SpannerException spannerException) {
             // The query might not be suitable for partitioning. Just try with a normal query.
@@ -949,9 +958,7 @@ public class BackendConnection {
     SpanBuilder builder =
         tracer.spanBuilder(name).setAttribute("pgadapter.connection_id", connectionId);
     if (statement != null) {
-      // Ignore deprecation for now, as there is no alternative offered (yet?).
-      //noinspection deprecation
-      builder.setAttribute(SemanticAttributes.DB_STATEMENT, statement.getSql());
+      builder.setAttribute(DB_STATEMENT, statement.getSql());
     }
     if (currentTransactionId != null) {
       builder.setAttribute("pgadapter.transaction_id", currentTransactionId.toString());
@@ -1064,7 +1071,8 @@ public class BackendConnection {
     AbstractStatementParser statementParser =
         AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
     if ("options".equalsIgnoreCase(name)) {
-      String[] commands = value.split("-c\\s+");
+      // Some drivers encode spaces as '+'.
+      String[] commands = value.split("-c[\\s+]+");
       for (String command : commands) {
         // Special case: If the setting is one that is handled by the Connection API, then we need
         // to execute the statement on the connection instead.
@@ -1158,8 +1166,11 @@ public class BackendConnection {
             && bufferedStatement.isBatchingPossible()
             && index < (getStatementCount() - 1)) {
           StatementType statementType = getStatementType(index);
-          StatementType nextStatementType = getStatementType(index + 1);
-          canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
+          // Do not start an explicit batch if the connection is already in auto-DML-batch mode.
+          if (!(statementType == StatementType.UPDATE && spannerConnection.isAutoBatchDml())) {
+            StatementType nextStatementType = getStatementType(index + 1);
+            canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
+          }
         }
 
         if (canUseBatch) {
@@ -1689,21 +1700,25 @@ public class BackendConnection {
 
   @InternalApi
   public static final class PartitionQueryResult implements StatementResult {
-    private final BatchTransactionId batchTransactionId;
+    private final BatchReadOnlyTransaction transaction;
     private final List<Partition> partitions;
     private final ResultSet metadataResultSet;
 
     public PartitionQueryResult(
-        BatchTransactionId batchTransactionId,
+        BatchReadOnlyTransaction transaction,
         List<Partition> partitions,
         ResultSet metadataResultSet) {
-      this.batchTransactionId = batchTransactionId;
+      this.transaction = Preconditions.checkNotNull(transaction);
       this.partitions = partitions;
       this.metadataResultSet = metadataResultSet;
     }
 
+    public void cleanup() {
+      this.transaction.cleanup();
+    }
+
     public BatchTransactionId getBatchTransactionId() {
-      return batchTransactionId;
+      return transaction.getBatchTransactionId();
     }
 
     public List<Partition> getPartitions() {

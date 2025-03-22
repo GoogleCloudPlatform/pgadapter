@@ -23,7 +23,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
@@ -31,17 +30,6 @@ import org.postgresql.util.ByteConverter;
 /** Translate wire protocol dates to desired formats. */
 @InternalApi
 public class DateParser extends Parser<Date> {
-  // Valid format for date: 'yyyy-MM-dd [+-]HH[:mi]'.
-  // Timezone information is optional. Timezone may also be specified using only hour value.
-  // NOTE: Following algorithm might perform slowly due to exception handling; sadly, this seems
-  //       to be the accepted default method for date validation.
-  private static final SimpleDateFormat[] VALID_DATE_FORMATS = {
-    new SimpleDateFormat("yyyy-MM-dd HH:mm"),
-    new SimpleDateFormat("yyyy-MM-dd +HH:mm"),
-    new SimpleDateFormat("yyyy-MM-dd -HH:mm"),
-    new SimpleDateFormat("yyyy-MM-dd +HH"),
-    new SimpleDateFormat("yyyy-MM-dd -HH")
-  };
 
   DateParser(ResultSet item, int position) {
     this.item = item.getDate(position);

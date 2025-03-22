@@ -5,10 +5,12 @@ The sample application starts PGAdapter as an in-process dependency, and uses th
 PostgreSQL JDBC driver and Hibernate dialect to connect through the in-process PGAdapter to Cloud
 Spanner.
 
-## Running
-Modify the `application.properties` file in the [src/main/resources](src/main/resources) directory
-to match your Cloud Spanner database. The database must exist and must use the PostgreSQL dialect.
-The application will automatically create the required tables when the application is starting.
+It also shows how to integrate Liquibase into a Spring Boot application.
+
+## Running on the Emulator
+The sample by default also starts a Spanner Emulator instance in a Docker test container and runs
+the sample on the Emulator. The host machine must have Docker installed for this to work.
+No other prior setup is needed to run the sample application on the Spanner Emulator.
 
 Run the application from your favorite IDE or execute it from the command line with:
 
@@ -16,7 +18,17 @@ Run the application from your favorite IDE or execute it from the command line w
 mvn spring-boot:run
 ```
 
-See [Troubleshooting](#troubleshooting) if you run into unexpected errors.
+## Running on a real Spanner Database
+Modify the `application.properties` file in the [src/main/resources](src/main/resources) directory
+to match your Cloud Spanner database and set the property `spanner.use_emulator=false`.
+The database must exist and must use the PostgreSQL dialect.
+The application will automatically create the required tables when the application is starting.
+
+Run the application from your favorite IDE or execute it from the command line with:
+
+```shell
+mvn spring-boot:run
+```
 
 ## Integration with IntelliJ
 
@@ -52,6 +64,9 @@ It is recommended to run PGAdapter in-process with your Java application. This s
 development and deployment process, as you only have one application that needs to be deployed and
 started. Running PGAdapter and your application in the same JVM will also give you minimal latency
 between your application and PGAdaper.
+
+This sample also shows how to automatically start the Spanner Emulator together with PGAdapter, so
+you can use the Spanner Emulator for local development.
 
 ### UUID Primary Keys
 
@@ -194,6 +209,18 @@ contains an example of a helper method that can be used to execute stale reads.
 The [SampleApplication.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/SampleApplication.java)
 contains a `staleRead()` method that shows how to use the `StaleReadService`.
 
+### Directed Reads
+
+Cloud Spanner supports [Directed Reads](https://cloud.google.com/spanner/docs/directed-reads) to
+provide flexibility to route read-only transactions to specific regions.
+
+Directed reads are not part of the standard JPA interface. It is however possible to execute
+directed reads by executing [session management commands](https://cloud.google.com/spanner/docs/jdbc-session-mgmt-commands-pgcompat).
+The [DirectedReadService](src/main/java/com/google/cloud/spanner/pgadapter/sample/service/DirectedReadService.java)
+contains an example of a helper method that can be used to execute directed reads.
+The [SampleApplication.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/SampleApplication.java)
+contains a `directedRead()` method that shows how to use the `DirectedReadService`.
+
 ## Liquibase
 The sample application uses Liquibase to manage the database schema. It is recommended to use
 a higher level schema management system like Liquibase to manage your database schema for multiple
@@ -223,17 +250,3 @@ mvn liquibase:rollback \
 The `spanner.ddl_transaction_mode=AutocommitExplicitTransaction` addition to the above JDBC connection
 URL ensures that PGAdapter will automatically commit any active transaction when it encounters a DDL
 statement, and then execute all following DDL statements as a single DDL batch.
-
-## Troubleshooting
-
-### Address already in use
-
-The application starts PGAdapter on port `9432` on your local machine. The following error can occur
-when you run the application if another process is already using that port number.
-
-```
-Server on port 9432 stopped by exception: java.net.BindException: Address already in use
-```
-
-You can change the port number that is used for PGAdapter by changing the value in the
-[PGAdapter.java](src/main/java/com/google/cloud/spanner/pgadapter/sample/PGAdapter.java) file.

@@ -36,12 +36,15 @@ public class SelectCurrentSchemaStatement implements LocalStatement {
     return new String[] {
       "select current_schema()",
       "SELECT current_schema()",
+      "SELECT CURRENT_SCHEMA()",
       "Select current_schema()",
       "select current_schema",
       "SELECT current_schema",
+      "SELECT CURRENT_SCHEMA",
       "Select current_schema",
       "select * from current_schema()",
       "SELECT * FROM current_schema()",
+      "SELECT * FROM CURRENT_SCHEMA()",
       "select * from current_schema",
       "SELECT * FROM current_schema"
     };

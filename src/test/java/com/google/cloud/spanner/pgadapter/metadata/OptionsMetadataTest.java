@@ -429,8 +429,9 @@ public class OptionsMetadataTest {
             .build()
             .getPropertyMap()
             .get("useVirtualThreads"));
-    assertEquals(
-        "true",
+    // Virtual threads should not be carried over to the underlying connection. Instead, this
+    // option only determines the type of thread that is used for a connection handler.
+    assertNull(
         OptionsMetadata.newBuilder()
             .useVirtualThreads()
             .setCredentials(NoCredentials.getInstance())
@@ -457,6 +458,31 @@ public class OptionsMetadataTest {
             .useVirtualGrpcTransportThreads()
             .build()
             .isUseGrpcTransportVirtualThreads());
+    assertNull(
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("enableEndToEndTracing"));
+    assertEquals(
+        "true",
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(true)
+            .setCredentials(NoCredentials.getInstance())
+            .build()
+            .getPropertyMap()
+            .get("enableEndToEndTracing"));
+    assertFalse(OptionsMetadata.newBuilder().build().isEnableEndToEndTracing());
+    assertTrue(
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(true)
+            .build()
+            .isEnableEndToEndTracing());
+    assertFalse(
+        OptionsMetadata.newBuilder()
+            .setEnableEndToEndTracing(false)
+            .build()
+            .isEnableEndToEndTracing());
 
     assertEquals(
         DdlTransactionMode.Batch,
@@ -602,5 +628,56 @@ public class OptionsMetadataTest {
             .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
             .build()
             .buildConnectionURL("projects/my-project/instances/my-instance/databases/my-database"));
+  }
+
+  @Test
+  public void testUseClientCertParameters() {
+    OptionsMetadata options =
+        OptionsMetadata.newBuilder().useClientCert("client.crt", "client.key").build();
+    assertEquals("client.crt", options.getPropertyMap().get("clientCertificate"));
+    assertEquals("client.key", options.getPropertyMap().get("clientKey"));
+  }
+
+  @Test
+  public void testExternalHostConfigurations() {
+    assertEquals(
+        DatabaseId.of("default", "default", "test_db"),
+        (new OptionsMetadata(new String[] {"-d", "test_db", "-e", "localhost:8000"}))
+            .getDefaultDatabaseId());
+    SpannerException spannerException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                new OptionsMetadata(
+                    new String[] {
+                      "-d", "test_db", "-e", "spanner.googleapis.com:443", "-c", "credentials.json"
+                    }));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+    assertEquals(
+        DatabaseId.of("default", "default", "test_db"),
+        OptionsMetadata.newBuilder()
+            .setEndpoint("localhost:8000")
+            .setDatabase("test_db")
+            .build()
+            .getDefaultDatabaseId());
+    spannerException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                OptionsMetadata.newBuilder()
+                    .setEndpoint("spanner.googleapis.com")
+                    .setDatabase("test_db")
+                    .build());
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+    spannerException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                OptionsMetadata.newBuilder()
+                    .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
+                    .setEndpoint("localhost:8000")
+                    .setDatabase("test_db")
+                    .build());
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
   }
 }

@@ -68,6 +68,7 @@ import java.sql.SQLException;
 import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -213,6 +214,23 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals(1, commitRequests.size());
     CommitRequest commitRequest = commitRequests.get(0);
     assertEquals(Priority.PRIORITY_LOW, commitRequest.getRequestOptions().getPriority());
+  }
+
+  @Test
+  public void testCopyInWithMaxCommitDelay() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.max_commit_delay='20ms'");
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertTrue(commitRequest.hasMaxCommitDelay());
+    assertEquals(TimeUnit.MILLISECONDS.toNanos(20), commitRequest.getMaxCommitDelay().getNanos());
   }
 
   @Test

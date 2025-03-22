@@ -15,6 +15,8 @@ package com.google.cloud.pgadapter.tpcc.dataloader;
 
 import com.google.cloud.pgadapter.tpcc.dataloader.OrderRowProducer.DistrictId;
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
+import java.util.List;
 
 class NewOrderRowProducer extends AbstractOrderedIdRowProducer {
   private static final String TABLE = "new_orders";
@@ -26,10 +28,6 @@ class NewOrderRowProducer extends AbstractOrderedIdRowProducer {
     w_id
     """;
 
-  private final long warehouseId;
-
-  private final long districtId;
-
   private final ImmutableList<Long> customerIds;
 
   NewOrderRowProducer(DataLoadStatus status, long warehouseId, long districtId, long rowCount) {
@@ -40,10 +38,9 @@ class NewOrderRowProducer extends AbstractOrderedIdRowProducer {
   }
 
   @Override
-  String createRow(long rowIndex) {
+  List<ImmutableList> createRowsAsList(long rowIndex) {
     if (rowIndex % 3L == 0) {
-      return String.join(
-          ",",
+      return Arrays.asList(
           ImmutableList.of(
               getId(rowIndex),
               getCustomerId(rowIndex),

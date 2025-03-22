@@ -14,7 +14,7 @@
 """
 
 import secrets
-from random import seed, randrange, random
+from random import choice, seed, randrange, random
 from datetime import date
 
 seed()
@@ -23,6 +23,11 @@ seed()
 """
  Helper functions for generating random names and titles.
 """
+
+
+def random_boolean():
+  return choice([True, False])
+
 
 def random_first_name():
   return first_names[randrange(len(first_names))]
@@ -64,13 +69,13 @@ adjectives = [
   "ultra",
   "happy",
   "emotional",
-  "filthy",
+  "lame",
   "charming",
   "alleged",
   "talented",
   "exotic",
   "lamentable",
-  "lewd",
+  "splendid",
   "old-fashioned",
   "savory",
   "delicate",

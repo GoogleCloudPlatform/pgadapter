@@ -24,7 +24,10 @@ if [ "$MESSAGE" == "" ]; then
 4 records inserted'
 fi
 if [ "$MESSAGE" == "" ]; then
-  source ./test_sample.sh write_data_with_dml_batch $'PREPARE\nINSERT 0 1
+  source ./test_sample.sh write_data_with_dml_batch $'PREPARE
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
 3 records inserted'
 fi
 if [ "$MESSAGE" == "" ]; then

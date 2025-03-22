@@ -18,7 +18,7 @@ import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/** Signals to client that we do not accept SSL. */
+/** Signals to client that we do not accept SSL or GSSAPI. */
 @InternalApi
 public class DeclineSSLResponse extends WireOutput {
 
@@ -41,7 +41,7 @@ public class DeclineSSLResponse extends WireOutput {
 
   @Override
   protected String getMessageName() {
-    return "Decline SSL";
+    return "Decline SSL/GSSAPI";
   }
 
   @Override

@@ -86,43 +86,43 @@ diff -i -w -s .ci/e2e-result/backslash-l.txt .ci/e2e-expected/backslash-l.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option dml batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/dml-batch.txt)" > .ci/e2e-result/dml-batching.txt
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "$(cat .ci/e2e-batching/dml-batch.txt)" > .ci/e2e-result/dml-batching.txt
 diff -i -w -s .ci/e2e-result/dml-batching.txt .ci/e2e-expected/dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option ddl batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/ddl-batch.txt)"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "$(cat .ci/e2e-batching/ddl-batch.txt)"
 echo "\d" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/ddl-batching.txt
 diff -i -w -s .ci/e2e-result/ddl-batching.txt .ci/e2e-expected/ddl-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option ddl-dml mix batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/ddl-dml-batch.txt)" &> .ci/e2e-result/ddl-dml-batching.txt
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "$(cat .ci/e2e-batching/ddl-dml-batch.txt)" &> .ci/e2e-result/ddl-dml-batching.txt
 diff -i -w -s .ci/e2e-result/ddl-dml-batching.txt .ci/e2e-expected/ddl-dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option SELECT DML batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/select-dml-batch.txt)" &> .ci/e2e-result/select-dml-batching.txt
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "$(cat .ci/e2e-batching/select-dml-batch.txt)" &> .ci/e2e-result/select-dml-batching.txt
 diff -i -w -s .ci/e2e-result/select-dml-batching.txt .ci/e2e-expected/select-dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option SELECT DDL batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/select-ddl-batch.txt)" &> .ci/e2e-result/select-ddl-batching.txt
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "$(cat .ci/e2e-batching/select-ddl-batch.txt)" &> .ci/e2e-result/select-ddl-batching.txt
 diff -i -w -s .ci/e2e-result/select-ddl-batching.txt .ci/e2e-expected/select-ddl-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option WITH DML batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/with-dml-batch.txt)" &> .ci/e2e-result/with-dml-batching.txt
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "$(cat .ci/e2e-batching/with-dml-batch.txt)" &> .ci/e2e-result/with-dml-batching.txt
 diff -i -w -s .ci/e2e-result/with-dml-batching.txt .ci/e2e-expected/with-dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option begin/commit batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/begin-commit-batch.txt)" &> .ci/e2e-result/begin-commit-batching.txt
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "$(cat .ci/e2e-batching/begin-commit-batch.txt)" &> .ci/e2e-result/begin-commit-batching.txt
 diff -i -w -s .ci/e2e-result/begin-commit-batching.txt .ci/e2e-expected/begin-commit-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"COPY FROM STDIN\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "COPY users FROM STDIN;" <<EOF
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "COPY users FROM STDIN;" <<EOF
 12	12	12
 13	13	13
 14	14	14
@@ -136,7 +136,7 @@ diff -i -w -s .ci/e2e-result/copy-from-stdin.txt .ci/e2e-expected/copy-from-stdi
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"COPY FROM STDIN in batch\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "select 0; COPY users FROM STDIN; COPY users FROM STDIN; select 1;" <<EOF
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --set=SHOW_ALL_RESULTS=off -c "select 0; COPY users FROM STDIN; COPY users FROM STDIN; select 1;" <<EOF
 18	18	18
 \.
 19	19	19

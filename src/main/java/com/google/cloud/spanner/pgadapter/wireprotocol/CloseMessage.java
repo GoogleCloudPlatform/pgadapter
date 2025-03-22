@@ -16,9 +16,11 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CloseCompleteResponse;
 import java.text.MessageFormat;
+import javax.annotation.Nullable;
 
 /** Close the designated statement. */
 @InternalApi
@@ -26,29 +28,39 @@ public class CloseMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'C';
 
-  private PreparedType type;
-  private String name;
-  private IntermediateStatement statement;
+  private final PreparedType type;
+  private final String name;
+  @Nullable private final IntermediateStatement statement;
 
   public CloseMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
     this.name = this.readAll();
+    IntermediateStatement statement = null;
     if (this.type == PreparedType.Statement) {
-      this.statement = this.connection.getStatement(this.name);
+      try {
+        statement = this.connection.getStatement(this.name);
+      } catch (PGException ignore) {
+      }
     } else {
-      this.statement = this.connection.getPortal(this.name);
+      try {
+        statement = this.connection.getPortal(this.name);
+      } catch (PGException ignore) {
+      }
     }
+    this.statement = statement;
   }
 
   /** Close the statement server-side and clean up by deleting their metdata locally. */
   @Override
   protected void sendPayload() throws Exception {
-    if (this.type == PreparedType.Portal) {
-      this.statement.close(); // Only portals need to be closed server side, since PS is not bound
-      this.connection.closePortal(this.name);
-    } else {
-      this.connection.closeStatement(this.name);
+    if (this.statement != null) {
+      if (this.type == PreparedType.Portal) {
+        this.statement.close(); // Only portals need to be closed server side, since PS is not bound
+        this.connection.closePortal(this.name);
+      } else {
+        this.connection.closeStatement(this.name);
+      }
     }
     new CloseCompleteResponse(this.outputStream).send();
   }

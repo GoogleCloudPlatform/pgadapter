@@ -23,6 +23,5 @@ import org.springframework.data.repository.query.Param;
 public interface SingerRepository extends JpaRepository<Singer, String> {
 
   /** Get all singers that have a last name that starts with the given prefix. */
-  @Query("SELECT s FROM Singer s WHERE cast(starts_with(s.lastName, :lastName) as boolean)")
   List<Singer> searchByLastNameStartsWith(@Param("lastName") String lastName);
 }

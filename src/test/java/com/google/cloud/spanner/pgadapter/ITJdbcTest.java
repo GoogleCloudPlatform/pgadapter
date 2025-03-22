@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.useFloat4InTests;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -439,11 +438,7 @@ public class ITJdbcTest implements IntegrationTest {
         } else {
           statement.setBytes(++index, "bytes_test".getBytes(StandardCharsets.UTF_8));
         }
-        if (useFloat4InTests()) {
-          statement.setFloat(++index, 10.1f);
-        } else {
-          statement.setDouble(++index, 10.1f);
-        }
+        statement.setFloat(++index, 10.1f);
         statement.setDouble(++index, 10.1);
         // TODO: Remove when the emulator supports casting to int4
         if (isSimpleMode) {
@@ -474,15 +469,8 @@ public class ITJdbcTest implements IntegrationTest {
                     "bytes2".getBytes(StandardCharsets.UTF_8)
                   }));
         }
-        if (useFloat4InTests()) {
-          statement.setArray(
-              ++index, connection.createArrayOf("float4", new Float[] {3.14f, null, -99.8f}));
-        } else {
-          statement.setArray(
-              ++index,
-              connection.createArrayOf(
-                  "float8", new Double[] {(double) 3.14f, null, (double) -99.8f}));
-        }
+        statement.setArray(
+            ++index, connection.createArrayOf("float4", new Float[] {3.14f, null, -99.8f}));
         statement.setArray(
             ++index, connection.createArrayOf("float8", new Double[] {3.14d, null, -99.8}));
         // TODO: Remove when Spangres supports casting to int4
@@ -578,14 +566,8 @@ public class ITJdbcTest implements IntegrationTest {
               },
               (byte[][]) resultSet.getArray(++index).getArray());
         }
-        if (useFloat4InTests()) {
-          assertArrayEquals(
-              new Float[] {3.14f, null, -99.8f}, (Float[]) resultSet.getArray(++index).getArray());
-        } else {
-          assertArrayEquals(
-              new Double[] {(double) 3.14f, null, (double) -99.8f},
-              (Double[]) resultSet.getArray(++index).getArray());
-        }
+        assertArrayEquals(
+            new Float[] {3.14f, null, -99.8f}, (Float[]) resultSet.getArray(++index).getArray());
         assertArrayEquals(
             new Double[] {3.14d, null, -99.8}, (Double[]) resultSet.getArray(++index).getArray());
         assertArrayEquals(
@@ -659,11 +641,7 @@ public class ITJdbcTest implements IntegrationTest {
         if (!isSimpleMode) {
           statement.setBytes(++index, "updated".getBytes(StandardCharsets.UTF_8));
         }
-        if (useFloat4InTests()) {
-          statement.setFloat(++index, 3.14f * 2f);
-        } else {
-          statement.setDouble(++index, 3.14f * 2f);
-        }
+        statement.setFloat(++index, 3.14f * 2f);
         statement.setDouble(++index, 3.14d * 2d);
         // TODO: Remove when Spangres supports casting to int4
         if (isSimpleMode) {
@@ -1134,7 +1112,7 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(resultSet.next());
         originalDateStyle = resultSet.getString("setting");
         assertTrue(
-            originalDateStyle,
+            "Original value: " + originalDateStyle,
             "ISO".equals(originalDateStyle) || "ISO, MDY".equals(originalDateStyle));
         assertFalse(resultSet.next());
       }
@@ -1193,6 +1171,23 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(originalDateStyle, resultSet.getString("setting"));
         assertFalse(resultSet.next());
       }
+
+      // Verify that we can get all pg_settings and that the number of setting is equal to the
+      // expected value.
+      int numExpectedSettings = 31;
+      int rowCount = 0;
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from pg_settings order by name")) {
+        while (resultSet.next()) {
+          for (int col = 1; col <= resultSet.getMetaData().getColumnCount(); col++) {
+            // Just verify that we can get the value.
+            resultSet.getObject(col);
+          }
+          assertNotNull(resultSet.getString("name"));
+          rowCount++;
+        }
+      }
+      assertEquals(numExpectedSettings, rowCount);
     }
   }
 

@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: "Install postgresql-client-14"
+      - name: "Install postgresql-client-17"
         run: |
           sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
-          sudo apt-get install postgresql-client-14
+          sudo apt-get install postgresql-client-17
       - name: Run psql snippets
         working-directory: ./samples/snippets/psql-snippets/tests
         run: ./test_samples.sh
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22.x'
+          go-version: '1.24.x'
       - name: Run Go snippets
         working-directory: ./samples/snippets/golang-snippets
         run: go test
@@ -80,3 +80,18 @@ jobs:
       - name: Run dotnet snippets
         working-directory: ./samples/snippets/dotnet-snippets
         run: dotnet test
+  php-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+      - run: php --version
+      - name: Install dependencies
+        working-directory: ./samples/snippets/php-snippets
+        run: composer install
+      - name: Run PHP snippets
+        working-directory: ./samples/snippets/php-snippets/test
+        run: ../vendor/bin/phpunit SamplesTest.php

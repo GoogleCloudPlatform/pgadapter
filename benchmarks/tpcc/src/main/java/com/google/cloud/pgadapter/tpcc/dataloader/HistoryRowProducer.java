@@ -13,7 +13,10 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc.dataloader;
 
+import com.google.cloud.Timestamp;
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
+import java.util.List;
 
 class HistoryRowProducer extends AbstractRowProducer {
   private static final String TABLE = "history";
@@ -28,10 +31,6 @@ class HistoryRowProducer extends AbstractRowProducer {
     h_amount,
     h_data
     """;
-
-  private final long warehouseId;
-
-  private final long districtId;
 
   HistoryRowProducer(DataLoadStatus status, long warehouseId, long districtId, long rowCount) {
     super(TABLE, COLUMNS, rowCount, status::incHistory);
@@ -49,7 +48,21 @@ class HistoryRowProducer extends AbstractRowProducer {
             String.valueOf(warehouseId),
             String.valueOf(districtId),
             String.valueOf(warehouseId),
-            now(),
+            nowAsString(),
+            getYtdPayment(),
+            getData()));
+  }
+
+  @Override
+  List<ImmutableList> createRowsAsList(long rowIndex) {
+    return Arrays.asList(
+        ImmutableList.of(
+            getId(rowIndex),
+            String.valueOf(districtId),
+            String.valueOf(warehouseId),
+            String.valueOf(districtId),
+            String.valueOf(warehouseId),
+            Timestamp.now(),
             getYtdPayment(),
             getData()));
   }

@@ -29,27 +29,41 @@ spec:
       # TODO(developer): replace this value with the actual Kubernetes Service Account name
       serviceAccountName: <YOUR_KSA_NAME>
       containers:
-      - name: example-app
-        # TODO(developer): replace these values
-        image: <YOUR_REGION>-docker.pkg.dev/<YOUR_PROJECT_ID>/example-repo/example-app
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 8080
-        resources:
-          requests:
-            cpu: 200m
-      - name: pgadapter
-        image: gcr.io/cloud-spanner-pg-adapter/pgadapter
-        ports:
-          - containerPort: 5432
-        # TODO(developer): Replace with actual project, instance and database name
-        args:
-          - "-p <YOUR_SPANNER_PROJECT_ID>"
-          - "-i <YOUR_SPANNER_INSTANCE_ID>"
-          - "-d <YOUR_SPANNER_DATABASE_ID>"
-          - "-x"
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: 200m
+        - name: example-app
+          # TODO(developer): replace these values
+          image: <YOUR_REGION>-docker.pkg.dev/<YOUR_PROJECT_ID>/example-repo/example-app
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 200m
+      initContainers:
+        - name: pgadapter
+          image: gcr.io/cloud-spanner-pg-adapter/pgadapter
+          # Setting restartPolicy to Always makes this a side-car container.
+          restartPolicy: Always
+          ports:
+            - containerPort: 5432
+          # TODO(developer): Replace with actual project, instance and database name
+          args:
+            - "-p <YOUR_SPANNER_PROJECT_ID>"
+            - "-i <YOUR_SPANNER_INSTANCE_ID>"
+            - "-d <YOUR_SPANNER_DATABASE_ID>"
+            - "-x"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: 200m
+          # Add a readiness probe that checks that PGAdapter is listening on port 5432.
+          # NOTE: This probe will cause PGAdapter to log an EOF warning. This error may be ignored.
+          # The warning is caused by the TCP probe, which will open a TCP connection to PGAdapter,
+          # but not send a PostgreSQL startup message, and instead just close the connection.
+          readinessProbe:
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+            tcpSocket:
+              port: 5432
 ---
