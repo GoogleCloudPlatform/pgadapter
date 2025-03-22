@@ -14,7 +14,7 @@
 
 import {Prisma, PrismaClient} from "@prisma/client";
 import {
-  randomAlbumTitle, randomElement,
+  randomAlbumTitle,
   randomFirstName,
   randomId,
   randomLastName,
@@ -47,6 +47,7 @@ export function createPrismaClient() {
 const execAsync = promisify(exec);
 
 export async function deployMigrations() {
+  console.log(`Running npx prisma migrate deploy on ${process.env.DATABASE_URL}`);
   await execAsync("npx prisma migrate deploy", {
     env: process.env,
   });

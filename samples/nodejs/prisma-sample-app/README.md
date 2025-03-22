@@ -25,6 +25,31 @@ modifications.
 
 See [Limitations](#limitations) for a full list of limitations when working with `Prisma`.
 
+
+# Running the Sample Application
+
+The sample application is set up to automatically do the following:
+1. Start PGAdapter and the Spanner Emulator in a Docker container.
+2. Dynamically set the `DATABASE_URL` environment variable to point to the PGAdapter + Emulator
+   instance that was started by the sample script.
+3. Create the Spanner instance and database on the Spanner Emulator.
+4. Run `npx prisma migrate deploy` on the database to create the sample application tables.
+5. Run the sample application. This will create, query, update, and delete some sample data.
+6. Run `npx prisma migrate deploy` once more on the database to show that running this multiple
+   times is supported.
+
+Run the sample application with the following command:
+
+```shell
+npm run start
+```
+
+# Manually Configuring and Running the Sample
+
+The sample application automatically starts PGAdapter and the Spanner Emulator when the application
+is run. You can also manually start PGAdapter and configure it to connect to a real Spanner
+instance.
+
 ## Start PGAdapter
 You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
 pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
@@ -46,28 +71,22 @@ docker run \
 ## Configuration
 
 Modify the .env file in this directory, so it corresponds to your local setup:
-1. Modify the `DATABASE_URL` and `STALE_READ_DATABASE_URL` variables to point to your PGAdapter
+1. Modify the `DATABASE_URL` variable to point to your PGAdapter
    instance and your database. Do not modify or remove the
-   `?sslmode=disable&options=-c%20spanner.well_known_client=prisma` sections.
-2. Modify the `SHADOW_DATABASE_URL` to point to a local PostgreSQL instance. This is required, as
-   Cloud Spanner cannot be used as a shadow database. See also https://www.prisma.io/docs/concepts/components/prisma-migrate/shadow-database#cloud-hosted-shadow-databases-must-be-created-manually
+   `?sslmode=disable&options=-c%20spanner.well_known_client=prisma` section.
+2. Set the `AUTO_START_PGADAPTER` variable to `false`.
 
-## Creating the Sample Data Model
+## Create the Sample Data Model
 
-The sample data model can be created using `Prisma` migrations. Run the following command to create
-the sample data model:
+Running the sample application will automatically create the database schema. You can also create
+the database schema manually with the following command:
 
 ```shell
 npx prisma migrate deploy
 ```
 
-## Running the Sample Application
-
-Run the sample application with the following command:
-
-```shell
-npm run start
-```
+__NOTE__: Spanner PostgreSQL and PGAdapter do not support any other Prisma `migrate` commands than
+`prisma migrate deploy`.
 
 ## Data Types
 
@@ -102,10 +121,8 @@ The following limitations are currently known:
 
 ### Migrations
 Prisma Migrations make extensive use of `pg_catalog` tables and functions. Not all of these are supported
-by Cloud Spanner. PGAdapter contains replacement queries for the most commonly used `pg_catalog`
-features. This makes it possible to use Prisma Migrations with PGAdapter, but some migration
-commands could still fail. Please feel free to open an issue in the GitHub repository if you run
-into any such issues.
+by Spanner. Spanner and PGAdapter therefore do not support Prisma `migrate` commands other than
+`prisma migrate deploy`.
 
 An alternative way to use Prisma Migrations with Cloud Spanner PostgreSQL is to execute the
 migration commands on an open-source PostgreSQL database. See [migrations.md](migrations.md) for
@@ -121,7 +138,7 @@ See also:
 - https://cloud.google.com/spanner/docs/reference/postgresql/data-definition-language#extensions_to
 
 ### Shadow Database
-Prisma Migrations use a shadow database for generating and verifying new migrations. Cloud Spanner
+Prisma Migrations use a shadow database for generating and verifying new migrations. Spanner
 cannot be used for this purpose. Instead, you need to set up a separate PostgreSQL database that can
 be used as the shadow database.
 

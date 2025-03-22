@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {PrismaClient} from '@prisma/client'
 import {
   createPrismaClient,
   createRandomSingersAndAlbumsAndTracks,
@@ -33,15 +32,21 @@ runSample()
   });
 
 async function runSample() {
-  // Start PGAdapter and the Spanner emulator in a Docker container.
-  // Using a TestContainer to run PGAdapter is OK in development and test, but for production, it is
-  // recommended to run PGAdapter as a side-car container.
-  // See https://github.com/GoogleCloudPlatform/pgadapter/tree/postgresql-dialect/samples/cloud-run/nodejs
-  // for a sample.
-  const pgAdapter = await startPGAdapter();
-  const port = pgAdapter.getMappedPort(5432);
-  console.log(`PGAdapter started on port ${port}`);
-  process.env.DATABASE_URL = `postgresql://localhost:${port}/prisma-sample?options=-c%20spanner.well_known_client=prisma`;
+  let pgAdapter: StartedTestContainer = null;
+  if (process.env.AUTO_START_PGADAPTER && process.env.AUTO_START_PGADAPTER.toLowerCase() == 'true') {
+    // Start PGAdapter and the Spanner emulator in a Docker container.
+    // Using a TestContainer to run PGAdapter is OK in development and test, but for production, it is
+    // recommended to run PGAdapter as a side-car container.
+    // See https://github.com/GoogleCloudPlatform/pgadapter/tree/postgresql-dialect/samples/cloud-run/nodejs
+    // for a sample.
+    pgAdapter = await startPGAdapter();
+    const port = pgAdapter.getMappedPort(5432);
+    console.log(`PGAdapter started on port ${port}`);
+
+    // Dynamically set the DATABASE_URL environment variable to point to the PGAdapter instance
+    // that was started.
+    process.env.DATABASE_URL = `postgresql://localhost:${port}/prisma-sample?options=-c%20spanner.well_known_client=prisma`;
+  }
   
   // Create the Prisma client.
   createPrismaClient();
@@ -62,7 +67,9 @@ async function runSample() {
   // times on an existing database.
   await deployMigrations();
 
-  await pgAdapter.stop();
+  if (pgAdapter) {
+    await pgAdapter.stop();
+  }
 }
 
 export async function startPGAdapter(): Promise<StartedTestContainer> {

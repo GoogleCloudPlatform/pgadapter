@@ -1,10 +1,10 @@
 # Prisma Migrations with PGAdapter
 
-Prisma migration commands, other than `prisma migration deploy`, are not supported on Cloud Spanner
-PostgreSQL, as they use `pg_catalog` tables and other features of PostgreSQL that are not supported
-by Cloud Spanner.
+Prisma `migrate` commands, other than `prisma migrate deploy`, are not supported on Spanner
+PostgreSQL, as they use various `pg_catalog` tables and other features of PostgreSQL that are not
+supported by Spanner.
 
-You can however use a local PostgreSQL database and execute Prisma migration commands on that
+You can however use a local PostgreSQL database and execute Prisma `migrate` commands on that
 database instead.
 
 ## Empty PostgreSQL Database
