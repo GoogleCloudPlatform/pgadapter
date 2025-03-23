@@ -29,6 +29,7 @@ runSample()
   })
   .catch(async (e) => {
     console.error(e);
+    process.exit(1);
   });
 
 async function runSample() {
