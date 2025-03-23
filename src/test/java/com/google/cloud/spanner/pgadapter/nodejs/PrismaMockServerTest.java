@@ -773,7 +773,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: true,\n"
-            + "  col_bytea: <Buffer 74 65 73 74>,\n"
+            + "  col_bytea: Uint8Array(4) [ 116, 101, 115, 116 ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 3.14,\n"
             + "  col_int: 100,\n"
@@ -785,9 +785,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_array_bigint: [ 1n, 1n, 2n ],\n"
             + "  col_array_bool: [ true, true, false ],\n"
             + "  col_array_bytea: [\n"
-            + "    <Buffer 62 79 74 65 73 31>,\n"
-            + "    <Buffer 62 79 74 65 73 31>,\n"
-            + "    <Buffer 62 79 74 65 73 32>\n"
+            + "    Uint8Array(6) [ 98, 121, 116, 101, 115, 49 ],\n"
+            + "    Uint8Array(6) [ 98, 121, 116, 101, 115, 49 ],\n"
+            + "    Uint8Array(6) [ 98, 121, 116, 101, 115, 50 ]\n"
             + "  ],\n"
             + "  col_array_float4: [ 3.14, 3.14, -99.99 ],\n"
             + "  col_array_float8: [ 3.14, 3.14, -99.99 ],\n"
@@ -907,7 +907,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: false,\n"
-            + "  col_bytea: <Buffer 75 70 64 61 74 65 64>,\n"
+            + "  col_bytea: Uint8Array(7) [\n"
+            + "    117, 112, 100,\n"
+            + "     97, 116, 101,\n"
+            + "    100\n"
+            + "  ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 6.626,\n"
             + "  col_int: -100,\n"
@@ -1106,7 +1110,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: false,\n"
-            + "  col_bytea: <Buffer 75 70 64 61 74 65 64>,\n"
+            + "  col_bytea: Uint8Array(7) [\n"
+            + "    117, 112, 100,\n"
+            + "     97, 116, 101,\n"
+            + "    100\n"
+            + "  ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 6.626,\n"
             + "  col_int: -100,\n"
@@ -1201,7 +1209,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: false,\n"
-            + "  col_bytea: <Buffer 75 70 64 61 74 65 64>,\n"
+            + "  col_bytea: Uint8Array(7) [\n"
+            + "    117, 112, 100,\n"
+            + "     97, 116, 101,\n"
+            + "    100\n"
+            + "  ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 6.626,\n"
             + "  col_int: -100,\n"
@@ -1720,11 +1732,10 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   public void testTransactionIsolationLevel() throws Exception {
     String output = runTest("testTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
 
-    assertTrue(output, output.contains("Transaction failed:"));
     assertTrue(
         output,
         output.contains(
-            "current transaction is aborted, commands ignored until end of transaction block"));
+            "Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
   }
 
   @Test
