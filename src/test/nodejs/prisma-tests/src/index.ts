@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import {Prisma, PrismaClient, User} from '@prisma/client'
+import {exec} from "child_process";
+import {promisify} from "util";
 
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>, options?: string) {
   if (host.charAt(0) == '/') {
@@ -69,6 +71,21 @@ async function testPgAdvisoryLock(client: PrismaClient) {
   } catch (e) {
     console.error(`Query error: ${e}`);
   }
+}
+
+const execAsync = promisify(exec);
+async function testMigrateStatus() {
+  console.log(`Running npx prisma migrate status on ${process.env.DATABASE_URL}`);
+  await execAsync("npx prisma migrate status", {
+    env: process.env,
+  });
+}
+
+async function testMigrateDeploy() {
+  console.log(`Running npx prisma migrate deploy on ${process.env.DATABASE_URL}`);
+  await execAsync("npx prisma migrate deploy", {
+    env: process.env,
+  });
 }
 
 async function testShowAutoAddLimitClause(client: PrismaClient) {
@@ -374,6 +391,18 @@ require('yargs')
     'Locks/unlocks the specific advisory lock for Prisma',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testPgAdvisoryLock)
+)
+.command(
+    'testMigrateStatus <host> <port> <database>',
+    'Runs npx prisma migrate status',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testMigrateStatus)
+)
+.command(
+    'testMigrateDeploy <host> <port> <database>',
+    'Runs npx prisma migrate deploy',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testMigrateDeploy)
 )
 .command(
     'testShowAutoAddLimitClause <host> <port> <database>',
