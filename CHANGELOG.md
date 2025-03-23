@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.46.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.46.1...v0.46.2) (2025-03-23)
+
+
+### Bug Fixes
+
+* translate _prisma_migrations to prisma_migrations ([#3076](https://github.com/GoogleCloudPlatform/pgadapter/issues/3076)) ([c037501](https://github.com/GoogleCloudPlatform/pgadapter/commit/c0375017a12e48585c5a30e959868c6ae9e3e938))
+
+
+### Performance Improvements
+
+* get database dialect using multiplexed session ([2b10e08](https://github.com/GoogleCloudPlatform/pgadapter/commit/2b10e085087c8296565a91542ed0c31a6f563886))
+* skip gRPC trailers for successful queries ([2b10e08](https://github.com/GoogleCloudPlatform/pgadapter/commit/2b10e085087c8296565a91542ed0c31a6f563886))
+
+
+### Dependencies
+
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 3a98e62 ([#3060](https://github.com/GoogleCloudPlatform/pgadapter/issues/3060)) ([d1c6f03](https://github.com/GoogleCloudPlatform/pgadapter/commit/d1c6f03d1ac4562ce6408a0e8f3fd085fbf75cf8))
+* update module github.com/jackc/pgx/v5 to v5.7.3 ([#3077](https://github.com/GoogleCloudPlatform/pgadapter/issues/3077)) ([0dfa67b](https://github.com/GoogleCloudPlatform/pgadapter/commit/0dfa67b161252447d0903facf3d49f32bcde870f))
+
 ## [0.46.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.46.0...v0.46.1) (2025-03-21)
 
 
