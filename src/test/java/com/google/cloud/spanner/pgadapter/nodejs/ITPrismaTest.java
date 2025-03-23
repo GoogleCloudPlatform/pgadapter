@@ -18,7 +18,6 @@ import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.getOnlyAllType
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
@@ -379,7 +378,10 @@ public class ITPrismaTest implements IntegrationTest {
             testEnv.getPGAdapterHost(),
             testEnv.getPGAdapterPort());
 
-    assertTrue(output, output.contains("Transaction failed: PrismaClientUnknownRequestError: Error in connector: Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
+    assertTrue(
+        output,
+        output.contains(
+            "Transaction failed: PrismaClientUnknownRequestError: Error in connector: Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
   }
 
   static String runTest(String testName, String host, int port)
