@@ -54,8 +54,12 @@ export async function deployMigrations() {
 }
 
 export async function deleteExistingData() {
+  console.log("Deleting all existing ticket sales");
+  let result = await prisma.ticketSale.deleteMany({});
+  console.log(`Deleted ${result.count} ticket sales`);
+  
   console.log("Deleting all existing concerts");
-  let result = await prisma.concert.deleteMany({});
+  result = await prisma.concert.deleteMany({});
   console.log(`Deleted ${result.count} concerts`);
 
   console.log("Deleting all existing albums and related tracks");
@@ -182,6 +186,21 @@ export async function createVenueAndConcertInTransaction() {
   })
   console.log(`Created a concert for ${result.singer.fullName}`);
   console.log(`The concert is named ${result.concert.name} and start at ${result.concert.startTime} at ${result.venue.name}`);
+  console.log();
+}
+
+export async function createTicketSale() {
+  console.log("Creating a ticket sale. Ticket sale uses an auto-generated primary key");
+  const concert = await prisma.concert.findFirst({});
+  const ticketSale = await prisma.ticketSale.create({
+    data: {
+      concertId: concert.id,
+      customerName: "Alice Neeson",
+      price: 99.50,
+      seats: ["A11", "A12", "A13"],
+    }
+  });
+  console.log(`Created a ticket sale with id ${ticketSale.id}`);
   console.log();
 }
 

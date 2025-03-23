@@ -14,7 +14,7 @@
 
 import {
   createPrismaClient,
-  createRandomSingersAndAlbumsAndTracks,
+  createRandomSingersAndAlbumsAndTracks, createTicketSale,
   createVenueAndConcertInTransaction,
   deleteExistingData, deployMigrations, printAlbumsReleasedBefore1900,
   printSingersAndAlbums, staleRead, updateVenueDescription
@@ -63,6 +63,7 @@ async function runSample() {
   await printAlbumsReleasedBefore1900();
   await updateVenueDescription();
   await staleRead();
+  await createTicketSale();
   
   // Run 'npx prisma migrate deploy' once more, just to verify that we can run this command multiple
   // times on an existing database.
