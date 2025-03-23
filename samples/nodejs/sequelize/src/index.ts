@@ -306,4 +306,5 @@ async function insertOrUpdateSinger(sequelize: Sequelize) {
   await main();
 })().catch(e => {
   console.error(e);
+  process.exit(1);
 });

@@ -32,7 +32,7 @@ jobs:
       - run: php --version
       - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 18
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.0'
@@ -91,7 +91,7 @@ jobs:
           dotnet-version: '6.0.x'
       - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 18
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.0'
