@@ -146,10 +146,6 @@ public class ITPrismaTest implements IntegrationTest {
 
   @Test
   public void testCreateUser() throws IOException, InterruptedException {
-    assumeFalse(
-        "The emulator does not return the columns of a DML statement with a RETURNING clause, which breaks the creation of a prepared statement",
-        IntegrationTest.isRunningOnEmulator());
-
     String output =
         runTest("testCreateUser", testEnv.getPGAdapterHost(), testEnv.getPGAdapterPort());
     assertEquals(
@@ -163,10 +159,6 @@ public class ITPrismaTest implements IntegrationTest {
 
   @Test
   public void testNestedWrite() throws IOException, InterruptedException {
-    assumeFalse(
-        "The emulator does not return the columns of a DML statement with a RETURNING clause, which breaks the creation of a prepared statement",
-        IntegrationTest.isRunningOnEmulator());
-
     String output =
         runTest("testNestedWrite", testEnv.getPGAdapterHost(), testEnv.getPGAdapterPort());
     assertEquals("{ id: '4', email: 'alice2@prisma.io', name: null }\n", output);
@@ -184,17 +176,13 @@ public class ITPrismaTest implements IntegrationTest {
 
   @Test
   public void testCreateAllTypes() throws IOException, InterruptedException {
-    assumeFalse(
-        "The emulator does not return the columns of a DML statement with a RETURNING clause, which breaks the creation of a prepared statement",
-        IntegrationTest.isRunningOnEmulator());
-
     String output =
         runTest("testCreateAllTypes", testEnv.getPGAdapterHost(), testEnv.getPGAdapterPort());
     assertEquals(
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: true,\n"
-            + "  col_bytea: <Buffer 74 65 73 74>,\n"
+            + "  col_bytea: Uint8Array(4) [ 116, 101, 115, 116 ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 3.14,\n"
             + "  col_int: 100,\n"
@@ -220,10 +208,6 @@ public class ITPrismaTest implements IntegrationTest {
 
   @Test
   public void testUpdateAllTypes() throws Exception {
-    assumeFalse(
-        "The emulator does not return the columns of a DML statement with a RETURNING clause, which breaks the creation of a prepared statement",
-        IntegrationTest.isRunningOnEmulator());
-
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("insert into \"AllTypes\" (col_bigint) values (1)");
     }
@@ -234,7 +218,11 @@ public class ITPrismaTest implements IntegrationTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: false,\n"
-            + "  col_bytea: <Buffer 75 70 64 61 74 65 64>,\n"
+            + "  col_bytea: Uint8Array(7) [\n"
+            + "    117, 112, 100,\n"
+            + "     97, 116, 101,\n"
+            + "    100\n"
+            + "  ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 6.626,\n"
             + "  col_int: -100,\n"
@@ -258,7 +246,7 @@ public class ITPrismaTest implements IntegrationTest {
         output);
   }
 
-  @Ignore("INSERT OR IGNORE ... RETURNING is not supported")
+  @Ignore("INSERT OR UPDATE does not support setting specific columns")
   @Test
   public void testUpsertAllTypes() throws IOException, InterruptedException {
     String output =
@@ -293,10 +281,6 @@ public class ITPrismaTest implements IntegrationTest {
 
   @Test
   public void testDeleteAllTypes() throws Exception {
-    assumeFalse(
-        "The emulator does not return the columns of a DML statement with a RETURNING clause, which breaks the creation of a prepared statement",
-        IntegrationTest.isRunningOnEmulator());
-
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("insert into \"AllTypes\" (col_bigint) values (1)");
     }
@@ -340,10 +324,6 @@ public class ITPrismaTest implements IntegrationTest {
 
   @Test
   public void testCreateMultipleUsersWithoutTransaction() throws Exception {
-    assumeFalse(
-        "The emulator does not return the columns of a DML statement with a RETURNING clause, which breaks the creation of a prepared statement",
-        IntegrationTest.isRunningOnEmulator());
-
     String output =
         runTest(
             "testCreateMultipleUsersWithoutTransaction",
@@ -354,10 +334,6 @@ public class ITPrismaTest implements IntegrationTest {
 
   @Test
   public void testCreateMultipleUsersInTransaction() throws Exception {
-    assumeFalse(
-        "The emulator does not return the columns of a DML statement with a RETURNING clause, which breaks the creation of a prepared statement",
-        IntegrationTest.isRunningOnEmulator());
-
     String output =
         runTest(
             "testCreateMultipleUsersInTransaction",
@@ -403,11 +379,7 @@ public class ITPrismaTest implements IntegrationTest {
             testEnv.getPGAdapterHost(),
             testEnv.getPGAdapterPort());
 
-    assertTrue(output, output.contains("Transaction failed:"));
-    assertTrue(
-        output,
-        output.contains(
-            "current transaction is aborted, commands ignored until end of transaction block"));
+    assertTrue(output, output.contains("Transaction failed: PrismaClientUnknownRequestError: Error in connector: Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
   }
 
   static String runTest(String testName, String host, int port)

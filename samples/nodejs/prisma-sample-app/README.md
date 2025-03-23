@@ -92,7 +92,7 @@ __NOTE__: Spanner PostgreSQL and PGAdapter do not support any other Prisma `migr
 
 See the [prisma/schema.prisma](prisma/schema.prisma) file for an example mapping for all data types.
 
-Cloud Spanner supports the following data types in combination with `Prisma`.
+Spanner supports the following data types in combination with `Prisma`.
 
 | PostgreSQL Type                        | Prisma type       |
 |----------------------------------------|-------------------|
@@ -107,6 +107,11 @@ Cloud Spanner supports the following data types in combination with `Prisma`.
 | bytea                                  | Bytes             |
 | jsonb                                  | Json              |
 
+## Prisma Studio
+
+[Prisma Studio](https://www.prisma.io/docs/orm/tools/prisma-studio) can be used with PGAdapter and
+Spanner. Make sure to start PGAdapter first, and then let Prisma Studio connect to PGAdapter as if
+it were PostgreSQL.
 
 ## Limitations
 The following limitations are currently known:

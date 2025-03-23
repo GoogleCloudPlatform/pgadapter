@@ -46,6 +46,8 @@ PGAdapter can be used with the following frameworks and tools:
    for a sample application.
 1. `Sequelize.js` ORM can be used with PGAdapter. See [Sequelize.js sample application](samples/nodejs/sequelize)
    for a sample application.
+1. `Prisma` ORM can be used with PGAdapter. See [Prisma sample application](samples/nodejs/prisma-sample-app)
+   for a sample application.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
