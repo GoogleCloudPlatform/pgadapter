@@ -6,7 +6,7 @@ toolchain go1.24.1
 
 require (
 	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250323074852-37f29d31de31
-	github.com/jackc/pgx/v5 v5.7.3
+	github.com/jackc/pgx/v5 v5.7.4
 )
 
 require (
@@ -32,7 +32,6 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
-	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
@@ -47,7 +46,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/shirou/gopsutil/v3 v3.23.12 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
