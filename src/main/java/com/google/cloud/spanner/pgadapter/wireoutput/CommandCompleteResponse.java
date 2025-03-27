@@ -31,8 +31,12 @@ public class CommandCompleteResponse extends WireOutput {
   private final byte[] command;
 
   public CommandCompleteResponse(DataOutputStream output, String command) {
-    super(output, HEADER_LENGTH + command.getBytes(UTF8).length + NULL_TERMINATOR_LENGTH);
-    this.command = command.getBytes(UTF8);
+    this(output, command.getBytes(UTF8));
+  }
+
+  private CommandCompleteResponse(DataOutputStream output, byte[] command) {
+    super(output, HEADER_LENGTH + command.length + NULL_TERMINATOR_LENGTH);
+    this.command = command;
   }
 
   @Override

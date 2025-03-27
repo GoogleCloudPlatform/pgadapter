@@ -22,7 +22,6 @@ import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.common.util.concurrent.Futures;
-import java.util.List;
 import java.util.concurrent.Future;
 
 /**
@@ -32,18 +31,19 @@ import java.util.concurrent.Future;
 @InternalApi
 public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   static final byte[][] NO_PARAMS = new byte[0][];
+  static final short[] NO_FORMAT_CODES = new short[0];
 
   private final IntermediatePreparedStatement preparedStatement;
   private final byte[][] parameters;
-  protected final List<Short> parameterFormatCodes;
-  protected final List<Short> resultFormatCodes;
+  protected final short[] parameterFormatCodes;
+  protected final short[] resultFormatCodes;
 
   public IntermediatePortalStatement(
       String name,
       IntermediatePreparedStatement preparedStatement,
       byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      short[] parameterFormatCodes,
+      short[] resultFormatCodes) {
     super(
         preparedStatement.connectionHandler,
         preparedStatement.options,
@@ -62,23 +62,23 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   }
 
   public short getParameterFormatCode(int index) {
-    if (this.parameterFormatCodes.size() == 0) {
+    if (this.parameterFormatCodes.length == 0) {
       return 0;
-    } else if (index >= this.parameterFormatCodes.size()) {
-      return this.parameterFormatCodes.get(0);
+    } else if (index >= this.parameterFormatCodes.length) {
+      return this.parameterFormatCodes[0];
     } else {
-      return this.parameterFormatCodes.get(index);
+      return this.parameterFormatCodes[index];
     }
   }
 
   @Override
   public short getResultFormatCode(int index) {
-    if (this.resultFormatCodes == null || this.resultFormatCodes.isEmpty()) {
+    if (this.resultFormatCodes == null || this.resultFormatCodes.length == 0) {
       return super.getResultFormatCode(index);
-    } else if (this.resultFormatCodes.size() == 1) {
-      return this.resultFormatCodes.get(0);
+    } else if (this.resultFormatCodes.length == 1) {
+      return this.resultFormatCodes[0];
     } else {
-      return this.resultFormatCodes.get(index);
+      return this.resultFormatCodes[index];
     }
   }
 

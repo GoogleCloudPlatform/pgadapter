@@ -16,13 +16,13 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.Server.getVersion;
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
+import static com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.sendReadyResponse;
 
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
 import com.google.cloud.spanner.pgadapter.utils.Logging.Action;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
@@ -218,10 +218,13 @@ public class ExtendedQueryProtocolHandler {
         throw PGExceptionFactory.newQueryCancelledException();
       }
       if (includeReadyResponse) {
-        new ReadyResponse(
-                connectionHandler.getConnectionMetadata().getOutputStream(),
-                getBackendConnection().getConnectionState().getReadyResponseStatus())
-            .send(false);
+        sendReadyResponse(
+            connectionHandler.getConnectionMetadata().getOutputStream(),
+            getBackendConnection().getConnectionState().getReadyResponseStatus());
+        //        new ReadyResponse(
+        //                connectionHandler.getConnectionMetadata().getOutputStream(),
+        //                getBackendConnection().getConnectionState().getReadyResponseStatus())
+        //            .send(false);
       }
     } catch (Throwable exception) {
       recordException(exception);

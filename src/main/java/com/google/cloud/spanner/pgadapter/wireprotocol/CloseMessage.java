@@ -14,11 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.wireoutput.CloseCompleteResponse.sendCloseCompleteResponse;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.wireoutput.CloseCompleteResponse;
 import java.text.MessageFormat;
 import javax.annotation.Nullable;
 
@@ -51,7 +52,7 @@ public class CloseMessage extends ControlMessage {
     this.statement = statement;
   }
 
-  /** Close the statement server-side and clean up by deleting their metdata locally. */
+  /** Close the statement server-side and clean up by deleting their metadata locally. */
   @Override
   protected void sendPayload() throws Exception {
     if (this.statement != null) {
@@ -62,7 +63,9 @@ public class CloseMessage extends ControlMessage {
         this.connection.closeStatement(this.name);
       }
     }
-    new CloseCompleteResponse(this.outputStream).send();
+    sendCloseCompleteResponse(this.outputStream);
+    this.outputStream.flush();
+    // new CloseCompleteResponse(this.outputStream).send();
   }
 
   @Override

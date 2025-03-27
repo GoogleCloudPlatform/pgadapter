@@ -83,6 +83,8 @@ public abstract class ControlMessage extends WireMessage {
   /** Maximum number of invalid messages in a row allowed before we terminate the connection. */
   static final int MAX_INVALID_MESSAGE_COUNT = 50;
 
+  static final short[] NO_FORMAT_CODES = new short[0];
+
   /**
    * Token that is used to mark {@link ControlMessage}s that are manually created to execute a
    * {@link QueryMessage}.
@@ -207,11 +209,14 @@ public abstract class ControlMessage extends WireMessage {
    * @return A list of format codes.
    * @throws Exception If reading fails in any way.
    */
-  protected static List<Short> getFormatCodes(DataInputStream input) throws Exception {
-    List<Short> formatCodes = new ArrayList<>();
+  protected static short[] getFormatCodes(DataInputStream input) throws Exception {
     short numberOfFormatCodes = input.readShort();
+    if (numberOfFormatCodes == 0) {
+      return NO_FORMAT_CODES;
+    }
+    short[] formatCodes = new short[numberOfFormatCodes];
     for (int i = 0; i < numberOfFormatCodes; i++) {
-      formatCodes.add(input.readShort());
+      formatCodes[i] = input.readShort();
     }
     return formatCodes;
   }

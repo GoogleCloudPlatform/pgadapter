@@ -72,11 +72,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.Rule;
@@ -632,7 +628,7 @@ public class ProtocolTest {
         .thenReturn(intermediatePreparedStatement);
 
     byte[][] expectedParameters = {parameter};
-    List<Short> expectedFormatCodes = new ArrayList<>();
+    short[] expectedFormatCodes = new short[0];
     String expectedPortalName = "some portal";
     String expectedStatementName = "some statement";
 
@@ -651,8 +647,8 @@ public class ProtocolTest {
     assertEquals(expectedPortalName, ((BindMessage) message).getPortalName());
     assertEquals(expectedStatementName, ((BindMessage) message).getStatementName());
     assertArrayEquals(expectedParameters, ((BindMessage) message).getParameters());
-    assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
-    assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
+    assertArrayEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
+    assertArrayEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
     assertEquals("select * from foo", ((BindMessage) message).getSql());
     assertTrue(((BindMessage) message).hasParameterValues());
 
@@ -716,8 +712,8 @@ public class ProtocolTest {
             resultCodes);
 
     byte[][] expectedParameters = {firstParameter, secondParameter};
-    List<Short> expectedFormatCodes = Arrays.asList((short) 0, (short) 1);
-    List<Short> expectedResultFormatCodes = Collections.singletonList((short) 1);
+    short[] expectedFormatCodes = new short[] {(short) 0, (short) 1};
+    short[] expectedResultFormatCodes = new short[] {(short) 1};
     String expectedPortalName = "some portal";
     String expectedStatementName = "some statement";
 
@@ -737,8 +733,8 @@ public class ProtocolTest {
     assertEquals(expectedPortalName, ((BindMessage) message).getPortalName());
     assertEquals(expectedStatementName, ((BindMessage) message).getStatementName());
     assertArrayEquals(expectedParameters, ((BindMessage) message).getParameters());
-    assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
-    assertEquals(expectedResultFormatCodes, ((BindMessage) message).getResultFormatCodes());
+    assertArrayEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
+    assertArrayEquals(expectedResultFormatCodes, ((BindMessage) message).getResultFormatCodes());
   }
 
   @Test
@@ -791,8 +787,8 @@ public class ProtocolTest {
             resultCodes);
 
     byte[][] expectedParameters = {firstParameter, secondParameter};
-    List<Short> expectedFormatCodes = Collections.singletonList((short) 1);
-    List<Short> expectedResultFormatCodes = Collections.singletonList((short) 1);
+    short[] expectedFormatCodes = new short[] {(short) 1};
+    short[] expectedResultFormatCodes = new short[] {(short) 1};
     String expectedPortalName = "some portal";
     String expectedStatementName = "some statement";
 
@@ -812,8 +808,8 @@ public class ProtocolTest {
     assertEquals(expectedPortalName, ((BindMessage) message).getPortalName());
     assertEquals(expectedStatementName, ((BindMessage) message).getStatementName());
     assertArrayEquals(expectedParameters, ((BindMessage) message).getParameters());
-    assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
-    assertEquals(expectedResultFormatCodes, ((BindMessage) message).getResultFormatCodes());
+    assertArrayEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
+    assertArrayEquals(expectedResultFormatCodes, ((BindMessage) message).getResultFormatCodes());
   }
 
   @Test

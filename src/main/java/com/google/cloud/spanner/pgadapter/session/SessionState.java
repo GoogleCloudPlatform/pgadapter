@@ -43,6 +43,8 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -111,6 +113,37 @@ public class SessionState {
         "spanner.replace_pg_catalog_tables", Boolean.toString(options.replacePgCatalogTables()));
 
     initCopySettings(this.settings);
+  }
+
+  /**
+   * These fields contain cached values for settings that are used often and/or expensive to
+   * calculate.
+   */
+  private final AtomicReference<RemoveEscapeClauseEnum> cachedRemoveEscapeClause =
+      new AtomicReference<>();
+
+  private final AtomicReference<ZoneId> cachedZoneId = new AtomicReference<>();
+  private final AtomicReference<Boolean> cachedReplaceForUpdateClause = new AtomicReference<>();
+  private final AtomicReference<Boolean> cachedReplacePgCatalogTables = new AtomicReference<>();
+  private final AtomicReference<Boolean> cachedEmulatePgClassTables = new AtomicReference<>();
+  private final AtomicReference<Integer> cachedStringConversionBufferSize = new AtomicReference<>();
+
+  private void invalidateCache() {
+    cachedRemoveEscapeClause.set(null);
+    cachedZoneId.set(null);
+    cachedReplaceForUpdateClause.set(null);
+    cachedReplacePgCatalogTables.set(null);
+    cachedEmulatePgClassTables.set(null);
+    cachedStringConversionBufferSize.set(null);
+  }
+
+  private <T> T getCachedValue(Supplier<T> supplier, AtomicReference<T> cachedValue) {
+    if (cachedValue.get() != null) {
+      return cachedValue.get();
+    }
+    T value = supplier.get();
+    cachedValue.set(value);
+    return value;
   }
 
   @VisibleForTesting
@@ -242,7 +275,7 @@ public class SessionState {
 
   private void internalSet(
       String extension, String name, String setting, Map<String, PGSetting> currentSettings) {
-    clearCachedValues();
+    invalidateCache();
     String key = toKey(extension, name);
     PGSetting newSetting = currentSettings.get(key);
     if (newSetting == null) {
@@ -262,10 +295,6 @@ public class SessionState {
     // Consider all users as SUPERUSER.
     newSetting.setSetting(Context.SUPERUSER, setting);
     currentSettings.put(key, newSetting);
-  }
-
-  private void clearCachedValues() {
-    cachedZoneId = null;
   }
 
   /** Returns the current value of the specified setting. */
@@ -459,20 +488,25 @@ public class SessionState {
    */
   // TODO: Remove in the next major version update.
   public boolean isReplaceForUpdateClause() {
-    return getBoolSetting("spanner", "replace_for_update", false);
+    return getCachedValue(
+        () -> getBoolSetting("spanner", "replace_for_update", false), cachedReplaceForUpdateClause);
   }
 
   /** Returns whether LIKE ... ESCAPE clauses are removed. */
   public RemoveEscapeClauseEnum getRemoveEscapeClause() {
-    PGSetting setting = internalGet(toKey("spanner", "remove_escape_clause"), false);
-    if (setting == null) {
-      return RemoveEscapeClauseEnum.DEFAULT;
-    }
-    return tryGetFirstNonNull(
-        RemoveEscapeClauseEnum.DEFAULT,
-        () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getSetting())),
-        () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getResetVal())),
-        () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getBootVal())));
+    return getCachedValue(
+        () -> {
+          PGSetting setting = internalGet(toKey("spanner", "remove_escape_clause"), false);
+          if (setting == null) {
+            return RemoveEscapeClauseEnum.DEFAULT;
+          }
+          return tryGetFirstNonNull(
+              RemoveEscapeClauseEnum.DEFAULT,
+              () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getSetting())),
+              () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getResetVal())),
+              () -> RemoveEscapeClauseEnum.valueOf(upper(setting.getBootVal())));
+        },
+        cachedRemoveEscapeClause);
   }
 
   private static String upper(String s) {
@@ -481,15 +515,19 @@ public class SessionState {
 
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
   public boolean isReplacePgCatalogTables() {
-    PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);
-    if (setting == null) {
-      return true;
-    }
-    return tryGetFirstNonNull(
-        true,
-        () -> BooleanParser.toBoolean(setting.getSetting()),
-        () -> BooleanParser.toBoolean(setting.getResetVal()),
-        () -> BooleanParser.toBoolean(setting.getBootVal()));
+    return getCachedValue(
+        () -> {
+          PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);
+          if (setting == null) {
+            return true;
+          }
+          return tryGetFirstNonNull(
+              true,
+              () -> BooleanParser.toBoolean(setting.getSetting()),
+              () -> BooleanParser.toBoolean(setting.getResetVal()),
+              () -> BooleanParser.toBoolean(setting.getBootVal()));
+        },
+        cachedReplacePgCatalogTables);
   }
 
   /**
@@ -497,15 +535,19 @@ public class SessionState {
    * use the object name as OID.
    */
   public boolean isEmulatePgClassTables() {
-    PGSetting setting = internalGet(toKey("spanner", "emulate_pg_class_tables"), false);
-    if (setting == null) {
-      return false;
-    }
-    return tryGetFirstNonNull(
-        true,
-        () -> BooleanParser.toBoolean(setting.getSetting()),
-        () -> BooleanParser.toBoolean(setting.getResetVal()),
-        () -> BooleanParser.toBoolean(setting.getBootVal()));
+    return getCachedValue(
+        () -> {
+          PGSetting setting = internalGet(toKey("spanner", "emulate_pg_class_tables"), false);
+          if (setting == null) {
+            return false;
+          }
+          return tryGetFirstNonNull(
+              true,
+              () -> BooleanParser.toBoolean(setting.getSetting()),
+              () -> BooleanParser.toBoolean(setting.getResetVal()),
+              () -> BooleanParser.toBoolean(setting.getBootVal()));
+        },
+        cachedEmulatePgClassTables);
   }
 
   /** Returns the {@link DdlTransactionMode} that is used for this connection at this time. */
@@ -547,7 +589,9 @@ public class SessionState {
    * means no buffer and instead convert it directly in all cases.
    */
   public int getStringConversionBufferSize() {
-    return getIntegerSetting("spanner", "string_conversion_buffer_size", 0);
+    return getCachedValue(
+        () -> getIntegerSetting("spanner", "string_conversion_buffer_size", 0),
+        cachedStringConversionBufferSize);
   }
 
   /**
@@ -570,25 +614,24 @@ public class SessionState {
     return getIntegerSetting("spanner", "dml_batch_update_count", 0);
   }
 
-  private ZoneId cachedZoneId;
-
   /** Returns the {@link ZoneId} of the current timezone for this session. */
   public ZoneId getTimezone() {
-    if (cachedZoneId != null) {
-      return cachedZoneId;
-    }
-    PGSetting setting = internalGet(toKey(null, "timezone"), false);
-    if (setting == null) {
-      return ZoneId.systemDefault();
-    }
-    String id =
-        tryGetFirstNonNull(
-            ZoneId.systemDefault().getId(),
-            setting::getSetting,
-            setting::getResetVal,
-            setting::getBootVal);
+    return getCachedValue(
+        () -> {
+          PGSetting setting = internalGet(toKey(null, "timezone"), false);
+          if (setting == null) {
+            return ZoneId.systemDefault();
+          }
+          String id =
+              tryGetFirstNonNull(
+                  ZoneId.systemDefault().getId(),
+                  setting::getSetting,
+                  setting::getResetVal,
+                  setting::getBootVal);
 
-    return (cachedZoneId = zoneIdFromString(id));
+          return zoneIdFromString(id);
+        },
+        cachedZoneId);
   }
 
   private ZoneId zoneIdFromString(String value) {

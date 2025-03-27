@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
+import static com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse.sendParseCompleteResponse;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.CLOSE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DEALLOCATE;
@@ -62,7 +63,6 @@ import com.google.cloud.spanner.pgadapter.statements.ShowDatabaseDdlStatement;
 import com.google.cloud.spanner.pgadapter.statements.ShutdownStatement;
 import com.google.cloud.spanner.pgadapter.statements.TruncateStatement;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
-import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
 import java.text.MessageFormat;
 
@@ -297,7 +297,8 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
       handleError(statement.getException());
     } else if (isExtendedProtocol()) {
       // The simple query protocol does not need the ParseComplete response.
-      new ParseCompleteResponse(this.outputStream).send(false);
+      sendParseCompleteResponse(this.outputStream);
+      // new ParseCompleteResponse(this.outputStream).send(false);
     }
   }
 

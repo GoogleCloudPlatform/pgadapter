@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
@@ -32,7 +33,7 @@ public class StringParser extends Parser<String> {
   private static final byte[] HEADER = new byte[0];
 
   StringParser(ResultSet item, int position) {
-    this.item = item.getString(position);
+    this.item = getString(item, position);
   }
 
   StringParser(Object item) {
@@ -42,6 +43,15 @@ public class StringParser extends Parser<String> {
   StringParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       this.item = toString(item);
+    }
+  }
+
+  static String getString(ResultSet resultSet, int position) {
+    if (resultSet instanceof ProtobufResultSet
+        && ((ProtobufResultSet) resultSet).canGetProtobufValue(position)) {
+      return ((ProtobufResultSet) resultSet).getProtobufValue(position).getStringValue();
+    } else {
+      return resultSet.getString(position);
     }
   }
 
@@ -65,7 +75,7 @@ public class StringParser extends Parser<String> {
       DataOutputStream dataOutputStream,
       ResultSet resultSet,
       int position) {
-    writeToPG(sessionState, dataOutputStream, resultSet.getString(position));
+    writeToPG(sessionState, dataOutputStream, getString(resultSet, position));
     return null;
   }
 
@@ -80,10 +90,15 @@ public class StringParser extends Parser<String> {
     int length = value.length();
     try {
       if (bufferSize <= 0 || length < bufferSize) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        dataOutputStream.writeInt(bytes.length + header.length);
-        dataOutputStream.write(header);
-        dataOutputStream.write(bytes);
+        if (header.length == 0) {
+          dataOutputStream.writeShort(0);
+          dataOutputStream.writeUTF(value);
+        } else {
+          byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+          dataOutputStream.writeInt(bytes.length + header.length);
+          dataOutputStream.write(header);
+          dataOutputStream.write(bytes);
+        }
       } else {
         try (OutputStreamWriter writer =
             new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
@@ -104,7 +119,7 @@ public class StringParser extends Parser<String> {
   public static byte[] binaryParse(ResultSet resultSet, int position) {
     return resultSet.isNull(position)
         ? null
-        : resultSet.getString(position).getBytes(StandardCharsets.UTF_8);
+        : getString(resultSet, position).getBytes(StandardCharsets.UTF_8);
   }
 
   @Override

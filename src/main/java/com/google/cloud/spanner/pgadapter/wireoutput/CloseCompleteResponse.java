@@ -16,11 +16,17 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Assures to the client that a portal got closed successfully. */
 @InternalApi
 public class CloseCompleteResponse extends WireOutput {
+  private static final byte[] RESPONSE = new byte[] {'3', 0, 0, 0, 4};
+
+  public static void sendCloseCompleteResponse(DataOutputStream output) throws IOException {
+    output.write(RESPONSE);
+  }
 
   public CloseCompleteResponse(DataOutputStream output) {
     super(output, 4);

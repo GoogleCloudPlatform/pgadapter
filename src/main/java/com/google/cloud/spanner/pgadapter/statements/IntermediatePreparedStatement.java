@@ -27,7 +27,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import org.postgresql.core.Oid;
@@ -41,7 +40,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   private final String name;
   protected final int[] givenParameterDataTypes;
-  protected Statement statement;
+  protected final Statement statement;
   private Future<DescribeResult> describeResult;
 
   public IntermediatePreparedStatement(
@@ -89,10 +88,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * @return An Intermediate Portal Statement (or rather a bound version of this statement)
    */
   public IntermediatePortalStatement createPortal(
-      String name,
-      byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      String name, byte[][] parameters, short[] parameterFormatCodes, short[] resultFormatCodes) {
     return new IntermediatePortalStatement(
         name, this, parameters, parameterFormatCodes, resultFormatCodes);
   }
