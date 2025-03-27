@@ -26,7 +26,6 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -39,7 +38,6 @@ import org.postgresql.core.Oid;
 public class IntermediatePreparedStatement extends IntermediateStatement {
   static final int[] NO_PARAMETER_TYPES = new int[0];
 
-  private final String name;
   protected final int[] givenParameterDataTypes;
   protected Statement statement;
   private Future<DescribeResult> describeResult;
@@ -47,12 +45,12 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   public IntermediatePreparedStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
+      // TODO: Remove name argument
       String name,
       int[] givenParameterDataTypes,
       ParsedStatement parsedStatement,
       Statement originalStatement) {
     super(connectionHandler, options, parsedStatement, originalStatement);
-    this.name = name;
     this.givenParameterDataTypes = givenParameterDataTypes;
     this.statement = originalStatement;
   }
@@ -147,8 +145,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         || hasOnlyNullValues(parameterValues)) {
       return;
     }
-    if (parameterValues.length != this.givenParameterDataTypes.length
-        || Arrays.stream(this.givenParameterDataTypes).anyMatch(p -> p == 0)) {
+    if (hasUnknownParams(parameterValues)) {
       // Note: We are only asking the backend to parse the types if there is at least one
       // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
       // There is also no need to auto-describe if only null values are untyped.
@@ -177,6 +174,18 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       getConnectionHandler()
           .registerAutoDescribedStatement(this.originalStatement.getSql(), this.describeResult);
     }
+  }
+
+  private boolean hasUnknownParams(byte[][] parameterValues) {
+    if (parameterValues.length != this.givenParameterDataTypes.length) {
+      return true;
+    }
+    for (int givenParameterDataType : this.givenParameterDataTypes) {
+      if (givenParameterDataType == Oid.UNSPECIFIED) {
+        return true;
+      }
+    }
+    return false;
   }
 
   boolean hasOnlyNullValues(byte[][] parameterValues) {
