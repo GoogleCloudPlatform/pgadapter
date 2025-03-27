@@ -16,11 +16,18 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Signals that there are more rows available. */
 @InternalApi
 public class PortalSuspendedResponse extends WireOutput {
+  private static final byte[] RESPONSE = new byte[] {'s', 0, 0, 0, 4};
+
+  /** Send a standard PortalSuspended response. */
+  public static void send(DataOutputStream output) throws IOException {
+    output.write(RESPONSE);
+  }
 
   public PortalSuspendedResponse(DataOutputStream output) {
     super(output, 4);

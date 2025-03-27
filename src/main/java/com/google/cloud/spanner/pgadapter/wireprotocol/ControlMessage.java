@@ -266,11 +266,11 @@ public abstract class ControlMessage extends WireMessage {
       switch (statement.getStatementType()) {
         case DDL:
         case UNKNOWN:
-          new CommandCompleteResponse(this.outputStream, command).send(false);
+          CommandCompleteResponse.send(this.outputStream, command);
           break;
         case CLIENT_SIDE:
           if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
-            new CommandCompleteResponse(this.outputStream, command).send(false);
+            CommandCompleteResponse.send(this.outputStream, command);
             break;
           }
           // fallthrough to QUERY
@@ -280,13 +280,12 @@ public abstract class ControlMessage extends WireMessage {
             SendResultSetState state = sendResultSet(statement, mode, maxRows);
             statement.setHasMoreData(state.hasMoreRows());
             if (state.hasMoreRows() && mode == QueryMode.EXTENDED) {
-              new PortalSuspendedResponse(this.outputStream).send(false);
+              PortalSuspendedResponse.send(this.outputStream);
             } else {
               if (!state.hasMoreRows() && mode == QueryMode.EXTENDED) {
                 statement.close();
               }
-              new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
-                  .send(false);
+              CommandCompleteResponse.send(this.outputStream, state.getCommandAndNumRows());
             }
           } else {
             // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
@@ -294,7 +293,7 @@ public abstract class ControlMessage extends WireMessage {
             // target table had OIDs, but OIDs system columns are not supported anymore; therefore
             // oid is always 0.
             command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
-            new CommandCompleteResponse(this.outputStream, command).send(false);
+            CommandCompleteResponse.send(this.outputStream, command);
           }
           break;
         default:

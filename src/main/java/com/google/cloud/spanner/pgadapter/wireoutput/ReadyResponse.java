@@ -21,10 +21,44 @@ import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
- * Signals readiness status to receieve messages (here we only tend to send Idle, which means ready)
+ * Signals readiness status to receive messages (here we only tend to send Idle, which means ready)
  */
 @InternalApi
 public class ReadyResponse extends WireOutput {
+  private static final byte[] IDLE_RESPONSE = new byte[] {'Z', 0, 0, 0, 5, (byte) Status.IDLE.c};
+  private static final byte[] TRANSACTION_RESPONSE =
+      new byte[] {'Z', 0, 0, 0, 5, (byte) Status.TRANSACTION.c};
+  private static final byte[] FAILED_RESPONSE =
+      new byte[] {'Z', 0, 0, 0, 5, (byte) Status.FAILED.c};
+
+  /** Send a ReadyResponse with the given status. */
+  public static void send(DataOutputStream output, Status status) throws IOException {
+    switch (status) {
+      case IDLE:
+        sendIdleResponse(output);
+        break;
+      case TRANSACTION:
+        sendTransactionResponse(output);
+        break;
+      case FAILED:
+        sendFailedResponse(output);
+        break;
+      default:
+        throw new IllegalArgumentException();
+    }
+  }
+
+  public static void sendIdleResponse(DataOutputStream output) throws IOException {
+    output.write(IDLE_RESPONSE);
+  }
+
+  public static void sendTransactionResponse(DataOutputStream output) throws IOException {
+    output.write(TRANSACTION_RESPONSE);
+  }
+
+  public static void sendFailedResponse(DataOutputStream output) throws IOException {
+    output.write(FAILED_RESPONSE);
+  }
 
   private final Status status;
 
