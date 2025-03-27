@@ -143,7 +143,8 @@ public class Converter implements AutoCloseable {
    * @return a byte array containing the data in the specified format.
    */
   public static byte[] convertToPG(
-      ResultSet result, int position, DataFormat format, SessionState sessionState) {
+      ResultSet result, int position, DataFormat format, SessionState sessionState)
+      throws IOException {
     return convertToPG(null, result, position, format, sessionState);
   }
 
@@ -152,7 +153,8 @@ public class Converter implements AutoCloseable {
       ResultSet result,
       int position,
       DataFormat format,
-      SessionState sessionState) {
+      SessionState sessionState)
+      throws IOException {
     Preconditions.checkArgument(!result.isNull(position), "Column may not contain a null value");
     Type type = result.getColumnType(position);
     switch (type.getCode()) {
@@ -161,7 +163,7 @@ public class Converter implements AutoCloseable {
       case BYTES:
         return BinaryParser.convertToPG(sessionState, outputStream, result, position, format);
       case DATE:
-        return DateParser.convertToPG(result, position, format);
+        return DateParser.convertToPG(sessionState, outputStream, result, position, format);
       case FLOAT32:
         return FloatParser.convertToPG(result, position, format);
       case FLOAT64:
