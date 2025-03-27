@@ -25,7 +25,6 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.Future;
 
 abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement {
@@ -129,8 +128,8 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
       String name,
       IntermediatePreparedStatement preparedStatement,
       byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes,
+      short[] parameterFormatCodes,
+      short[] resultFormatCodes,
       ParsedFetchOrMoveStatement fetchOrMoveStatement) {
     super(name, preparedStatement, parameters, parameterFormatCodes, resultFormatCodes);
     this.fetchOrMoveStatement = fetchOrMoveStatement;
@@ -186,10 +185,7 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
 
   @Override
   public IntermediatePortalStatement createPortal(
-      String name,
-      byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      String name, byte[][] parameters, short[] parameterFormatCodes, short[] resultFormatCodes) {
     // FETCH and MOVE do not support binding any parameters, so we just return the same statement.
     return this;
   }

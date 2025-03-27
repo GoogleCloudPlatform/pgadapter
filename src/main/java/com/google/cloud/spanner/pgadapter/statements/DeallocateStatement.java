@@ -26,9 +26,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
-import java.util.List;
 import java.util.concurrent.Future;
 
 public class DeallocateStatement extends IntermediatePortalStatement {
@@ -58,8 +56,8 @@ public class DeallocateStatement extends IntermediatePortalStatement {
             parsedStatement,
             originalStatement),
         NO_PARAMS,
-        ImmutableList.of(),
-        ImmutableList.of());
+        NO_FORMAT_CODES,
+        NO_FORMAT_CODES);
     this.deallocateStatement = parse(originalStatement.getSql());
   }
 
@@ -98,10 +96,7 @@ public class DeallocateStatement extends IntermediatePortalStatement {
 
   @Override
   public IntermediatePortalStatement createPortal(
-      String name,
-      byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      String name, byte[][] parameters, short[] parameterFormatCodes, short[] resultFormatCodes) {
     // EXECUTE does not support binding any parameters, so we just return the same statement.
     return this;
   }

@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
+import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_FORMAT_CODES;
 
 import com.google.api.core.InternalApi;
 import com.google.api.gax.grpc.GrpcCallContext;
@@ -207,11 +208,14 @@ public abstract class ControlMessage extends WireMessage {
    * @return A list of format codes.
    * @throws Exception If reading fails in any way.
    */
-  protected static List<Short> getFormatCodes(DataInputStream input) throws Exception {
-    List<Short> formatCodes = new ArrayList<>();
+  protected static short[] getFormatCodes(DataInputStream input) throws Exception {
     short numberOfFormatCodes = input.readShort();
+    if (numberOfFormatCodes == 0) {
+      return NO_FORMAT_CODES;
+    }
+    short[] formatCodes = new short[numberOfFormatCodes];
     for (int i = 0; i < numberOfFormatCodes; i++) {
-      formatCodes.add(input.readShort());
+      formatCodes[i] = input.readShort();
     }
     return formatCodes;
   }

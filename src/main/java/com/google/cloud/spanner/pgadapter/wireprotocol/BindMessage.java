@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_FORMAT_CODES;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -21,10 +23,8 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Message of type bind (meaning that it is a message called to a prepared statement to complete it
@@ -37,8 +37,8 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   private final String portalName;
   private final String statementName;
-  private final List<Short> formatCodes;
-  private final List<Short> resultFormatCodes;
+  private final short[] formatCodes;
+  private final short[] resultFormatCodes;
   private final byte[][] parameters;
   private final IntermediatePortalStatement statement;
 
@@ -72,8 +72,8 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     super(connection, 4, manuallyCreatedToken);
     this.portalName = portalName;
     this.statementName = statementName;
-    this.formatCodes = ImmutableList.of();
-    this.resultFormatCodes = ImmutableList.of();
+    this.formatCodes = NO_FORMAT_CODES;
+    this.resultFormatCodes = NO_FORMAT_CODES;
     this.parameters = Preconditions.checkNotNull(parameters);
     IntermediatePreparedStatement statement = connection.getStatement(statementName);
     this.statement =
@@ -158,11 +158,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     return this.parameters;
   }
 
-  public List<Short> getFormatCodes() {
+  public short[] getFormatCodes() {
     return this.formatCodes;
   }
 
-  public List<Short> getResultFormatCodes() {
+  public short[] getResultFormatCodes() {
     return this.resultFormatCodes;
   }
 }

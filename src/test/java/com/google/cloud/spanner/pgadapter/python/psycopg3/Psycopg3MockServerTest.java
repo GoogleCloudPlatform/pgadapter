@@ -424,8 +424,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             .collect(Collectors.toList());
     assertEquals(1, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(1, bindMessage.getResultFormatCodes().size());
-    assertEquals(format.getCode(), bindMessage.getResultFormatCodes().get(0).shortValue());
+    assertEquals(1, bindMessage.getResultFormatCodes().length);
+    assertEquals(format.getCode(), bindMessage.getResultFormatCodes()[0]);
   }
 
   @Test
@@ -622,10 +622,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             .collect(Collectors.toList());
     assertEquals(1, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(11, bindMessage.getFormatCodes().size());
-    assertArrayEquals(
-        new Short[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-        bindMessage.getFormatCodes().toArray(new Short[0]));
+    assertEquals(11, bindMessage.getFormatCodes().length);
+    assertArrayEquals(new short[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, bindMessage.getFormatCodes());
   }
 
   @Test
@@ -690,10 +688,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             .collect(Collectors.toList());
     assertEquals(1, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(11, bindMessage.getFormatCodes().size());
-    assertArrayEquals(
-        new Short[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        bindMessage.getFormatCodes().toArray(new Short[0]));
+    assertEquals(11, bindMessage.getFormatCodes().length);
+    assertArrayEquals(new short[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, bindMessage.getFormatCodes());
   }
 
   @Test
