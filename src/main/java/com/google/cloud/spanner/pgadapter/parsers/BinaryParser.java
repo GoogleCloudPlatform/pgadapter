@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
+import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
@@ -108,7 +109,7 @@ public class BinaryParser extends Parser<ByteArray> {
       DataFormat format) {
     int bufferSize = sessionState.getBinaryConversionBufferSize();
     try {
-      String base64 = resultSet.getValue(position).getAsString();
+      String base64 = getBase64(resultSet, position);
       switch (format) {
         case SPANNER:
         case POSTGRESQL_BINARY:
@@ -128,13 +129,21 @@ public class BinaryParser extends Parser<ByteArray> {
           }
           return null;
         case POSTGRESQL_TEXT:
-          return bytesToHex(resultSet.getBytes(position).toByteArray());
+          return bytesToHex(Base64.getDecoder().decode(base64));
         default:
           throw new IllegalArgumentException("unknown data format: " + format);
       }
     } catch (IOException ioException) {
       throw SpannerExceptionFactory.asSpannerException(ioException);
     }
+  }
+
+  static String getBase64(ResultSet resultSet, int column) {
+    if (resultSet instanceof ProtobufResultSet
+        && ((ProtobufResultSet) resultSet).canGetProtobufValue(column)) {
+      return ((ProtobufResultSet) resultSet).getProtobufValue(column).getStringValue();
+    }
+    return resultSet.getValue(column).getAsString();
   }
 
   static int copy(int length, InputStream from, DataOutputStream to, int bufferSize)
