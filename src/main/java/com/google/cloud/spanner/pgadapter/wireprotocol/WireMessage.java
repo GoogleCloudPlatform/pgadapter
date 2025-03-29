@@ -23,7 +23,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -149,30 +148,47 @@ public abstract class WireMessage {
   }
 
   /**
-   * Reads a null-terminated string from a {@link DataInputStream}. Note that though existing
-   * solutions for this exist, they are either not keyed exactly for our use case, or would lead to
-   * a more combersome addition to this codebase. Also note the 128 byte length is chosen from
-   * profiling and determining that it exceeds the 90th percentile size for inbound messages.
+   * The max number of characters to read when scanning for a null-terminator. Null-terminated
+   * strings are used in the PG wire-protocol for names of prepared statements and portals, but also
+   * for the SQL string of a statement. We therefore need to read potentially very long strings.
+   */
+  private static final int MARK_READ_LIMIT = 100_000_000;
+
+  /**
+   * Reads a null-terminated string from a {@link DataInputStream}.
    *
    * @return the string.
    * @throws IOException if an error occurs while reading from the stream, or if no null-terminator
    *     is found before the end of the stream.
    */
   public String readString() throws IOException {
-    byte[] buffer = new byte[128];
+    this.inputStream.mark(MARK_READ_LIMIT);
     int index = 0;
-    while (true) {
+    while (index < MARK_READ_LIMIT) {
       byte b = this.inputStream.readByte();
       if (b == 0) {
         break;
       }
-      buffer[index] = b;
       index++;
-      if (index == buffer.length) {
-        buffer = Arrays.copyOf(buffer, buffer.length * 2);
+      if (index == MARK_READ_LIMIT) {
+        throw new IOException("No null terminator found");
       }
     }
-    return new String(buffer, 0, index, StandardCharsets.UTF_8);
+    // Reset the stream to the mark and read the name (if any).
+    this.inputStream.reset();
+    if (index == 0) {
+      // No name, but we still need to skip the null-terminator.
+      //noinspection StatementWithEmptyBody
+      while (this.inputStream.skip(1) < 1) {}
+      return "";
+    }
+
+    byte[] result = new byte[index];
+    this.inputStream.readFully(result);
+    // Skip the null-terminator.
+    //noinspection StatementWithEmptyBody
+    while (this.inputStream.skip(1) < 1) {}
+    return new String(result, StandardCharsets.UTF_8);
   }
 
   /**
