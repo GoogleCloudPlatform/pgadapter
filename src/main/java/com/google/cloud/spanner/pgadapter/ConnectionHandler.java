@@ -609,7 +609,8 @@ public class ConnectionHandler implements Runnable {
       new ErrorResponse(this, exception).send();
     } else {
       new ErrorResponse(this, exception).send();
-      new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
+      ReadyResponse.sendIdleResponse(output);
+      output.flush();
     }
   }
 

@@ -107,7 +107,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   public void flush() throws Exception {
     if (isExtendedProtocol()) {
       // The simple query protocol does not expect a BindComplete response.
-      new BindCompleteResponse(this.outputStream).send(false);
+      BindCompleteResponse.send(this.outputStream);
     }
   }
 

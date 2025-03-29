@@ -22,6 +22,12 @@ import java.text.MessageFormat;
 /** Assures to the client that a statement got bound to a portal successfully. */
 @InternalApi
 public class BindCompleteResponse extends WireOutput {
+  private static final byte[] RESPONSE = new byte[] {'2', 0, 0, 0, 4};
+
+  /** Send a standard BindComplete response message. */
+  public static void send(DataOutputStream output) throws IOException {
+    output.write(RESPONSE);
+  }
 
   public BindCompleteResponse(DataOutputStream output) {
     super(output, 4);
