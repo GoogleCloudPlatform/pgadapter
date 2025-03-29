@@ -120,6 +120,8 @@ public class Converter implements AutoCloseable {
                 : fixedFormat;
         byte[] column =
             Converter.convertToPG(outputStream, this.resultSet, column_index, format, sessionState);
+        // TODO: Remove this if statement and write statements once all data types are written
+        // directly to the output stream.
         if (column != null) {
           outputStream.writeInt(column.length);
           outputStream.write(column);
@@ -137,17 +139,17 @@ public class Converter implements AutoCloseable {
    * Return the data of the specified column of the {@link ResultSet} as a byte array. The column
    * may not contain a null value.
    *
+   * @param outputStream The output stream to write value to if the converter supports that.
    * @param result The {@link ResultSet} to read the data from.
    * @param position The column index.
    * @param format The {@link DataFormat} format to use to encode the data.
-   * @return a byte array containing the data in the specified format.
+   * @param sessionState The {@link SessionState} that should be used to determine how to format the
+   *     data (e.g. timezone).
+   * @return a byte array containing the data in the specified format or null if the data was
+   *     written directly to the output stream.
    */
-  public static byte[] convertToPG(
-      ResultSet result, int position, DataFormat format, SessionState sessionState)
-      throws IOException {
-    return convertToPG(null, result, position, format, sessionState);
-  }
-
+  // TODO: Rename this method to writeToPG and change return type to void once all data types write
+  // directly to the output stream.
   public static byte[] convertToPG(
       DataOutputStream outputStream,
       ResultSet result,
@@ -170,7 +172,7 @@ public class Converter implements AutoCloseable {
         return DoubleParser.convertToPG(result, position, format);
       case INT64:
       case PG_OID:
-        return LongParser.convertToPG(result, position, format);
+        return LongParser.convertToPG(sessionState, outputStream, result, position, format);
       case PG_NUMERIC:
         return NumericParser.convertToPG(result, position, format);
       case STRING:
