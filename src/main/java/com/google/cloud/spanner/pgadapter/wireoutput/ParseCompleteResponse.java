@@ -22,6 +22,12 @@ import java.text.MessageFormat;
 /** Signals the end of a parse transaction. */
 @InternalApi
 public class ParseCompleteResponse extends WireOutput {
+  private static final byte[] RESPONSE = new byte[] {'1', 0, 0, 0, 4};
+
+  /** Send a standard ParseComplete response. */
+  public static void send(DataOutputStream output) throws IOException {
+    output.write(RESPONSE);
+  }
 
   public ParseCompleteResponse(DataOutputStream output) {
     super(output, 4);

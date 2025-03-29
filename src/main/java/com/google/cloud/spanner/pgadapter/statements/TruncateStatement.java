@@ -73,8 +73,8 @@ public class TruncateStatement extends IntermediatePortalStatement {
             parsedStatement,
             originalStatement),
         NO_PARAMS,
-        ImmutableList.of(),
-        ImmutableList.of());
+        NO_FORMAT_CODES,
+        NO_FORMAT_CODES);
     this.truncateStatement = parse(originalStatement.getSql());
   }
 
@@ -111,10 +111,7 @@ public class TruncateStatement extends IntermediatePortalStatement {
 
   @Override
   public IntermediatePortalStatement createPortal(
-      String name,
-      byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      String name, byte[][] parameters, short[] parameterFormatCodes, short[] resultFormatCodes) {
     // TRUNCATE does not support binding any parameters, so we just return the same statement.
     return this;
   }

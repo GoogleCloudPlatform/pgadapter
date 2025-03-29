@@ -216,10 +216,9 @@ public class ExtendedQueryProtocolHandler {
         throw PGExceptionFactory.newQueryCancelledException();
       }
       if (includeReadyResponse) {
-        new ReadyResponse(
-                connectionHandler.getConnectionMetadata().getOutputStream(),
-                getBackendConnection().getConnectionState().getReadyResponseStatus())
-            .send(false);
+        ReadyResponse.send(
+            connectionHandler.getConnectionMetadata().getOutputStream(),
+            getBackendConnection().getConnectionState().getReadyResponseStatus());
       }
     } catch (Throwable exception) {
       recordException(exception);
