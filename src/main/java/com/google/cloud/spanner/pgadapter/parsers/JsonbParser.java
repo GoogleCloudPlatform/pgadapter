@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
@@ -34,7 +35,7 @@ public class JsonbParser extends Parser<String> {
   private static final byte[] BINARY_HEADER = new byte[] {1};
 
   JsonbParser(ResultSet item, int position) {
-    this.item = item.getPgJsonb(position);
+    this.item = getJsonb(item, position);
   }
 
   JsonbParser(Object item) {
@@ -103,15 +104,26 @@ public class JsonbParser extends Parser<String> {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        StringParser.writeToPG(sessionState, dataOutputStream, resultSet.getPgJsonb(position));
+        StringParser.writeToPG(sessionState, dataOutputStream, getJsonb(resultSet, position));
         return null;
       case POSTGRESQL_BINARY:
         StringParser.writeToPG(
-            sessionState, dataOutputStream, resultSet.getPgJsonb(position), BINARY_HEADER);
+            sessionState, dataOutputStream, getJsonb(resultSet, position), BINARY_HEADER);
         return null;
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
+  }
+
+  /** Get the string from the result as efficiently as possible. */
+  static String getJsonb(ResultSet resultSet, int column) {
+    // If the result set is a ProtobufResultSet and the protobuf value is still present, then get
+    // the string directly from that.
+    if (resultSet instanceof ProtobufResultSet
+        && ((ProtobufResultSet) resultSet).canGetProtobufValue(column)) {
+      return ((ProtobufResultSet) resultSet).getProtobufValue(column).getStringValue();
+    }
+    return resultSet.getPgJsonb(column);
   }
 
   @Override
