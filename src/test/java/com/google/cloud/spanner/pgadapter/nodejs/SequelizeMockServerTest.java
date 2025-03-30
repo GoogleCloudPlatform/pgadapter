@@ -213,9 +213,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
     ResultSet metadataResultSet =
         ResultSet.newBuilder()
             .setMetadata(
-                resultSet
-                    .getMetadata()
-                    .toBuilder()
+                resultSet.getMetadata().toBuilder()
                     .setUndeclaredParameters(
                         createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
                             .getUndeclaredParameters())
@@ -281,9 +279,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
     ResultSet metadataResultSet =
         ResultSet.newBuilder()
             .setMetadata(
-                resultSet
-                    .getMetadata()
-                    .toBuilder()
+                resultSet.getMetadata().toBuilder()
                     .setUndeclaredParameters(
                         createParameterTypesMetadata(
                                 ImmutableList.of(
@@ -329,8 +325,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
                   .bind("p11")
                   .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                   .build(),
-              resultSet
-                  .toBuilder()
+              resultSet.toBuilder()
                   .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
                   .build()));
     }
@@ -406,8 +401,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
                                 .getUndeclaredParameters())
@@ -436,8 +430,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             Statement.of(insertSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -451,8 +444,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             Statement.of(insertSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -552,8 +544,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
                                 .getUndeclaredParameters())

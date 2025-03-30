@@ -86,6 +86,7 @@ public class SessionState {
 
   /** transactionSettings are the modified session settings during a transaction. */
   private Map<String, PGSetting> transactionSettings;
+
   /** localSettings are the modified local settings during a transaction. */
   private Map<String, PGSetting> localSettings;
 

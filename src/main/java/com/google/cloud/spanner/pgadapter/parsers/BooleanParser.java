@@ -45,6 +45,7 @@ public class BooleanParser extends Parser<Boolean> {
     ByteConverter.bool(TRUE_VALUE_BYTES_BINARY, 0, true);
     ByteConverter.bool(FALSE_VALUE_BYTES_BINARY, 0, false);
   }
+
   // See https://www.postgresql.org/docs/current/datatype-boolean.html
   private static final Set<String> TRUE_VALUES =
       ImmutableSet.of("t", "tr", "tru", "true", "y", "ye", "yes", "on", "1");

@@ -143,6 +143,7 @@ public class ConnectionHandler implements Runnable {
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
   private boolean hasDeterminedClientUsingQuery;
+
   /**
    * List of PARSE messages that we received before auto-detecting the client. This list can be used
    * by the detector to determine which client is connected, and is cleared after the detection is

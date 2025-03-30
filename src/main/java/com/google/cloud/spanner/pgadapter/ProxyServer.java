@@ -75,6 +75,7 @@ public class ProxyServer extends AbstractApiService {
    * the TCP socket was assigned, so we can assign the same port number to the Unix domain socket.
    */
   private final CountDownLatch tcpStartedLatch = new CountDownLatch(1);
+
   /**
    * List of server sockets accepting connections. It currently only contains one TCP socket and
    * optionally one Unix domain socket, but could in theory be expanded to contain multiple sockets
@@ -93,9 +94,9 @@ public class ProxyServer extends AbstractApiService {
 
   private final ExecutorService createConnectionHandlerExecutor =
       new ThreadPoolExecutor(
-          /* corePoolSize = */ 1,
+          /* corePoolSize= */ 1,
           Runtime.getRuntime().availableProcessors(),
-          /* keepAliveTime = */ 10L,
+          /* keepAliveTime= */ 10L,
           TimeUnit.SECONDS,
           new LinkedBlockingQueue<>());
   private final ThreadFactory threadFactory;
@@ -521,19 +522,25 @@ public class ProxyServer extends AbstractApiService {
     return this.metrics;
   }
 
-  /** @return the JDBC connection properties that are used by this server */
+  /**
+   * @return the JDBC connection properties that are used by this server
+   */
   public Properties getProperties() {
     return (Properties) this.properties.clone();
   }
 
-  /** @return the current number of connections. */
+  /**
+   * @return the current number of connections.
+   */
   public int getNumberOfConnections() {
     synchronized (this.handlers) {
       return this.handlers.size();
     }
   }
 
-  /** @return the local TCP port that this server is using. */
+  /**
+   * @return the local TCP port that this server is using.
+   */
   public int getLocalPort() {
     return localPort;
   }

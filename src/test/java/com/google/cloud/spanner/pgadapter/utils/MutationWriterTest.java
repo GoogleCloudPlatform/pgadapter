@@ -141,7 +141,7 @@ public class MutationWriterTest {
             connection,
             "numbers",
             tableColumns,
-            /* indexedColumnsCount = */ 1,
+            /* indexedColumnsCount= */ 1,
             Format.TEXT,
             format,
             false);
@@ -193,7 +193,7 @@ public class MutationWriterTest {
               connection,
               "numbers",
               tableColumns,
-              /* indexedColumnsCount = */ 1,
+              /* indexedColumnsCount= */ 1,
               Format.TEXT,
               format,
               false);
@@ -250,7 +250,7 @@ public class MutationWriterTest {
               connection,
               "numbers",
               tableColumns,
-              /* indexedColumnsCount = */ 1,
+              /* indexedColumnsCount= */ 1,
               Format.TEXT,
               format,
               false);
@@ -296,7 +296,7 @@ public class MutationWriterTest {
               connection,
               "numbers",
               tableColumns,
-              /* indexedColumnsCount = */ 0,
+              /* indexedColumnsCount= */ 0,
               Format.TEXT,
               format,
               false);
@@ -346,7 +346,7 @@ public class MutationWriterTest {
               connection,
               "numbers",
               tableColumns,
-              /* indexedColumnsCount = */ 1,
+              /* indexedColumnsCount= */ 1,
               Format.TEXT,
               format,
               false);
@@ -398,7 +398,7 @@ public class MutationWriterTest {
             connection,
             "numbers",
             tableColumns,
-            /* indexedColumnsCount = */ 1,
+            /* indexedColumnsCount= */ 1,
             Format.TEXT,
             format,
             false);
@@ -624,7 +624,7 @@ public class MutationWriterTest {
             connection,
             "numbers",
             tableColumns,
-            /* indexedColumnsCount = */ 1,
+            /* indexedColumnsCount= */ 1,
             Format.TEXT,
             format,
             false);
