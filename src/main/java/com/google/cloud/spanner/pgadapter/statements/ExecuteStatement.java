@@ -97,7 +97,7 @@ public class ExecuteStatement extends IntermediatePortalStatement {
       new DescribeMessage(
               connectionHandler,
               PreparedType.Portal,
-              /* name = */ "",
+              /* name= */ "",
               ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
           .send();
       new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();

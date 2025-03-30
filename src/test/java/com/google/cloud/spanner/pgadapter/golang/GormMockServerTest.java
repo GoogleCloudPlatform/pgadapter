@@ -328,8 +328,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA
-                        .toBuilder()
+                    ALL_TYPES_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -369,8 +368,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA
-                        .toBuilder()
+                    ALL_TYPES_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -616,8 +614,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAllArrayTypesResultSetMetadata("")
-                        .toBuilder()
+                    createAllArrayTypesResultSetMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -657,8 +654,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAllArrayTypesResultSetMetadata("")
-                        .toBuilder()
+                    createAllArrayTypesResultSetMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -1100,8 +1096,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA
-                        .toBuilder()
+                    ALL_TYPES_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(

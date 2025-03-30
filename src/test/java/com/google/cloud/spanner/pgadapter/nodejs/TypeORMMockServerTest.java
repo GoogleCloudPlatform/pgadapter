@@ -95,8 +95,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    USERS_METADATA
-                        .toBuilder()
+                    USERS_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -148,8 +147,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(existsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    USERS_METADATA
-                        .toBuilder()
+                    USERS_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -200,8 +198,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    USERS_METADATA
-                        .toBuilder()
+                    USERS_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -286,8 +283,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(loadSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    USERS_METADATA
-                        .toBuilder()
+                    USERS_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -321,8 +317,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(existsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    USERS_METADATA
-                        .toBuilder()
+                    USERS_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -427,8 +422,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(loadSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    USERS_METADATA
-                        .toBuilder()
+                    USERS_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -461,8 +455,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(existsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    USERS_METADATA
-                        .toBuilder()
+                    USERS_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -555,8 +548,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAllTypesResultSetMetadata("AllTypes_")
-                        .toBuilder()
+                    createAllTypesResultSetMetadata("AllTypes_").toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -617,8 +609,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             Statement.of(existsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAllTypesResultSetMetadata("AllTypes_")
-                        .toBuilder()
+                    createAllTypesResultSetMetadata("AllTypes_").toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(

@@ -218,8 +218,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAllTypesResultSetMetadata("")
-                        .toBuilder()
+                    createAllTypesResultSetMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
                                 .getUndeclaredParameters()))
@@ -426,8 +425,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(insertUserSql),
-            SELECT1_RESULTSET
-                .toBuilder()
+            SELECT1_RESULTSET.toBuilder()
                 .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
                 .build()));
     String insertAddressesSql =

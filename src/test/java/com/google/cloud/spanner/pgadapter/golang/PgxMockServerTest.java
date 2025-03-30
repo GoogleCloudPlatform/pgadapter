@@ -193,8 +193,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -469,8 +468,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA
-                        .toBuilder()
+                    ALL_TYPES_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -516,8 +514,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA
-                        .toBuilder()
+                    ALL_TYPES_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -691,8 +688,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(

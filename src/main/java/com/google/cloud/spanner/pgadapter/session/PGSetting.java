@@ -64,6 +64,7 @@ public class PGSetting {
   private static final int SOURCEFILE_INDEX = 14;
   private static final int SOURCELINE_INDEX = 15;
   private static final int PENDING_RESTART_INDEX = 16;
+
   /** The column names of the pg_settings table. */
   private static final ImmutableList<String> COLUMN_NAMES =
       ImmutableList.of(
@@ -122,7 +123,7 @@ public class PGSetting {
     String[] values = line.split("\t");
     Preconditions.checkArgument(values.length == 17);
     return new PGSetting(
-        /* extension = */ null,
+        /* extension= */ null,
         parseString(values[NAME_INDEX]),
         parseString(values[CATEGORY_INDEX]),
         parseString(values[SHORT_DESC_INDEX]),

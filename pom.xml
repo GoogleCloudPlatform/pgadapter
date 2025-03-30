@@ -55,7 +55,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.15.0</version>
+    <version>1.15.1</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -386,12 +386,12 @@
     <profile>
       <id>format</id>
       <activation>
-        <jdk>[11,)</jdk>
+        <jdk>[17,)</jdk>
       </activation>
       <build>
         <plugins>
           <plugin>
-            <groupId>com.coveo</groupId>
+            <groupId>com.spotify.fmt</groupId>
             <artifactId>fmt-maven-plugin</artifactId>
             <executions>
               <execution>
