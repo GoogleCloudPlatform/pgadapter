@@ -800,12 +800,10 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
       String expectedOutput =
           "(1, 'abcd')\n"
               + "1\n"
-              + ("14.1".equals(pgVersion)
-                  ? String.format("Unknown statement: BEGIN ISOLATION LEVEL %s\n", isolationLevel)
-                  : unsupportedIsolationLevel.equals("2")
-                      ? "(2, 'pqrs')\n" // 2 == READ COMMITTED is translated if version < 9.1
-                      : String.format(
-                          "Unknown value for TRANSACTION: ISOLATION LEVEL %s\n", isolationLevel));
+              + (unsupportedIsolationLevel.equals("2")
+                  ? "(2, 'pqrs')\n"
+                  : String.format(
+                      "Unknown value for TRANSACTION: ISOLATION LEVEL %s\n", isolationLevel));
 
       String actualOutput =
           executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
@@ -1214,13 +1212,7 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
         StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
-    String expectedOutput =
-        "(1, 'abcd')\n"
-            + "1\n"
-            + "2\n"
-            + ("14.1".equals(pgVersion)
-                ? "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n"
-                : "(2, 'pqrs')\n");
+    String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
     String actualOutput = executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
@@ -1314,13 +1306,7 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
     // Setting the isolation level to REPEATABLE READ works for versions lower than 9.1, because
     // psycopg2 thinks that the server does not support REPEATABLE READ, and will therefore
     // automatically convert it to SERIALIZABLE.
-    String expectedOutput =
-        "(1, 'abcd')\n"
-            + "1\n"
-            + "2\n"
-            + (pgVersion.equals("14.1")
-                ? "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n"
-                : "(2, 'pqrs')\n");
+    String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
     String actualOutput = executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
@@ -1477,16 +1463,12 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
 
-    String expectedOutput =
-        "14.1".equals(pgVersion)
-            ? "Unknown value for default_transaction_isolation: 'REPEATABLE READ'\n"
-            : "10\n";
+    String expectedOutput = "10\n";
     String actualOutput = executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
-    int expectedRequests = "14.1".equals(pgVersion) ? 0 : 1;
-    assertEquals(expectedRequests, mockSpanner.countRequestsOfType(CommitRequest.class));
-    assertEquals(expectedRequests, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -1577,7 +1559,7 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
 
     String expectedOutput =
         pgVersion.equals("14.1")
-            ? "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY NOT DEFERRABLE\n"
+            ? "Update statements are not allowed for read-only transactions\n"
             : "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
     String actualOutput = executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
 
