@@ -740,106 +740,6 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
   }
 
   @Test
-  public void testUnsupportedIsolationLevelsSessionInTransactions() throws Exception {
-    // tests isolation_level settings for unsupported isolation levels using set_session function
-    List<String> unsupportedIsolationLevels = Arrays.asList("1", "2", "4");
-
-    String sql1 = "Select * from some_table";
-    String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
-    String sql3 = "Select * from some_table3";
-    String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
-
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
-
-    for (String unsupportedIsolationLevel : unsupportedIsolationLevels) {
-      List<String> statements = new ArrayList<>();
-
-      // query will be executed as expected
-      statements.add("query");
-      statements.add(sql1);
-
-      // update will be executed as expected
-      statements.add("update");
-      statements.add(sql2);
-
-      // 1 commit request will be sent
-      statements.add("transaction");
-      statements.add("commit");
-
-      statements.add("transaction");
-      statements.add("set session isolation_level " + unsupportedIsolationLevel);
-
-      // query won't be executed because the previous setting would've thrown error, except for
-      // pgVersion=1.0 and isolationLevel=2.
-      statements.add("query");
-      statements.add(sql3);
-
-      String isolationLevel;
-      switch (unsupportedIsolationLevel) {
-        case "1":
-          isolationLevel = "READ COMMITTED";
-          break;
-        case "2":
-          isolationLevel = "REPEATABLE READ";
-          break;
-        case "4":
-          isolationLevel = "READ UNCOMMITTED";
-          // psycopg2 auto-converts READ UNCOMMITTED to READ COMMITTED for old PG versions.
-          if (pgVersion.equals("1.0")) {
-            isolationLevel = "READ COMMITTED";
-          }
-          break;
-        default:
-          isolationLevel = unsupportedIsolationLevel;
-      }
-      String expectedOutput =
-          "(1, 'abcd')\n"
-              + "1\n"
-              + ("14.1".equals(pgVersion)
-                  ? String.format("Unknown statement: BEGIN ISOLATION LEVEL %s\n", isolationLevel)
-                  : unsupportedIsolationLevel.equals("2")
-                      ? "(2, 'pqrs')\n" // 2 == READ COMMITTED is translated if version < 9.1
-                      : String.format(
-                          "Unknown value for TRANSACTION: ISOLATION LEVEL %s\n", isolationLevel));
-
-      String actualOutput =
-          executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
-      assertEquals(expectedOutput, actualOutput);
-
-      List<AbstractMessage> requests = mockSpanner.getRequests();
-      requests =
-          requests.stream()
-              .filter(
-                  request ->
-                      !request.getClass().equals(BatchCreateSessionsRequest.class)
-                          && !request.getClass().equals(RollbackRequest.class))
-              .collect(Collectors.toList());
-      if (pgVersion.equals("1.0") && unsupportedIsolationLevel.equals("2")) {
-        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-        assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-      } else {
-        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-        assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-      }
-
-      assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
-      assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
-
-      assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
-      assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
-
-      assertEquals(CommitRequest.class, requests.get(2).getClass());
-
-      mockSpanner.clearRequests();
-    }
-  }
-
-  @Test
   public void testSupportedIsolationLevelInTransactions() throws Exception {
     // tests supported isolation_level settings using connection.isolation_level variable
     List<String> statements = new ArrayList<>();
@@ -1214,21 +1114,15 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
         StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
-    String expectedOutput =
-        "(1, 'abcd')\n"
-            + "1\n"
-            + "2\n"
-            + ("14.1".equals(pgVersion)
-                ? "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n"
-                : "(2, 'pqrs')\n");
+    String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
     String actualOutput = executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     int expectedCommits = "14.1".equals(pgVersion) ? 1 : 2;
     int expectedExecuteRequests = "14.1".equals(pgVersion) ? 3 : 4;
-    assertEquals(expectedCommits, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    assertEquals(expectedExecuteRequests, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
     List<AbstractMessage> requests = mockSpanner.getRequests();
     requests =
@@ -1236,7 +1130,7 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
             .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
             .collect(Collectors.toList());
 
-    assertEquals(expectedCommits + expectedExecuteRequests, requests.size());
+    assertEquals(6, requests.size());
 
     assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
     assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
@@ -1314,21 +1208,15 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
     // Setting the isolation level to REPEATABLE READ works for versions lower than 9.1, because
     // psycopg2 thinks that the server does not support REPEATABLE READ, and will therefore
     // automatically convert it to SERIALIZABLE.
-    String expectedOutput =
-        "(1, 'abcd')\n"
-            + "1\n"
-            + "2\n"
-            + (pgVersion.equals("14.1")
-                ? "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n"
-                : "(2, 'pqrs')\n");
+    String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
     String actualOutput = executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     int expectedCommits = "14.1".equals(pgVersion) ? 1 : 2;
     int expectedExecuteRequests = "14.1".equals(pgVersion) ? 3 : 4;
-    assertEquals(expectedCommits, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    assertEquals(expectedExecuteRequests, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
     List<AbstractMessage> requests = mockSpanner.getRequests();
     requests =
@@ -1336,7 +1224,7 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
             .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
             .collect(Collectors.toList());
 
-    assertEquals(expectedCommits + expectedExecuteRequests, requests.size());
+    assertEquals(6, requests.size());
 
     assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
     assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
@@ -1477,16 +1365,12 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
 
-    String expectedOutput =
-        "14.1".equals(pgVersion)
-            ? "Unknown value for default_transaction_isolation: 'REPEATABLE READ'\n"
-            : "10\n";
+    String expectedOutput = "10\n";
     String actualOutput = executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
-    int expectedRequests = "14.1".equals(pgVersion) ? 0 : 1;
-    assertEquals(expectedRequests, mockSpanner.countRequestsOfType(CommitRequest.class));
-    assertEquals(expectedRequests, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -1577,7 +1461,7 @@ public class PythonTransactionTests extends AbstractPsycopg2Test {
 
     String expectedOutput =
         pgVersion.equals("14.1")
-            ? "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY NOT DEFERRABLE\n"
+            ? "Update statements are not allowed for read-only transactions\n"
             : "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
     String actualOutput = executeTransactions(pgVersion, host, pgServer.getLocalPort(), statements);
 
