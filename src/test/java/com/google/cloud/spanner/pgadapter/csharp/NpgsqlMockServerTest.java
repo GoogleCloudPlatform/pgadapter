@@ -52,6 +52,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
@@ -835,26 +836,37 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     }
 
     String result = execute("TestReadWriteTransaction", createConnectionString());
-    assertEquals("Row: 1\n" + "Success\n", result);
+    assertEquals("Row: 1\n"
+        + "Row: 1\n"
+        + "Success\n", result);
 
     List<ExecuteSqlRequest> select1Requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals("SELECT 1"))
             .collect(Collectors.toList());
-    assertEquals(1, select1Requests.size());
-    assertTrue(select1Requests.get(0).hasTransaction());
-    assertTrue(select1Requests.get(0).getTransaction().hasBegin());
-    assertTrue(select1Requests.get(0).getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, select1Requests.size());
+    int index = 0;
+    for (ExecuteSqlRequest request : select1Requests) {
+      assertTrue(request.hasTransaction());
+      assertTrue(request.getTransaction().hasBegin());
+      assertTrue(request.getTransaction().getBegin().hasReadWrite());
+      ++index;
+      if (index == 1) {
+        assertEquals(IsolationLevel.SERIALIZABLE, request.getTransaction().getBegin().getIsolationLevel());
+      } else {
+        assertEquals(IsolationLevel.REPEATABLE_READ, request.getTransaction().getBegin().getIsolationLevel());
+      }
+    }
     List<ExecuteSqlRequest> insertRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(getInsertAllTypesSql()))
             .collect(Collectors.toList());
-    assertEquals(2, insertRequests.size());
+    assertEquals(4, insertRequests.size());
     for (ExecuteSqlRequest insertRequest : insertRequests) {
       assertTrue(insertRequest.hasTransaction());
       assertTrue(insertRequest.getTransaction().hasId());
     }
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 

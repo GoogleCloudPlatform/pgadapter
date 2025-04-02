@@ -14,7 +14,6 @@
 
 using System.Data;
 using Npgsql;
-using Npgsql.Internal.Postgres;
 using NpgsqlTypes;
 using System.Globalization;
 using System.Reflection;
@@ -1175,54 +1174,59 @@ public class NpgsqlTest
     {
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
-        // The serialization level *MUST* be specified in npgsql. Otherwise,
+        // The isolation level *MUST* be specified in npgsql. Otherwise,
         // npgsql will default to read-committed.
-        var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+        foreach (var isolationLevel in new [] { IsolationLevel.Serializable, IsolationLevel.RepeatableRead })
+        {
+            var transaction = connection.BeginTransaction(isolationLevel);
 
-        var selectCommand = new NpgsqlCommand("SELECT 1", connection);
-        selectCommand.Transaction = transaction;
-        using (var reader = selectCommand.ExecuteReader())
-        {
-            while (reader.Read())
+            var selectCommand = new NpgsqlCommand("SELECT 1", connection);
+            selectCommand.Transaction = transaction;
+            using (var reader = selectCommand.ExecuteReader())
             {
-                Console.WriteLine("Row: " + reader.GetInt64(0));
-            }
-        }
-        var insertSql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
-        foreach (var id in new [] {10, 20})
-        {
-            using var insertCommand = new NpgsqlCommand(insertSql, connection)
-            {
-                Parameters =
+                while (reader.Read())
                 {
-                    new() { Value = id },
-                    new() { Value = true },
-                    new() { Value = Encoding.UTF8.GetBytes("test_bytes") },
-                    new() { Value = 3.14f },
-                    new() { Value = 3.14d },
-                    new() { Value = 100 },
-                    new() { Value = 6.626m },
-                    new()
-                    {
-                        Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime(),
-                        DbType = DbType.DateTimeOffset
-                    },
-                    new() { Value = DateTime.Parse("2022-04-02"), DbType = DbType.Date },
-                    new() { Value = "test_string" },
-                    new() { Value = JsonDocument.Parse("{\"key\":\"value\"}") },
+                    Console.WriteLine("Row: " + reader.GetInt64(0));
                 }
-            };
-            insertCommand.Transaction = transaction;
-            var updateCount = insertCommand.ExecuteNonQuery();
-            if (updateCount != 1)
-            {
-                Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
-                return;
             }
+
+            var insertSql =
+                "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+                + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+            foreach (var id in new[] { 10, 20 })
+            {
+                using var insertCommand = new NpgsqlCommand(insertSql, connection)
+                {
+                    Parameters =
+                    {
+                        new() { Value = id },
+                        new() { Value = true },
+                        new() { Value = Encoding.UTF8.GetBytes("test_bytes") },
+                        new() { Value = 3.14f },
+                        new() { Value = 3.14d },
+                        new() { Value = 100 },
+                        new() { Value = 6.626m },
+                        new()
+                        {
+                            Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime(),
+                            DbType = DbType.DateTimeOffset
+                        },
+                        new() { Value = DateTime.Parse("2022-04-02"), DbType = DbType.Date },
+                        new() { Value = "test_string" },
+                        new() { Value = JsonDocument.Parse("{\"key\":\"value\"}") },
+                    }
+                };
+                insertCommand.Transaction = transaction;
+                var updateCount = insertCommand.ExecuteNonQuery();
+                if (updateCount != 1)
+                {
+                    Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
+                    return;
+                }
+            }
+
+            transaction.Commit();
         }
-        transaction.Commit();
         Console.WriteLine("Success");
     }
 

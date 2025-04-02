@@ -19,10 +19,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/jackc/pgtype"
-	"github.com/shopspring/decimal"
 	"reflect"
 	"time"
+
+	"github.com/jackc/pgtype"
+	"github.com/shopspring/decimal"
 
 	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
@@ -77,17 +78,17 @@ type AllTypes struct {
 }
 
 type AllArrayTypes struct {
-	ID                  *string `gorm:"primaryKey"`
-	ColArrayBigint      pgtype.Int8Array `gorm:"type:bigint[]"`
-	ColArrayBool        pgtype.BoolArray `gorm:"type:bool[]"`
-	ColArrayBytea       pgtype.ByteaArray `gorm:"type:bytea[]"`
-	ColArrayFloat8      pgtype.Float8Array `gorm:"type:float8[]"`
-	ColArrayInt         pgtype.Int4Array `gorm:"type:integer[]"`
-	ColArrayNumeric     pgtype.NumericArray `gorm:"type:numeric[]"`
+	ID                  *string                 `gorm:"primaryKey"`
+	ColArrayBigint      pgtype.Int8Array        `gorm:"type:bigint[]"`
+	ColArrayBool        pgtype.BoolArray        `gorm:"type:bool[]"`
+	ColArrayBytea       pgtype.ByteaArray       `gorm:"type:bytea[]"`
+	ColArrayFloat8      pgtype.Float8Array      `gorm:"type:float8[]"`
+	ColArrayInt         pgtype.Int4Array        `gorm:"type:integer[]"`
+	ColArrayNumeric     pgtype.NumericArray     `gorm:"type:numeric[]"`
 	ColArrayTimestamptz pgtype.TimestamptzArray `gorm:"type:timestamptz[]"`
-	ColArrayDate        pgtype.DateArray `gorm:"type:date[]"`
-	ColArrayVarchar     pgtype.TextArray `gorm:"type:varchar[]"`
-	ColArrayJsonb       pgtype.JSONBArray `gorm:"type:jsonb[]"`
+	ColArrayDate        pgtype.DateArray        `gorm:"type:date[]"`
+	ColArrayVarchar     pgtype.TextArray        `gorm:"type:varchar[]"`
+	ColArrayJsonb       pgtype.JSONBArray       `gorm:"type:jsonb[]"`
 }
 
 //export TestCreateBlogAndUser
@@ -419,7 +420,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 		return C.CString(err.Error())
 	}
 	defer conn.Close()
-	_, _  = conn.ExecContext(context.Background(), "set time zone UTC")
+	_, _ = conn.ExecContext(context.Background(), "set time zone UTC")
 	row := AllArrayTypes{}
 	if err := db.First(&row).Error; err != nil {
 		return C.CString(fmt.Sprintf("failed to get AllArrayTypes: %v", err))
@@ -464,7 +465,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Int: int64(2), Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayBigint, wantInt8Array; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayBigint mismatch\nGot:  %v\nWant: %v", g, w))
@@ -477,7 +478,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Bool: false, Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayBool, wantBoolArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayBool mismatch\nGot:  %v\nWant: %v", g, w))
@@ -490,7 +491,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Float: -99.99, Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayFloat8, wantFloat8Array; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayFloat8 mismatch\nGot:  %v\nWant: %v", g, w))
@@ -503,7 +504,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Bytes: []byte("bytes2"), Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayBytea, wantByteaArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayBytea mismatch\nGot:  %v\nWant: %v", g, w))
@@ -516,7 +517,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Int: -200, Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayInt, wantInt4Array; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayInt mismatch\nGot:  %v\nWant: %v", g, w))
@@ -533,7 +534,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Int: num2.Int, Exp: num2.Exp, Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayNumeric, wantNumericArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayNumeric mismatch\nGot:  %v\nWant: %v", g, w))
@@ -546,7 +547,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Time: parseTimestamp("2000-01-01T00:00:00+00:00"), Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayTimestamptz, wantTimestamptzArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayTimestamptz mismatch\nGot:  %v\nWant: %v", g, w))
@@ -559,7 +560,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Time: time.Time(parseDate("2000-01-01")), Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayDate, wantDateArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayDate mismatch\nGot:  %v\nWant: %v", g, w))
@@ -572,7 +573,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{String: "string2", Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayVarchar, wantVarcharArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayVarchar mismatch\nGot:  %v\nWant: %v", g, w))
@@ -585,7 +586,7 @@ func TestQueryAllArrayDataTypes(connString string) *C.char {
 			{Bytes: []byte("{\"key\": \"value2\"}"), Status: pgtype.Present},
 		},
 		Dimensions: []pgtype.ArrayDimension{{3, 1}},
-		Status: pgtype.Present,
+		Status:     pgtype.Present,
 	}
 	if g, w := row.ColArrayJsonb, wantJsonbArray; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColArrayJsonb mismatch\nGot:  %v\nWant: %v", g, w))
@@ -669,7 +670,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Int: int64(2), Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayBool: pgtype.BoolArray{
 			Elements: []pgtype.Bool{
@@ -678,7 +679,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Bool: false, Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayFloat8: pgtype.Float8Array{
 			Elements: []pgtype.Float8{
@@ -687,7 +688,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Float: -99.99, Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayBytea: pgtype.ByteaArray{
 			Elements: []pgtype.Bytea{
@@ -696,7 +697,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Bytes: []byte("bytes2"), Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayInt: pgtype.Int4Array{
 			Elements: []pgtype.Int4{
@@ -705,7 +706,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Int: -200, Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayNumeric: pgtype.NumericArray{
 			Elements: []pgtype.Numeric{
@@ -714,7 +715,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Int: num2.Int, Exp: num2.Exp, Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayTimestamptz: pgtype.TimestamptzArray{
 			Elements: []pgtype.Timestamptz{
@@ -723,7 +724,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Time: parseTimestamp("2000-01-01T00:00:00Z").Local(), Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayDate: pgtype.DateArray{
 			Elements: []pgtype.Date{
@@ -732,7 +733,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Time: time.Time(parseDate("2000-01-01")), Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayVarchar: pgtype.TextArray{
 			Elements: []pgtype.Text{
@@ -741,7 +742,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{String: "string2", Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 		ColArrayJsonb: pgtype.JSONBArray{
 			Elements: []pgtype.JSONB{
@@ -750,7 +751,7 @@ func TestInsertAllArrayDataTypes(connString string) *C.char {
 				{Bytes: []byte("{\"key\": \"value2\"}"), Status: pgtype.Present},
 			},
 			Dimensions: []pgtype.ArrayDimension{{3, 1}},
-			Status: pgtype.Present,
+			Status:     pgtype.Present,
 		},
 	}
 	res := db.Create(&row)
@@ -828,22 +829,24 @@ func TestTransaction(connString string) *C.char {
 	}
 	defer conn.Close()
 
-	err = db.Transaction(func(tx *gorm.DB) error {
-		tx.Omit(
-			"col_bigint",
-			"col_bool",
-			"col_bytea",
-			"col_float8",
-			"col_int",
-			"col_numeric",
-			"col_timestamptz",
-			"col_date",
-		).Create(AllTypes{ColVarchar: stringRef("1")}).Create(AllTypes{ColVarchar: stringRef("2")})
+	for _, isolation := range []sql.IsolationLevel{sql.LevelSerializable, sql.LevelRepeatableRead} {
+		err = db.Transaction(func(tx *gorm.DB) error {
+			tx.Omit(
+				"col_bigint",
+				"col_bool",
+				"col_bytea",
+				"col_float8",
+				"col_int",
+				"col_numeric",
+				"col_timestamptz",
+				"col_date",
+			).Create(AllTypes{ColVarchar: stringRef("1")}).Create(AllTypes{ColVarchar: stringRef("2")})
 
-		return tx.Error
-	})
-	if err != nil {
-		return C.CString(fmt.Sprintf("failed to execute transaction: %v", err))
+			return tx.Error
+		}, &sql.TxOptions{Isolation: isolation})
+		if err != nil {
+			return C.CString(fmt.Sprintf("failed to execute transaction: %v", err))
+		}
 	}
 
 	return nil

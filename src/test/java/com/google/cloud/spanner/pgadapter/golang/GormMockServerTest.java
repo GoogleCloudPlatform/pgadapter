@@ -38,6 +38,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
@@ -1008,13 +1009,14 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(3, requests.size());
+    assertEquals(5, requests.size());
     ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
     assertTrue(describeRequest.hasTransaction());
     assertTrue(describeRequest.getTransaction().hasBegin());
     assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(IsolationLevel.SERIALIZABLE, describeRequest.getTransaction().getBegin().getIsolationLevel());
 
     ExecuteSqlRequest executeRequest1 = requests.get(1);
     assertEquals(sql, executeRequest1.getSql());
@@ -1028,9 +1030,25 @@ public class GormMockServerTest extends AbstractMockServerTest {
     assertTrue(executeRequest2.hasTransaction());
     assertTrue(executeRequest2.getTransaction().hasId());
 
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    ExecuteSqlRequest executeRequest3 = requests.get(3);
+    assertEquals(sql, executeRequest3.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest3.getQueryMode());
+    assertTrue(executeRequest3.hasTransaction());
+    assertTrue(executeRequest3.getTransaction().hasBegin());
+    assertTrue(executeRequest3.getTransaction().getBegin().hasReadWrite());
+    assertEquals(IsolationLevel.REPEATABLE_READ, executeRequest3.getTransaction().getBegin().getIsolationLevel());
+
+    ExecuteSqlRequest executeRequest4 = requests.get(4);
+    assertEquals(sql, executeRequest4.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest4.getQueryMode());
+    assertTrue(executeRequest4.hasTransaction());
+    assertTrue(executeRequest4.getTransaction().hasId());
+
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
     CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
     assertEquals(executeRequest2.getTransaction().getId(), commitRequest.getTransactionId());
+    CommitRequest commitRequest2 = mockSpanner.getRequestsOfType(CommitRequest.class).get(1);
+    assertEquals(executeRequest4.getTransaction().getId(), commitRequest2.getTransactionId());
   }
 
   @Test

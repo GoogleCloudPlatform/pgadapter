@@ -40,6 +40,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
@@ -1718,13 +1719,67 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testTransactionIsolationLevel() throws Exception {
-    String output = runTest("testTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
+  public void testUnsupportedTransactionIsolationLevel() throws Exception {
+    String output = runTest("testUnsupportedTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
 
     assertTrue(
         output,
         output.contains(
             "Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
+  }
+
+  @Test
+  public void testTransactionIsolationLevel() throws Exception {
+    String insertSql =
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\"";
+    ResultSetMetadata metadata =
+        createParameterTypesMetadata(
+            ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+            .toBuilder()
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
+                .bind("p2")
+                .to("alice@prisma.io")
+                .bind("p3")
+                .to("Alice")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
+                        .build())
+                .build()));
+    
+    String output = runTest("testTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
+
+    assertTrue(
+        output,
+        output.contains(
+            "Created one user using isolation level repeatable read"));
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest describeRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+    // TODO: Fix this once 'set transaction isolation level' is supported.
+    assertEquals(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED, describeRequest.getTransaction().getBegin().getIsolationLevel());
   }
 
   @Test
