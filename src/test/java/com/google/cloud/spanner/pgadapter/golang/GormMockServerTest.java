@@ -1016,7 +1016,9 @@ public class GormMockServerTest extends AbstractMockServerTest {
     assertTrue(describeRequest.hasTransaction());
     assertTrue(describeRequest.getTransaction().hasBegin());
     assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
-    assertEquals(IsolationLevel.SERIALIZABLE, describeRequest.getTransaction().getBegin().getIsolationLevel());
+    assertEquals(
+        IsolationLevel.SERIALIZABLE,
+        describeRequest.getTransaction().getBegin().getIsolationLevel());
 
     ExecuteSqlRequest executeRequest1 = requests.get(1);
     assertEquals(sql, executeRequest1.getSql());
@@ -1036,7 +1038,9 @@ public class GormMockServerTest extends AbstractMockServerTest {
     assertTrue(executeRequest3.hasTransaction());
     assertTrue(executeRequest3.getTransaction().hasBegin());
     assertTrue(executeRequest3.getTransaction().getBegin().hasReadWrite());
-    assertEquals(IsolationLevel.REPEATABLE_READ, executeRequest3.getTransaction().getBegin().getIsolationLevel());
+    assertEquals(
+        IsolationLevel.REPEATABLE_READ,
+        executeRequest3.getTransaction().getBegin().getIsolationLevel());
 
     ExecuteSqlRequest executeRequest4 = requests.get(4);
     assertEquals(sql, executeRequest4.getSql());

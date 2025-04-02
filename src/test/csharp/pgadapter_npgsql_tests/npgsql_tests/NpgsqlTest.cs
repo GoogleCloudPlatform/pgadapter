@@ -1178,6 +1178,8 @@ public class NpgsqlTest
         // npgsql will default to read-committed.
         foreach (var isolationLevel in new [] { IsolationLevel.Serializable, IsolationLevel.RepeatableRead })
         {
+            new NpgsqlCommand("DELETE FROM all_types WHERE col_bigint IN (10,20)", connection).ExecuteNonQuery();
+            
             var transaction = connection.BeginTransaction(isolationLevel);
 
             var selectCommand = new NpgsqlCommand("SELECT 1", connection);
@@ -1224,7 +1226,6 @@ public class NpgsqlTest
                     return;
                 }
             }
-
             transaction.Commit();
         }
         Console.WriteLine("Success");

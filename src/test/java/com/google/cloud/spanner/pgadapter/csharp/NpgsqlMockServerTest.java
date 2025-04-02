@@ -804,6 +804,10 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   @Test
   public void testReadWriteTransaction() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.of("DELETE FROM all_types WHERE col_bigint IN (10,20)"), 2L));
+
     String sql = getInsertAllTypesSql();
     for (long id : new Long[] {10L, 20L}) {
       mockSpanner.putStatementResult(
@@ -836,9 +840,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     }
 
     String result = execute("TestReadWriteTransaction", createConnectionString());
-    assertEquals("Row: 1\n"
-        + "Row: 1\n"
-        + "Success\n", result);
+    assertEquals("Row: 1\n" + "Row: 1\n" + "Success\n", result);
 
     List<ExecuteSqlRequest> select1Requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -852,9 +854,12 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
       assertTrue(request.getTransaction().getBegin().hasReadWrite());
       ++index;
       if (index == 1) {
-        assertEquals(IsolationLevel.SERIALIZABLE, request.getTransaction().getBegin().getIsolationLevel());
+        assertEquals(
+            IsolationLevel.SERIALIZABLE, request.getTransaction().getBegin().getIsolationLevel());
       } else {
-        assertEquals(IsolationLevel.REPEATABLE_READ, request.getTransaction().getBegin().getIsolationLevel());
+        assertEquals(
+            IsolationLevel.REPEATABLE_READ,
+            request.getTransaction().getBegin().getIsolationLevel());
       }
     }
     List<ExecuteSqlRequest> insertRequests =
@@ -866,7 +871,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
       assertTrue(insertRequest.hasTransaction());
       assertTrue(insertRequest.getTransaction().hasId());
     }
-    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 

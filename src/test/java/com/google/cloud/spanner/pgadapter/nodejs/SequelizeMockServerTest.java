@@ -360,7 +360,8 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testUnmanagedReadWriteTransaction() throws IOException, InterruptedException {
-    testTransaction("testUnmanagedReadWriteTransaction", IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+    testTransaction(
+        "testUnmanagedReadWriteTransaction", IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
   }
 
   @Test
@@ -369,12 +370,16 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testManagedReadWriteTransactionWithIsolationLevel() throws IOException, InterruptedException {
+  public void testManagedReadWriteTransactionWithIsolationLevel()
+      throws IOException, InterruptedException {
     // TODO: Fix once 'set transaction isolation level repeatable read' is supported.
-    testTransaction("testManagedReadWriteTransactionWithIsolationLevel", IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+    testTransaction(
+        "testManagedReadWriteTransactionWithIsolationLevel",
+        IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
   }
 
-  private void testTransaction(String methodName, IsolationLevel expectedIsolationLevel) throws IOException, InterruptedException {
+  private void testTransaction(String methodName, IsolationLevel expectedIsolationLevel)
+      throws IOException, InterruptedException {
     String selectSql =
         "SELECT \"id\", \"name\", \"createdAt\", \"updatedAt\" FROM \"users\" AS \"users\" WHERE \"users\".\"id\" = $1 LIMIT 1;";
     ResultSetMetadata metadata =
@@ -497,7 +502,9 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
     assertEquals(QueryMode.PLAN, selectRequests.get(0).getQueryMode());
     assertTrue(selectRequests.get(0).getTransaction().hasBegin());
     assertTrue(selectRequests.get(0).getTransaction().getBegin().hasReadWrite());
-    assertEquals(expectedIsolationLevel, selectRequests.get(0).getTransaction().getBegin().getIsolationLevel());
+    assertEquals(
+        expectedIsolationLevel,
+        selectRequests.get(0).getTransaction().getBegin().getIsolationLevel());
 
     assertEquals(QueryMode.NORMAL, selectRequests.get(1).getQueryMode());
     assertTrue(selectRequests.get(1).getTransaction().hasId());

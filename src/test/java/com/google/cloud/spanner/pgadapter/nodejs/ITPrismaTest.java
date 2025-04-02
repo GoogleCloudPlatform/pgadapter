@@ -371,10 +371,10 @@ public class ITPrismaTest implements IntegrationTest {
   }
 
   @Test
-  public void testTransactionIsolationLevel() throws Exception {
+  public void testUnsupportedTransactionIsolationLevel() throws Exception {
     String output =
         runTest(
-            "testTransactionIsolationLevel",
+            "testUnsupportedTransactionIsolationLevel",
             testEnv.getPGAdapterHost(),
             testEnv.getPGAdapterPort());
 
@@ -382,6 +382,17 @@ public class ITPrismaTest implements IntegrationTest {
         output,
         output.contains(
             "Transaction failed: PrismaClientUnknownRequestError: Error in connector: Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
+  }
+
+  @Test
+  public void testTransactionIsolationLevel() throws Exception {
+    String output =
+        runTest(
+            "testTransactionIsolationLevel",
+            testEnv.getPGAdapterHost(),
+            testEnv.getPGAdapterPort());
+
+    assertTrue(output, output.contains("Created one user using isolation level repeatable read"));
   }
 
   static String runTest(String testName, String host, int port)

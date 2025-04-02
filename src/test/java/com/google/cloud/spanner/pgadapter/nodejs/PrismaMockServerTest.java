@@ -1720,7 +1720,8 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testUnsupportedTransactionIsolationLevel() throws Exception {
-    String output = runTest("testUnsupportedTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
+    String output =
+        runTest("testUnsupportedTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
 
     assertTrue(
         output,
@@ -1734,7 +1735,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\"";
     ResultSetMetadata metadata =
         createParameterTypesMetadata(
-            ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
             .setRowType(
                 createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
@@ -1766,20 +1767,20 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("Alice").build())
                         .build())
                 .build()));
-    
+
     String output = runTest("testTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
 
-    assertTrue(
-        output,
-        output.contains(
-            "Created one user using isolation level repeatable read"));
+    assertTrue(output, output.contains("Created one user using isolation level repeatable read"));
     assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    ExecuteSqlRequest describeRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    ExecuteSqlRequest describeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
     assertTrue(describeRequest.hasTransaction());
     assertTrue(describeRequest.getTransaction().hasBegin());
     assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
     // TODO: Fix this once 'set transaction isolation level' is supported.
-    assertEquals(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED, describeRequest.getTransaction().getBegin().getIsolationLevel());
+    assertEquals(
+        IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
+        describeRequest.getTransaction().getBegin().getIsolationLevel());
   }
 
   @Test
