@@ -163,7 +163,7 @@ async function testCreateMultipleUsersInTransaction(client: PrismaClient) {
   console.log("Created two users");
 }
 
-async function testTransactionIsolationLevel(client: PrismaClient) {
+async function testUnsupportedTransactionIsolationLevel(client: PrismaClient) {
   try {
     await client.$transaction(async tx => {
       await tx.user.create({
@@ -186,6 +186,27 @@ async function testTransactionIsolationLevel(client: PrismaClient) {
       timeout: 10000, // default: 5000
     });
     console.log("Created two users");
+  } catch (e) {
+    console.log(`Transaction failed: ${e}`);
+  }
+}
+
+async function testTransactionIsolationLevel(client: PrismaClient) {
+  try {
+    await client.$transaction(async tx => {
+      await tx.user.create({
+        data: {
+          id: '2373a81d-772c-4221-adf0-06965bc02c2c',
+          name: 'Alice',
+          email: 'alice@prisma.io',
+        },
+      });
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      maxWait: 5000, // default: 2000
+      timeout: 10000, // default: 5000
+    });
+    console.log("Created one user using isolation level repeatable read");
   } catch (e) {
     console.log(`Transaction failed: ${e}`);
   }
@@ -465,8 +486,14 @@ require('yargs')
     opts => runTest(opts.host, opts.port, opts.database, testHandledErrorInTransaction)
 )
 .command(
-    'testTransactionIsolationLevel <host> <port> <database>',
+    'testUnsupportedTransactionIsolationLevel <host> <port> <database>',
     'Uses a transaction with read-committed isolation level',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testUnsupportedTransactionIsolationLevel)
+)
+.command(
+    'testTransactionIsolationLevel <host> <port> <database>',
+    'Uses a transaction with repeatable read isolation level',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testTransactionIsolationLevel)
 )

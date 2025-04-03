@@ -202,7 +202,3 @@ blog := Blog{
 db.Create(&user)
 db.Create(&blog)
 ```
-
-### Locking
-Locking clauses, like `clause.Locking{Strength: "UPDATE"}`, are not supported. These are generally speaking also not
-required, as Cloud Spanner uses isolation level `serializable` for read/write transactions.

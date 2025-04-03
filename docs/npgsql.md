@@ -78,8 +78,8 @@ P0001: Unknown statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
 ```
 
 npgsql always starts a transaction with isolation level `read committed` if no isolation level is
-specified when calling `connection.BeginTransaction()`. Include `IsolationLevel.Serializable` to
-work around this problem:
+specified when calling `connection.BeginTransaction()`. Include `IsolationLevel.Serializable` or
+`IsolationLevel.RepeatableRead` to work around this problem:
 
 ```csharp
 using var connection = new NpgsqlConnection(ConnectionString);
