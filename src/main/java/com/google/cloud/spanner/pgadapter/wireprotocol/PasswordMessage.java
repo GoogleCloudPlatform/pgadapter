@@ -130,11 +130,11 @@ public class PasswordMessage extends ControlMessage {
           // Successfully identified as a private key. Manually create a ServiceAccountCredentials
           // instance and try to use this when connecting to Spanner.
           return ServiceAccountCredentials.fromPkcs8(
-              /*clientId=*/ null,
+              /* clientId= */ null,
               username,
               privateKeyText,
-              /*privateKeyId=*/ null,
-              /*scopes=*/ null);
+              /* privateKeyId= */ null,
+              /* scopes= */ null);
         }
       } catch (IOException ioException) {
         // Ignore and try to parse it as a credentials file.

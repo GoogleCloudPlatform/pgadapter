@@ -50,10 +50,10 @@ class WriteDataWithDml {
 
         final List<Singer> singers =
             Arrays.asList(
-                new Singer(/* SingerId = */ 12L, "Melissa", "Garcia"),
-                new Singer(/* SingerId = */ 13L, "Russel", "Morales"),
-                new Singer(/* SingerId = */ 14L, "Jacqueline", "Long"),
-                new Singer(/* SingerId = */ 15L, "Dylan", "Shaw"));
+                new Singer(/* SingerId= */ 12L, "Melissa", "Garcia"),
+                new Singer(/* SingerId= */ 13L, "Russel", "Morales"),
+                new Singer(/* SingerId= */ 14L, "Jacqueline", "Long"),
+                new Singer(/* SingerId= */ 15L, "Dylan", "Shaw"));
 
         // Note that JDBC parameters start at index 1.
         int paramIndex = 0;

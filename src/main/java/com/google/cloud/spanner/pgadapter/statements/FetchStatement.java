@@ -22,7 +22,6 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCr
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
-import com.google.common.collect.ImmutableList;
 
 public class FetchStatement extends AbstractFetchOrMoveStatement {
 
@@ -42,8 +41,8 @@ public class FetchStatement extends AbstractFetchOrMoveStatement {
             parsedStatement,
             originalStatement),
         NO_PARAMS,
-        ImmutableList.of(),
-        ImmutableList.of(),
+        NO_FORMAT_CODES,
+        NO_FORMAT_CODES,
         parse(originalStatement.getSql(), "fetch", ParsedFetchStatement.class));
   }
 

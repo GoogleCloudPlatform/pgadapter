@@ -977,12 +977,22 @@ func TestReadWriteTransactionIsolationLevelRepeatableRead(connString string) *C.
 	}
 	defer conn.Close(ctx)
 
-	_, err = conn.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
-	if err == nil {
-		return C.CString("missing expected error for BeginTx with isolation level RepeatableRead")
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to begin transaction: %v", err.Error()))
 	}
-	if g, w := err.Error(), "ERROR: Unknown statement: begin isolation level repeatable read (SQLSTATE P0001)"; g != w {
-		return C.CString(fmt.Sprintf("error mismatch\nGot:  %v\nWant: %v", g, w))
+
+	var value int64
+	err = tx.QueryRow(ctx, "SELECT 1").Scan(&value)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	if g, w := value, int64(1); g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return C.CString(fmt.Sprintf("failed to commit transaction: %v", err))
 	}
 
 	return nil

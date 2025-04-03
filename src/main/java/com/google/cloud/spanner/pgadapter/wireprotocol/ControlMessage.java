@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
+import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_FORMAT_CODES;
 
 import com.google.api.core.InternalApi;
 import com.google.api.gax.grpc.GrpcCallContext;
@@ -207,11 +208,14 @@ public abstract class ControlMessage extends WireMessage {
    * @return A list of format codes.
    * @throws Exception If reading fails in any way.
    */
-  protected static List<Short> getFormatCodes(DataInputStream input) throws Exception {
-    List<Short> formatCodes = new ArrayList<>();
+  protected static short[] getFormatCodes(DataInputStream input) throws Exception {
     short numberOfFormatCodes = input.readShort();
+    if (numberOfFormatCodes == 0) {
+      return NO_FORMAT_CODES;
+    }
+    short[] formatCodes = new short[numberOfFormatCodes];
     for (int i = 0; i < numberOfFormatCodes; i++) {
-      formatCodes.add(input.readShort());
+      formatCodes[i] = input.readShort();
     }
     return formatCodes;
   }
@@ -266,27 +270,26 @@ public abstract class ControlMessage extends WireMessage {
       switch (statement.getStatementType()) {
         case DDL:
         case UNKNOWN:
-          new CommandCompleteResponse(this.outputStream, command).send(false);
+          CommandCompleteResponse.send(this.outputStream, command);
           break;
         case CLIENT_SIDE:
           if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
-            new CommandCompleteResponse(this.outputStream, command).send(false);
+            CommandCompleteResponse.send(this.outputStream, command);
             break;
           }
-          // fallthrough to QUERY
+        // fallthrough to QUERY
         case QUERY:
         case UPDATE:
           if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
             SendResultSetState state = sendResultSet(statement, mode, maxRows);
             statement.setHasMoreData(state.hasMoreRows());
             if (state.hasMoreRows() && mode == QueryMode.EXTENDED) {
-              new PortalSuspendedResponse(this.outputStream).send(false);
+              PortalSuspendedResponse.send(this.outputStream);
             } else {
               if (!state.hasMoreRows() && mode == QueryMode.EXTENDED) {
                 statement.close();
               }
-              new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
-                  .send(false);
+              CommandCompleteResponse.send(this.outputStream, state.getCommandAndNumRows());
             }
           } else {
             // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
@@ -294,7 +297,7 @@ public abstract class ControlMessage extends WireMessage {
             // target table had OIDs, but OIDs system columns are not supported anymore; therefore
             // oid is always 0.
             command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
-            new CommandCompleteResponse(this.outputStream, command).send(false);
+            CommandCompleteResponse.send(this.outputStream, command);
           }
           break;
         default:

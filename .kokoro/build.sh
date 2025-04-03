@@ -50,10 +50,6 @@ test)
     mvn test -B -ntp -Dclirr.skip=true -Denforcer.skip=true
     RETURN_CODE=$?
     ;;
-lint)
-    mvn com.coveo:fmt-maven-plugin:check -B -ntp
-    RETURN_CODE=$?
-    ;;
 javadoc)
     mvn javadoc:javadoc javadoc:test-javadoc -B -ntp
     RETURN_CODE=$?

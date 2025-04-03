@@ -20,6 +20,8 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Abstract base class for extended query protocol messages. These can be buffered in memory locally
@@ -66,5 +68,17 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   protected void handleError(Exception exception) throws Exception {
     super.handleError(exception);
     this.returnedErrorResponse = true;
+  }
+
+  private static final Map<Class<? extends AbstractQueryProtocolMessage>, String>
+      RECEIVED_EVENT_DESCRIPTIONS = new HashMap<>();
+
+  public String receivedEventDescription() {
+    String value = RECEIVED_EVENT_DESCRIPTIONS.get(getClass());
+    if (value == null) {
+      value = "Received message: '" + getIdentifier() + "'";
+      RECEIVED_EVENT_DESCRIPTIONS.put(getClass(), value);
+    }
+    return value;
   }
 }

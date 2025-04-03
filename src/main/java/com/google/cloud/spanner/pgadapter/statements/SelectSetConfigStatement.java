@@ -34,7 +34,6 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Future;
 
@@ -61,8 +60,8 @@ public class SelectSetConfigStatement extends IntermediatePortalStatement {
             parsedStatement,
             originalStatement),
         NO_PARAMS,
-        ImmutableList.of(),
-        ImmutableList.of());
+        NO_FORMAT_CODES,
+        NO_FORMAT_CODES);
     this.setStatement = parse(originalStatement.getSql());
   }
 
@@ -143,10 +142,7 @@ public class SelectSetConfigStatement extends IntermediatePortalStatement {
 
   @Override
   public IntermediatePortalStatement createPortal(
-      String name,
-      byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      String name, byte[][] parameters, short[] parameterFormatCodes, short[] resultFormatCodes) {
     return this;
   }
 }

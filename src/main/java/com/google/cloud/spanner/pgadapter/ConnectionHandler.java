@@ -143,6 +143,7 @@ public class ConnectionHandler implements Runnable {
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
   private boolean hasDeterminedClientUsingQuery;
+
   /**
    * List of PARSE messages that we received before auto-detecting the client. This list can be used
    * by the detector to determine which client is connected, and is cleared after the detection is
@@ -274,13 +275,6 @@ public class ConnectionHandler implements Runnable {
     this.spannerConnection = spannerConnection;
     this.databaseId = connectionOptions.getDatabaseId();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
-    // TODO: Remove when the emulator supports FOR UPDATE clauses.
-    if (Boolean.parseBoolean(server.getProperties().getProperty("autoConfigEmulator", "false"))) {
-      this.extendedQueryProtocolHandler
-          .getBackendConnection()
-          .getSessionState()
-          .setConnectionStartupValue("spanner", "replace_for_update", "true");
-    }
   }
 
   @VisibleForTesting
@@ -616,7 +610,8 @@ public class ConnectionHandler implements Runnable {
       new ErrorResponse(this, exception).send();
     } else {
       new ErrorResponse(this, exception).send();
-      new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
+      ReadyResponse.sendIdleResponse(output);
+      output.flush();
     }
   }
 

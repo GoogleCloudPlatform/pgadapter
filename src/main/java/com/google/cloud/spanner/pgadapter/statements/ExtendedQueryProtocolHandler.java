@@ -138,9 +138,7 @@ public class ExtendedQueryProtocolHandler {
    * received.
    */
   public void buffer(AbstractQueryProtocolMessage message) {
-    addEvent(
-        "Received message: '" + message.getIdentifier() + "'",
-        Attributes.of(DB_STATEMENT, message.getSql()));
+    addEvent(message.receivedEventDescription(), Attributes.of(DB_STATEMENT, message.getSql()));
     messages.add(message);
   }
 
@@ -218,10 +216,9 @@ public class ExtendedQueryProtocolHandler {
         throw PGExceptionFactory.newQueryCancelledException();
       }
       if (includeReadyResponse) {
-        new ReadyResponse(
-                connectionHandler.getConnectionMetadata().getOutputStream(),
-                getBackendConnection().getConnectionState().getReadyResponseStatus())
-            .send(false);
+        ReadyResponse.send(
+            connectionHandler.getConnectionMetadata().getOutputStream(),
+            getBackendConnection().getConnectionState().getReadyResponseStatus());
       }
     } catch (Throwable exception) {
       recordException(exception);

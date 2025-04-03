@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import {Prisma, PrismaClient, User} from '@prisma/client'
+import {exec} from "child_process";
+import {promisify} from "util";
 
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>, options?: string) {
   if (host.charAt(0) == '/') {
@@ -69,6 +71,21 @@ async function testPgAdvisoryLock(client: PrismaClient) {
   } catch (e) {
     console.error(`Query error: ${e}`);
   }
+}
+
+const execAsync = promisify(exec);
+async function testMigrateStatus() {
+  console.log(`Running npx prisma migrate status on ${process.env.DATABASE_URL}`);
+  await execAsync("npx prisma migrate status", {
+    env: process.env,
+  });
+}
+
+async function testMigrateDeploy() {
+  console.log(`Running npx prisma migrate deploy on ${process.env.DATABASE_URL}`);
+  await execAsync("npx prisma migrate deploy", {
+    env: process.env,
+  });
 }
 
 async function testShowAutoAddLimitClause(client: PrismaClient) {
@@ -146,7 +163,7 @@ async function testCreateMultipleUsersInTransaction(client: PrismaClient) {
   console.log("Created two users");
 }
 
-async function testTransactionIsolationLevel(client: PrismaClient) {
+async function testUnsupportedTransactionIsolationLevel(client: PrismaClient) {
   try {
     await client.$transaction(async tx => {
       await tx.user.create({
@@ -169,6 +186,27 @@ async function testTransactionIsolationLevel(client: PrismaClient) {
       timeout: 10000, // default: 5000
     });
     console.log("Created two users");
+  } catch (e) {
+    console.log(`Transaction failed: ${e}`);
+  }
+}
+
+async function testTransactionIsolationLevel(client: PrismaClient) {
+  try {
+    await client.$transaction(async tx => {
+      await tx.user.create({
+        data: {
+          id: '2373a81d-772c-4221-adf0-06965bc02c2c',
+          name: 'Alice',
+          email: 'alice@prisma.io',
+        },
+      });
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      maxWait: 5000, // default: 2000
+      timeout: 10000, // default: 5000
+    });
+    console.log("Created one user using isolation level repeatable read");
   } catch (e) {
     console.log(`Transaction failed: ${e}`);
   }
@@ -376,6 +414,18 @@ require('yargs')
     opts => runTest(opts.host, opts.port, opts.database, testPgAdvisoryLock)
 )
 .command(
+    'testMigrateStatus <host> <port> <database>',
+    'Runs npx prisma migrate status',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testMigrateStatus)
+)
+.command(
+    'testMigrateDeploy <host> <port> <database>',
+    'Runs npx prisma migrate deploy',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testMigrateDeploy)
+)
+.command(
     'testShowAutoAddLimitClause <host> <port> <database>',
     'Shows whether a LIMIT clause is automatically added when needed',
     {},
@@ -436,8 +486,14 @@ require('yargs')
     opts => runTest(opts.host, opts.port, opts.database, testHandledErrorInTransaction)
 )
 .command(
-    'testTransactionIsolationLevel <host> <port> <database>',
+    'testUnsupportedTransactionIsolationLevel <host> <port> <database>',
     'Uses a transaction with read-committed isolation level',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testUnsupportedTransactionIsolationLevel)
+)
+.command(
+    'testTransactionIsolationLevel <host> <port> <database>',
+    'Uses a transaction with repeatable read isolation level',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testTransactionIsolationLevel)
 )

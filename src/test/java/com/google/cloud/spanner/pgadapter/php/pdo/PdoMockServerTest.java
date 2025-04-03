@@ -129,8 +129,7 @@ public class PdoMockServerTest extends AbstractMockServerTest {
     Statement statement = Statement.newBuilder(sql).bind("p1").to("baz").build();
 
     ResultSetMetadata metadata =
-        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
-            .toBuilder()
+        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)).toBuilder()
             .setRowType(
                 StructType.newBuilder()
                     .addFields(
@@ -199,8 +198,7 @@ public class PdoMockServerTest extends AbstractMockServerTest {
     Statement selectFoo = Statement.newBuilder(sql).bind("p1").to("foo").build();
 
     ResultSetMetadata metadata =
-        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
-            .toBuilder()
+        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)).toBuilder()
             .setRowType(
                 StructType.newBuilder()
                     .addFields(
@@ -646,8 +644,7 @@ public class PdoMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from all_types"),
-            ALL_TYPES_RESULTSET
-                .toBuilder()
+            ALL_TYPES_RESULTSET.toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
                 .build()));
 

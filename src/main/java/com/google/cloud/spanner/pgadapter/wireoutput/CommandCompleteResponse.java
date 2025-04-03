@@ -17,22 +17,40 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 
 /** Signals to a client that an issued query is complete. */
 @InternalApi
 public class CommandCompleteResponse extends WireOutput {
-
+  private static final byte IDENTIFIER = 'C';
   private static final int HEADER_LENGTH = 4;
   private static final int NULL_TERMINATOR_LENGTH = 1;
 
   private static final byte NULL_TERMINATOR = 0;
 
+  /** Send a CommandComplete response. */
+  public static void send(DataOutputStream output, String command) throws IOException {
+    byte[] commandBytes = command.getBytes(StandardCharsets.UTF_8);
+    output.writeByte(IDENTIFIER);
+    output.writeInt(calculateLength(commandBytes));
+    output.write(commandBytes);
+    output.write(NULL_TERMINATOR);
+  }
+
+  private static int calculateLength(byte[] command) {
+    return HEADER_LENGTH + command.length + NULL_TERMINATOR_LENGTH;
+  }
+
   private final byte[] command;
 
   public CommandCompleteResponse(DataOutputStream output, String command) {
-    super(output, HEADER_LENGTH + command.getBytes(UTF8).length + NULL_TERMINATOR_LENGTH);
-    this.command = command.getBytes(UTF8);
+    this(output, command.getBytes(UTF8));
+  }
+
+  private CommandCompleteResponse(DataOutputStream output, byte[] command) {
+    super(output, HEADER_LENGTH + command.length + NULL_TERMINATOR_LENGTH);
+    this.command = command;
   }
 
   @Override
@@ -43,7 +61,7 @@ public class CommandCompleteResponse extends WireOutput {
 
   @Override
   public byte getIdentifier() {
-    return 'C';
+    return IDENTIFIER;
   }
 
   @Override

@@ -992,7 +992,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
         try (ResultSet resultSet = statement.executeQuery()) {
           while (resultSet.next()) {
             assertTrue(spannerResult.next());
-            assertEqual(/*binary=*/ true, spannerResult, resultSet);
+            assertEqual(/* binary= */ true, spannerResult, resultSet);
           }
         }
       }

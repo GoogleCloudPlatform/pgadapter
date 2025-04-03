@@ -46,6 +46,8 @@ PGAdapter can be used with the following frameworks and tools:
    for a sample application.
 1. `Sequelize.js` ORM can be used with PGAdapter. See [Sequelize.js sample application](samples/nodejs/sequelize)
    for a sample application.
+1. `Prisma` ORM can be used with PGAdapter. See [Prisma sample application](samples/nodejs/prisma-sample-app)
+   for a sample application.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
@@ -116,9 +118,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.46.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.46.2` with the version you want to download):
 ```shell
-VERSION=v0.46.0
+VERSION=v0.46.2
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -153,7 +155,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.46.0</version>
+  <version>0.46.2</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```

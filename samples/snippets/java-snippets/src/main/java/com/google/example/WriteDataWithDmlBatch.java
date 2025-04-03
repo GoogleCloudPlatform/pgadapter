@@ -45,9 +45,9 @@ class WriteDataWithDmlBatch {
               "INSERT INTO singers (singer_id, first_name, last_name) VALUES (?, ?, ?)")) {
         final List<Singer> singers =
             Arrays.asList(
-                new Singer(/* SingerId = */ 16L, "Sarah", "Wilson"),
-                new Singer(/* SingerId = */ 17L, "Ethan", "Miller"),
-                new Singer(/* SingerId = */ 18L, "Maya", "Patel"));
+                new Singer(/* SingerId= */ 16L, "Sarah", "Wilson"),
+                new Singer(/* SingerId= */ 17L, "Ethan", "Miller"),
+                new Singer(/* SingerId= */ 18L, "Maya", "Patel"));
 
         for (Singer singer : singers) {
           // Note that JDBC parameters start at index 1.

@@ -33,13 +33,13 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.46.0</version>
+      <version>0.46.2</version>
     </dependency>
     <!-- Hibernate core dependency -->
     <dependency>
       <groupId>org.hibernate.orm</groupId>
       <artifactId>hibernate-core</artifactId>
-      <version>6.6.10.Final</version>
+      <version>6.6.12.Final</version>
     </dependency>
     <!-- Postgresql JDBC driver dependency -->
     <dependency>
@@ -57,7 +57,7 @@
     <dependency>
       <groupId>io.hypersistence</groupId>
       <artifactId>hypersistence-utils-hibernate-63</artifactId>
-      <version>3.9.5</version>
+      <version>3.9.9</version>
     </dependency>
     <!-- Add testcontainers, so we can run a Docker container with PGAdapter+Spanner Emulator -->
     <dependency>

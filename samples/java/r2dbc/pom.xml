@@ -55,7 +55,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.46.0</version>
+      <version>0.46.2</version>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>

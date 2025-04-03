@@ -46,6 +46,7 @@ public class SimpleParser {
   static class TableOrIndexName {
     /** Schema is an optional schema name prefix. */
     final String schema;
+
     /** Name is the actual object name. */
     final String name;
 

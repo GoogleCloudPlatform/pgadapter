@@ -60,6 +60,7 @@ public class RegexQueryPartReplacer implements QueryPartReplacer {
       Pattern pattern, Supplier<String> replacement) {
     return new RegexQueryPartReplacer(pattern, replacement, ReplacementStatus.STOP, false);
   }
+
   /** Replace the entire with the given static value and then stop. */
   public static RegexQueryPartReplacer replaceAllAndStop(Pattern pattern, String replacement) {
     return new RegexQueryPartReplacer(
