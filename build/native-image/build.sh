@@ -7,6 +7,5 @@ native-image \
   -H:ReflectionConfigurationFiles=../../build/native-image/reflectconfig.json \
   -jar pgadapter.jar \
   --no-fallback
-  -H:IncludeResources=".*metadata.*json$"
 
 ./pgadapter -p appdev-soda-spanner-staging -i knut-test-ycsb -s 5433
