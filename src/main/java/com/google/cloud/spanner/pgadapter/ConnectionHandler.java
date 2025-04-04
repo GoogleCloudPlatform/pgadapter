@@ -397,6 +397,13 @@ public class ConnectionHandler implements Runnable {
 
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
+      } catch (EOFException ignore) {
+        // Just ignore the connection and close it if the client never sends us a valid startup
+        // message. This also prevents probers that just check for an open TCP port to cause errors
+        // to be logged.
+        return result;
+      }
+      try {
         if (!ssl
             && getServer().getOptions().getSslMode().isSslEnabled()
             && this.message instanceof SSLMessage) {
