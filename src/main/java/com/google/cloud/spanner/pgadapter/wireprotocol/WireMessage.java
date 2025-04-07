@@ -186,8 +186,7 @@ public abstract class WireMessage {
       this.inputStream.readFully(result);
       // Skip the null-terminator.
       //noinspection StatementWithEmptyBody
-      while (this.inputStream.skip(1) < 1) {
-      }
+      while (this.inputStream.skip(1) < 1) {}
       return new String(result, StandardCharsets.UTF_8);
     } finally {
       // Drop the mark.

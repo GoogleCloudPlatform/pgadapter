@@ -109,6 +109,15 @@ public abstract class ControlMessage extends WireMessage {
     return manuallyCreatedToken == null;
   }
 
+  private static char readNextMsg(ConnectionHandler connection) throws IOException {
+    DataInputStream inputStream = connection.getConnectionMetadata().getInputStream();
+    long startTime = System.currentTimeMillis();
+    while (inputStream.available() == 0 && System.currentTimeMillis() - startTime < 1000) {
+      Thread.yield();
+    }
+    return (char) inputStream.readUnsignedByte();
+  }
+
   /**
    * Factory method to create the message from the specific command type char.
    *
@@ -118,7 +127,7 @@ public abstract class ControlMessage extends WireMessage {
    */
   public static ControlMessage create(ConnectionHandler connection) throws Exception {
     boolean validMessage = true;
-    char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
+    char nextMsg = readNextMsg(connection);
     try {
       if (connection.getStatus() == ConnectionStatus.COPY_IN) {
         switch (nextMsg) {
