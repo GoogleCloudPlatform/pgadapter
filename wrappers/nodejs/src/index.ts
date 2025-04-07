@@ -1,0 +1,1 @@
+export {startPGAdapter} from './pgadapter'
