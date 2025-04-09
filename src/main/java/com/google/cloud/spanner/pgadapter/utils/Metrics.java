@@ -34,21 +34,18 @@ public class Metrics {
   private final DoubleHistogram pgadapterLatencies;
 
   public static List<Double> getMetricLatencyMillisBuckets() {
-    int kMaxNumFiniteBuckets = 50;
-    double BASE = 1.25;
-    double SCALE_FACTOR = 0.25;
-    double MAX_VALUE = 600;
-    double bucket_value = SCALE_FACTOR;
+    final int MAX_NUM_FINITE_BUCKETS = 50;
+    final double BASE = 1.25;
+    final double SCALE_FACTOR = 0.25;
+    final double MAX_VALUE = 600;
+    double bucketValue = SCALE_FACTOR;
 
-    List<Double> rpc_millis_bucket_boundaries = new ArrayList<Double>(kMaxNumFiniteBuckets);
-    for (int i = 0; i < kMaxNumFiniteBuckets; i++) {
-      if (bucket_value > MAX_VALUE) {
-        break;
-      }
-      rpc_millis_bucket_boundaries.add(bucket_value);
-      bucket_value = SCALE_FACTOR * BASE;
+    List<Double> rpcMillisBucketBoundaries = new ArrayList<Double>(MAX_NUM_FINITE_BUCKETS);
+    for (int i = 0; i < MAX_NUM_FINITE_BUCKETS && bucketValue <= MAX_VALUE; i++) {
+      rpcMillisBucketBoundaries.add(bucketValue);
+      bucketValue = SCALE_FACTOR * BASE;
     }
-    return rpc_millis_bucket_boundaries;
+    return rpcMillisBucketBoundaries;
   }
 
   public Metrics(OpenTelemetry openTelemetry) {
