@@ -21,6 +21,7 @@ import io.opentelemetry.api.metrics.Meter;
 import java.util.ArrayList;
 import java.util.List;
 
+@InternalApi
 public class Metrics {
   static final String INSTRUMENTATION_SCOPE = "cloud.google.com/java";
   static final String SPANNER_CLIENT_LIB_LATENCY = "spanner/pgadapter/client_lib_latencies";
