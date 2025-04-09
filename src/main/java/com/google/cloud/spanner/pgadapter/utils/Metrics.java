@@ -16,9 +16,9 @@ package com.google.cloud.spanner.pgadapter.utils;
 import com.google.api.core.InternalApi;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.Attributes;
-import io.opentelemetry.api.metrics.LongHistogram;
+import io.opentelemetry.api.metrics.DoubleHistogram;
 import io.opentelemetry.api.metrics.Meter;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 @InternalApi
@@ -31,31 +31,39 @@ public class Metrics {
   static final String PGADAPTER_LATENCY_DESCRIPTION =
       "Latency between PGAdapter receiving a statement from the client and PGAdapter returning the last row of the response to the client";
 
-  private final LongHistogram spannerClientLibLatencies;
-  private final LongHistogram pgadapterLatencies;
+  private final DoubleHistogram spannerClientLibLatencies;
+  private final DoubleHistogram pgadapterLatencies;
+
+  public static List<Double> getMetricLatencyMillisBuckets() {
+    final int MAX_NUM_FINITE_BUCKETS = 50;
+    final double BASE = 1.25;
+    final double SCALE_FACTOR = 0.25;
+    final double MAX_VALUE = 600;
+    double bucketValue = SCALE_FACTOR;
+
+    List<Double> rpcMillisBucketBoundaries = new ArrayList<Double>(MAX_NUM_FINITE_BUCKETS);
+    for (int i = 0; i < MAX_NUM_FINITE_BUCKETS && bucketValue <= MAX_VALUE; i++) {
+      rpcMillisBucketBoundaries.add(bucketValue);
+      bucketValue = SCALE_FACTOR * BASE;
+    }
+    return rpcMillisBucketBoundaries;
+  }
 
   public Metrics(OpenTelemetry openTelemetry) {
     Meter meter = openTelemetry.getMeter(INSTRUMENTATION_SCOPE);
-    List<Long> RPC_MILLIS_BUCKET_BOUNDARIES =
-        Arrays.asList(
-            1L, 2L, 3L, 4L, 5L, 6L, 8L, 10L, 13L, 16L, 20L, 25L, 30L, 40L, 50L, 65L, 80L, 100L,
-            130L, 160L, 200L, 250L, 300L, 400L, 500L, 650L, 800L, 1000L, 2000L, 5000L, 10000L,
-            20000L, 50000L, 100000L);
     spannerClientLibLatencies =
         meter
             .histogramBuilder(SPANNER_CLIENT_LIB_LATENCY)
-            .ofLongs()
             .setDescription(SPANNER_CLIENT_LIB_LATENCY_DESCRIPTION)
             .setUnit("ms")
-            .setExplicitBucketBoundariesAdvice(RPC_MILLIS_BUCKET_BOUNDARIES)
+            .setExplicitBucketBoundariesAdvice(getMetricLatencyMillisBuckets())
             .build();
     pgadapterLatencies =
         meter
             .histogramBuilder(PGADAPTER_LATENCY)
-            .ofLongs()
             .setDescription(PGADAPTER_LATENCY_DESCRIPTION)
             .setUnit("ms")
-            .setExplicitBucketBoundariesAdvice(RPC_MILLIS_BUCKET_BOUNDARIES)
+            .setExplicitBucketBoundariesAdvice(getMetricLatencyMillisBuckets())
             .build();
   }
 
