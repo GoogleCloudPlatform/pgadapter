@@ -124,6 +124,7 @@ public class SessionState {
       new AtomicReference<>();
 
   private final AtomicReference<ZoneId> cachedZoneId = new AtomicReference<>();
+  private final AtomicReference<Boolean> cachedAutoAddLimitClause = new AtomicReference<>();
   private final AtomicReference<Boolean> cachedReplaceForUpdateClause = new AtomicReference<>();
   private final AtomicReference<Boolean> cachedReplacePgCatalogTables = new AtomicReference<>();
   private final AtomicReference<Boolean> cachedEmulatePgClassTables = new AtomicReference<>();
@@ -133,6 +134,7 @@ public class SessionState {
   private void invalidateCache() {
     cachedRemoveEscapeClause.set(null);
     cachedZoneId.set(null);
+    cachedAutoAddLimitClause.set(null);
     cachedReplaceForUpdateClause.set(null);
     cachedReplacePgCatalogTables.set(null);
     cachedEmulatePgClassTables.set(null);
@@ -475,7 +477,8 @@ public class SessionState {
   // TODO: Remove when Cloud Spanner supports parametrized OFFSET clauses without a LIMIT clause.
   @InternalApi
   public boolean isAutoAddLimitClause() {
-    return getBoolSetting("spanner", "auto_add_limit_clause", false);
+    return getCachedValue(
+        () -> getBoolSetting("spanner", "auto_add_limit_clause", false), cachedAutoAddLimitClause);
   }
 
   /**
