@@ -87,7 +87,7 @@ public class SelectSetConfigStatement extends IntermediatePortalStatement {
       throw PGExceptionFactory.newPGException(
           "missing ',' after setting value", SQLState.SyntaxError);
     }
-    String localString = parser.readKeyword().toLowerCase(Locale.ENGLISH);
+    String localString = parser.readKeyword().toString().toLowerCase(Locale.ENGLISH);
     boolean local = BooleanParser.toBoolean(localString);
     if (!parser.eatToken(")")) {
       throw PGExceptionFactory.newPGException("missing ')' for set_config", SQLState.SyntaxError);

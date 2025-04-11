@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB_STATEMENT;
-import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_FORMAT_CODES;
 
 import com.google.api.core.InternalApi;
 import com.google.api.gax.grpc.GrpcCallContext;
@@ -32,12 +31,8 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
-import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.PartitionQueryResult;
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
@@ -61,7 +56,6 @@ import io.grpc.MethodDescriptor;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -75,14 +69,11 @@ import org.threeten.bp.Duration;
 
 /**
  * Generic representation for a control wire message: that is, a message which does not handle any
- * form of start-up, but reather general communications.
+ * form of start-up, but rather general communications.
  */
 @InternalApi
 public abstract class ControlMessage extends WireMessage {
   private static final Logger logger = Logger.getLogger(ControlMessage.class.getName());
-
-  /** Maximum number of invalid messages in a row allowed before we terminate the connection. */
-  static final int MAX_INVALID_MESSAGE_COUNT = 50;
 
   /**
    * Token that is used to mark {@link ControlMessage}s that are manually created to execute a
@@ -107,126 +98,6 @@ public abstract class ControlMessage extends WireMessage {
 
   public boolean isExtendedProtocol() {
     return manuallyCreatedToken == null;
-  }
-
-  private static char readNextMsg(ConnectionHandler connection) throws IOException {
-    DataInputStream inputStream = connection.getConnectionMetadata().getInputStream();
-    long startTime = System.currentTimeMillis();
-    while (inputStream.available() == 0 && System.currentTimeMillis() - startTime < 1000) {
-      Thread.yield();
-    }
-    return (char) inputStream.readUnsignedByte();
-  }
-
-  /**
-   * Factory method to create the message from the specific command type char.
-   *
-   * @param connection The connection handler object setup with the ability to send/receive.
-   * @return The constructed wire message given the input message.
-   * @throws Exception If construction or reading fails.
-   */
-  public static ControlMessage create(ConnectionHandler connection) throws Exception {
-    boolean validMessage = true;
-    char nextMsg = readNextMsg(connection);
-    try {
-      if (connection.getStatus() == ConnectionStatus.COPY_IN) {
-        switch (nextMsg) {
-          case CopyDoneMessage.IDENTIFIER:
-            return new CopyDoneMessage(connection);
-          case CopyDataMessage.IDENTIFIER:
-            return new CopyDataMessage(connection);
-          case CopyFailMessage.IDENTIFIER:
-            return new CopyFailMessage(connection);
-          case SyncMessage.IDENTIFIER:
-          case FlushMessage.IDENTIFIER:
-            // Skip sync/flush in COPY_IN. This is consistent with real PostgreSQL which also does
-            // this to accommodate clients that do not check what type of statement they sent in an
-            // ExecuteMessage, and instead always blindly send a flush/sync after each execute.
-            return SkipMessage.createForValidStream(connection);
-          default:
-            // Skip other unexpected messages and throw an exception to fail the copy operation.
-            validMessage = false;
-            SkipMessage.createForInvalidStream(connection);
-            throw new IllegalStateException(
-                String.format(
-                    "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: '%c'",
-                    nextMsg));
-        }
-      } else {
-        switch (nextMsg) {
-          case QueryMessage.IDENTIFIER:
-            return new QueryMessage(connection);
-          case ParseMessage.IDENTIFIER:
-            return new ParseMessage(connection);
-          case BindMessage.IDENTIFIER:
-            return new BindMessage(connection);
-          case DescribeMessage.IDENTIFIER:
-            return new DescribeMessage(connection);
-          case ExecuteMessage.IDENTIFIER:
-            return new ExecuteMessage(connection);
-          case CloseMessage.IDENTIFIER:
-            return new CloseMessage(connection);
-          case TerminateMessage.IDENTIFIER:
-            return new TerminateMessage(connection);
-          case FunctionCallMessage.IDENTIFIER:
-            return new FunctionCallMessage(connection);
-          case FlushMessage.IDENTIFIER:
-            return new FlushMessage(connection);
-          case SyncMessage.IDENTIFIER:
-            return new SyncMessage(connection);
-          case CopyDoneMessage.IDENTIFIER:
-          case CopyDataMessage.IDENTIFIER:
-          case CopyFailMessage.IDENTIFIER:
-            // Silently skip COPY messages in non-COPY mode. This is consistent with the PG wire
-            // protocol. If we continue to receive COPY messages while in non-COPY mode, we'll
-            // terminate the connection to prevent the server from being flooded with invalid
-            // messages.
-            validMessage = false;
-            // Note: The stream itself is still valid as we received a message that we recognized.
-            return SkipMessage.createForValidStream(connection);
-          default:
-            throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
-        }
-      }
-    } finally {
-      if (validMessage) {
-        connection.clearInvalidMessageCount();
-      } else {
-        connection.increaseInvalidMessageCount();
-        if (connection.getInvalidMessageCount() > MAX_INVALID_MESSAGE_COUNT) {
-          new ErrorResponse(
-                  connection,
-                  PGException.newBuilder(
-                          String.format(
-                              "Received %d invalid/unexpected messages. Last received message: '%c'",
-                              connection.getInvalidMessageCount(), nextMsg))
-                      .setSQLState(SQLState.ProtocolViolation)
-                      .setSeverity(Severity.FATAL)
-                      .build())
-              .send();
-          connection.setStatus(ConnectionStatus.TERMINATED);
-        }
-      }
-    }
-  }
-
-  /**
-   * Extract format codes from message (useful for both input and output format codes).
-   *
-   * @param input The data stream containing the user request.
-   * @return A list of format codes.
-   * @throws Exception If reading fails in any way.
-   */
-  protected static short[] getFormatCodes(DataInputStream input) throws Exception {
-    short numberOfFormatCodes = input.readShort();
-    if (numberOfFormatCodes == 0) {
-      return NO_FORMAT_CODES;
-    }
-    short[] formatCodes = new short[numberOfFormatCodes];
-    for (int i = 0; i < numberOfFormatCodes; i++) {
-      formatCodes[i] = input.readShort();
-    }
-    return formatCodes;
   }
 
   public enum PreparedType {

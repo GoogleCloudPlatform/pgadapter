@@ -33,15 +33,17 @@ public abstract class WireMessage {
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
 
   protected int length;
-  protected DataInputStream inputStream;
-  protected DataOutputStream outputStream;
-  protected ConnectionHandler connection;
+  protected final DataInputStream inputStream;
+  protected final DataOutputStream outputStream;
+  protected final ConnectionHandler connection;
+  protected final MessageReader messageReader;
 
   public WireMessage(ConnectionHandler connection, int length) {
     Preconditions.checkArgument(length >= 4);
     this.connection = connection;
     this.inputStream = connection.getConnectionMetadata().getInputStream();
     this.outputStream = connection.getConnectionMetadata().getOutputStream();
+    this.messageReader = connection.getServer().getMessageReader();
     this.length = length;
   }
 
@@ -210,6 +212,6 @@ public abstract class WireMessage {
    * setting for {@link ConnectionHandler}.
    */
   public void nextHandler() throws Exception {
-    this.connection.setMessageState(ControlMessage.create(this.connection));
+    this.connection.setMessageState(messageReader.create(this.connection));
   }
 }

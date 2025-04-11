@@ -80,7 +80,7 @@ public class SelectCurrentSettingStatement extends IntermediatePortalStatement {
     QuotedString setting = parser.readSingleQuotedString();
     boolean missingOk = false;
     if (parser.eatToken(",")) {
-      String missingOkString = parser.readKeyword().toLowerCase(Locale.ENGLISH);
+      String missingOkString = parser.readKeyword().toString().toLowerCase(Locale.ENGLISH);
       missingOk = BooleanParser.toBoolean(missingOkString);
     }
     if (!parser.eatToken(")")) {

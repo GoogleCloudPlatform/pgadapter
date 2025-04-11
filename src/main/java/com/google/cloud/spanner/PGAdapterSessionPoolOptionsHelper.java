@@ -27,6 +27,7 @@ public class PGAdapterSessionPoolOptionsHelper {
   @InternalApi
   public static SessionPoolOptions.Builder useMultiplexedSessions(
       SessionPoolOptions.Builder builder) {
+    builder.setTrackStackTraceOfSessionCheckout(false);
     return builder.setUseMultiplexedSession(true);
   }
 }

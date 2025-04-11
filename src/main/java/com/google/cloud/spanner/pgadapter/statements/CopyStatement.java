@@ -630,7 +630,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       throw PGExceptionFactory.newPGException(
           "missing 'FROM' or 'TO' keyword: " + sql, SQLState.SyntaxError);
     }
-    builder.direction = Direction.valueOf(parser.readKeyword().toUpperCase());
+    builder.direction = Direction.valueOf(parser.readKeyword().toString().toUpperCase());
     if (builder.direction == Direction.FROM) {
       // Silently ignore typo 'copy from stdout'.
       // See
@@ -666,14 +666,14 @@ public class CopyStatement extends IntermediatePortalStatement {
           if (optionParser.peekKeyword("text")
               || optionParser.peekKeyword("csv")
               || optionParser.peekKeyword("binary")) {
-            builder.format = Format.valueOf(optionParser.readKeyword().toUpperCase());
+            builder.format = Format.valueOf(optionParser.readKeyword().toString().toUpperCase());
           } else {
             throw PGExceptionFactory.newPGException("Invalid format option: " + optionExpression);
           }
         } else if (optionParser.eatKeyword("freeze")) {
           if (optionParser.hasMoreTokens()) {
-            String value = optionParser.readKeyword();
-            builder.freeze = BooleanParser.toBoolean(value);
+            CharSequence value = optionParser.readKeyword();
+            builder.freeze = BooleanParser.toBoolean(value.toString());
           } else {
             builder.freeze = true;
           }
@@ -686,8 +686,8 @@ public class CopyStatement extends IntermediatePortalStatement {
             builder.headerMatch = true;
             builder.header = true;
           } else if (optionParser.hasMoreTokens()) {
-            String value = optionParser.readKeyword();
-            builder.header = BooleanParser.toBoolean(value);
+            CharSequence value = optionParser.readKeyword();
+            builder.header = BooleanParser.toBoolean(value.toString());
           } else {
             builder.header = true;
           }

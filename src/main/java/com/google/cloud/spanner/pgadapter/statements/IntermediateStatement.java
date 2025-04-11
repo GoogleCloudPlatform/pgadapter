@@ -110,7 +110,7 @@ public class IntermediateStatement {
     }
     this.parsedStatement = potentiallyReplacedStatement;
     this.connection = connectionHandler.getSpannerConnection();
-    this.command = parseCommand(this.parsedStatement.getSqlWithoutComments());
+    this.command = parseCommand(originalStatement.getSql());
     this.commandTag = this.command;
     this.outputStream = connectionHandler.getConnectionMetadata().getOutputStream();
   }
