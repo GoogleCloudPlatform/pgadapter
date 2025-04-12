@@ -14,8 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
-import com.google.cloud.spanner.Statement.Builder;
 import com.google.cloud.spanner.Value;
+import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
 import java.sql.Types;
 
@@ -24,6 +24,10 @@ import java.sql.Types;
  * SQL type will be reported as {@link Types#OTHER}.
  */
 class UnspecifiedParser extends Parser<Value> {
+  private static final com.google.protobuf.Value NULL_VALUE =
+      com.google.protobuf.Value.newBuilder()
+          .setNullValue(com.google.protobuf.NullValue.NULL_VALUE)
+          .build();
 
   UnspecifiedParser(Object item) {
     this.item = (Value) item;
@@ -52,7 +56,7 @@ class UnspecifiedParser extends Parser<Value> {
   }
 
   @Override
-  public void bind(Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+    parametersBuilder.put(name, this.item == null ? Value.untyped(NULL_VALUE) : this.item);
   }
 }

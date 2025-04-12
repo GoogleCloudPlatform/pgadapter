@@ -18,9 +18,10 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.base.Utf8;
+import com.google.common.collect.ImmutableMap;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -127,7 +128,7 @@ public class StringParser extends Parser<String> {
   }
 
   @Override
-  public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+    parametersBuilder.put(name, Value.string(this.item));
   }
 }

@@ -15,10 +15,11 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
+import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -109,7 +110,7 @@ public class UuidParser extends Parser<String> {
   }
 
   @Override
-  public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+    parametersBuilder.put(name, Value.string(this.item));
   }
 }
