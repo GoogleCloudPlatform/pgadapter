@@ -297,7 +297,8 @@ public class ProtocolTest {
             parameters);
 
     int[] expectedParameterDataTypes = new int[] {1002};
-    String expectedSQL = "SELECT * FROM users WHERE name = $1";
+    String expectedSQL =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment";
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
@@ -362,7 +363,8 @@ public class ProtocolTest {
             parameters);
 
     int[] expectedParameterDataTypes = new int[] {0};
-    String expectedSQL = "SELECT * FROM users WHERE name = $1";
+    String expectedSQL =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment";
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
@@ -412,7 +414,8 @@ public class ProtocolTest {
             messageMetadata, length, statementName.getBytes(), payload.getBytes(), intToBytes(0));
 
     int[] expectedParameterDataTypes = new int[0];
-    String expectedSQL = "SELECT * FROM users WHERE name = $1";
+    String expectedSQL =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment";
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));

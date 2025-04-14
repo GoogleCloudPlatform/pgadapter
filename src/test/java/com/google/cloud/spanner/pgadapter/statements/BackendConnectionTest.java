@@ -389,8 +389,6 @@ public class BackendConnectionTest {
         .thenReturn(listDatabasesResult);
     ImmutableList<LocalStatement> localStatements = ImmutableList.of(listDatabasesStatement);
     ParsedStatement parsedListDatabasesStatement = mock(ParsedStatement.class);
-    when(parsedListDatabasesStatement.getSqlWithoutComments())
-        .thenReturn(ListDatabasesStatement.LIST_DATABASES_SQL);
 
     BackendConnection backendConnection =
         new BackendConnection(
@@ -430,7 +428,6 @@ public class BackendConnectionTest {
     when(statementResult.getResultType()).thenReturn(ResultType.RESULT_SET);
     ParsedStatement parsedStatement = mock(ParsedStatement.class);
     String sql = "SELECT * FROM foo";
-    when(parsedStatement.getSqlWithoutComments()).thenReturn(sql);
     Statement statement = Statement.of(sql);
     when(connection.execute(statement)).thenReturn(statementResult);
 
@@ -471,7 +468,6 @@ public class BackendConnectionTest {
     Connection connection = mock(Connection.class);
     Statement statement = Statement.of("select foo from bar");
     ParsedStatement parsedStatement = mock(ParsedStatement.class);
-    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
     RuntimeException error = new RuntimeException("test error");
     when(connection.execute(statement)).thenThrow(error);
 
@@ -503,7 +499,6 @@ public class BackendConnectionTest {
 
     Statement statement = Statement.of("insert into foo (id) values (1)");
     ParsedStatement parsedStatement = mock(ParsedStatement.class);
-    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
     RuntimeException error = new RuntimeException("test error");
     when(connection.execute(statement)).thenThrow(error);
 
@@ -540,7 +535,6 @@ public class BackendConnectionTest {
 
     Statement commitStatement = Statement.of("commit");
     ParsedStatement parsedCommitStatement = mock(ParsedStatement.class);
-    when(parsedCommitStatement.getSqlWithoutComments()).thenReturn(commitStatement.getSql());
     when(parsedCommitStatement.getType()).thenReturn(StatementType.CLIENT_SIDE);
     when(parsedCommitStatement.getClientSideStatementType())
         .thenReturn(ClientSideStatementType.COMMIT);
@@ -585,7 +579,6 @@ public class BackendConnectionTest {
 
     Statement rollbackStatement = Statement.of("rollback");
     ParsedStatement parsedRollbackStatement = mock(ParsedStatement.class);
-    when(parsedRollbackStatement.getSqlWithoutComments()).thenReturn(rollbackStatement.getSql());
     when(parsedRollbackStatement.getType()).thenReturn(StatementType.CLIENT_SIDE);
     when(parsedRollbackStatement.getClientSideStatementType())
         .thenReturn(ClientSideStatementType.ROLLBACK);
@@ -628,7 +621,6 @@ public class BackendConnectionTest {
     Connection connection = mock(Connection.class);
     Statement statement = Statement.of("select foo from bar");
     ParsedStatement parsedStatement = mock(ParsedStatement.class);
-    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
     SpannerException error =
         SpannerExceptionFactory.newSpannerException(ErrorCode.CANCELLED, "query cancelled");
     when(connection.execute(statement)).thenThrow(error);
@@ -664,11 +656,9 @@ public class BackendConnectionTest {
     Connection connection = mock(Connection.class);
     ParsedStatement parsedStatement1 = mock(ParsedStatement.class);
     when(parsedStatement1.getType()).thenReturn(StatementType.DDL);
-    when(parsedStatement1.getSqlWithoutComments()).thenReturn(sql1);
 
     ParsedStatement parsedStatement2 = mock(ParsedStatement.class);
     when(parsedStatement2.getType()).thenReturn(StatementType.DDL);
-    when(parsedStatement2.getSqlWithoutComments()).thenReturn(sql2);
 
     Statement statement1 = Statement.of(sql1);
     Statement statement2 = Statement.of(sql2);

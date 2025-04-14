@@ -109,7 +109,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
       Statement originalStatement) {
     super(
         connection,
-        5 + parsedStatement.getSqlWithoutComments().length(),
+        5 + originalStatement.getSql().length(),
         ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
     this.name = name;
     this.parameterDataTypes = parameterDataTypes;
