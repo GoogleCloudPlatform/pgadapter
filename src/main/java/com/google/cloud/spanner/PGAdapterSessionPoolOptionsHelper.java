@@ -27,6 +27,9 @@ public class PGAdapterSessionPoolOptionsHelper {
   @InternalApi
   public static SessionPoolOptions.Builder useMultiplexedSessions(
       SessionPoolOptions.Builder builder) {
+    // Disable tracking where regular sessions are checked out, as debugging session leaks in
+    // PGAdapter should not be necessary.
+    builder.setTrackStackTraceOfSessionCheckout(false);
     return builder.setUseMultiplexedSession(true);
   }
 }
