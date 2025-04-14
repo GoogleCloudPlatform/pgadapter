@@ -33,7 +33,6 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
-import java.util.Locale;
 import java.util.concurrent.Future;
 
 /**
@@ -80,8 +79,8 @@ public class SelectCurrentSettingStatement extends IntermediatePortalStatement {
     QuotedString setting = parser.readSingleQuotedString();
     boolean missingOk = false;
     if (parser.eatToken(",")) {
-      String missingOkString = parser.readKeyword().toString().toLowerCase(Locale.ENGLISH);
-      missingOk = BooleanParser.toBoolean(missingOkString);
+      CharSequence missingOkString = parser.readKeyword();
+      missingOk = BooleanParser.toBoolean(missingOkString.toString());
     }
     if (!parser.eatToken(")")) {
       throw PGExceptionFactory.newPGException(

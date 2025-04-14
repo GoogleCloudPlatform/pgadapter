@@ -373,7 +373,7 @@ public class SimpleParser {
     }
     CharSequence keyword = parser.readKeyword();
     if (keyword.length() == 0) {
-      parser.pos = 0;
+      parser.setPos(0);
       keyword = parser.readKeyword();
     }
     return keyword.toString().toUpperCase();
