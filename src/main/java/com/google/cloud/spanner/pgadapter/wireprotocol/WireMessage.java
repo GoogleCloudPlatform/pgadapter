@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.logging.Level;
@@ -32,17 +33,42 @@ public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
 
-  protected int length;
-  protected DataInputStream inputStream;
-  protected DataOutputStream outputStream;
-  protected ConnectionHandler connection;
+  /**
+   * Token that is used to mark {@link ControlMessage}s that are manually created to execute a
+   * {@link QueryMessage}.
+   */
+  public enum ManuallyCreatedToken {
+    MANUALLY_CREATED_TOKEN
+  }
 
-  public WireMessage(ConnectionHandler connection, int length) {
+  private final ManuallyCreatedToken manuallyCreatedToken;
+
+  protected final int length;
+  protected final DataInputStream inputStream;
+  protected final DataOutputStream outputStream;
+  protected final ConnectionHandler connection;
+  protected final byte[] message;
+
+  public WireMessage(ConnectionHandler connection, int length, ManuallyCreatedToken token)
+      throws IOException {
     Preconditions.checkArgument(length >= 4);
     this.connection = connection;
     this.inputStream = connection.getConnectionMetadata().getInputStream();
     this.outputStream = connection.getConnectionMetadata().getOutputStream();
     this.length = length;
+    this.manuallyCreatedToken = token;
+    if (token != ManuallyCreatedToken.MANUALLY_CREATED_TOKEN && this.inputStream.markSupported()) {
+      this.message = new byte[Math.max(length - this.getHeaderLength(), 0)];
+      this.inputStream.mark(length);
+      this.inputStream.readFully(this.message);
+      this.inputStream.reset();
+    } else {
+      this.message = new byte[0];
+    }
+  }
+
+  public boolean isExtendedProtocol() {
+    return manuallyCreatedToken == null;
   }
 
   /**
@@ -163,32 +189,35 @@ public abstract class WireMessage {
    */
   public String readString() throws IOException {
     this.inputStream.mark(MARK_READ_LIMIT);
-    int index = 0;
-    while (index < MARK_READ_LIMIT) {
-      byte b = this.inputStream.readByte();
-      if (b == 0) {
-        break;
+    try {
+      int index = 0;
+      while (index < MARK_READ_LIMIT) {
+        byte b = this.inputStream.readByte();
+        if (b == 0) {
+          break;
+        }
+        index++;
+        if (index == MARK_READ_LIMIT) {
+          throw new IOException("No null terminator found");
+        }
       }
-      index++;
-      if (index == MARK_READ_LIMIT) {
-        throw new IOException("No null terminator found");
+      if (index == 0) {
+        // Empty string, we don't have to ready anything.
+        return "";
       }
-    }
-    // Reset the stream to the mark and read the name (if any).
-    this.inputStream.reset();
-    if (index == 0) {
-      // No name, but we still need to skip the null-terminator.
+
+      // Reset the stream to the mark and read the string.
+      this.inputStream.reset();
+      byte[] result = new byte[index];
+      this.inputStream.readFully(result);
+      // Skip the null-terminator.
       //noinspection StatementWithEmptyBody
       while (this.inputStream.skip(1) < 1) {}
-      return "";
+      return new String(result, StandardCharsets.UTF_8);
+    } finally {
+      // Drop the mark to prevent unnecessary buffering.
+      this.inputStream.mark(0);
     }
-
-    byte[] result = new byte[index];
-    this.inputStream.readFully(result);
-    // Skip the null-terminator.
-    //noinspection StatementWithEmptyBody
-    while (this.inputStream.skip(1) < 1) {}
-    return new String(result, StandardCharsets.UTF_8);
   }
 
   /**

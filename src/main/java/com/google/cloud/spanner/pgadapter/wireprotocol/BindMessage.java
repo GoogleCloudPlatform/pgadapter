@@ -23,6 +23,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
@@ -58,7 +59,8 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   }
 
   /** Constructor for Bind messages that are constructed to execute a Query message. */
-  public BindMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+  public BindMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken)
+      throws IOException {
     this(connection, "", "", new byte[0][], manuallyCreatedToken);
   }
 
@@ -68,7 +70,8 @@ public class BindMessage extends AbstractQueryProtocolMessage {
       String statementName,
       String portalName,
       byte[][] parameters,
-      ManuallyCreatedToken manuallyCreatedToken) {
+      ManuallyCreatedToken manuallyCreatedToken)
+      throws IOException {
     super(connection, 4, manuallyCreatedToken);
     this.portalName = portalName;
     this.statementName = statementName;

@@ -76,6 +76,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
@@ -391,8 +392,7 @@ public class ConnectionHandler implements Runnable {
    */
   private RunConnectionState runConnection(boolean ssl) {
     RunConnectionState result = RunConnectionState.TERMINATED;
-    try (ConnectionMetadata connectionMetadata =
-        new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream())) {
+    try (ConnectionMetadata connectionMetadata = new ConnectionMetadata(this.socket)) {
       this.connectionMetadata = connectionMetadata;
 
       try {
@@ -862,7 +862,7 @@ public class ConnectionHandler implements Runnable {
    * opportunity to determine the client that is connected based on the SQL string that is being
    * executed.
    */
-  public void maybeDetermineWellKnownClient(Statement statement) {
+  public void maybeDetermineWellKnownClient(Statement statement) throws IOException {
     if (!this.hasDeterminedClientUsingQuery) {
       if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
           && getServer().getOptions().shouldAutoDetectClient()) {

@@ -532,7 +532,8 @@ public class ConnectionHandlerTest {
   }
 
   @Test
-  public void testMaybeDetermineWellKnownClient_remainsUnspecifiedForUnknownStatement() {
+  public void testMaybeDetermineWellKnownClient_remainsUnspecifiedForUnknownStatement()
+      throws IOException {
     OptionsMetadata options = mock(OptionsMetadata.class);
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
@@ -549,7 +550,8 @@ public class ConnectionHandlerTest {
   }
 
   @Test
-  public void testMaybeDetermineWellKnownClient_changesFromUnspecifiedWithKnownStatement() {
+  public void testMaybeDetermineWellKnownClient_changesFromUnspecifiedWithKnownStatement()
+      throws IOException {
     OptionsMetadata options = mock(OptionsMetadata.class);
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);
@@ -570,7 +572,8 @@ public class ConnectionHandlerTest {
   }
 
   @Test
-  public void testMaybeDetermineWellKnownClient_respectsAutoDetectClientSetting() {
+  public void testMaybeDetermineWellKnownClient_respectsAutoDetectClientSetting()
+      throws IOException {
     OptionsMetadata options = mock(OptionsMetadata.class);
     ProxyServer server = mock(ProxyServer.class);
     when(server.getOptions()).thenReturn(options);

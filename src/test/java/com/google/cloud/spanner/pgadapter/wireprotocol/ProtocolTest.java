@@ -61,8 +61,8 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStateme
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage.ManuallyCreatedToken;
 import com.google.common.primitives.Bytes;
 import com.google.common.util.concurrent.SettableFuture;
 import io.opentelemetry.api.OpenTelemetry;
@@ -1739,7 +1739,7 @@ public class ProtocolTest {
   }
 
   @Test
-  public void testGetPortalMetadataBeforeFlushFails() {
+  public void testGetPortalMetadataBeforeFlushFails() throws IOException {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);

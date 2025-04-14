@@ -23,6 +23,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -36,8 +37,8 @@ import java.util.Map;
  */
 @InternalApi
 public abstract class BootstrapMessage extends WireMessage {
-  public BootstrapMessage(ConnectionHandler connection, int length) {
-    super(connection, length);
+  public BootstrapMessage(ConnectionHandler connection, int length) throws IOException {
+    super(connection, length, /* ManuallyCreatedToken= */ null);
   }
 
   /**
@@ -172,5 +173,10 @@ public abstract class BootstrapMessage extends WireMessage {
     }
     ReadyResponse.sendIdleResponse(output);
     output.flush();
+  }
+
+  @Override
+  protected int getHeaderLength() {
+    return 8;
   }
 }

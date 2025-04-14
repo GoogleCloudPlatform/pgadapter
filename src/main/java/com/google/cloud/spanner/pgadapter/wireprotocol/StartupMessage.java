@@ -133,11 +133,6 @@ public class StartupMessage extends BootstrapMessage {
   }
 
   @Override
-  protected int getHeaderLength() {
-    return 8;
-  }
-
-  @Override
   protected String getMessageName() {
     return "Start-Up";
   }

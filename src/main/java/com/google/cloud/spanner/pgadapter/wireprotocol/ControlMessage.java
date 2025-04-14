@@ -84,29 +84,17 @@ public abstract class ControlMessage extends WireMessage {
   /** Maximum number of invalid messages in a row allowed before we terminate the connection. */
   static final int MAX_INVALID_MESSAGE_COUNT = 50;
 
-  /**
-   * Token that is used to mark {@link ControlMessage}s that are manually created to execute a
-   * {@link QueryMessage}.
-   */
-  public enum ManuallyCreatedToken {
-    MANUALLY_CREATED_TOKEN
-  }
-
-  private final ManuallyCreatedToken manuallyCreatedToken;
-
   public ControlMessage(ConnectionHandler connection) throws IOException {
-    super(connection, connection.getConnectionMetadata().getInputStream().readInt());
-    this.manuallyCreatedToken = null;
+    super(
+        connection,
+        connection.getConnectionMetadata().getInputStream().readInt(),
+        /* manuallyCreatedToken= */ null);
   }
 
   /** Constructor for manually created Control messages. */
-  protected ControlMessage(ConnectionHandler connection, int length, ManuallyCreatedToken token) {
-    super(connection, length);
-    this.manuallyCreatedToken = token;
-  }
-
-  public boolean isExtendedProtocol() {
-    return manuallyCreatedToken == null;
+  protected ControlMessage(ConnectionHandler connection, int length, ManuallyCreatedToken token)
+      throws IOException {
+    super(connection, length, token);
   }
 
   /**

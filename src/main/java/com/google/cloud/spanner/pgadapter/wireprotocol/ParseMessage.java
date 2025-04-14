@@ -64,6 +64,7 @@ import com.google.cloud.spanner.pgadapter.statements.TruncateStatement;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Creates a prepared statement. */
@@ -96,7 +97,8 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
    * Constructor for manually created Parse messages that originate from the simple query protocol.
    */
   public ParseMessage(
-      ConnectionHandler connection, ParsedStatement parsedStatement, Statement originalStatement) {
+      ConnectionHandler connection, ParsedStatement parsedStatement, Statement originalStatement)
+      throws IOException {
     this(connection, "", new int[0], parsedStatement, originalStatement);
   }
 
@@ -106,7 +108,8 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
       String name,
       int[] parameterDataTypes,
       ParsedStatement parsedStatement,
-      Statement originalStatement) {
+      Statement originalStatement)
+      throws IOException {
     super(
         connection,
         5 + parsedStatement.getSqlWithoutComments().length(),

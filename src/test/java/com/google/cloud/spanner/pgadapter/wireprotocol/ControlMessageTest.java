@@ -33,13 +33,14 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage.ManuallyCreatedToken;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Tracer;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -154,7 +155,7 @@ public final class ControlMessageTest {
   }
 
   @Test
-  public void testSendNoRowsAsResultSetFails() {
+  public void testSendNoRowsAsResultSetFails() throws IOException {
     OpenTelemetry otel = OpenTelemetry.noop();
     Tracer tracer = otel.getTracer("test");
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);

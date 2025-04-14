@@ -29,7 +29,7 @@ public class SSLMessage extends BootstrapMessage {
 
   private final ThreadLocal<Boolean> executedOnce = ThreadLocal.withInitial(() -> false);
 
-  public SSLMessage(ConnectionHandler connection) {
+  public SSLMessage(ConnectionHandler connection) throws IOException {
     super(connection, MESSAGE_LENGTH);
   }
 

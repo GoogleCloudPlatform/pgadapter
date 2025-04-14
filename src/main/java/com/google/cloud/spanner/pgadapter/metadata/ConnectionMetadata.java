@@ -24,29 +24,42 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.TimeUnit;
 
 @InternalApi
 public class ConnectionMetadata implements AutoCloseable {
   private static final int SOCKET_BUFFER_SIZE = 1 << 16;
 
+  private final ByteBuffer buffer = ByteBuffer.allocateDirect(SOCKET_BUFFER_SIZE);
+  private final SocketChannel socketChannel;
   private final DataInputStream inputStream;
   private final DataOutputStream outputStream;
   private boolean markedForRestart;
+
+  public ConnectionMetadata(InputStream rawInputStream, OutputStream rawOutputStream) {
+    this.socketChannel = null;
+    this.inputStream = new DataInputStream(rawInputStream);
+    this.outputStream = new DataOutputStream(rawOutputStream);
+  }
 
   /**
    * Creates a {@link DataInputStream} and a {@link DataOutputStream} from the given raw streams and
    * pushes these as the current streams to use for communication for a connection.
    */
-  public ConnectionMetadata(InputStream rawInputStream, OutputStream rawOutputStream) {
+  public ConnectionMetadata(Socket socket) throws IOException {
+    this.socketChannel = socket.getChannel();
     this.inputStream =
         new DataInputStream(
             new BufferedInputStream(
-                Preconditions.checkNotNull(rawInputStream), SOCKET_BUFFER_SIZE));
+                Preconditions.checkNotNull(socket.getInputStream()), SOCKET_BUFFER_SIZE));
     this.outputStream =
         new DataOutputStream(
             new BufferedOutputStream(
-                Preconditions.checkNotNull(rawOutputStream), SOCKET_BUFFER_SIZE));
+                Preconditions.checkNotNull(socket.getOutputStream()), SOCKET_BUFFER_SIZE));
+
   }
 
   public void markForRestart() {

@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -53,7 +54,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   }
 
   /** Constructor for manually created Describe messages from the simple query protocol. */
-  public DescribeMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+  public DescribeMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken)
+      throws IOException {
     this(connection, PreparedType.Portal, "", manuallyCreatedToken);
   }
 
@@ -62,7 +64,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
       ConnectionHandler connection,
       PreparedType type,
       String name,
-      ManuallyCreatedToken manuallyCreatedToken) {
+      ManuallyCreatedToken manuallyCreatedToken)
+      throws IOException {
     super(connection, 4, manuallyCreatedToken);
     this.type = type;
     this.name = name;

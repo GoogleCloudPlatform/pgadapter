@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -31,7 +32,8 @@ public class SyncMessage extends ControlMessage {
     super(connection);
   }
 
-  public SyncMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+  public SyncMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken)
+      throws IOException {
     super(connection, 4, manuallyCreatedToken);
   }
 

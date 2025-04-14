@@ -28,7 +28,7 @@ public class GSSENCRequestMessage extends BootstrapMessage {
 
   private final ThreadLocal<Boolean> executedOnce = ThreadLocal.withInitial(() -> false);
 
-  public GSSENCRequestMessage(ConnectionHandler connection) {
+  public GSSENCRequestMessage(ConnectionHandler connection) throws IOException {
     super(connection, MESSAGE_LENGTH);
   }
 
