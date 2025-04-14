@@ -163,32 +163,35 @@ public abstract class WireMessage {
    */
   public String readString() throws IOException {
     this.inputStream.mark(MARK_READ_LIMIT);
-    int index = 0;
-    while (index < MARK_READ_LIMIT) {
-      byte b = this.inputStream.readByte();
-      if (b == 0) {
-        break;
+    try {
+      int index = 0;
+      while (index < MARK_READ_LIMIT) {
+        byte b = this.inputStream.readByte();
+        if (b == 0) {
+          break;
+        }
+        index++;
+        if (index == MARK_READ_LIMIT) {
+          throw new IOException("No null terminator found");
+        }
       }
-      index++;
-      if (index == MARK_READ_LIMIT) {
-        throw new IOException("No null terminator found");
+      if (index == 0) {
+        // Empty string, we don't have to ready anything.
+        return "";
       }
-    }
-    // Reset the stream to the mark and read the name (if any).
-    this.inputStream.reset();
-    if (index == 0) {
-      // No name, but we still need to skip the null-terminator.
+
+      // Reset the stream to the mark and read the string.
+      this.inputStream.reset();
+      byte[] result = new byte[index];
+      this.inputStream.readFully(result);
+      // Skip the null-terminator.
       //noinspection StatementWithEmptyBody
       while (this.inputStream.skip(1) < 1) {}
-      return "";
+      return new String(result, StandardCharsets.UTF_8);
+    } finally {
+      // Drop the mark.
+      this.inputStream.mark(0);
     }
-
-    byte[] result = new byte[index];
-    this.inputStream.readFully(result);
-    // Skip the null-terminator.
-    //noinspection StatementWithEmptyBody
-    while (this.inputStream.skip(1) < 1) {}
-    return new String(result, StandardCharsets.UTF_8);
   }
 
   /**
