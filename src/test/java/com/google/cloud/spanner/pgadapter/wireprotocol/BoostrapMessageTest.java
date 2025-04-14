@@ -70,7 +70,7 @@ public class BoostrapMessageTest {
 
     BootstrapMessage message = BootstrapMessage.create(connection);
     assertEquals(StartupMessage.class, message.getClass());
-    assertEquals(message.length, 1024);
+    assertEquals(1024, message.length);
   }
 
   @Test
@@ -83,7 +83,7 @@ public class BoostrapMessageTest {
 
     BootstrapMessage message = BootstrapMessage.create(connection);
     assertEquals(SSLMessage.class, message.getClass());
-    assertEquals(message.length, 8);
+    assertEquals(8, message.length);
   }
 
   @Test
@@ -96,7 +96,7 @@ public class BoostrapMessageTest {
 
     BootstrapMessage message = BootstrapMessage.create(connection);
     assertEquals(CancelMessage.class, message.getClass());
-    assertEquals(message.length, 16);
+    assertEquals(16, message.length);
   }
 
   @Test
