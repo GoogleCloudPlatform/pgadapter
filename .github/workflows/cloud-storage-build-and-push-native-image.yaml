@@ -41,14 +41,14 @@ jobs:
             --initialize-at-build-time=com.google.protobuf,com.google.gson,com.google.cloud.spanner.pgadapter.Server \
             -J-Xmx14g \
             -H:IncludeResources=".*" \
-            -H:ReflectionConfigurationFiles=../../build/native-image/reflectconfig.json \
+            -H:ReflectionConfigurationFiles=../../build/native-image/reflect-config.json \
             -jar pgadapter.jar \
             --no-fallback
           
           tar -czvf pgadapter-linux-x64.tar.gz pgadapter
           cp "pgadapter-linux-x64.tar.gz" "pgadapter-linux-x64-$VERSION.tar.gz"
-          echo "native_image=pgadapter-linux-x64-$VERSION.tar.gz" >> $GITHUB_ENV
-          echo "native_image_current=pgadapter-linux-x64.tar.gz" >> $GITHUB_ENV
+          echo "native_image=target/pgadapter/pgadapter-linux-x64-$VERSION.tar.gz" >> $GITHUB_ENV
+          echo "native_image_current=target/pgadapter/pgadapter-linux-x64.tar.gz" >> $GITHUB_ENV
           echo ${{ env.native_image }}
           echo ${{ env.native_image_current }}
 
