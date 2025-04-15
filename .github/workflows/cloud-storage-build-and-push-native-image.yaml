@@ -10,8 +10,16 @@ env:
 
 jobs:
   setup-build-publish-deploy:
-    name: Setup, Build, and Publish
-    runs-on: ubuntu-latest
+    name: 'Build Native Image ${{ matrix.platform }}'
+    strategy:
+      matrix:
+        os: [ macos-latest, ubuntu-latest ]
+        include:
+          - os: 'ubuntu-latest'
+            platform: 'linux-amd64'
+          - os: 'macos-latest'
+            platform: 'darwin-arm64'
+    runs-on: ${{ matrix.os }}
     steps:
 
       - name: Checkout
@@ -45,10 +53,10 @@ jobs:
             -jar pgadapter.jar \
             --no-fallback
           
-          tar -czvf pgadapter-linux-x64.tar.gz pgadapter
-          cp "pgadapter-linux-x64.tar.gz" "pgadapter-linux-x64-$VERSION.tar.gz"
-          echo "native_image=target/pgadapter/pgadapter-linux-x64-$VERSION.tar.gz" >> $GITHUB_ENV
-          echo "native_image_current=target/pgadapter/pgadapter-linux-x64.tar.gz" >> $GITHUB_ENV
+          tar -czvf "pgadapter-${{ matrix.platform }}.tar.gz" pgadapter
+          cp "pgadapter-${{ matrix.platform }}.tar.gz" "pgadapter-${{ matrix.platform }}-$VERSION.tar.gz"
+          echo "native_image=target/pgadapter/pgadapter-${{ matrix.platform }}-$VERSION.tar.gz" >> $GITHUB_ENV
+          echo "native_image_current=target/pgadapter/pgadapter-${{ matrix.platform }}.tar.gz" >> $GITHUB_ENV
           echo ${{ env.native_image }}
           echo ${{ env.native_image_current }}
 
