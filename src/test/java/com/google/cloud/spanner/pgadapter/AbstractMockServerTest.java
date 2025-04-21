@@ -1230,8 +1230,7 @@ public abstract class AbstractMockServerTest {
       boolean alsoAsArrays,
       ImmutableList<String> names,
       ImmutableList<TypeCode> parameterTypes) {
-    return createMetadata(types, alsoAsArrays, names)
-        .toBuilder()
+    return createMetadata(types, alsoAsArrays, names).toBuilder()
         .setUndeclaredParameters(
             createParameterTypesMetadata(parameterTypes).getUndeclaredParameters())
         .build();
@@ -1475,6 +1474,20 @@ public abstract class AbstractMockServerTest {
             .setDone(true)
             .setResponse(Any.pack(Empty.getDefaultInstance()))
             .setMetadata(Any.pack(UpdateDatabaseDdlMetadata.getDefaultInstance()))
+            .build());
+  }
+
+  protected void addDdlErrorResponse(com.google.rpc.Status error) {
+    mockDatabaseAdmin.addResponse(
+        Operation.newBuilder()
+            .setMetadata(
+                Any.pack(
+                    UpdateDatabaseDdlMetadata.newBuilder()
+                        .setDatabase("projects/proj/instances/inst/databases/db")
+                        .build()))
+            .setName("projects/proj/instances/inst/databases/db/operations/1")
+            .setDone(true)
+            .setError(error)
             .build());
   }
 

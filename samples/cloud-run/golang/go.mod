@@ -2,7 +2,7 @@ module pgadapter-cloud-run
 
 go 1.21
 
-require github.com/jackc/pgx/v5 v5.7.2
+require github.com/jackc/pgx/v5 v5.7.4
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect

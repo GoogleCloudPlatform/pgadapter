@@ -37,9 +37,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyOutResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
-import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -75,8 +73,8 @@ public class CopyToStatement extends IntermediatePortalStatement {
             createParsedStatement(parsedCopyStatement),
             createSelectStatement(parsedCopyStatement)),
         NO_PARAMS,
-        ImmutableList.of(),
-        ImmutableList.of());
+        NO_FORMAT_CODES,
+        NO_FORMAT_CODES);
     this.parsedCopyStatement = parsedCopyStatement;
     if (parsedCopyStatement.format == CopyStatement.Format.BINARY) {
       this.csvFormat = null;
@@ -215,10 +213,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   @Override
   public IntermediatePortalStatement createPortal(
-      String name,
-      byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      String name, byte[][] parameters, short[] parameterFormatCodes, short[] resultFormatCodes) {
     // COPY does not support binding any parameters, so we just return the same statement.
     return this;
   }

@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
+import com.google.cloud.spanner.pgadapter.wireprotocol.MessageReader;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
@@ -69,12 +70,14 @@ public class ProxyServer extends AbstractApiService {
   private final Metrics metrics;
   private final Properties properties;
   private final List<ConnectionHandler> handlers = new LinkedList<>();
+  private final MessageReader messageReader;
 
   /**
    * Latch that is closed when the TCP server has started. We need this to know the exact port that
    * the TCP socket was assigned, so we can assign the same port number to the Unix domain socket.
    */
   private final CountDownLatch tcpStartedLatch = new CountDownLatch(1);
+
   /**
    * List of server sockets accepting connections. It currently only contains one TCP socket and
    * optionally one Unix domain socket, but could in theory be expanded to contain multiple sockets
@@ -93,9 +96,9 @@ public class ProxyServer extends AbstractApiService {
 
   private final ExecutorService createConnectionHandlerExecutor =
       new ThreadPoolExecutor(
-          /* corePoolSize = */ 1,
+          /* corePoolSize= */ 1,
           Runtime.getRuntime().availableProcessors(),
-          /* keepAliveTime = */ 10L,
+          /* keepAliveTime= */ 10L,
           TimeUnit.SECONDS,
           new LinkedBlockingQueue<>());
   private final ThreadFactory threadFactory;
@@ -161,6 +164,7 @@ public class ProxyServer extends AbstractApiService {
   public ProxyServer(
       OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties) {
     this.options = optionsMetadata;
+    this.messageReader = new MessageReader(optionsMetadata);
     this.openTelemetry = openTelemetry;
     this.metrics =
         optionsMetadata.isEnableOpenTelemetryMetrics()
@@ -173,6 +177,10 @@ public class ProxyServer extends AbstractApiService {
         ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory(
             "ConnectionHandler", optionsMetadata.isUseVirtualThreads());
     addConnectionProperties();
+  }
+
+  public MessageReader getMessageReader() {
+    return this.messageReader;
   }
 
   private void addConnectionProperties() {
@@ -521,19 +529,25 @@ public class ProxyServer extends AbstractApiService {
     return this.metrics;
   }
 
-  /** @return the JDBC connection properties that are used by this server */
+  /**
+   * @return the JDBC connection properties that are used by this server
+   */
   public Properties getProperties() {
     return (Properties) this.properties.clone();
   }
 
-  /** @return the current number of connections. */
+  /**
+   * @return the current number of connections.
+   */
   public int getNumberOfConnections() {
     synchronized (this.handlers) {
       return this.handlers.size();
     }
   }
 
-  /** @return the local TCP port that this server is using. */
+  /**
+   * @return the local TCP port that this server is using.
+   */
   public int getLocalPort() {
     return localPort;
   }

@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import java.nio.CharBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,7 @@ public class SimpleParser {
   static class TableOrIndexName {
     /** Schema is an optional schema name prefix. */
     final String schema;
+
     /** Name is the actual object name. */
     final String name;
 
@@ -369,11 +371,12 @@ public class SimpleParser {
         }
       } while (parser.eatToken(","));
     }
-    String keyword = parser.readKeyword();
-    if (Strings.isNullOrEmpty(keyword)) {
-      keyword = new SimpleParser(sql).readKeyword();
+    CharSequence keyword = parser.readKeyword();
+    if (keyword.length() == 0) {
+      parser.setPos(0);
+      keyword = parser.readKeyword();
     }
-    return keyword.toUpperCase();
+    return keyword.toString().toUpperCase();
   }
 
   /** Returns true if the given sql string is the given command. */
@@ -629,13 +632,13 @@ public class SimpleParser {
   }
 
   @Nonnull
-  String readKeyword() {
+  CharSequence readKeyword() {
     skipWhitespaces();
     int startPos = pos;
     while (pos < sql.length() && !isValidEndOfKeyword(pos)) {
       pos++;
     }
-    return sql.substring(startPos, pos);
+    return CharBuffer.wrap(sql, startPos, pos);
   }
 
   TypeDefinition readType() {
@@ -643,8 +646,8 @@ public class SimpleParser {
     int length = 0;
     int scale = 0;
     boolean array = false;
-    String keyword;
-    while (!(keyword = readKeyword()).equalsIgnoreCase("")) {
+    CharSequence keyword;
+    while ((keyword = readKeyword()).length() != 0) {
       if (name.length() > 0) {
         name.append(' ');
       }

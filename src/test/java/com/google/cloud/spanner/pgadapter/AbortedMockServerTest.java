@@ -1008,7 +1008,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
         try (ResultSet resultSet = statement.executeQuery()) {
           while (resultSet.next()) {
             assertTrue(spannerResult.next());
-            assertEqual(/*binary=*/ true, spannerResult, resultSet);
+            assertEqual(/* binary= */ true, spannerResult, resultSet);
           }
         }
       }
@@ -1490,7 +1490,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(361, count);
+        assertEquals(362, count);
       }
     }
   }

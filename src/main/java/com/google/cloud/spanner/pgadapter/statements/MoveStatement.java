@@ -20,7 +20,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
-import com.google.common.collect.ImmutableList;
 
 /**
  * MOVE is the same as FETCH, except it just skips the results instead of actually sending the rows
@@ -45,8 +44,8 @@ public class MoveStatement extends AbstractFetchOrMoveStatement {
             parsedStatement,
             originalStatement),
         NO_PARAMS,
-        ImmutableList.of(),
-        ImmutableList.of(),
+        NO_FORMAT_CODES,
+        NO_FORMAT_CODES,
         parse(originalStatement.getSql(), "move", ParsedMoveStatement.class));
   }
 

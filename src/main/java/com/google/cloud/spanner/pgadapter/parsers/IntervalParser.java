@@ -23,7 +23,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -35,7 +34,26 @@ import org.postgresql.util.PGInterval;
 /** Translate from wire protocol to interval. */
 @InternalApi
 public class IntervalParser extends Parser<Interval> {
-  private static final BigDecimal NANOS_PER_SECOND = new BigDecimal(Interval.NANOS_PER_SECOND);
+  private static final long MONTHS_PER_YEAR = 12;
+  private static final long MINUTES_PER_HOUR = 60;
+  private static final long SECONDS_PER_MINUTE = 60;
+  private static final long SECONDS_PER_HOUR = MINUTES_PER_HOUR * SECONDS_PER_MINUTE;
+  private static final long MILLIS_PER_SECOND = 1000;
+  private static final long MICROS_PER_MILLI = 1000;
+  private static final long NANOS_PER_MICRO = 1000;
+  private static final BigInteger NANOS_PER_MICRO_BIG_INTEGER = BigInteger.valueOf(NANOS_PER_MICRO);
+  private static final long MICROS_PER_SECOND = MICROS_PER_MILLI * MILLIS_PER_SECOND;
+  private static final long MICROS_PER_MINUTE = SECONDS_PER_MINUTE * MICROS_PER_SECOND;
+  private static final long MICROS_PER_HOUR = SECONDS_PER_HOUR * MICROS_PER_SECOND;
+  private static final BigInteger NANOS_PER_MILLI =
+      BigInteger.valueOf(MICROS_PER_MILLI * NANOS_PER_MICRO);
+  private static final BigInteger NANOS_PER_SECOND =
+      BigInteger.valueOf(MICROS_PER_SECOND * NANOS_PER_MICRO);
+  private static final BigInteger NANOS_PER_MINUTE =
+      BigInteger.valueOf(MICROS_PER_MINUTE * NANOS_PER_MICRO);
+  private static final BigInteger NANOS_PER_HOUR =
+      BigInteger.valueOf(MICROS_PER_HOUR * NANOS_PER_MICRO);
+  private static final Interval ZERO = Interval.builder().build();
 
   IntervalParser(ResultSet item, int position) {
     this.item = item.getInterval(position);
@@ -92,7 +110,7 @@ public class IntervalParser extends Parser<Interval> {
             pgInterval.getHours(),
             pgInterval.getMinutes(),
             pgInterval.getWholeSeconds(),
-            Interval.NANOS_PER_MICRO * pgInterval.getMicroSeconds());
+            NANOS_PER_MICRO * pgInterval.getMicroSeconds());
     return Interval.parseFromString(isoValue);
   }
 
@@ -115,7 +133,7 @@ public class IntervalParser extends Parser<Interval> {
   }
 
   static byte[] convertToPGBinary(Interval value) {
-    long microseconds = value.getNanoseconds().divide(Interval.NANOS_PER_MICROSECOND).longValue();
+    long microseconds = value.getNanos().divide(NANOS_PER_MICRO_BIG_INTEGER).longValue();
     int days = value.getDays();
     int months = value.getMonths();
     byte[] result = new byte[16];
@@ -138,14 +156,14 @@ public class IntervalParser extends Parser<Interval> {
   }
 
   private static String toPGString(Interval value) {
-    BigInteger nanos = value.getNanoseconds();
-    BigInteger[] hours = nanos.divideAndRemainder(Interval.NANOS_PER_HOUR);
+    BigInteger nanos = value.getNanos();
+    BigInteger[] hours = nanos.divideAndRemainder(NANOS_PER_HOUR);
     nanos = hours[1];
-    BigInteger[] minutes = nanos.divideAndRemainder(Interval.NANOS_PER_MINUTE);
+    BigInteger[] minutes = nanos.divideAndRemainder(NANOS_PER_MINUTE);
     nanos = minutes[1];
-    BigInteger[] seconds = nanos.divideAndRemainder(Interval.NANOS_PER_SECOND);
+    BigInteger[] seconds = nanos.divideAndRemainder(NANOS_PER_SECOND);
     nanos = seconds[1];
-    long micros = Math.abs(nanos.longValueExact() / Interval.NANOS_PER_MICRO);
+    long micros = Math.abs(nanos.longValueExact() / NANOS_PER_MICRO);
     return String.format(
         Locale.ROOT,
         "%d mons %d days %02d:%02d:%s.%06d",

@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -39,6 +40,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
@@ -137,8 +139,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(TypeCode.INT64, TypeCode.INT64))
@@ -212,8 +213,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -278,8 +278,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
               Statement.of(sql),
               ResultSet.newBuilder()
                   .setMetadata(
-                      metadata
-                          .toBuilder()
+                      metadata.toBuilder()
                           .setUndeclaredParameters(
                               createParameterTypesMetadata(
                                       ImmutableList.of(
@@ -411,8 +410,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(StructType.getDefaultInstance())
                         .build())
                 .addRows(
@@ -502,8 +500,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     String insertUserSql =
         "INSERT INTO \"public\".\"User\" (\"id\",\"email\") VALUES ($1,$2) RETURNING \"public\".\"User\".\"id\"";
     ResultSetMetadata insertUserMetadata =
-        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING))
-            .toBuilder()
+        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING)).toBuilder()
             .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
             .build();
     mockSpanner.putStatementResult(
@@ -627,8 +624,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -772,7 +768,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: true,\n"
-            + "  col_bytea: <Buffer 74 65 73 74>,\n"
+            + "  col_bytea: Uint8Array(4) [ 116, 101, 115, 116 ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 3.14,\n"
             + "  col_int: 100,\n"
@@ -784,9 +780,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_array_bigint: [ 1n, 1n, 2n ],\n"
             + "  col_array_bool: [ true, true, false ],\n"
             + "  col_array_bytea: [\n"
-            + "    <Buffer 62 79 74 65 73 31>,\n"
-            + "    <Buffer 62 79 74 65 73 31>,\n"
-            + "    <Buffer 62 79 74 65 73 32>\n"
+            + "    Uint8Array(6) [ 98, 121, 116, 101, 115, 49 ],\n"
+            + "    Uint8Array(6) [ 98, 121, 116, 101, 115, 49 ],\n"
+            + "    Uint8Array(6) [ 98, 121, 116, 101, 115, 50 ]\n"
             + "  ],\n"
             + "  col_array_float4: [ 3.14, 3.14, -99.99 ],\n"
             + "  col_array_float8: [ 3.14, 3.14, -99.99 ],\n"
@@ -849,8 +845,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(updateSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    allTypesMetadata
-                        .toBuilder()
+                    allTypesMetadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -906,7 +901,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: false,\n"
-            + "  col_bytea: <Buffer 75 70 64 61 74 65 64>,\n"
+            + "  col_bytea: Uint8Array(7) [\n"
+            + "    117, 112, 100,\n"
+            + "     97, 116, 101,\n"
+            + "    100\n"
+            + "  ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 6.626,\n"
             + "  col_int: -100,\n"
@@ -1105,7 +1104,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: false,\n"
-            + "  col_bytea: <Buffer 75 70 64 61 74 65 64>,\n"
+            + "  col_bytea: Uint8Array(7) [\n"
+            + "    117, 112, 100,\n"
+            + "     97, 116, 101,\n"
+            + "    100\n"
+            + "  ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 6.626,\n"
             + "  col_int: -100,\n"
@@ -1178,8 +1181,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(deleteSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    allTypesMetadata
-                        .toBuilder()
+                    allTypesMetadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
                                 .getUndeclaredParameters())
@@ -1200,7 +1202,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "{\n"
             + "  col_bigint: 1n,\n"
             + "  col_bool: false,\n"
-            + "  col_bytea: <Buffer 75 70 64 61 74 65 64>,\n"
+            + "  col_bytea: Uint8Array(7) [\n"
+            + "    117, 112, 100,\n"
+            + "     97, 116, 101,\n"
+            + "    100\n"
+            + "  ],\n"
             + "  col_float4: 3.14,\n"
             + "  col_float8: 6.626,\n"
             + "  col_int: -100,\n"
@@ -1327,9 +1333,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                     .build())
             .build();
     ListValue row =
-        createAllTypesResultSet("")
-            .getRows(0)
-            .toBuilder()
+        createAllTypesResultSet("").getRows(0).toBuilder()
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -1346,8 +1350,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    selectMetadata
-                        .toBuilder()
+                    selectMetadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -1716,14 +1719,351 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testTransactionIsolationLevel() throws Exception {
-    String output = runTest("testTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
+  public void testUnsupportedTransactionIsolationLevel() throws Exception {
+    String output =
+        runTest("testUnsupportedTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
 
-    assertTrue(output, output.contains("Transaction failed:"));
     assertTrue(
         output,
         output.contains(
-            "current transaction is aborted, commands ignored until end of transaction block"));
+            "Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
+  }
+
+  @Test
+  public void testTransactionIsolationLevel() throws Exception {
+    String insertSql =
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\"";
+    ResultSetMetadata metadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+            .toBuilder()
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
+                .bind("p2")
+                .to("alice@prisma.io")
+                .bind("p3")
+                .to("Alice")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
+                        .build())
+                .build()));
+
+    String output = runTest("testTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
+
+    assertTrue(output, output.contains("Created one user using isolation level repeatable read"));
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest describeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+    // TODO: Fix this once 'set transaction isolation level' is supported.
+    assertEquals(
+        IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
+        describeRequest.getTransaction().getBegin().getIsolationLevel());
+  }
+
+  @Test
+  public void testMigrateStatus() throws Exception {
+    setupPrismaMigrateQueries();
+
+    String output = runTest("testMigrateStatus", getHost(), pgServer.getLocalPort());
+    assertTrue(output, output.contains("Running npx prisma migrate status on"));
+  }
+
+  @Test
+  public void testMigrateDeploy() throws Exception {
+    setupPrismaMigrateQueries();
+    addDdlResponseToSpannerAdmin();
+
+    String tableSql =
+        "with pg_class as (\n"
+            + "  select\n"
+            + "  '''\"' || t.table_schema || '\".\"' || t.table_name || '\"''' as oid,\n"
+            + "  table_name as relname,\n"
+            + "  case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "  0 as reltype,\n"
+            + "  0 as reloftype,\n"
+            + "  0 as relowner,\n"
+            + "  1 as relam,\n"
+            + "  0 as relfilenode,\n"
+            + "  0 as reltablespace,\n"
+            + "  0 as relpages,\n"
+            + "  0.0::float8 as reltuples,\n"
+            + "  0 as relallvisible,\n"
+            + "  0 as reltoastrelid,\n"
+            + "  false as relhasindex,\n"
+            + "  false as relisshared,\n"
+            + "  'p' as relpersistence,\n"
+            + "  CASE table_type WHEN 'BASE TABLE' THEN 'r' WHEN 'VIEW' THEN 'v' ELSE '' END as relkind,\n"
+            + "  count(*) as relnatts,\n"
+            + "  0 as relchecks,\n"
+            + "  false as relhasrules,\n"
+            + "  false as relhastriggers,\n"
+            + "  false as relhassubclass,\n"
+            + "  false as relrowsecurity,\n"
+            + "  false as relforcerowsecurity,\n"
+            + "  true as relispopulated,\n"
+            + "  'n' as relreplident,\n"
+            + "  false as relispartition,\n"
+            + "  0 as relrewrite,\n"
+            + "  0 as relfrozenxid,\n"
+            + "  0 as relminmxid,\n"
+            + "  '{}'::bigint[] as relacl,\n"
+            + "  '{}'::text[] as reloptions,\n"
+            + "  0 as relpartbound\n"
+            + "from information_schema.tables t\n"
+            + "inner join information_schema.columns using (table_catalog, table_schema, table_name)\n"
+            + "group by t.table_name, t.table_schema, t.table_type\n"
+            + "union all\n"
+            + "select\n"
+            + "    '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as oid,\n"
+            + "    i.index_name as relname,\n"
+            + "    case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "    0 as reltype,\n"
+            + "    0 as reloftype,\n"
+            + "    0 as relowner,\n"
+            + "    1 as relam,\n"
+            + "    0 as relfilenode,\n"
+            + "    0 as reltablespace,\n"
+            + "    0 as relpages,\n"
+            + "    0.0::float8 as reltuples,\n"
+            + "    0 as relallvisible,\n"
+            + "    0 as reltoastrelid,\n"
+            + "    false as relhasindex,\n"
+            + "    false as relisshared,\n"
+            + "    'p' as relpersistence,\n"
+            + "    'i' as relkind,\n"
+            + "    count(*) as relnatts,\n"
+            + "    0 as relchecks,\n"
+            + "    false as relhasrules,\n"
+            + "    false as relhastriggers,\n"
+            + "    false as relhassubclass,\n"
+            + "    false as relrowsecurity,\n"
+            + "    false as relforcerowsecurity,\n"
+            + "    true as relispopulated,\n"
+            + "    'n' as relreplident,\n"
+            + "    false as relispartition,\n"
+            + "    0 as relrewrite,\n"
+            + "    0 as relfrozenxid,\n"
+            + "    0 as relminmxid,\n"
+            + "    '{}'::bigint[] as relacl,\n"
+            + "    '{}'::text[] as reloptions,\n"
+            + "    0 as relpartbound\n"
+            + "from information_schema.indexes i\n"
+            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name, index_name)\n"
+            + "group by i.index_name, i.table_name, i.table_schema\n"
+            + "),\n"
+            + "pg_namespace as (\n"
+            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+            + "  from information_schema.schemata\n"
+            + ")\n"
+            + "\n"
+            + "                SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name\n"
+            + "                FROM pg_class AS tbl\n"
+            + "                INNER JOIN pg_namespace AS namespace ON namespace.oid = tbl.relnamespace\n"
+            + "                WHERE tbl.relkind = 'r' AND namespace.nspname = ANY ( $1 )\n"
+            + "            ";
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("table_name")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(
+                                Type.newBuilder()
+                                    .setCode(TypeCode.ARRAY)
+                                    .setArrayElementType(
+                                        Type.newBuilder().setCode(TypeCode.STRING).build())
+                                    .build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(tableSql), ResultSet.newBuilder().setMetadata(metadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(tableSql)
+                .bind("p1")
+                .toStringArray(ImmutableList.of("public"))
+                .build(),
+            ResultSet.newBuilder().setMetadata(metadata).build()));
+
+    String output = runTest("testMigrateDeploy", getHost(), pgServer.getLocalPort());
+
+    assertTrue(output, output.contains("Running npx prisma migrate deploy"));
+    assertEquals(1, mockDatabaseAdmin.getRequests().size());
+    assertEquals(UpdateDatabaseDdlRequest.class, mockDatabaseAdmin.getRequests().get(0).getClass());
+    UpdateDatabaseDdlRequest request =
+        (UpdateDatabaseDdlRequest) mockDatabaseAdmin.getRequests().get(0);
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(
+        "CREATE TABLE prisma_migrations (\n"
+            + "    id                      VARCHAR(36) PRIMARY KEY NOT NULL,\n"
+            + "    checksum                VARCHAR(64) NOT NULL,\n"
+            + "    finished_at             TIMESTAMPTZ,\n"
+            + "    migration_name          VARCHAR(255) NOT NULL,\n"
+            + "    logs                    TEXT,\n"
+            + "    rolled_back_at          TIMESTAMPTZ,\n"
+            + "    started_at              TIMESTAMPTZ NOT NULL DEFAULT now(),\n"
+            + "    applied_steps_count     INTEGER NOT NULL DEFAULT 0\n"
+            + ")",
+        request.getStatements(0));
+  }
+
+  private void setupPrismaMigrateQueries() {
+    String versionSql =
+        "with pg_namespace as (\n"
+            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+            + "  from information_schema.schemata\n"
+            + ")\n"
+            + "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = $1), '14.1', '140001'::integer as numeric_version;";
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("exists")
+                            .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("c1")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("numeric_version")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .build())
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(versionSql), ResultSet.newBuilder().setMetadata(metadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(versionSql).bind("p1").to("public").build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("14.1").build())
+                        .addValues(Value.newBuilder().setStringValue("14001").build())
+                        .build())
+                .build()));
+
+    String migrationsSql =
+        "SELECT \"id\", \"checksum\", \"finished_at\", \"migration_name\", \"logs\", \"rolled_back_at\", \"started_at\", \"applied_steps_count\" FROM prisma_migrations ORDER BY \"started_at\" ASC";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(migrationsSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("id")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("checksum")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("finished_at")
+                                        .setType(
+                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("migration_name")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("logs")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("rolled_back_at")
+                                        .setType(
+                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("started_at")
+                                        .setType(
+                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("applied_steps_count")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("foo").build())
+                        .addValues(
+                            Value.newBuilder().setStringValue("2025-03-22T10:00:00Z").build())
+                        .addValues(Value.newBuilder().setStringValue("v1").build())
+                        .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                        .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                        .addValues(
+                            Value.newBuilder().setStringValue("2025-03-22T10:00:00Z").build())
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .build())
+                .build()));
   }
 
   static String runTest(String testName, String host, int port)

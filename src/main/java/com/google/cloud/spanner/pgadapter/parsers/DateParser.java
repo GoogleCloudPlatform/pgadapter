@@ -17,12 +17,15 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.api.core.InternalApi;
 import com.google.cloud.Date;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import java.nio.charset.StandardCharsets;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
@@ -118,16 +121,45 @@ public class DateParser extends Parser<Date> {
     return IntegerParser.binaryParse(daysAsInt);
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+  public static byte[] convertToPG(
+      SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    writeToPG(sessionState, outputStream, resultSet, position, format);
+    return null;
+  }
+
+  static void writeToPG(
+      SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        return toString(resultSet.getDate(position)).getBytes(StandardCharsets.UTF_8);
+        StringParser.writeToPG(sessionState, outputStream, getDateAsString(resultSet, position));
+        break;
       case POSTGRESQL_BINARY:
-        return convertToPG(resultSet.getDate(position));
+        byte[] value = convertToPG(resultSet.getDate(position));
+        outputStream.writeInt(value.length);
+        outputStream.write(value);
+        break;
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
+  }
+
+  static String getDateAsString(ResultSet resultSet, int column) {
+    if (resultSet instanceof ProtobufResultSet
+        && ((ProtobufResultSet) resultSet).canGetProtobufValue(column)) {
+      return ((ProtobufResultSet) resultSet).getProtobufValue(column).getStringValue();
+    }
+    return toString(resultSet.getDate(column));
   }
 
   /**

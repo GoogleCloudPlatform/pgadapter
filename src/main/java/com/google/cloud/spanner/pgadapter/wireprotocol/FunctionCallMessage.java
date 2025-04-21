@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.text.MessageFormat;
-import java.util.List;
 
 /**
  * Normally used to send a function call the back-end. Spanner does not currently support this, so
@@ -31,14 +30,14 @@ public class FunctionCallMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'F';
 
   private final int functionID;
-  private final List<Short> argumentFormatCodes;
+  private final short[] argumentFormatCodes;
   private final byte[][] arguments;
   private final Short resultFormatCode;
 
   public FunctionCallMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.functionID = this.inputStream.readInt();
-    this.argumentFormatCodes = getFormatCodes(this.inputStream);
+    this.argumentFormatCodes = MessageReader.getFormatCodes(this.inputStream);
     this.arguments = getParameters(this.inputStream);
     this.resultFormatCode = this.inputStream.readShort();
   }

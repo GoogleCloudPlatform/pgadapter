@@ -51,6 +51,13 @@ import org.hibernate.id.enhanced.SequenceStyleGenerator;
 @Entity
 public class TicketSale {
   @Id
+  // This entity uses a bit-reversed sequence to generate primary key values. Note that it uses an
+  // explicit sequence and not for example a serial, bigserial or identity column. It is recommended
+  // not to use serial or identity for primary key generation with Hibernate, as it reduces the
+  // options that Hibernate has to batch and optimize insert statements. When using a sequence,
+  // Hibernate can pre-fetch a batch of primary key values and include these in the insert
+  // statement. This again allows Hibernate to send those insert statements as one batch to the
+  // database and reduce the overall number of roundtrips.
   @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ticketSaleId")
   @GenericGenerator(
       // This is the name of the generator, not the name of the sequence. This name must correspond

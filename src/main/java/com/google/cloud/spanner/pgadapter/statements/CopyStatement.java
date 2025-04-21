@@ -129,8 +129,8 @@ public class CopyStatement extends IntermediatePortalStatement {
             parsedStatement,
             originalStatement),
         NO_PARAMS,
-        ImmutableList.of(),
-        ImmutableList.of());
+        NO_FORMAT_CODES,
+        NO_FORMAT_CODES);
     this.parsedCopyStatement = parsedCopyStatement;
   }
 
@@ -162,7 +162,9 @@ public class CopyStatement extends IntermediatePortalStatement {
     return StatementType.UPDATE;
   }
 
-  /** @return Mapping of table column names to column type. */
+  /**
+   * @return Mapping of table column names to column type.
+   */
   public Map<String, Type> getTableColumns() {
     return this.tableColumns;
   }
@@ -201,37 +203,51 @@ public class CopyStatement extends IntermediatePortalStatement {
     return parsedCopyStatement.table;
   }
 
-  /** @return List of column names specified in COPY statement, if provided. */
+  /**
+   * @return List of column names specified in COPY statement, if provided.
+   */
   public List<TableOrIndexName> getCopyColumnNames() {
     return parsedCopyStatement.columns;
   }
 
-  /** @return Format type specified in COPY statement, if provided. */
+  /**
+   * @return Format type specified in COPY statement, if provided.
+   */
   public String getFormatType() {
     return parsedCopyStatement.format.toString();
   }
 
-  /** @return True if copy data contains a header, false otherwise. */
+  /**
+   * @return True if copy data contains a header, false otherwise.
+   */
   public boolean hasHeader() {
     return parsedCopyStatement.header;
   }
 
-  /** @return Null string specified in COPY statement, if provided. */
+  /**
+   * @return Null string specified in COPY statement, if provided.
+   */
   public String getNullString() {
     return this.format.getNullString();
   }
 
-  /** @return Delimiter character specified in COPY statement, if provided. */
+  /**
+   * @return Delimiter character specified in COPY statement, if provided.
+   */
   public char getDelimiterChar() {
     return this.format.getDelimiter();
   }
 
-  /** @return Escape character specified in COPY statement, if provided. */
+  /**
+   * @return Escape character specified in COPY statement, if provided.
+   */
   public char getEscapeChar() {
     return this.format.getEscapeCharacter();
   }
 
-  /** @return Quote character specified in COPY statement, if provided. */
+  /**
+   * @return Quote character specified in COPY statement, if provided.
+   */
   public char getQuoteChar() {
     return this.format.getQuoteCharacter();
   }
@@ -240,7 +256,9 @@ public class CopyStatement extends IntermediatePortalStatement {
     return this.mutationWriter;
   }
 
-  /** @return 0 for text/csv formatting and 1 for binary */
+  /**
+   * @return 0 for text/csv formatting and 1 for binary
+   */
   public byte getFormatCode() {
     return (parsedCopyStatement.format == Format.BINARY) ? (byte) 1 : (byte) 0;
   }
@@ -404,10 +422,7 @@ public class CopyStatement extends IntermediatePortalStatement {
 
   @Override
   public IntermediatePortalStatement createPortal(
-      String name,
-      byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) {
+      String name, byte[][] parameters, short[] parameterFormatCodes, short[] resultFormatCodes) {
     // COPY does not support binding any parameters, so we just return the same statement.
     return this;
   }
@@ -615,7 +630,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       throw PGExceptionFactory.newPGException(
           "missing 'FROM' or 'TO' keyword: " + sql, SQLState.SyntaxError);
     }
-    builder.direction = Direction.valueOf(parser.readKeyword().toUpperCase());
+    builder.direction = Direction.valueOf(parser.readKeyword().toString().toUpperCase());
     if (builder.direction == Direction.FROM) {
       // Silently ignore typo 'copy from stdout'.
       // See
@@ -651,14 +666,14 @@ public class CopyStatement extends IntermediatePortalStatement {
           if (optionParser.peekKeyword("text")
               || optionParser.peekKeyword("csv")
               || optionParser.peekKeyword("binary")) {
-            builder.format = Format.valueOf(optionParser.readKeyword().toUpperCase());
+            builder.format = Format.valueOf(optionParser.readKeyword().toString().toUpperCase());
           } else {
             throw PGExceptionFactory.newPGException("Invalid format option: " + optionExpression);
           }
         } else if (optionParser.eatKeyword("freeze")) {
           if (optionParser.hasMoreTokens()) {
-            String value = optionParser.readKeyword();
-            builder.freeze = BooleanParser.toBoolean(value);
+            CharSequence value = optionParser.readKeyword();
+            builder.freeze = BooleanParser.toBoolean(value.toString());
           } else {
             builder.freeze = true;
           }
@@ -671,8 +686,8 @@ public class CopyStatement extends IntermediatePortalStatement {
             builder.headerMatch = true;
             builder.header = true;
           } else if (optionParser.hasMoreTokens()) {
-            String value = optionParser.readKeyword();
-            builder.header = BooleanParser.toBoolean(value);
+            CharSequence value = optionParser.readKeyword();
+            builder.header = BooleanParser.toBoolean(value.toString());
           } else {
             builder.header = true;
           }

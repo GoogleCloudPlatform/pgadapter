@@ -95,7 +95,7 @@ public class StartupMessage extends BootstrapMessage {
       connection
           .getExtendedQueryProtocolHandler()
           .getBackendConnection()
-          .initSessionSetting(parameter.getKey(), parameter.getValue(), /* overwrite = */ false);
+          .initSessionSetting(parameter.getKey(), parameter.getValue(), /* overwrite= */ false);
     }
     if (connection.getWellKnownClient() != WellKnownClient.UNSPECIFIED) {
       connection

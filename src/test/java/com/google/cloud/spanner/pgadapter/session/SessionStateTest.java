@@ -162,7 +162,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(360, allSettings.size());
+    assertEquals(361, allSettings.size());
   }
 
   @Test
@@ -200,7 +200,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(362, allSettings.size());
+    assertEquals(363, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -433,6 +433,7 @@ public class SessionStateTest {
         + "'{\"name\":\"spanner.ddl_transaction_mode\",\"setting\":\"Batch\",\"unit\":null,\"category\":\"PGAdapter Options\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"enum\",\"min_val\":null,\"max_val\":null,\"enum_vals\":[\"Single\", \"Batch\", \"AutocommitImplicitTransaction\", \"AutocommitExplicitTransaction\"],\"boot_val\":\"Batch\",\"reset_val\":\"Batch\",\"source\":\"default\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
         + "'{\"name\":\"spanner.emulate_pg_class_tables\",\"setting\":\"on\",\"unit\":null,\"category\":\"PGAdapter Options Emulate pg_class and related tables using common table expressions and textual OIDs\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"bool\",\"min_val\":null,\"max_val\":null,\"enum_vals\":null,\"boot_val\":\"off\",\"reset_val\":\"off\",\"source\":\"default\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
         + "'{\"name\":\"spanner.force_autocommit\",\"setting\":\"off\",\"unit\":null,\"category\":\"PGAdapter Options Execute all statements in autocommit mode\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"bool\",\"min_val\":null,\"max_val\":null,\"enum_vals\":null,\"boot_val\":\"off\",\"reset_val\":\"off\",\"source\":\"default\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
+        + "'{\"name\":\"spanner.remove_escape_clause\",\"setting\":\"DEFAULT\",\"unit\":null,\"category\":\"PGAdapter Options\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"enum\",\"min_val\":null,\"max_val\":null,\"enum_vals\":[\"NONE\", \"DEFAULT\", \"ALL\"],\"boot_val\":\"DEFAULT\",\"reset_val\":\"DEFAULT\",\"source\":\"default\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
         + "'{\"name\":\"spanner.replace_pg_catalog_tables\",\"setting\":\"false\",\"unit\":null,\"category\":\"PGAdapter Options\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"bool\",\"min_val\":null,\"max_val\":null,\"enum_vals\":null,\"boot_val\":\"on\",\"reset_val\":\"on\",\"source\":\"default\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
         + "'{\"name\":\"spanner.well_known_client\",\"setting\":\"UNSPECIFIED\",\"unit\":null,\"category\":\"PGAdapter Options\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"backend\",\"vartype\":\"string\",\"min_val\":null,\"max_val\":null,\"enum_vals\":null,\"boot_val\":\"UNSPECIFIED\",\"reset_val\":\"UNSPECIFIED\",\"source\":\"default\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
         + "'{\"name\":\"transaction_isolation\",\"setting\":\"serializable\",\"unit\":null,\"category\":\"Client Connection Defaults / Statement Behavior\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"enum\",\"min_val\":null,\"max_val\":null,\"enum_vals\":[\"serializable\", \"repeatable read\", \"read committed\", \"read uncommitted\"],\"boot_val\":\"serializable\",\"reset_val\":\"serializable\",\"source\":\"override\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
@@ -680,7 +681,7 @@ public class SessionStateTest {
             null,
             null,
             null,
-            /* resetVal = */ "off",
+            /* resetVal= */ "off",
             null,
             null,
             false);
@@ -710,7 +711,7 @@ public class SessionStateTest {
             null,
             null,
             null,
-            /* bootVal = */ "off",
+            /* bootVal= */ "off",
             null,
             null,
             null,
@@ -742,7 +743,7 @@ public class SessionStateTest {
             null,
             null,
             null,
-            /* resetVal = */ "off",
+            /* resetVal= */ "off",
             null,
             null,
             false);
@@ -772,7 +773,7 @@ public class SessionStateTest {
             null,
             null,
             null,
-            /* bootVal = */ "off",
+            /* bootVal= */ "off",
             null,
             null,
             null,
@@ -863,7 +864,7 @@ public class SessionStateTest {
             null,
             null,
             null,
-            /* resetVal = */ "Single",
+            /* resetVal= */ "Single",
             null,
             null,
             false);
@@ -892,7 +893,7 @@ public class SessionStateTest {
             null,
             null,
             null,
-            /* bootVal = */ "Single",
+            /* bootVal= */ "Single",
             null,
             null,
             null,

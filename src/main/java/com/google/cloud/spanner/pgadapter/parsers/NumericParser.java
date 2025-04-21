@@ -57,6 +57,7 @@ public class NumericParser extends Parser<String> {
       }
     }
   }
+
   /**
    * Converts the binary data to a string representation of the numeric value. That is either a
    * valid numeric string or 'NaN'.

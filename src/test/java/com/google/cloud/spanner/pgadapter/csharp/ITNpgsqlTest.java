@@ -160,7 +160,9 @@ public class ITNpgsqlTest implements IntegrationTest {
 
   static void assertEqualsIgnoreControlCharacters(String expected, String actual) {
     assertNotNull(actual);
-    assertTrue("Expected: %s\n" + "     Got: %s\n", actual.endsWith(expected));
+    assertTrue(
+        String.format("Expected: %s\n" + "     Got: %s\n", expected, actual),
+        actual.endsWith(expected));
   }
 
   @Test
@@ -465,7 +467,7 @@ public class ITNpgsqlTest implements IntegrationTest {
   @Test
   public void testReadWriteTransaction() throws IOException, InterruptedException {
     String result = execute("TestReadWriteTransaction", createConnectionString());
-    assertEqualsIgnoreControlCharacters("Row: 1\n" + "Success\n", result);
+    assertEqualsIgnoreControlCharacters("Row: 1\n" + "Row: 1\n" + "Success\n", result);
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
         client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {

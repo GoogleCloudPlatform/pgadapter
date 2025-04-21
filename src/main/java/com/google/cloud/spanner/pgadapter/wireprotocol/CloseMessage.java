@@ -51,7 +51,7 @@ public class CloseMessage extends ControlMessage {
     this.statement = statement;
   }
 
-  /** Close the statement server-side and clean up by deleting their metdata locally. */
+  /** Close the statement server-side and clean up by deleting their metadata locally. */
   @Override
   protected void sendPayload() throws Exception {
     if (this.statement != null) {
@@ -62,7 +62,8 @@ public class CloseMessage extends ControlMessage {
         this.connection.closeStatement(this.name);
       }
     }
-    new CloseCompleteResponse(this.outputStream).send();
+    CloseCompleteResponse.send(this.outputStream);
+    this.outputStream.flush();
   }
 
   @Override

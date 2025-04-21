@@ -72,6 +72,7 @@ import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.Session;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
@@ -1722,8 +1723,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String jdbcSql = "select col_date from all_types where col_date=?";
     String pgSql = "select col_date from all_types where col_date=$1";
     ResultSetMetadata metadata =
-        ALL_TYPES_METADATA
-            .toBuilder()
+        ALL_TYPES_METADATA.toBuilder()
             .setUndeclaredParameters(
                 StructType.newBuilder()
                     .addFields(
@@ -1825,8 +1825,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String jdbcSql = "select col_date from all_types where col_date=?";
     String pgSql = "select col_date from all_types where col_date=$1";
     ResultSetMetadata metadata =
-        ALL_TYPES_METADATA
-            .toBuilder()
+        ALL_TYPES_METADATA.toBuilder()
             .setUndeclaredParameters(
                 StructType.newBuilder()
                     .addFields(
@@ -3339,8 +3338,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             Statement.of(pgSql),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA
-                        .toBuilder()
+                    ALL_TYPES_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -3703,7 +3701,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
         // The ExecuteSql request should only be sent once to Cloud Spanner by PGAdapter.
         // The normal Spanner client will also send it once to Spanner.
-        assertEquals(binary ? 11 : 8, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(binary ? 3 : 2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
         ExecuteSqlRequest executeRequest =
             mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(binary ? 2 : 1);
         assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
@@ -4520,7 +4518,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(361, count);
+        assertEquals(362, count);
       }
     }
   }
@@ -5573,6 +5571,43 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testRemoveDefaultEscapeClause() throws SQLException {
+    String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(expectedSql), SELECT1_RESULTSET));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '\\' AND city LIKE 'NY%' ESCAPE '\\'")) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testRemoveAllEscapeClauses() throws SQLException {
+    String expectedSql = "SELECT * FROM users WHERE name LIKE 'test%' AND city LIKE 'NY%'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(expectedSql), SELECT1_RESULTSET));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.remove_escape_clause=all");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "SELECT * FROM users WHERE name LIKE 'test%' ESCAPE '%' AND city LIKE 'NY%' ESCAPE 'Y'")) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testEmulatePgClass() throws SQLException {
     String withEmulation = "with " + EMULATED_PG_CLASS_PREFIX + "\nselect 1 from pg_class";
     mockSpanner.putStatementResult(
@@ -6068,6 +6103,120 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       mockSpanner.unfreeze();
       executor.shutdown();
     }
+  }
+
+  @Test
+  public void testDefaultIsolationLevel() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertEquals(UPDATE_COUNT, statement.executeUpdate(UPDATE_STATEMENT.getSql()));
+        connection.commit();
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+        assertTrue(request.hasTransaction());
+        assertTrue(request.getTransaction().hasBegin());
+        assertEquals(
+            IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
+            request.getTransaction().getBegin().getIsolationLevel());
+      }
+    }
+  }
+
+  @Test
+  public void testIsolationLevel() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      for (int isolation :
+          new int[] {Connection.TRANSACTION_SERIALIZABLE, Connection.TRANSACTION_REPEATABLE_READ}) {
+        connection.setTransactionIsolation(isolation);
+        try (java.sql.Statement statement = connection.createStatement()) {
+          assertEquals(UPDATE_COUNT, statement.executeUpdate(UPDATE_STATEMENT.getSql()));
+          connection.commit();
+
+          assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+          ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+          assertTrue(request.hasTransaction());
+          assertTrue(request.getTransaction().hasBegin());
+          assertEquals(
+              translationIsolationLevel(isolation),
+              request.getTransaction().getBegin().getIsolationLevel());
+
+          mockSpanner.clearRequests();
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testIsolationLevelAutoCommit() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (int isolation :
+          new int[] {Connection.TRANSACTION_SERIALIZABLE, Connection.TRANSACTION_REPEATABLE_READ}) {
+        connection.setTransactionIsolation(isolation);
+        try (java.sql.Statement statement = connection.createStatement()) {
+          assertEquals(UPDATE_COUNT, statement.executeUpdate(UPDATE_STATEMENT.getSql()));
+
+          assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+          ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+          assertTrue(request.hasTransaction());
+          assertTrue(request.getTransaction().hasBegin());
+          assertEquals(
+              translationIsolationLevel(isolation),
+              request.getTransaction().getBegin().getIsolationLevel());
+
+          mockSpanner.clearRequests();
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testIsolationLevelForOneTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      for (int isolation :
+          new int[] {Connection.TRANSACTION_SERIALIZABLE, Connection.TRANSACTION_REPEATABLE_READ}) {
+        try (java.sql.Statement statement = connection.createStatement()) {
+          statement.execute("set transaction isolation level " + getIsolationLevelName(isolation));
+          assertEquals(UPDATE_COUNT, statement.executeUpdate(UPDATE_STATEMENT.getSql()));
+          connection.commit();
+
+          assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+          ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+          assertTrue(request.hasTransaction());
+          assertTrue(request.getTransaction().hasBegin());
+          // TODO: Change this when https://github.com/googleapis/java-spanner/pull/3718 has been
+          // released and merged into PGAdapter.
+          assertEquals(
+              IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
+              request.getTransaction().getBegin().getIsolationLevel());
+
+          mockSpanner.clearRequests();
+        }
+      }
+    }
+  }
+
+  private static IsolationLevel translationIsolationLevel(int jdbcLevel) {
+    switch (jdbcLevel) {
+      case Connection.TRANSACTION_SERIALIZABLE:
+        return IsolationLevel.SERIALIZABLE;
+      case Connection.TRANSACTION_REPEATABLE_READ:
+        return IsolationLevel.REPEATABLE_READ;
+    }
+    throw new IllegalArgumentException();
+  }
+
+  private static String getIsolationLevelName(int jdbcLevel) {
+    switch (jdbcLevel) {
+      case Connection.TRANSACTION_SERIALIZABLE:
+        return "serializable";
+      case Connection.TRANSACTION_REPEATABLE_READ:
+        return "repeatable read";
+    }
+    throw new IllegalArgumentException();
   }
 
   private void verifySelect1(java.sql.Statement statement) throws SQLException {

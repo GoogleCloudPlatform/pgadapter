@@ -37,9 +37,9 @@ export async function createDataModel(sequelize: Sequelize) {
   // Create the data model.
   await sequelize.query(
       `
-            create sequence if not exists singers_seq bit_reversed_positive;
+            alter database db set spanner.default_sequence_kind='bit_reversed_positive';
             create table "Singers" (
-              id          bigint not null primary key default nextval('singers_seq'),
+              id          serial primary key,
               "firstName" varchar,
               "lastName"  varchar,
               "fullName"  varchar generated always as (
@@ -52,9 +52,8 @@ export async function createDataModel(sequelize: Sequelize) {
               "updatedAt" timestamptz
             );
             
-            create sequence if not exists albums_seq bit_reversed_positive;
             create table "Albums" (
-              id                bigint not null primary key default nextval('albums_seq'),
+              id                serial primary key,
               title             varchar,
               "marketingBudget" numeric,
               "SingerId"        bigint,
@@ -73,18 +72,16 @@ export async function createDataModel(sequelize: Sequelize) {
               primary key (id, "trackNumber")
             ) interleave in parent "Albums" on delete cascade;
 
-            create sequence if not exists venues_seq bit_reversed_positive;
             create table if not exists "Venues" (
-              id          bigint not null primary key default nextval('venues_seq'),
+              id          serial primary key,
               name        varchar not null,
               description varchar not null,
               "createdAt" timestamptz default current_timestamp,
               "updatedAt" timestamptz
             );
 
-            create sequence if not exists concerts_seq bit_reversed_positive;
             create table if not exists "Concerts" (
-              id          bigint not null primary key default nextval('concerts_seq'),
+              id          serial primary key,
               "VenueId"   bigint not null,
               "SingerId"  bigint not null,
               name        varchar not null,
@@ -97,9 +94,8 @@ export async function createDataModel(sequelize: Sequelize) {
               constraint chk_end_time_after_start_time check ("endTime" > "startTime")
             );
 
-            create sequence if not exists ticket_sales_seq bit_reversed_positive;
             create table if not exists "TicketSales" (
-              id             bigint not null primary key default nextval('ticket_sales_seq'),
+              id             serial primary key,
               "ConcertId"    bigint not null,
               "customerName" varchar not null,
               price          decimal not null,

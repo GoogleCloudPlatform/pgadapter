@@ -23,7 +23,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -33,14 +32,16 @@ public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
 
-  protected int length;
-  protected DataInputStream inputStream;
-  protected DataOutputStream outputStream;
-  protected ConnectionHandler connection;
+  protected final int length;
+  protected final MessageReader messageReader;
+  protected final DataInputStream inputStream;
+  protected final DataOutputStream outputStream;
+  protected final ConnectionHandler connection;
 
   public WireMessage(ConnectionHandler connection, int length) {
     Preconditions.checkArgument(length >= 4);
     this.connection = connection;
+    this.messageReader = connection.getServer().getMessageReader();
     this.inputStream = connection.getConnectionMetadata().getInputStream();
     this.outputStream = connection.getConnectionMetadata().getOutputStream();
     this.length = length;
@@ -149,30 +150,50 @@ public abstract class WireMessage {
   }
 
   /**
-   * Reads a null-terminated string from a {@link DataInputStream}. Note that though existing
-   * solutions for this exist, they are either not keyed exactly for our use case, or would lead to
-   * a more combersome addition to this codebase. Also note the 128 byte length is chosen from
-   * profiling and determining that it exceeds the 90th percentile size for inbound messages.
+   * The max number of characters to read when scanning for a null-terminator. Null-terminated
+   * strings are used in the PG wire-protocol for names of prepared statements and portals, but also
+   * for the SQL string of a statement. We therefore need to read potentially very long strings.
+   */
+  private static final int MARK_READ_LIMIT = 100_000_000;
+
+  /**
+   * Reads a null-terminated string from a {@link DataInputStream}.
    *
    * @return the string.
    * @throws IOException if an error occurs while reading from the stream, or if no null-terminator
    *     is found before the end of the stream.
    */
   public String readString() throws IOException {
-    byte[] buffer = new byte[128];
-    int index = 0;
-    while (true) {
-      byte b = this.inputStream.readByte();
-      if (b == 0) {
-        break;
+    this.inputStream.mark(MARK_READ_LIMIT);
+    try {
+      int index = 0;
+      while (index < MARK_READ_LIMIT) {
+        byte b = this.inputStream.readByte();
+        if (b == 0) {
+          break;
+        }
+        index++;
+        if (index == MARK_READ_LIMIT) {
+          throw new IOException("No null terminator found");
+        }
       }
-      buffer[index] = b;
-      index++;
-      if (index == buffer.length) {
-        buffer = Arrays.copyOf(buffer, buffer.length * 2);
+      if (index == 0) {
+        // Empty string, we don't have to ready anything.
+        return "";
       }
+
+      // Reset the stream to the mark and read the string.
+      this.inputStream.reset();
+      byte[] result = new byte[index];
+      this.inputStream.readFully(result);
+      // Skip the null-terminator.
+      //noinspection StatementWithEmptyBody
+      while (this.inputStream.skip(1) < 1) {}
+      return new String(result, StandardCharsets.UTF_8);
+    } finally {
+      // Drop the mark.
+      this.inputStream.mark(0);
     }
-    return new String(buffer, 0, index, StandardCharsets.UTF_8);
   }
 
   /**
@@ -191,6 +212,6 @@ public abstract class WireMessage {
    * setting for {@link ConnectionHandler}.
    */
   public void nextHandler() throws Exception {
-    this.connection.setMessageState(ControlMessage.create(this.connection));
+    this.connection.setMessageState(this.messageReader.create(this.connection));
   }
 }

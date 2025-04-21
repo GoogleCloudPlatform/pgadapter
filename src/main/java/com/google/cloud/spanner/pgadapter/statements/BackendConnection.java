@@ -57,6 +57,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.session.RemoveEscapeClauseEnum;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -365,10 +366,16 @@ public class BackendConnection {
           if (sessionState.isReplaceForUpdateClause()
               && !spannerConnection.isDelayTransactionStartUntilFirstWrite()) {
             updatedStatement =
-                replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ true);
+                replaceForUpdate(updatedStatement, sqlLowerCase, /* replaceWithHint= */ true);
           } else {
             updatedStatement =
-                replaceForUpdate(updatedStatement, sqlLowerCase, /*replaceWithHint=*/ false);
+                replaceForUpdate(updatedStatement, sqlLowerCase, /* replaceWithHint= */ false);
+          }
+          RemoveEscapeClauseEnum removeEscapeClauseEnum = sessionState.getRemoveEscapeClause();
+          if (removeEscapeClauseEnum != RemoveEscapeClauseEnum.NONE) {
+            updatedStatement =
+                EscapeClauseParser.removeEscapeClauses(
+                    updatedStatement, sqlLowerCase, removeEscapeClauseEnum);
           }
           updatedStatement = bindStatement(updatedStatement, sqlLowerCase);
           result.set(analyzeOrExecute(updatedStatement));
@@ -1323,7 +1330,7 @@ public class BackendConnection {
                   "DDL statements are only allowed outside explicit transactions.",
                   SQLState.InvalidTransactionState);
             }
-            // Fall-through to commit the transaction if necessary.
+          // Fall-through to commit the transaction if necessary.
           case AutocommitExplicitTransaction:
             // DDL statements are allowed even in explicit transactions. Commit any transaction that
             // might be active.
@@ -1364,7 +1371,7 @@ public class BackendConnection {
                 "DDL statements are only allowed outside explicit transactions.",
                 SQLState.InvalidTransactionState);
           }
-          // Fallthrough to commit the transaction if necessary.
+        // Fallthrough to commit the transaction if necessary.
         case AutocommitExplicitTransaction:
           // Commit any transaction that might be active and allow executing the statement.
           // Switch the execution state to implicit transaction.

@@ -1174,7 +1174,7 @@ public class ITJdbcTest implements IntegrationTest {
 
       // Verify that we can get all pg_settings and that the number of setting is equal to the
       // expected value.
-      int numExpectedSettings = 30;
+      int numExpectedSettings = 31;
       int rowCount = 0;
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("select * from pg_settings order by name")) {

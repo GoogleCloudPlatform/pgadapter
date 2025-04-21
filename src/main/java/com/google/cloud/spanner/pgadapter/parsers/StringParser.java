@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
@@ -32,14 +33,14 @@ public class StringParser extends Parser<String> {
   private static final byte[] HEADER = new byte[0];
 
   StringParser(ResultSet item, int position) {
-    this.item = item.getString(position);
+    this.item = getString(item, position);
   }
 
   StringParser(Object item) {
     this.item = (String) item;
   }
 
-  StringParser(byte[] item, FormatCode formatCode) {
+  StringParser(byte[] item, FormatCode ignore) {
     if (item != null) {
       this.item = toString(item);
     }
@@ -60,12 +61,24 @@ public class StringParser extends Parser<String> {
     return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
   }
 
+  /** Get the string from the result as efficiently as possible. */
+  static String getString(ResultSet resultSet, int column) {
+    // If the result set is a ProtobufResultSet and the protobuf value is still present, then get
+    // the string directly from that.
+    if (resultSet instanceof ProtobufResultSet
+        && ((ProtobufResultSet) resultSet).canGetProtobufValue(column)) {
+      return ((ProtobufResultSet) resultSet).getProtobufValue(column).getStringValue();
+    } else {
+      return resultSet.getString(column);
+    }
+  }
+
   public static byte[] convertToPG(
       SessionState sessionState,
       DataOutputStream dataOutputStream,
       ResultSet resultSet,
       int position) {
-    writeToPG(sessionState, dataOutputStream, resultSet.getString(position));
+    writeToPG(sessionState, dataOutputStream, getString(resultSet, position));
     return null;
   }
 
@@ -77,13 +90,25 @@ public class StringParser extends Parser<String> {
   static void writeToPG(
       SessionState sessionState, DataOutputStream dataOutputStream, String value, byte[] header) {
     int bufferSize = sessionState.getStringConversionBufferSize();
-    int length = value.length();
+    // Skip getting the length if we don't need it.
+    int length = bufferSize <= 0 ? 0 : value.length();
     try {
       if (bufferSize <= 0 || length < bufferSize) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        dataOutputStream.writeInt(bytes.length + header.length);
-        dataOutputStream.write(header);
-        dataOutputStream.write(bytes);
+        // Just use the writeUTF method of DataOutputStream if there is no header that needs to be
+        // written.
+        if (header.length == 0) {
+          // PG expects the length be 4 bytes.
+          // writeUTF writes the length as 2 bytes.
+          // So in order to get the correct length written to the stream, we first write 2 bytes
+          // containing all zeros.
+          dataOutputStream.writeShort(0);
+          dataOutputStream.writeUTF(value);
+        } else {
+          byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+          dataOutputStream.writeInt(bytes.length + header.length);
+          dataOutputStream.write(header);
+          dataOutputStream.write(bytes);
+        }
       } else {
         try (OutputStreamWriter writer =
             new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
@@ -99,12 +124,6 @@ public class StringParser extends Parser<String> {
     } catch (IOException ioException) {
       throw SpannerExceptionFactory.asSpannerException(ioException);
     }
-  }
-
-  public static byte[] binaryParse(ResultSet resultSet, int position) {
-    return resultSet.isNull(position)
-        ? null
-        : resultSet.getString(position).getBytes(StandardCharsets.UTF_8);
   }
 
   @Override

@@ -52,6 +52,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
@@ -197,8 +198,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -463,8 +463,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA
-                        .toBuilder()
+                    ALL_TYPES_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -513,8 +512,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA
-                        .toBuilder()
+                    ALL_TYPES_METADATA.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -689,8 +687,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             StructType.newBuilder()
                                 .addFields(
@@ -1326,6 +1323,9 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
 
     assertTrue(describeRequest.getTransaction().hasBegin());
     assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(
+        IsolationLevel.SERIALIZABLE,
+        describeRequest.getTransaction().getBegin().getIsolationLevel());
     assertTrue(executeRequest.getTransaction().hasId());
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -1337,7 +1337,20 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
 
-    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest describeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(
+        IsolationLevel.REPEATABLE_READ,
+        describeRequest.getTransaction().getBegin().getIsolationLevel());
+    assertTrue(executeRequest.getTransaction().hasId());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test

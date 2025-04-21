@@ -123,9 +123,7 @@ public class KnexMockServerTest extends AbstractMockServerTest {
     ResultSet metadataResultSet =
         ResultSet.newBuilder()
             .setMetadata(
-                resultSet
-                    .getMetadata()
-                    .toBuilder()
+                resultSet.getMetadata().toBuilder()
                     .setUndeclaredParameters(
                         createParameterTypesMetadata(
                                 ImmutableList.of(TypeCode.INT64, TypeCode.INT64))

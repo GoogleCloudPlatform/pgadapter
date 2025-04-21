@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_FORMAT_CODES;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_PARAMS;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.NO_PARAMETER_TYPES;
 import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
@@ -56,7 +57,7 @@ import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.MessageReader;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
@@ -69,7 +70,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -126,8 +126,8 @@ public class StatementTest {
             new IntermediatePreparedStatement(
                 connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
             NO_PARAMS,
-            ImmutableList.of(),
-            ImmutableList.of());
+            NO_FORMAT_CODES,
+            NO_FORMAT_CODES);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("SELECT", intermediateStatement.getCommand());
@@ -155,8 +155,8 @@ public class StatementTest {
             new IntermediatePreparedStatement(
                 connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
             NO_PARAMS,
-            ImmutableList.of(),
-            ImmutableList.of());
+            NO_FORMAT_CODES,
+            NO_FORMAT_CODES);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
@@ -190,8 +190,8 @@ public class StatementTest {
             new IntermediatePreparedStatement(
                 connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
             NO_PARAMS,
-            ImmutableList.of(),
-            ImmutableList.of());
+            NO_FORMAT_CODES,
+            NO_FORMAT_CODES);
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
@@ -237,8 +237,8 @@ public class StatementTest {
             new IntermediatePreparedStatement(
                 connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
             NO_PARAMS,
-            ImmutableList.of(),
-            ImmutableList.of());
+            NO_FORMAT_CODES,
+            NO_FORMAT_CODES);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("CREATE", intermediateStatement.getCommand());
@@ -285,8 +285,8 @@ public class StatementTest {
             new IntermediatePreparedStatement(
                 connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
             NO_PARAMS,
-            ImmutableList.of(),
-            ImmutableList.of());
+            NO_FORMAT_CODES,
+            NO_FORMAT_CODES);
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
@@ -358,7 +358,7 @@ public class StatementTest {
     byte[][] parameters = {"userName".getBytes(), "20".getBytes(), "30".getBytes()};
     IntermediatePortalStatement intermediatePortalStatement =
         intermediateStatement.createPortal(
-            "", parameters, Arrays.asList((short) 0, (short) 0, (short) 0), new ArrayList<>());
+            "", parameters, new short[] {(short) 0, (short) 0, (short) 0}, NO_FORMAT_CODES);
     intermediatePortalStatement.bind(Statement.of(sqlStatement));
     intermediatePortalStatement.executeAsync(backendConnection);
     backendConnection.flush();
@@ -397,7 +397,7 @@ public class StatementTest {
     byte[][] parameters = {"{}".getBytes()};
 
     IntermediatePortalStatement portalStatement =
-        intermediateStatement.createPortal("", parameters, new ArrayList<>(), new ArrayList<>());
+        intermediateStatement.createPortal("", parameters, NO_FORMAT_CODES, NO_FORMAT_CODES);
     Statement boundStatement = portalStatement.bind(Statement.of(sqlStatement));
     assertEquals(
         Value.untyped(com.google.protobuf.Value.newBuilder().setStringValue("{}").build()),
@@ -441,8 +441,8 @@ public class StatementTest {
                 parse(sqlStatement),
                 Statement.of(sqlStatement)),
             NO_PARAMS,
-            ImmutableList.of(),
-            ImmutableList.of());
+            NO_FORMAT_CODES,
+            NO_FORMAT_CODES);
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,
@@ -477,15 +477,16 @@ public class StatementTest {
     byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(server.getMessageReader()).thenReturn(new MessageReader(mock(OptionsMetadata.class)));
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(server.getOptions()).thenReturn(options);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
     SimpleQueryStatement simpleQueryStatement = ((QueryMessage) message).getSimpleQueryStatement();
 
@@ -592,8 +593,8 @@ public class StatementTest {
             new IntermediatePreparedStatement(
                 connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
             NO_PARAMS,
-            ImmutableList.of(),
-            ImmutableList.of());
+            NO_FORMAT_CODES,
+            NO_FORMAT_CODES);
     BackendConnection backendConnection =
         new BackendConnection(
             NOOP_OTEL,

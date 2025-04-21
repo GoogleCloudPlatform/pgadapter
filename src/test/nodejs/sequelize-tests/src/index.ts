@@ -14,7 +14,7 @@
 
 import {DataTypes, literal, Op} from "sequelize";
 
-const { Sequelize, QueryTypes } = require('sequelize');
+const { Sequelize, QueryTypes, Transaction } = require('sequelize');
 
 let User: any;
 let AllTypes: any;
@@ -191,6 +191,21 @@ async function testManagedReadWriteTransaction(client) {
   }
 }
 
+async function testManagedReadWriteTransactionWithIsolationLevel(client) {
+  try {
+    await client.transaction({isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ}, async (transaction: any) => {
+      const id = 1;
+      const user = await User.findOne({where: { id: {[Op.eq]: literal('$id')} }, bind: {id}, transaction: transaction});
+      console.log(JSON.stringify(user, null, 2));
+      const newUser = await User.create({name: 'Test'}, {transaction});
+      console.log(JSON.stringify(newUser, null, 2));
+      return newUser;
+    });
+  } catch (e) {
+    console.error(`Transaction error: ${e}`);
+  }
+}
+
 async function testContinueAfterFailedTransaction(client) {
   try {
     await client.transaction(async (transaction: any) => {
@@ -249,6 +264,12 @@ require('yargs')
     'Executes a managed read/write transaction',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testManagedReadWriteTransaction)
+)
+.command(
+    'testManagedReadWriteTransactionWithIsolationLevel <host> <port> <database>',
+    'Executes a managed read/write transaction with isolation level repeatable read',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testManagedReadWriteTransactionWithIsolationLevel)
 )
 .command(
     'testContinueAfterFailedTransaction <host> <port> <database>',

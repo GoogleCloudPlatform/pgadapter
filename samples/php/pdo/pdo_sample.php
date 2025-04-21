@@ -19,9 +19,10 @@
  *   php pdo_sample.py -p my-project -i my-instance -d my-database
 */
 
+error_reporting(E_ALL ^ E_DEPRECATED);
 require 'vendor/autoload.php';
 
-use Testcontainers\Container\Container;
+use Testcontainers\Container\GenericContainer;
 use Testcontainers\Wait\WaitForLog;
 
 // Start PGAdapter+Emulator in a Docker container.
@@ -41,6 +42,7 @@ echo sprintf("Greeting from Cloud Spanner PostgreSQL: %s\n", $rows[0][0]);
 $rows = null;
 $statement = null;
 $connection = null;
+$pg_adapter->stop();
 
 // Starts PGAdapter+Emulator in a Docker test container. This setup is useful for development and test
 // purposes, but should not be used in production, as the host-to-Docker network bridge can be slow.
@@ -52,19 +54,15 @@ function start_pg_adapter(): array
     // The 'pgadapter-emulator' Docker image is a combined Docker image of PGAdapter + the Spanner emulator.
     // This Docker image automatically creates any Spanner instance and database that you try to connect to,
     // which means that you don't have to manually create the instance/database before connecting to it.
-    $pg_adapter = Container::make("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator");
+    $pg_adapter = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator");
     // Map port '5432' in the container to a random port on the host.
-    $pg_adapter->withPort("0", "5432");
-    $pg_adapter->withWait(new WaitForLog('Server started on port'));
-    $pg_adapter->run();
+    $pg_adapter->withExposedPorts(5432);
+    $pg_adapter->withWait(new WaitForLog("Server started on port"));
+    $container = $pg_adapter->start();
 
     // Get the mapped host port of port '5432' in the container and use that port number to connect
     // to PGAdapter using the PHP PDO driver.
-    $reflected_pg_adapter = new ReflectionObject($pg_adapter);
-    $inspected_data = $reflected_pg_adapter->getProperty('inspectedData');
-    $inspected_data->setAccessible(true);
-    $ports = $inspected_data->getValue($pg_adapter)[0]['NetworkSettings']['Ports'];
-    $port = $ports['5432/tcp'][0]['HostPort'];
+    $port = $container->getMappedPort(5432);
 
-    return [$pg_adapter, $port];
+    return [$container, $port];
 }

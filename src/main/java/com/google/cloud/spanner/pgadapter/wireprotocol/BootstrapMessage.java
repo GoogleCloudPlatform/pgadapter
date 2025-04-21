@@ -22,7 +22,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.KeyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
@@ -171,6 +170,7 @@ public abstract class BootstrapMessage extends WireMessage {
     for (NoticeResponse noticeResponse : startupNotices) {
       noticeResponse.send(false);
     }
-    new ReadyResponse(output, Status.IDLE).send();
+    ReadyResponse.sendIdleResponse(output);
+    output.flush();
   }
 }

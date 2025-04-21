@@ -79,13 +79,14 @@ import java.net.SocketException;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -142,6 +143,7 @@ public class ConnectionHandler implements Runnable {
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
   private boolean hasDeterminedClientUsingQuery;
+
   /**
    * List of PARSE messages that we received before auto-detecting the client. This list can be used
    * by the detector to determine which client is connected, and is cleared after the detection is
@@ -273,13 +275,6 @@ public class ConnectionHandler implements Runnable {
     this.spannerConnection = spannerConnection;
     this.databaseId = connectionOptions.getDatabaseId();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
-    // TODO: Remove when the emulator supports FOR UPDATE clauses.
-    if (Boolean.parseBoolean(server.getProperties().getProperty("autoConfigEmulator", "false"))) {
-      this.extendedQueryProtocolHandler
-          .getBackendConnection()
-          .getSessionState()
-          .setConnectionStartupValue("spanner", "replace_for_update", "true");
-    }
   }
 
   @VisibleForTesting
@@ -325,9 +320,12 @@ public class ConnectionHandler implements Runnable {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
-    for (Entry<Object, Object> entry : info.entrySet()) {
-      if (!Strings.isNullOrEmpty((String) entry.getValue())) {
-        result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
+    List<Object> keys = new ArrayList<>(info.keySet());
+    keys.sort(Comparator.comparing(Object::toString));
+    for (Object key : keys) {
+      String value = (String) info.get(key);
+      if (!Strings.isNullOrEmpty(value)) {
+        result.append(";").append(key).append("=").append(value);
       }
     }
     return result.toString();
@@ -399,6 +397,13 @@ public class ConnectionHandler implements Runnable {
 
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
+      } catch (EOFException ignore) {
+        // Just ignore the connection and close it if the client never sends us a valid startup
+        // message. This also prevents probers that just check for an open TCP port to cause errors
+        // to be logged.
+        return result;
+      }
+      try {
         if (!ssl
             && getServer().getOptions().getSslMode().isSslEnabled()
             && this.message instanceof SSLMessage) {
@@ -612,7 +617,8 @@ public class ConnectionHandler implements Runnable {
       new ErrorResponse(this, exception).send();
     } else {
       new ErrorResponse(this, exception).send();
-      new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
+      ReadyResponse.sendIdleResponse(output);
+      output.flush();
     }
   }
 

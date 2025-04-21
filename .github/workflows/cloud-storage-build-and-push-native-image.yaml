@@ -1,0 +1,67 @@
+name: Build and Push native image to Google Cloud Storage
+
+on:
+  # This allows manual activation of this action for testing.
+  workflow_dispatch:
+
+env:
+  GITHUB_SHA: ${{ github.sha }}
+  GITHUB_REF: ${{ github.ref }}
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, and Publish
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
+
+      # Setup GraalVM
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '23'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
+
+      # Build the assembly and native image
+      - name: Build assembly
+        run: |
+          mvn package -Passembly -DskipTests
+          export VERSION=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $VERSION
+          cd "target/pgadapter"
+          native-image \
+            --initialize-at-build-time=com.google.protobuf,com.google.gson,com.google.cloud.spanner.pgadapter.Server \
+            -J-Xmx14g \
+            -H:IncludeResources=".*" \
+            -H:ReflectionConfigurationFiles=../../build/native-image/reflectconfig.json \
+            -jar pgadapter.jar \
+            --no-fallback
+          
+          tar -czvf pgadapter-linux-x64.tar.gz pgadapter
+          cp "pgadapter-linux-x64.tar.gz" "pgadapter-linux-x64-$VERSION.tar.gz"
+          echo "native_image=pgadapter-linux-x64-$VERSION.tar.gz" >> $GITHUB_ENV
+          echo "native_image_current=pgadapter-linux-x64.tar.gz" >> $GITHUB_ENV
+          echo ${{ env.native_image }}
+          echo ${{ env.native_image_current }}
+
+      # Upload the native image to Google Cloud Storage
+      - id: 'upload-versioned-file'
+        uses: 'google-github-actions/upload-cloud-storage@v2'
+        with:
+          path: ${{ env.native_image }}
+          destination: 'pgadapter-jar-releases'
+          parent: false
+      - id: 'overwrite-current-file'
+        uses: 'google-github-actions/upload-cloud-storage@v2'
+        with:
+          path: ${{ env.native_image_current }}
+          destination: 'pgadapter-jar-releases'
+          parent: false

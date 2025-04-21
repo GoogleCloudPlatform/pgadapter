@@ -37,6 +37,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
@@ -213,9 +214,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
     ResultSet metadataResultSet =
         ResultSet.newBuilder()
             .setMetadata(
-                resultSet
-                    .getMetadata()
-                    .toBuilder()
+                resultSet.getMetadata().toBuilder()
                     .setUndeclaredParameters(
                         createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
                             .getUndeclaredParameters())
@@ -281,9 +280,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
     ResultSet metadataResultSet =
         ResultSet.newBuilder()
             .setMetadata(
-                resultSet
-                    .getMetadata()
-                    .toBuilder()
+                resultSet.getMetadata().toBuilder()
                     .setUndeclaredParameters(
                         createParameterTypesMetadata(
                                 ImmutableList.of(
@@ -329,8 +326,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
                   .bind("p11")
                   .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                   .build(),
-              resultSet
-                  .toBuilder()
+              resultSet.toBuilder()
                   .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
                   .build()));
     }
@@ -364,15 +360,26 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testUnmanagedReadWriteTransaction() throws IOException, InterruptedException {
-    testTransaction("testUnmanagedReadWriteTransaction");
+    testTransaction(
+        "testUnmanagedReadWriteTransaction", IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
   }
 
   @Test
   public void testManagedReadWriteTransaction() throws IOException, InterruptedException {
-    testTransaction("testManagedReadWriteTransaction");
+    testTransaction("testManagedReadWriteTransaction", IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
   }
 
-  private void testTransaction(String methodName) throws IOException, InterruptedException {
+  @Test
+  public void testManagedReadWriteTransactionWithIsolationLevel()
+      throws IOException, InterruptedException {
+    // TODO: Fix once 'set transaction isolation level repeatable read' is supported.
+    testTransaction(
+        "testManagedReadWriteTransactionWithIsolationLevel",
+        IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+  }
+
+  private void testTransaction(String methodName, IsolationLevel expectedIsolationLevel)
+      throws IOException, InterruptedException {
     String selectSql =
         "SELECT \"id\", \"name\", \"createdAt\", \"updatedAt\" FROM \"users\" AS \"users\" WHERE \"users\".\"id\" = $1 LIMIT 1;";
     ResultSetMetadata metadata =
@@ -406,8 +413,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
                                 .getUndeclaredParameters())
@@ -436,8 +442,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             Statement.of(insertSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -451,8 +456,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             Statement.of(insertSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
@@ -498,6 +502,9 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
     assertEquals(QueryMode.PLAN, selectRequests.get(0).getQueryMode());
     assertTrue(selectRequests.get(0).getTransaction().hasBegin());
     assertTrue(selectRequests.get(0).getTransaction().getBegin().hasReadWrite());
+    assertEquals(
+        expectedIsolationLevel,
+        selectRequests.get(0).getTransaction().getBegin().getIsolationLevel());
 
     assertEquals(QueryMode.NORMAL, selectRequests.get(1).getQueryMode());
     assertTrue(selectRequests.get(1).getTransaction().hasId());
@@ -552,8 +559,7 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    metadata
-                        .toBuilder()
+                    metadata.toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
                                 .getUndeclaredParameters())
