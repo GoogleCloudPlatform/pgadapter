@@ -1777,9 +1777,8 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(describeRequest.hasTransaction());
     assertTrue(describeRequest.getTransaction().hasBegin());
     assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
-    // TODO: Fix this once 'set transaction isolation level' is supported.
     assertEquals(
-        IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
+        IsolationLevel.REPEATABLE_READ,
         describeRequest.getTransaction().getBegin().getIsolationLevel());
   }
 

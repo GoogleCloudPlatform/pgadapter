@@ -21,6 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -41,7 +42,9 @@ public class SelectVersionStatementTest {
       when(pgSetting.getSetting()).thenReturn(version);
 
       try (ResultSet resultSet =
-          SelectVersionStatement.INSTANCE.execute(backendConnection).getResultSet()) {
+          SelectVersionStatement.INSTANCE
+              .execute(backendConnection, Statement.of("select server_version"))
+              .getResultSet()) {
         assertTrue(resultSet.next());
         assertEquals(1, resultSet.getColumnCount());
         assertEquals("PostgreSQL " + version, resultSet.getString("version"));

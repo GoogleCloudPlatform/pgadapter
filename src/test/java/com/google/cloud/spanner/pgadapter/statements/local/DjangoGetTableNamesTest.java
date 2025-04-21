@@ -19,6 +19,7 @@ import static org.junit.Assert.assertFalse;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -60,7 +61,9 @@ public class DjangoGetTableNamesTest {
 
     DjangoGetTableNamesStatement djangoGetTableNamesStatement =
         DjangoGetTableNamesStatement.INSTANCE;
-    StatementResult statementResult = djangoGetTableNamesStatement.execute(backendConnection);
+    StatementResult statementResult =
+        djangoGetTableNamesStatement.execute(
+            backendConnection, Statement.of(djangoGetTableNamesSql));
     ResultSet resultSet = statementResult.getResultSet();
     assertFalse(resultSet.next());
     assertEquals(2, resultSet.getColumnCount());
