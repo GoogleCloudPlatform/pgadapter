@@ -15,7 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_FORMAT_CODES;
-import static com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.MAX_INVALID_MESSAGE_COUNT;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.MessageReader.MAX_INVALID_MESSAGE_COUNT;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -145,6 +145,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(options.requiresMatcher()).thenReturn(false);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
@@ -156,7 +157,7 @@ public class ProtocolTest {
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
     assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
 
@@ -179,11 +180,12 @@ public class ProtocolTest {
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
     assertNotNull(((QueryMessage) message).getSimpleQueryStatement());
     assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
@@ -197,13 +199,15 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    assertThrows(IOException.class, () -> ControlMessage.create(connectionHandler));
+    assertThrows(IOException.class, () -> server.getMessageReader().create(connectionHandler));
   }
 
   @Test
@@ -242,6 +246,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -249,7 +254,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(ParseMessage.class, message.getClass());
     assertEquals(expectedMessageName, ((ParseMessage) message).getName());
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
@@ -306,6 +311,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -313,7 +319,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(ParseMessage.class, message.getClass());
     assertEquals(expectedMessageName, ((ParseMessage) message).getName());
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
@@ -371,6 +377,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -378,7 +385,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(ParseMessage.class, message.getClass());
     assertEquals(expectedMessageName, ((ParseMessage) message).getName());
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
@@ -421,6 +428,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -428,7 +436,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(ParseMessage.class, message.getClass());
     assertEquals(expectedMessageName, ((ParseMessage) message).getName());
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
@@ -479,6 +487,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -486,7 +495,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(true);
     assertThrows(IllegalStateException.class, message::send);
@@ -525,6 +534,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -532,7 +542,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(true);
     assertThrows(IllegalStateException.class, message::send);
@@ -572,6 +582,7 @@ public class ProtocolTest {
 
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -579,7 +590,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
 
     message.send();
   }
@@ -621,6 +632,7 @@ public class ProtocolTest {
             parameter,
             resultCodesCount);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
     when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
         .thenReturn(intermediatePortalStatement);
@@ -642,8 +654,9 @@ public class ProtocolTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(BindMessage.class, message.getClass());
     assertEquals(expectedPortalName, ((BindMessage) message).getPortalName());
     assertEquals(expectedStatementName, ((BindMessage) message).getStatementName());
@@ -720,6 +733,7 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
@@ -728,8 +742,9 @@ public class ProtocolTest {
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
     when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
         .thenReturn(intermediatePortalStatement);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(BindMessage.class, message.getClass());
     assertEquals(expectedPortalName, ((BindMessage) message).getPortalName());
     assertEquals(expectedStatementName, ((BindMessage) message).getStatementName());
@@ -795,6 +810,7 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
@@ -803,8 +819,9 @@ public class ProtocolTest {
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
     when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
         .thenReturn(intermediatePortalStatement);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(BindMessage.class, message.getClass());
     assertEquals(expectedPortalName, ((BindMessage) message).getPortalName());
     assertEquals(expectedStatementName, ((BindMessage) message).getStatementName());
@@ -828,6 +845,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
     when(intermediatePortalStatement.getSql()).thenReturn("select * from foo");
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
@@ -835,8 +853,9 @@ public class ProtocolTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(DescribeMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((DescribeMessage) message).getName());
     assertEquals("select * from foo", ((DescribeMessage) message).getSql());
@@ -867,14 +886,16 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(DescribeMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((DescribeMessage) message).getName());
 
@@ -903,6 +924,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -912,8 +934,9 @@ public class ProtocolTest {
     when(intermediatePreparedStatement.hasException()).thenReturn(true);
     when(intermediatePreparedStatement.getException())
         .thenReturn(PGExceptionFactory.newPGException("test error", SQLState.InternalError));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(DescribeMessage.class, message.getClass());
     DescribeMessage describeMessage = (DescribeMessage) message;
 
@@ -938,6 +961,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -946,7 +971,7 @@ public class ProtocolTest {
         .thenReturn(extendedQueryProtocolHandler);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(ExecuteMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((ExecuteMessage) message).getName());
     assertEquals(totalRows, ((ExecuteMessage) message).getMaxRows());
@@ -985,6 +1010,7 @@ public class ProtocolTest {
 
     PGException testException =
         PGExceptionFactory.newPGException("test error", SQLState.SyntaxError);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(intermediatePortalStatement.hasException()).thenReturn(true);
     when(intermediatePortalStatement.getException()).thenReturn(testException);
     when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
@@ -995,8 +1021,9 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(ExecuteMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((ExecuteMessage) message).getName());
     assertEquals(totalRows, ((ExecuteMessage) message).getMaxRows());
@@ -1028,12 +1055,14 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(CloseMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((CloseMessage) message).getName());
     assertEquals(expectedType, ((CloseMessage) message).getType());
@@ -1066,12 +1095,14 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(CloseMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((CloseMessage) message).getName());
     assertEquals(expectedType, ((CloseMessage) message).getType());
@@ -1099,6 +1130,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
@@ -1111,7 +1144,7 @@ public class ProtocolTest {
         .thenReturn(extendedQueryProtocolHandler);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.IDLE);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(message.getClass(), SyncMessage.class);
 
     message.send();
@@ -1135,6 +1168,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getTraceConnectionId()).thenReturn(UUID.randomUUID());
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
@@ -1142,12 +1176,13 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getServer()).thenReturn(server);
 
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.TRANSACTION);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(SyncMessage.class, message.getClass());
 
     message.send();
@@ -1170,13 +1205,15 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     DataOutputStream outputStream = mock(DataOutputStream.class);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(message.getClass(), FlushMessage.class);
 
     message.send();
@@ -1196,13 +1233,15 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     DataOutputStream outputStream = mock(DataOutputStream.class);
 
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(FlushMessage.class, message.getClass());
 
     message.send();
@@ -1239,6 +1278,7 @@ public class ProtocolTest {
     when(backendConnection.getMetrics()).thenReturn(new Metrics(OpenTelemetry.noop()));
     OptionsMetadata options = mock(OptionsMetadata.class);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1247,7 +1287,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
     assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
 
@@ -1286,8 +1326,10 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(TerminateMessage.class, message.getClass());
   }
 
@@ -1299,8 +1341,10 @@ public class ProtocolTest {
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
 
-    assertThrows(IllegalStateException.class, () -> ControlMessage.create(connectionHandler));
+    assertThrows(
+        IllegalStateException.class, () -> server.getMessageReader().create(connectionHandler));
   }
 
   @Test
@@ -1318,11 +1362,13 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
     MutationWriter mw = mock(MutationWriter.class);
     when(copyStatement.getMutationWriter()).thenReturn(mw);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(CopyDataMessage.class, message.getClass());
     assertArrayEquals(payload, ((CopyDataMessage) message).getPayload());
 
@@ -1346,8 +1392,10 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
     // This should be a no-op.
     message.sendPayload();
   }
@@ -1357,6 +1405,7 @@ public class ProtocolTest {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
 
     byte[] messageMetadata = {'d'};
     byte[] payload1 = "1\t'one'\n2\t".getBytes();
@@ -1382,10 +1431,11 @@ public class ProtocolTest {
     when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getServer()).thenReturn(server);
 
     {
       when(connectionMetadata.getInputStream()).thenReturn(inputStream1);
-      WireMessage message = ControlMessage.create(connectionHandler);
+      WireMessage message = server.getMessageReader().create(connectionHandler);
       assertEquals(CopyDataMessage.class, message.getClass());
       assertArrayEquals(payload1, ((CopyDataMessage) message).getPayload());
       CopyDataMessage copyDataMessage = (CopyDataMessage) message;
@@ -1393,7 +1443,7 @@ public class ProtocolTest {
     }
     {
       when(connectionMetadata.getInputStream()).thenReturn(inputStream2);
-      WireMessage message = ControlMessage.create(connectionHandler);
+      WireMessage message = server.getMessageReader().create(connectionHandler);
       assertEquals(CopyDataMessage.class, message.getClass());
       assertArrayEquals(payload2, ((CopyDataMessage) message).getPayload());
       CopyDataMessage copyDataMessage = (CopyDataMessage) message;
@@ -1401,7 +1451,7 @@ public class ProtocolTest {
     }
     {
       when(connectionMetadata.getInputStream()).thenReturn(inputStream3);
-      WireMessage message = ControlMessage.create(connectionHandler);
+      WireMessage message = server.getMessageReader().create(connectionHandler);
       assertEquals(CopyDataMessage.class, message.getClass());
       assertArrayEquals(payload3, ((CopyDataMessage) message).getPayload());
       CopyDataMessage copyDataMessage = (CopyDataMessage) message;
@@ -1427,8 +1477,10 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
 
     assertEquals(CopyDoneMessage.class, message.getClass());
     CopyDoneMessage messageSpy = (CopyDoneMessage) spy(message);
@@ -1459,8 +1511,10 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
 
     assertEquals(CopyFailMessage.class, message.getClass());
     assertEquals(expectedErrorMessage, ((CopyFailMessage) message).getErrorMessage());
@@ -1514,8 +1568,10 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
+    WireMessage message = server.getMessageReader().create(connectionHandler);
 
     assertEquals(FunctionCallMessage.class, message.getClass());
     assertThrows(IllegalStateException.class, message::send);
@@ -1564,6 +1620,7 @@ public class ProtocolTest {
     when(sessionState.get(null, "server_version")).thenReturn(serverVersionSetting);
     when(backendConnection.getSessionState()).thenReturn(sessionState);
     when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(options.shouldAuthenticate()).thenReturn(false);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1664,6 +1721,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
     WireMessage message = BootstrapMessage.create(connectionHandler);
     assertEquals(CancelMessage.class, message.getClass());
@@ -1694,6 +1753,7 @@ public class ProtocolTest {
     when(options.getSslMode()).thenReturn(SslMode.Enable);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
 
     WireMessage message = BootstrapMessage.create(connectionHandler);
     assertEquals(SSLMessage.class, message.getClass());
@@ -1724,6 +1784,7 @@ public class ProtocolTest {
     when(options.getSslMode()).thenReturn(SslMode.Disable);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
 
     WireMessage message = BootstrapMessage.create(connectionHandler);
     assertEquals(SSLMessage.class, message.getClass());
@@ -1747,6 +1808,8 @@ public class ProtocolTest {
     when(intermediatePortalStatement.containsResultSet()).thenReturn(true);
     when(intermediatePortalStatement.describeAsync(backendConnection))
         .thenReturn(SettableFuture.create());
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
     DescribeMessage describeMessage =
         new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
@@ -1768,6 +1831,8 @@ public class ProtocolTest {
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
     SkipMessage message = SkipMessage.createForValidStream(connectionHandler);
     message.send();
@@ -1791,8 +1856,10 @@ public class ProtocolTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    ControlMessage message = ControlMessage.create(connectionHandler);
+    ControlMessage message = server.getMessageReader().create(connectionHandler);
 
     assertEquals(SkipMessage.class, message.getClass());
     // Verify that nothing was written to the output.
@@ -1811,8 +1878,10 @@ public class ProtocolTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    ControlMessage message = ControlMessage.create(connectionHandler);
+    ControlMessage message = server.getMessageReader().create(connectionHandler);
 
     assertEquals(SkipMessage.class, message.getClass());
     // Verify that nothing was written to the output.
@@ -1833,8 +1902,10 @@ public class ProtocolTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    ControlMessage message = ControlMessage.create(connectionHandler);
+    ControlMessage message = server.getMessageReader().create(connectionHandler);
 
     assertEquals(SkipMessage.class, message.getClass());
     // Verify that nothing was written to the output.
@@ -1853,8 +1924,10 @@ public class ProtocolTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
 
-    ControlMessage message = ControlMessage.create(connectionHandler);
+    ControlMessage message = server.getMessageReader().create(connectionHandler);
 
     assertEquals(SkipMessage.class, message.getClass());
     // Verify that nothing was written to the output.
@@ -1873,8 +1946,10 @@ public class ProtocolTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    ControlMessage message = ControlMessage.create(connectionHandler);
+    ControlMessage message = server.getMessageReader().create(connectionHandler);
 
     assertEquals(SkipMessage.class, message.getClass());
     // Verify that nothing was written to the output.
@@ -1908,16 +1983,18 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     doCallRealMethod().when(connectionHandler).increaseInvalidMessageCount();
     when(connectionHandler.getInvalidMessageCount()).thenCallRealMethod();
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
 
     for (int i = 0; i < MAX_INVALID_MESSAGE_COUNT; i++) {
-      ControlMessage message = ControlMessage.create(connectionHandler);
+      ControlMessage message = server.getMessageReader().create(connectionHandler);
       assertEquals(SkipMessage.class, message.getClass());
       // Verify that nothing was written to the output.
       assertEquals(0, result.size());
       verify(connectionHandler, never()).setStatus(ConnectionStatus.TERMINATED);
     }
 
-    ControlMessage.create(connectionHandler);
+    server.getMessageReader().create(connectionHandler);
     verify(connectionHandler).setStatus(ConnectionStatus.TERMINATED);
     byte[] resultBytes = result.toByteArray();
     assertEquals('E', resultBytes[0]);

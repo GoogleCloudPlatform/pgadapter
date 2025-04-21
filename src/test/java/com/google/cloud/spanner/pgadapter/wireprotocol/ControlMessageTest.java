@@ -20,7 +20,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
-import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
@@ -65,7 +64,6 @@ public final class ControlMessageTest {
   @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   @Mock private IntermediateStatement intermediateStatement;
   @Mock private ConnectionMetadata connectionMetadata;
-  @Mock private Connection connection;
 
   @Test
   public void testInsertResult() throws Exception {
@@ -102,7 +100,7 @@ public final class ControlMessageTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
-    ControlMessage controlMessage = ControlMessage.create(connectionHandler);
+    ControlMessage controlMessage = server.getMessageReader().create(connectionHandler);
     controlMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L);
 
     DataInputStream outputReader =
@@ -126,6 +124,7 @@ public final class ControlMessageTest {
         new DataInputStream(
             new ByteArrayInputStream(new byte[] {(byte) QUERY_IDENTIFIER, 0, 0, 0, 5, 0}));
 
+    when(connectionHandler.getServer()).thenReturn(mock(ProxyServer.class));
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getExtendedQueryProtocolHandler())
@@ -157,6 +156,7 @@ public final class ControlMessageTest {
   public void testSendNoRowsAsResultSetFails() {
     OpenTelemetry otel = OpenTelemetry.noop();
     Tracer tracer = otel.getTracer("test");
+    when(connectionHandler.getServer()).thenReturn(mock(ProxyServer.class));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
