@@ -21,6 +21,7 @@ import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
@@ -67,7 +68,7 @@ public class ListDatabasesStatement implements LocalStatement {
   }
 
   @Override
-  public StatementResult execute(BackendConnection backendConnection) {
+  public StatementResult execute(BackendConnection backendConnection, Statement statement) {
     Connection connection = backendConnection.getSpannerConnection();
     Spanner spanner = connection.getSpanner();
     InstanceId defaultInstanceId =

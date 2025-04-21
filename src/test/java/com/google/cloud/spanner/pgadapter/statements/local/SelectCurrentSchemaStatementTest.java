@@ -21,6 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,10 +37,30 @@ public class SelectCurrentSchemaStatementTest {
       when(backendConnection.getCurrentSchema()).thenReturn(schema);
 
       try (ResultSet resultSet =
-          SelectCurrentSchemaStatement.INSTANCE.execute(backendConnection).getResultSet()) {
+          SelectCurrentSchemaStatement.INSTANCE
+              .execute(backendConnection, Statement.of("select current_schema"))
+              .getResultSet()) {
         assertTrue(resultSet.next());
         assertEquals(1, resultSet.getColumnCount());
         assertEquals(schema, resultSet.getString("current_schema"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testExecuteSelectCurrentSchemaAsSchema() {
+    for (String schema : new String[] {"public", "information_schema", "foo"}) {
+      BackendConnection backendConnection = mock(BackendConnection.class);
+      when(backendConnection.getCurrentSchema()).thenReturn(schema);
+
+      try (ResultSet resultSet =
+          SelectCurrentSchemaStatement.INSTANCE
+              .execute(backendConnection, Statement.of("SELECT CURRENT_SCHEMA() AS SCHEMA"))
+              .getResultSet()) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getColumnCount());
+        assertEquals(schema, resultSet.getString("schema"));
         assertFalse(resultSet.next());
       }
     }

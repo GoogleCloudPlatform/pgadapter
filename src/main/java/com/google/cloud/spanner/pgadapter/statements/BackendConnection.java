@@ -315,7 +315,7 @@ public class BackendConnection {
                 .hasReplacementStatement()) {
           LocalStatement localStatement =
               Objects.requireNonNull(localStatements.get().get(statement.getSql()));
-          result.set(localStatement.execute(BackendConnection.this));
+          result.set(localStatement.execute(BackendConnection.this, statement));
         } else if (sessionStatement != null) {
           result.set(sessionStatement.execute(sessionState, spannerConnection));
         } else if (connectionState == ConnectionState.ABORTED

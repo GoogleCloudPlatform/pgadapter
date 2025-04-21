@@ -30,6 +30,7 @@ import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelperTest;
 import com.google.cloud.spanner.connection.StatementResult;
@@ -108,7 +109,9 @@ public class ListDatabasesStatementTest {
     when(backendConnection.getSpannerConnection()).thenReturn(connection);
 
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
-    StatementResult result = statement.execute(backendConnection);
+    StatementResult result =
+        statement.execute(
+            backendConnection, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
 
     assertEquals(ResultType.RESULT_SET, result.getResultType());
     ResultSet resultSet = result.getResultSet();
@@ -151,7 +154,9 @@ public class ListDatabasesStatementTest {
     when(backendConnection.getSpannerConnection()).thenReturn(connection);
 
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
-    StatementResult result = statement.execute(backendConnection);
+    StatementResult result =
+        statement.execute(
+            backendConnection, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
 
     assertEquals(ResultType.RESULT_SET, result.getResultType());
     ResultSet resultSet = result.getResultSet();
@@ -195,7 +200,9 @@ public class ListDatabasesStatementTest {
     when(backendConnection.getSpannerConnection()).thenReturn(connection);
 
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
-    StatementResult result = statement.execute(backendConnection);
+    StatementResult result =
+        statement.execute(
+            backendConnection, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
 
     assertEquals(ResultType.RESULT_SET, result.getResultType());
     ResultSet resultSet = result.getResultSet();
@@ -233,7 +240,9 @@ public class ListDatabasesStatementTest {
     when(backendConnection.getSpannerConnection()).thenReturn(connection);
 
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
-    StatementResult result = statement.execute(backendConnection);
+    StatementResult result =
+        statement.execute(
+            backendConnection, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
 
     assertEquals(ResultType.RESULT_SET, result.getResultType());
     ResultSet resultSet = result.getResultSet();
