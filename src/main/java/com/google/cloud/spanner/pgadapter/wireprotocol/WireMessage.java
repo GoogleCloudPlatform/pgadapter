@@ -32,14 +32,16 @@ public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
 
-  protected int length;
-  protected DataInputStream inputStream;
-  protected DataOutputStream outputStream;
-  protected ConnectionHandler connection;
+  protected final int length;
+  protected final MessageReader messageReader;
+  protected final DataInputStream inputStream;
+  protected final DataOutputStream outputStream;
+  protected final ConnectionHandler connection;
 
   public WireMessage(ConnectionHandler connection, int length) {
     Preconditions.checkArgument(length >= 4);
     this.connection = connection;
+    this.messageReader = connection.getServer().getMessageReader();
     this.inputStream = connection.getConnectionMetadata().getInputStream();
     this.outputStream = connection.getConnectionMetadata().getOutputStream();
     this.length = length;
@@ -163,32 +165,35 @@ public abstract class WireMessage {
    */
   public String readString() throws IOException {
     this.inputStream.mark(MARK_READ_LIMIT);
-    int index = 0;
-    while (index < MARK_READ_LIMIT) {
-      byte b = this.inputStream.readByte();
-      if (b == 0) {
-        break;
+    try {
+      int index = 0;
+      while (index < MARK_READ_LIMIT) {
+        byte b = this.inputStream.readByte();
+        if (b == 0) {
+          break;
+        }
+        index++;
+        if (index == MARK_READ_LIMIT) {
+          throw new IOException("No null terminator found");
+        }
       }
-      index++;
-      if (index == MARK_READ_LIMIT) {
-        throw new IOException("No null terminator found");
+      if (index == 0) {
+        // Empty string, we don't have to ready anything.
+        return "";
       }
-    }
-    // Reset the stream to the mark and read the name (if any).
-    this.inputStream.reset();
-    if (index == 0) {
-      // No name, but we still need to skip the null-terminator.
+
+      // Reset the stream to the mark and read the string.
+      this.inputStream.reset();
+      byte[] result = new byte[index];
+      this.inputStream.readFully(result);
+      // Skip the null-terminator.
       //noinspection StatementWithEmptyBody
       while (this.inputStream.skip(1) < 1) {}
-      return "";
+      return new String(result, StandardCharsets.UTF_8);
+    } finally {
+      // Drop the mark.
+      this.inputStream.mark(0);
     }
-
-    byte[] result = new byte[index];
-    this.inputStream.readFully(result);
-    // Skip the null-terminator.
-    //noinspection StatementWithEmptyBody
-    while (this.inputStream.skip(1) < 1) {}
-    return new String(result, StandardCharsets.UTF_8);
   }
 
   /**
@@ -207,6 +212,6 @@ public abstract class WireMessage {
    * setting for {@link ConnectionHandler}.
    */
   public void nextHandler() throws Exception {
-    this.connection.setMessageState(ControlMessage.create(this.connection));
+    this.connection.setMessageState(this.messageReader.create(this.connection));
   }
 }

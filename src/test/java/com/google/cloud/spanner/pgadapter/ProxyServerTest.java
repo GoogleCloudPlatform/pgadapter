@@ -19,6 +19,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.TestOptionsMetadataBuilder;
+import java.net.Socket;
 import java.time.Duration;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -26,6 +27,22 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ProxyServerTest {
+
+  @Test
+  public void testProbeConnection() throws Exception {
+    // This test verifies that doing a simple TCP aliveness probe to check whether PGAdapter is
+    // running can be done without any errors.
+    ProxyServer server = new ProxyServer(OptionsMetadata.newBuilder().setPort(0).build());
+    server.startServer();
+    server.awaitRunning();
+
+    //noinspection EmptyTryBlock
+    try (Socket ignore = new Socket("localhost", server.getLocalPort())) {
+      // Do nothing, just verify that we can connect without any errors.
+    }
+    server.stopServer();
+    server.awaitTerminated();
+  }
 
   @Test
   public void testFailedStartProxyServer() {
