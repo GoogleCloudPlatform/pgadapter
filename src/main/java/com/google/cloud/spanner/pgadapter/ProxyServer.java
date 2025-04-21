@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
+import com.google.cloud.spanner.pgadapter.wireprotocol.MessageReader;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
@@ -69,6 +70,7 @@ public class ProxyServer extends AbstractApiService {
   private final Metrics metrics;
   private final Properties properties;
   private final List<ConnectionHandler> handlers = new LinkedList<>();
+  private final MessageReader messageReader;
 
   /**
    * Latch that is closed when the TCP server has started. We need this to know the exact port that
@@ -162,6 +164,7 @@ public class ProxyServer extends AbstractApiService {
   public ProxyServer(
       OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties) {
     this.options = optionsMetadata;
+    this.messageReader = new MessageReader(optionsMetadata);
     this.openTelemetry = openTelemetry;
     this.metrics =
         optionsMetadata.isEnableOpenTelemetryMetrics()
@@ -174,6 +177,10 @@ public class ProxyServer extends AbstractApiService {
         ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory(
             "ConnectionHandler", optionsMetadata.isUseVirtualThreads());
     addConnectionProperties();
+  }
+
+  public MessageReader getMessageReader() {
+    return this.messageReader;
   }
 
   private void addConnectionProperties() {

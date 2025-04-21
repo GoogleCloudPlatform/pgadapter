@@ -5815,7 +5815,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           assertTrue(request.hasTransaction());
           assertTrue(request.getTransaction().hasBegin());
           assertEquals(
-              translationIsolationLevel(isolation),
+              translateIsolationLevel(isolation),
               request.getTransaction().getBegin().getIsolationLevel());
 
           mockSpanner.clearRequests();
@@ -5838,7 +5838,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           assertTrue(request.hasTransaction());
           assertTrue(request.getTransaction().hasBegin());
           assertEquals(
-              translationIsolationLevel(isolation),
+              translateIsolationLevel(isolation),
               request.getTransaction().getBegin().getIsolationLevel());
 
           mockSpanner.clearRequests();
@@ -5865,7 +5865,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           // TODO: Change this when https://github.com/googleapis/java-spanner/pull/3718 has been
           // released and merged into PGAdapter.
           assertEquals(
-              IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
+              translateIsolationLevel(isolation),
               request.getTransaction().getBegin().getIsolationLevel());
 
           mockSpanner.clearRequests();
@@ -5874,7 +5874,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  private static IsolationLevel translationIsolationLevel(int jdbcLevel) {
+  private static IsolationLevel translateIsolationLevel(int jdbcLevel) {
     switch (jdbcLevel) {
       case Connection.TRANSACTION_SERIALIZABLE:
         return IsolationLevel.SERIALIZABLE;

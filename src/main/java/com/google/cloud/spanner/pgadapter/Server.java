@@ -63,6 +63,10 @@ public class Server {
 
   private static volatile ShutdownHandler shutdownHandler;
 
+  static {
+    registerSignalHandlers();
+  }
+
   /**
    * Main method for running a Spanner PostgreSQL Adapter {@link Server} as a stand-alone
    * application. Here we call for parameter parsing and start the Proxy Server.
@@ -78,7 +82,6 @@ public class Server {
       // Create a shutdown handler and register signal handlers for the signals that should
       // terminate the server.
       Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
-      registerSignalHandlers();
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }

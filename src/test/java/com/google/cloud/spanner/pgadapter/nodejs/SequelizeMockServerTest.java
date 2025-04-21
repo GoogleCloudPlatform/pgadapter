@@ -372,10 +372,8 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
   @Test
   public void testManagedReadWriteTransactionWithIsolationLevel()
       throws IOException, InterruptedException {
-    // TODO: Fix once 'set transaction isolation level repeatable read' is supported.
     testTransaction(
-        "testManagedReadWriteTransactionWithIsolationLevel",
-        IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+        "testManagedReadWriteTransactionWithIsolationLevel", IsolationLevel.REPEATABLE_READ);
   }
 
   private void testTransaction(String methodName, IsolationLevel expectedIsolationLevel)

@@ -785,7 +785,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             + "\tactive BOOLEAN, \n"
             + "\tPRIMARY KEY (id)\n"
             + ")",
-        requests.get(0).getStatements(0));
+        requests.get(0).getStatements(0).trim());
     assertEquals(
         "CREATE TABLE venues (\n"
             + "\tid VARCHAR NOT NULL, \n"
@@ -796,7 +796,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             + "\tdescription JSONB, \n"
             + "\tPRIMARY KEY (id)\n"
             + ")",
-        requests.get(0).getStatements(1));
+        requests.get(0).getStatements(1).trim());
     assertEquals(
         "CREATE TABLE albums (\n"
             + "\tid VARCHAR NOT NULL, \n"
@@ -811,7 +811,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             + "\tPRIMARY KEY (id), \n"
             + "\tFOREIGN KEY(singer_id) REFERENCES singers (id)\n"
             + ")",
-        requests.get(0).getStatements(2));
+        requests.get(0).getStatements(2).trim());
     assertEquals(
         "CREATE TABLE concerts (\n"
             + "\tid VARCHAR NOT NULL, \n"
@@ -827,7 +827,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             + "\tFOREIGN KEY(venue_id) REFERENCES venues (id), \n"
             + "\tFOREIGN KEY(singer_id) REFERENCES singers (id)\n"
             + ")",
-        requests.get(0).getStatements(3));
+        requests.get(0).getStatements(3).trim());
     // The 'tracks' table is not generated 100% according to what we would want, but that is because
     // the PostgreSQL SQLAlchemy provider does not understand interleaved tables.
     assertEquals(
@@ -842,7 +842,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             + "\tPRIMARY KEY (id, track_number), \n"
             + "\tFOREIGN KEY(id) REFERENCES albums (id)\n"
             + ")",
-        requests.get(0).getStatements(4));
+        requests.get(0).getStatements(4).trim());
   }
 
   @Test
