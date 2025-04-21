@@ -21,6 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,7 +37,9 @@ public class SelectCurrentCatalogStatementTest {
       when(backendConnection.getCurrentDatabase()).thenReturn(database);
 
       try (ResultSet resultSet =
-          SelectCurrentCatalogStatement.INSTANCE.execute(backendConnection).getResultSet()) {
+          SelectCurrentCatalogStatement.INSTANCE
+              .execute(backendConnection, Statement.of("select current_catalog"))
+              .getResultSet()) {
         assertTrue(resultSet.next());
         assertEquals(1, resultSet.getColumnCount());
         assertEquals(database, resultSet.getString("current_catalog"));
