@@ -701,10 +701,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCreateAllTypes() throws IOException, InterruptedException {
     String insertSql =
-        "INSERT INTO \"public\".\"AllTypes\" (\"col_bigint\",\"col_bool\",\"col_bytea\",\"col_float4\",\"col_float8\",\"col_int\",\"col_numeric\",\"col_timestamptz\",\"col_date\",\"col_varchar\",\"col_jsonb\") "
-            + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) "
-            + "RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float4\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float4\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
-    ResultSet allTypesResultSet = createAllTypesResultSetWithoutNullsInArrays();
+        "INSERT INTO \"public\".\"AllTypes\" (\"col_bigint\",\"col_bool\",\"col_bytea\",\"col_float4\",\"col_float8\",\"col_int\",\"col_numeric\",\"col_timestamptz\",\"col_interval\",\"col_date\",\"col_varchar\",\"col_jsonb\") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float4\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_interval\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float4\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_interval\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
+    ResultSet allTypesResultSet =
+        createAllTypesResultSetWithoutNullsInArrays(/* intervalAsString= */ true);
 
     ResultSetMetadata insertMetadata =
         createParameterTypesMetadata(
@@ -717,6 +716,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                     TypeCode.INT64,
                     TypeCode.NUMERIC,
                     TypeCode.TIMESTAMP,
+                    TypeCode.STRING,
                     TypeCode.DATE,
                     TypeCode.STRING,
                     TypeCode.JSON))
@@ -750,10 +750,12 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-03-29"))
+                .to("P1Y2M3DT4H5M6.789S")
                 .bind("p10")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p11")
+                .to("test")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .build(),
             ResultSet.newBuilder()
@@ -774,6 +776,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_int: 100,\n"
             + "  col_numeric: 6.626,\n"
             + "  col_timestamptz: 2022-02-16T13:18:02.123Z,\n"
+            + "  col_interval: 'P1Y2M3DT4H5M6.789S',\n"
             + "  col_date: 2022-03-29T00:00:00.000Z,\n"
             + "  col_varchar: 'test',\n"
             + "  col_jsonb: { key: 'value' },\n"
@@ -793,6 +796,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "    2022-02-16T16:18:02.123Z,\n"
             + "    2000-01-01T00:00:00.000Z\n"
             + "  ],\n"
+            + "  col_array_interval: [ 'P-100MT123456.789S', 'P-100MT123456.789S', 'P1Y' ],\n"
             + "  col_array_date: [\n"
             + "    2023-02-20T00:00:00.000Z,\n"
             + "    2023-02-20T00:00:00.000Z,\n"
@@ -806,7 +810,8 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testUpdateAllTypes() throws IOException, InterruptedException {
-    ResultSetMetadata allTypesMetadata = createAllTypesResultSetMetadata("");
+    ResultSetMetadata allTypesMetadata =
+        createAllTypesResultSetMetadata("", /* intervalAsString= */ true);
     ListValue row =
         ListValue.newBuilder()
             .addValues(Value.newBuilder().setStringValue("1").build())
@@ -822,6 +827,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             .addValues(Value.newBuilder().setStringValue("-100").build())
             .addValues(Value.newBuilder().setStringValue("3.14").build())
             .addValues(Value.newBuilder().setStringValue("2023-03-13T05:40:02.123456000Z").build())
+            .addValues(Value.newBuilder().setStringValue("P1Y2M3DT4H5M6.789S").build())
             .addValues(Value.newBuilder().setStringValue("2023-03-13").build())
             .addValues(Value.newBuilder().setStringValue("updated").build())
             .addValues(Value.newBuilder().setStringValue("{\"key\":\"updated\"}").build())
@@ -836,10 +842,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .build();
 
     String updateSql =
-        "UPDATE \"public\".\"AllTypes\" SET \"col_bool\" = $1, \"col_bytea\" = $2, \"col_float4\" = $3, \"col_float8\" = $4, \"col_int\" = $5, \"col_numeric\" = $6, \"col_timestamptz\" = $7, \"col_date\" = $8, \"col_varchar\" = $9, \"col_jsonb\" = $10 WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $11 AND 1=1) RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float4\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float4\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
+        "UPDATE \"public\".\"AllTypes\" SET \"col_bool\" = $1, \"col_bytea\" = $2, \"col_float4\" = $3, \"col_float8\" = $4, \"col_int\" = $5, \"col_numeric\" = $6, \"col_timestamptz\" = $7, \"col_interval\" = $8, \"col_date\" = $9, \"col_varchar\" = $10, \"col_jsonb\" = $11 WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $12 AND 1=1) RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float4\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_interval\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float4\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_interval\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(updateSql),
@@ -856,6 +863,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
                                         TypeCode.TIMESTAMP,
+                                        TypeCode.STRING,
                                         TypeCode.DATE,
                                         TypeCode.STRING,
                                         TypeCode.JSON,
@@ -882,12 +890,14 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p7")
                 .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123456000Z"))
                 .bind("p8")
-                .to(Date.parseDate("2023-03-13"))
+                .to("P1Y2M3DT4H5M6.789S")
                 .bind("p9")
-                .to("updated")
+                .to(Date.parseDate("2023-03-13"))
                 .bind("p10")
-                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"updated\"}"))
+                .to("updated")
                 .bind("p11")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"updated\"}"))
+                .bind("p12")
                 .to(1L)
                 .build(),
             ResultSet.newBuilder()
@@ -911,6 +921,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_int: -100,\n"
             + "  col_numeric: 3.14,\n"
             + "  col_timestamptz: 2023-03-13T05:40:02.123Z,\n"
+            + "  col_interval: 'P1Y2M3DT4H5M6.789S',\n"
             + "  col_date: 2023-03-13T00:00:00.000Z,\n"
             + "  col_varchar: 'updated',\n"
             + "  col_jsonb: { key: 'updated' },\n"
@@ -922,6 +933,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_array_int: [],\n"
             + "  col_array_numeric: [],\n"
             + "  col_array_timestamptz: [],\n"
+            + "  col_array_interval: [],\n"
             + "  col_array_date: [],\n"
             + "  col_array_varchar: [],\n"
             + "  col_array_jsonb: []\n"
@@ -940,12 +952,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   @Test
   public void testUpsertAllTypes() throws IOException, InterruptedException {
     String upsertSql =
-        "INSERT INTO \"public\".\"AllTypes\" (\"col_bigint\",\"col_bool\",\"col_bytea\",\"col_float4\",\"col_float8\",\"col_int\",\"col_numeric\",\"col_timestamptz\",\"col_date\",\"col_varchar\",\"col_jsonb\") "
-            + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) "
-            + "ON CONFLICT (\"col_bigint\") DO UPDATE "
-            + "SET \"col_bool\" = $12, \"col_bytea\" = $13, \"col_float4\" = $14, \"col_float8\" = $15, \"col_int\" = $16, \"col_numeric\" = $17, \"col_timestamptz\" = $18, \"col_date\" = $19, \"col_varchar\" = $20, \"col_jsonb\" = $21 "
-            + "WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $22 AND 1=1) "
-            + "RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float4\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float4\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
+        "INSERT INTO \"public\".\"AllTypes\" (\"col_bigint\",\"col_bool\",\"col_bytea\",\"col_float4\",\"col_float8\",\"col_int\",\"col_numeric\",\"col_timestamptz\",\"col_interval\",\"col_date\",\"col_varchar\",\"col_jsonb\") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (\"col_bigint\") DO UPDATE SET \"col_bool\" = $13, \"col_bytea\" = $14, \"col_float4\" = $15, \"col_float8\" = $16, \"col_int\" = $17, \"col_numeric\" = $18, \"col_timestamptz\" = $19, \"col_interval\" = $20, \"col_date\" = $21, \"col_varchar\" = $22, \"col_jsonb\" = $23 WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $24 AND 1=1) RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float4\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_interval\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float4\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_interval\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
     ResultSetMetadata metadata =
         createMetadata(
             ImmutableList.of(
@@ -957,6 +964,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 TypeCode.INT64,
                 TypeCode.NUMERIC,
                 TypeCode.TIMESTAMP,
+                TypeCode.STRING,
                 TypeCode.DATE,
                 TypeCode.STRING,
                 TypeCode.JSON),
@@ -970,6 +978,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 "col_int",
                 "col_numeric",
                 "col_timestamptz",
+                "col_interval",
                 "col_date",
                 "col_varchar",
                 "col_jsonb",
@@ -981,6 +990,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 "col_array_int",
                 "col_array_numeric",
                 "col_array_timestamptz",
+                "col_array_interval",
                 "col_array_date",
                 "col_array_varchar",
                 "col_array_jsonb"),
@@ -993,6 +1003,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 TypeCode.INT64,
                 TypeCode.NUMERIC,
                 TypeCode.TIMESTAMP,
+                TypeCode.STRING,
                 TypeCode.DATE,
                 TypeCode.STRING,
                 TypeCode.JSON,
@@ -1003,6 +1014,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 TypeCode.INT64,
                 TypeCode.NUMERIC,
                 TypeCode.TIMESTAMP,
+                TypeCode.STRING,
                 TypeCode.DATE,
                 TypeCode.STRING,
                 TypeCode.JSON,
@@ -1030,9 +1042,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             .addValues(Value.newBuilder().setStringValue("-100").build())
             .addValues(Value.newBuilder().setStringValue("3.14").build())
             .addValues(Value.newBuilder().setStringValue("2023-03-13T05:40:02.123456000Z").build())
+            .addValues(Value.newBuilder().setStringValue("P1Y2M3DT4H5M6.789S").build())
             .addValues(Value.newBuilder().setStringValue("2023-03-13").build())
             .addValues(Value.newBuilder().setStringValue("updated").build())
             .addValues(Value.newBuilder().setStringValue("{\"key\":\"updated\"}").build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -1065,32 +1079,36 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123456000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2023-03-13"))
+                .to("P1Y2M3DT4H5M6.789S")
                 .bind("p10")
-                .to("updated")
-                .bind("p11")
-                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"updated\"}"))
-                .bind("p12")
-                .to(false)
-                .bind("p13")
-                .to(ByteArray.copyFrom("updated"))
-                .bind("p14")
-                .to(3.14f)
-                .bind("p15")
-                .to(6.626d)
-                .bind("p16")
-                .to(-100)
-                .bind("p17")
-                .to(com.google.cloud.spanner.Value.pgNumeric("3.14"))
-                .bind("p18")
-                .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123456000Z"))
-                .bind("p19")
                 .to(Date.parseDate("2023-03-13"))
-                .bind("p20")
+                .bind("p11")
                 .to("updated")
-                .bind("p21")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"updated\"}"))
+                .bind("p13")
+                .to(false)
+                .bind("p14")
+                .to(ByteArray.copyFrom("updated"))
+                .bind("p15")
+                .to(3.14f)
+                .bind("p16")
+                .to(6.626d)
+                .bind("p17")
+                .to(-100)
+                .bind("p18")
+                .to(com.google.cloud.spanner.Value.pgNumeric("3.14"))
+                .bind("p19")
+                .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123456000Z"))
+                .bind("p20")
+                .to("P1Y2M3DT4H5M6.789S")
+                .bind("p21")
+                .to(Date.parseDate("2023-03-13"))
                 .bind("p22")
+                .to("updated")
+                .bind("p23")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"updated\"}"))
+                .bind("p24")
                 .to(1L)
                 .build(),
             ResultSet.newBuilder()
@@ -1114,6 +1132,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_int: -100,\n"
             + "  col_numeric: 3.14,\n"
             + "  col_timestamptz: 2023-03-13T05:40:02.123Z,\n"
+            + "  col_interval: 'P1Y2M3DT4H5M6.789S',\n"
             + "  col_date: 2023-03-13T00:00:00.000Z,\n"
             + "  col_varchar: 'updated',\n"
             + "  col_jsonb: { key: 'updated' },\n"
@@ -1125,6 +1144,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_array_int: [],\n"
             + "  col_array_numeric: [],\n"
             + "  col_array_timestamptz: [],\n"
+            + "  col_array_interval: [],\n"
             + "  col_array_date: [],\n"
             + "  col_array_varchar: [],\n"
             + "  col_array_jsonb: []\n"
@@ -1142,9 +1162,10 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDeleteAllTypes() throws IOException, InterruptedException {
     String deleteSql =
-        "DELETE FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $1 AND 1=1) RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float4\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float4\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
+        "DELETE FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $1 AND 1=1) RETURNING \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float4\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_interval\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float4\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_interval\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\"";
 
-    ResultSetMetadata allTypesMetadata = createAllTypesResultSetMetadata("");
+    ResultSetMetadata allTypesMetadata =
+        createAllTypesResultSetMetadata("", /* intervalAsString= */ true);
     ListValue row =
         ListValue.newBuilder()
             .addValues(Value.newBuilder().setStringValue("1").build())
@@ -1160,9 +1181,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             .addValues(Value.newBuilder().setStringValue("-100").build())
             .addValues(Value.newBuilder().setStringValue("3.14").build())
             .addValues(Value.newBuilder().setStringValue("2023-03-13T05:40:02.123456000Z").build())
+            .addValues(Value.newBuilder().setStringValue("P1Y2M3DT4H5M6.789S").build())
             .addValues(Value.newBuilder().setStringValue("2023-03-13").build())
             .addValues(Value.newBuilder().setStringValue("updated").build())
             .addValues(Value.newBuilder().setStringValue("{\"key\":\"updated\"}").build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
             .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -1212,6 +1235,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_int: -100,\n"
             + "  col_numeric: 3.14,\n"
             + "  col_timestamptz: 2023-03-13T05:40:02.123Z,\n"
+            + "  col_interval: 'P1Y2M3DT4H5M6.789S',\n"
             + "  col_date: 2023-03-13T00:00:00.000Z,\n"
             + "  col_varchar: 'updated',\n"
             + "  col_jsonb: { key: 'updated' },\n"
@@ -1223,6 +1247,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_array_int: [],\n"
             + "  col_array_numeric: [],\n"
             + "  col_array_timestamptz: [],\n"
+            + "  col_array_interval: [],\n"
             + "  col_array_date: [],\n"
             + "  col_array_varchar: [],\n"
             + "  col_array_jsonb: []\n"
@@ -2071,6 +2096,10 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   }
 
   static ResultSet createAllTypesResultSetWithoutNullsInArrays() {
-    return createAllTypesResultSet("1", "", false, false, false);
+    return createAllTypesResultSetWithoutNullsInArrays(false);
+  }
+
+  static ResultSet createAllTypesResultSetWithoutNullsInArrays(boolean intervalAsString) {
+    return createAllTypesResultSet("1", "", false, false, intervalAsString);
   }
 }
