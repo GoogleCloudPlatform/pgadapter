@@ -16,11 +16,13 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Futures;
 import java.util.concurrent.Future;
 
@@ -110,8 +112,8 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     // Make sure the results from any Describe message are propagated to the prepared statement
     // before using it to bind the parameter values.
     preparedStatement.describe();
-    Statement.Builder builder = statement.toBuilder();
-    for (int index = 0; index < parameters.length; index++) {
+    ImmutableMap.Builder<String, Value> parametersBuilder = ImmutableMap.builder();
+    for (int index = 0; index < this.parameters.length; index++) {
       short formatCode = getParameterFormatCode(index);
       int type = preparedStatement.getParameterDataType(index);
       Parser<?> parser =
@@ -120,12 +122,12 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
                   .getExtendedQueryProtocolHandler()
                   .getBackendConnection()
                   .getSessionState(),
-              parameters[index],
+              this.parameters[index],
               type,
               FormatCode.of(formatCode));
-      parser.bind(builder, "p" + (index + 1));
+      parser.bind(parametersBuilder, "p" + (index + 1));
     }
-    return builder.build();
+    return Statement.of(statement.getSql(), parametersBuilder.build());
   }
 
   @Override

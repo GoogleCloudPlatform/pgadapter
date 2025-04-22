@@ -17,13 +17,13 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.common.collect.ImmutableMap;
 import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -127,7 +127,7 @@ public class JsonbParser extends Parser<String> {
   }
 
   @Override
-  public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(Value.pgJsonb(this.item));
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+    parametersBuilder.put(name, Value.pgJsonb(this.item));
   }
 }
