@@ -24,10 +24,11 @@ import java.sql.Types;
  * SQL type will be reported as {@link Types#OTHER}.
  */
 class UnspecifiedParser extends Parser<Value> {
-  private static final com.google.protobuf.Value NULL_VALUE =
-      com.google.protobuf.Value.newBuilder()
-          .setNullValue(com.google.protobuf.NullValue.NULL_VALUE)
-          .build();
+  private static final Value NULL_VALUE =
+      Value.untyped(
+          com.google.protobuf.Value.newBuilder()
+              .setNullValue(com.google.protobuf.NullValue.NULL_VALUE)
+              .build());
 
   UnspecifiedParser(Object item) {
     this.item = (Value) item;
@@ -57,6 +58,6 @@ class UnspecifiedParser extends Parser<Value> {
 
   @Override
   public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
-    parametersBuilder.put(name, this.item == null ? Value.untyped(NULL_VALUE) : this.item);
+    parametersBuilder.put(name, this.item == null ? NULL_VALUE : this.item);
   }
 }
