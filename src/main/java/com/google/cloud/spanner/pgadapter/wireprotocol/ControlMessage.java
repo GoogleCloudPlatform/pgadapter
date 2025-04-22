@@ -160,7 +160,7 @@ public abstract class ControlMessage extends WireMessage {
             CommandCompleteResponse.send(this.outputStream, command);
             break;
           }
-          // fallthrough to QUERY
+        // fallthrough to QUERY
         case QUERY:
         case UPDATE:
           if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
