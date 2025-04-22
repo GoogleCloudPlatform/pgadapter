@@ -336,6 +336,16 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
           .addRows(
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.INTERVAL)).build())
+                  .addValues(Value.newBuilder().setStringValue("interval").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.DATE)).build())
                   .addValues(Value.newBuilder().setStringValue("date").build())
                   .addValues(Value.newBuilder().setStringValue("b").build())
@@ -475,6 +485,17 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                   .addValues(Value.newBuilder().setBoolValue(false).build())
                   .addValues(
                       Value.newBuilder().setStringValue(String.valueOf(Oid.TIMESTAMPTZ)).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.INTERVAL_ARRAY)).build())
+                  .addValues(Value.newBuilder().setStringValue("_interval").build())
+                  .addValues(Value.newBuilder().setStringValue("a").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.INTERVAL)).build())
                   .build())
           .addRows(
               ListValue.newBuilder()
