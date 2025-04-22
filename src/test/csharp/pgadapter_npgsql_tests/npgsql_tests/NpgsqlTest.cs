@@ -172,7 +172,10 @@ public class NpgsqlTest
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
 
-        using var cmd = new NpgsqlCommand("SELECT * FROM all_types WHERE col_bigint=1", connection);
+        using var cmd = new NpgsqlCommand("SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, " +
+                                          "col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, " +
+                                          "col_varchar, col_jsonb " +
+                                          "FROM all_types WHERE col_bigint=1", connection);
         using (var reader = cmd.ExecuteReader())
         {
             while (reader.Read())
@@ -365,7 +368,8 @@ public class NpgsqlTest
 
         var sql =
             "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning *";
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
+            "returning col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
@@ -868,7 +872,7 @@ public class NpgsqlTest
         connection.Open();
         
         using (var reader =
-               connection.BeginBinaryExport("COPY (select * from all_types order by col_bigint) " +
+               connection.BeginBinaryExport("COPY (select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, col_array_varchar, col_array_jsonb from all_types order by col_bigint) " +
                                             "TO STDOUT (FORMAT BINARY)"))
         {
             while (reader.StartRow() > -1)

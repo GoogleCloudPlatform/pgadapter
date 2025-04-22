@@ -26,6 +26,7 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.Key;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
@@ -36,6 +37,7 @@ import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.protobuf.NullValue;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -113,6 +115,8 @@ public class ITNpgsqlTest implements IntegrationTest {
                 .to(new BigDecimal("6.626"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123456789+01:00"))
+                .set("col_interval")
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .set("col_date")
                 .to(Date.parseDate("2022-03-29"))
                 .set("col_varchar")
@@ -140,6 +144,12 @@ public class ITNpgsqlTest implements IntegrationTest {
                         Timestamp.parseTimestamp("2022-02-16T16:18:02.123456Z"),
                         null,
                         Timestamp.parseTimestamp("2000-01-01T00:00:00Z")))
+                .set("col_array_interval")
+                .to(
+                    Value.untyped(
+                        com.google.protobuf.Value.newBuilder()
+                            .setNullValue(NullValue.NULL_VALUE)
+                            .build()))
                 .set("col_array_date")
                 .toDateArray(
                     Arrays.asList(Date.parseDate("2023-02-20"), null, Date.parseDate("2000-01-01")))
@@ -359,6 +369,7 @@ public class ITNpgsqlTest implements IntegrationTest {
       assertEquals(
           Timestamp.parseTimestamp("2022-03-24T12:39:10.123456000Z"),
           resultSet.getTimestamp(col++));
+      assertTrue(resultSet.isNull(col++));
       assertEquals(Date.parseDate("2022-07-01"), resultSet.getDate(col++));
       assertEquals("test", resultSet.getString(col++));
       assertEquals("{\"key\": \"value\"}", resultSet.getPgJsonb(col++));
@@ -366,7 +377,7 @@ public class ITNpgsqlTest implements IntegrationTest {
       assertTrue(resultSet.next());
       col = 0;
       assertEquals(2L, resultSet.getLong(col++));
-      assertEquals(22, resultSet.getColumnCount());
+      assertEquals(24, resultSet.getColumnCount());
       for (col = 1; col < resultSet.getColumnCount(); col++) {
         assertTrue(resultSet.isNull(col));
       }
@@ -381,8 +392,8 @@ public class ITNpgsqlTest implements IntegrationTest {
     addNullRow();
     String result = execute("TestBinaryCopyOut", createConnectionString());
     assertEqualsIgnoreControlCharacters(
-        "1\tTrue\tdGVzdA==\t3.14\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]\n"
-            + "2\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
+        "1\tTrue\tdGVzdA==\t3.14\t3.14\t100\t6.626\t20220216T131802123456\t14M3DT14706789000\t20220329\ttest\t{\"key\": \"value\"}\t[1, , 2]\t[True, , False]\t[Ynl0ZXMx, , Ynl0ZXMy]\t[3.14, , -99.99]\t[3.14, , -99.99]\t[-100, , -200]\t[6.626, , -3.14]\t[20220216T161802123456, , 20000101T000000]\tNULL\t[20230220, , 20000101]\t[string1, , string2]\t[{\"key\": \"value1\"}, , {\"key\": \"value2\"}]\n"
+            + "2\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
             + "Success\n",
         result);
   }
@@ -393,8 +404,8 @@ public class ITNpgsqlTest implements IntegrationTest {
     addNullRow();
     String result = execute("TestTextCopyOut", createConnectionString());
     assertEqualsIgnoreControlCharacters(
-        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
-            + "2\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\tP1Y2M3DT4H5M6.789S\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t{\"2022-02-16 17:18:02.123456+01\",NULL,\"2000-01-01 01:00:00+01\"}\t\\N\t{\"2023-02-20\",NULL,\"2000-01-01\"}\t{\"string1\",NULL,\"string2\"}\t{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n"
+            + "2\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
             + "Success\n",
         result);
   }

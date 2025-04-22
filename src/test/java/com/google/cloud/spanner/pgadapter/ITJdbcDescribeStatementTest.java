@@ -96,6 +96,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
                 .to(new BigDecimal("3.14"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00"))
+                .set("col_interval")
+                .to("P1Y2M3DT4H5M6")
                 .set("col_date")
                 .to(com.google.cloud.Date.parseDate("2022-04-29"))
                 .set("col_varchar")
@@ -153,7 +155,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
     for (String sql :
         new String[] {
           "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
-              + "col_timestamptz, col_date, col_varchar, col_jsonb "
+              + "col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
@@ -163,18 +165,19 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_int=? "
               + "and col_numeric=? "
               + "and col_timestamptz=? "
+              + "and col_interval=? "
               + "and col_date=? "
               + "and col_varchar=? "
               + "and col_jsonb::text=?",
           "insert into all_types "
               + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
-              + "col_timestamptz, col_date, col_varchar, col_jsonb) "
-              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              + "col_timestamptz, coL_interval, col_date, col_varchar, col_jsonb) "
+              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           "insert into all_types "
               + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
-              + "col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
               + "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
-              + "col_timestamptz, col_date, col_varchar, col_jsonb "
+              + "col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
@@ -184,13 +187,14 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_int=? "
               + "and col_numeric=? "
               + "and col_timestamptz=? "
+              + "and col_interval=? "
               + "and col_date=? "
               + "and col_varchar=? "
               + "and col_jsonb::text=?",
-          "insert into all_types " + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "insert into all_types " + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           "insert into all_types "
               + "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
-              + "col_timestamptz, col_date, col_varchar, col_jsonb "
+              + "col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
@@ -200,6 +204,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_int=? "
               + "and col_numeric=? "
               + "and col_timestamptz=? "
+              + "and col_interval=? "
               + "and col_date=? "
               + "and col_varchar=? "
               + "and col_jsonb::text=?",
@@ -211,6 +216,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "col_int=?, "
               + "col_numeric=?, "
               + "col_timestamptz=?, "
+              + "col_interval=?, "
               + "col_date=?, "
               + "col_varchar=?, "
               + "col_jsonb=?",
@@ -222,6 +228,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "col_int=null, "
               + "col_numeric=null, "
               + "col_timestamptz=null, "
+              + "col_interval=null, "
               + "col_date=null, "
               + "col_varchar=null, "
               + "col_jsonb=null "
@@ -233,6 +240,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_int=? "
               + "and col_numeric=? "
               + "and col_timestamptz=? "
+              + "and col_interval=? "
               + "and col_date=? "
               + "and col_varchar=? "
               + "and col_jsonb::text=?",
@@ -246,6 +254,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_int=? "
               + "and col_numeric=? "
               + "and col_timestamptz=? "
+              + "and col_interval=? "
               + "and col_date=? "
               + "and col_varchar=? "
               + "and col_jsonb::text=?"
@@ -254,16 +263,16 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
           ParameterMetaData metadata = statement.getParameterMetaData();
           if (sql.startsWith("update all_types set col_bool=?,")) {
-            assertEquals(sql, 10, metadata.getParameterCount());
-          } else {
             assertEquals(sql, 11, metadata.getParameterCount());
+          } else {
+            assertEquals(sql, 12, metadata.getParameterCount());
           }
           for (int index = 1; index <= metadata.getParameterCount(); index++) {
             assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
             assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
           }
           int index = 0;
-          if (metadata.getParameterCount() == 11) {
+          if (metadata.getParameterCount() == 12) {
             assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
           }
           assertEquals(sql, Types.BIT, metadata.getParameterType(++index));
@@ -273,6 +282,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
           assertEquals(sql, Types.NUMERIC, metadata.getParameterType(++index));
           assertEquals(sql, Types.TIMESTAMP, metadata.getParameterType(++index));
+          assertEquals(sql, Types.VARCHAR, metadata.getParameterType(++index));
           assertEquals(sql, Types.DATE, metadata.getParameterType(++index));
           assertEquals(sql, Types.VARCHAR, metadata.getParameterType(++index));
           // jsonb does not support the '=' operator, which means that when a jsonb parameter is
@@ -514,8 +524,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           connection.prepareStatement(
               "insert into all_types "
                   + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
-                  + "col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "col_timestamptz, col_interval, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         // This forces the PG JDBC driver to use binary transfer mode for the results, and will
         // also cause it to send a DescribeStatement message.
         statement.unwrap(PgStatement.class).setPrepareThreshold(-1);
@@ -530,6 +540,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
         statement.setTimestamp(
             ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
+        statement.setString(++index, "P1Y");
         statement.setDate(++index, Date.valueOf("2022-04-29"));
         statement.setString(++index, "string_test");
 
@@ -552,6 +563,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertEquals(
             Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp(),
             resultSet.getTimestamp(++index));
+        assertEquals("P1Y", resultSet.getString(++index));
         assertEquals(Date.valueOf("2022-04-29"), resultSet.getDate(++index));
         assertEquals("string_test", resultSet.getString(++index));
 
@@ -617,6 +629,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertEquals(
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123457+01:00").toSqlTimestamp(),
             resultSet.getTimestamp(++index));
+        assertEquals("P1Y2M3DT4H5M6", resultSet.getString(++index));
         assertEquals(Date.valueOf("2000-02-29"), resultSet.getDate(++index));
         assertEquals("updated", resultSet.getString(++index));
 

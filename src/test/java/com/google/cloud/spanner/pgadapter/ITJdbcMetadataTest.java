@@ -79,7 +79,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   static Iterable<String> getDdlStatements() {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
-    builder.addAll(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
+    builder.addAll(PgAdapterTestEnv.DEFAULT_DATA_MODEL_WITHOUT_COL_INTERVAL);
     builder.addAll(
         Arrays.asList(
             "create unique index idx_numbers_name on numbers (name)",

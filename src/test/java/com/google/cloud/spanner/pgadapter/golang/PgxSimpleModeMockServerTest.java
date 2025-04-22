@@ -155,10 +155,10 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
   public void testQueryAllDataTypes() {
     String sql =
         "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, "
-            + "col_timestamptz, col_date, col_varchar, col_jsonb, "
+            + "col_timestamptz, col_interval, col_date, col_varchar, col_jsonb, "
             + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, "
-            + "col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, "
-            + "col_array_varchar, col_array_jsonb "
+            + "col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, "
+            + "col_array_date, col_array_varchar, col_array_jsonb "
             + "FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 

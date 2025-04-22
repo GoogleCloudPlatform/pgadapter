@@ -215,7 +215,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   @Test
   public void testQueryAllDataTypes() throws IOException, InterruptedException {
-    String sql = "SELECT * FROM all_types WHERE col_bigint=1";
+    String sql =
+        "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
     String result = execute("TestQueryAllDataTypes", createConnectionString());
@@ -378,7 +379,9 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   @Test
   public void testInsertAllDataTypesReturning() throws IOException, InterruptedException {
-    String sql = getInsertAllTypesSql() + " returning *";
+    String sql =
+        getInsertAllTypesSql()
+            + " returning col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(sql)
@@ -641,7 +644,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   public void testBinaryCopyOut() throws IOException, InterruptedException {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of("select * from all_types order by col_bigint"),
+            Statement.of(
+                "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, col_array_varchar, col_array_jsonb from all_types order by col_bigint"),
             ALL_TYPES_RESULTSET.toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
                 .build()));
@@ -774,8 +778,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     for (int i = 1; i <= 2; i++) {
       ExecuteSqlRequest executeRequest = requests.get(i);
       assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-      assertEquals(11, executeRequest.getParamTypesCount());
-      assertEquals(11, executeRequest.getParams().getFieldsCount());
+      assertEquals(12, executeRequest.getParamTypesCount());
+      assertEquals(12, executeRequest.getParams().getFieldsCount());
     }
 
     List<ParseMessage> parseMessages =
@@ -803,7 +807,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             .collect(Collectors.toList());
     assertEquals(2, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(11, bindMessage.getParameters().length);
+    assertEquals(12, bindMessage.getParameters().length);
     List<ExecuteMessage> executeMessages =
         pgServer.getDebugMessages().stream()
             .filter(msg -> msg instanceof ExecuteMessage)

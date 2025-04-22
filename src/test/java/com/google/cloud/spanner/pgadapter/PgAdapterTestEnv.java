@@ -125,6 +125,7 @@ public class PgAdapterTestEnv {
               + "col_int int, "
               + "col_numeric numeric, "
               + "col_timestamptz timestamptz, "
+              + "col_interval varchar, "
               + "col_date date, "
               + "col_varchar varchar(100), "
               + "col_jsonb jsonb, "
@@ -136,13 +137,16 @@ public class PgAdapterTestEnv {
               + "col_array_int int[], "
               + "col_array_numeric numeric[], "
               + "col_array_timestamptz timestamptz[], "
+              + "col_array_interval varchar[], "
               + "col_array_date date[], "
               + "col_array_varchar varchar(100)[], "
               + "col_array_jsonb jsonb[])");
 
-  //  public static boolean useFloat4InTests() {
-  //    return true;
-  //  }
+  public static final ImmutableList<String> DEFAULT_DATA_MODEL_WITHOUT_COL_INTERVAL =
+      DEFAULT_DATA_MODEL.stream()
+          .map(s -> s.replace("col_interval varchar, ", ""))
+          .map(s -> s.replace("col_array_interval varchar[], ", ""))
+          .collect(ImmutableList.toImmutableList());
 
   public static ImmutableList<String> getOnlyAllTypesDdl() {
     return DEFAULT_DATA_MODEL.subList(1, 2);
