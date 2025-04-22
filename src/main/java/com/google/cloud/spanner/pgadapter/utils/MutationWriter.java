@@ -173,9 +173,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     return new TransactionOption[] {Options.priority(copySettings.getCommitPriority())};
   }
 
-  /**
-   * @return number of rows copied into Spanner
-   */
+  /** @return number of rows copied into Spanner */
   public long getRowCount() {
     return this.rowCount;
   }

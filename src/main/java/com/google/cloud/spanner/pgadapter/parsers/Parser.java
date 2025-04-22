@@ -493,9 +493,7 @@ public abstract class Parser<T> {
    */
   public abstract String stringParse();
 
-  /**
-   * @return Binary representation of string data.
-   */
+  /** @return Binary representation of string data. */
   protected byte[] stringBinaryParse() {
     return this.stringParse().getBytes(UTF8);
   }
@@ -509,9 +507,7 @@ public abstract class Parser<T> {
     return this.stringParse();
   }
 
-  /**
-   * @return Binary representation of spanner string data.
-   */
+  /** @return Binary representation of spanner string data. */
   protected byte[] spannerBinaryParse() {
     return this.spannerParse().getBytes(UTF8);
   }

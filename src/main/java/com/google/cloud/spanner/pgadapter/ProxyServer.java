@@ -529,25 +529,19 @@ public class ProxyServer extends AbstractApiService {
     return this.metrics;
   }
 
-  /**
-   * @return the JDBC connection properties that are used by this server
-   */
+  /** @return the JDBC connection properties that are used by this server */
   public Properties getProperties() {
     return (Properties) this.properties.clone();
   }
 
-  /**
-   * @return the current number of connections.
-   */
+  /** @return the current number of connections. */
   public int getNumberOfConnections() {
     synchronized (this.handlers) {
       return this.handlers.size();
     }
   }
 
-  /**
-   * @return the local TCP port that this server is using.
-   */
+  /** @return the local TCP port that this server is using. */
   public int getLocalPort() {
     return localPort;
   }

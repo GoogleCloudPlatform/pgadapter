@@ -80,15 +80,11 @@ public abstract class Command {
    */
   protected abstract Pattern getPattern();
 
-  /**
-   * @return True if the SQL statement matches the pattern.
-   */
+  /** @return True if the SQL statement matches the pattern. */
   public boolean is() {
     return this.matcher.find();
   }
 
-  /**
-   * @return The equivalent Spanner statement for the specified SQL statement.
-   */
+  /** @return The equivalent Spanner statement for the specified SQL statement. */
   public abstract String translate();
 }

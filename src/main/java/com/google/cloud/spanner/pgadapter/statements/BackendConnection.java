@@ -1330,7 +1330,7 @@ public class BackendConnection {
                   "DDL statements are only allowed outside explicit transactions.",
                   SQLState.InvalidTransactionState);
             }
-          // Fall-through to commit the transaction if necessary.
+            // Fall-through to commit the transaction if necessary.
           case AutocommitExplicitTransaction:
             // DDL statements are allowed even in explicit transactions. Commit any transaction that
             // might be active.
@@ -1371,7 +1371,7 @@ public class BackendConnection {
                 "DDL statements are only allowed outside explicit transactions.",
                 SQLState.InvalidTransactionState);
           }
-        // Fallthrough to commit the transaction if necessary.
+          // Fallthrough to commit the transaction if necessary.
         case AutocommitExplicitTransaction:
           // Commit any transaction that might be active and allow executing the statement.
           // Switch the execution state to implicit transaction.
