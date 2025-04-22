@@ -23,6 +23,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -385,7 +386,9 @@ public class BackendConnectionTest {
     ListDatabasesStatement listDatabasesStatement = mock(ListDatabasesStatement.class);
     when(listDatabasesStatement.getSql())
         .thenReturn(new String[] {ListDatabasesStatement.LIST_DATABASES_SQL});
-    when(listDatabasesStatement.execute(any(BackendConnection.class)))
+    when(listDatabasesStatement.execute(
+            any(BackendConnection.class),
+            eq(Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL))))
         .thenReturn(listDatabasesResult);
     ImmutableList<LocalStatement> localStatements = ImmutableList.of(listDatabasesStatement);
     ParsedStatement parsedListDatabasesStatement = mock(ParsedStatement.class);
@@ -410,7 +413,8 @@ public class BackendConnectionTest {
             Function.identity());
     backendConnection.flush();
 
-    verify(listDatabasesStatement).execute(backendConnection);
+    verify(listDatabasesStatement)
+        .execute(backendConnection, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
     assertTrue(resultFuture.isDone());
     assertEquals(listDatabasesResult, resultFuture.get());
   }
@@ -447,7 +451,7 @@ public class BackendConnectionTest {
         backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
-    verify(listDatabasesStatement, never()).execute(backendConnection);
+    verify(listDatabasesStatement, never()).execute(backendConnection, statement);
     assertTrue(resultFuture.isDone());
     assertEquals(statementResult, resultFuture.get());
   }

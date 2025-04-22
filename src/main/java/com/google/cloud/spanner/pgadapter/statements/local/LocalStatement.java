@@ -47,5 +47,5 @@ public interface LocalStatement {
   }
 
   /** Executes the local statement and returns the result. */
-  StatementResult execute(BackendConnection backendConnection);
+  StatementResult execute(BackendConnection backendConnection, Statement statement);
 }
