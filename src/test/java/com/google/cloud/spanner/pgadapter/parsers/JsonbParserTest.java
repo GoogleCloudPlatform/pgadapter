@@ -16,12 +16,14 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -82,9 +84,12 @@ public class JsonbParserTest {
 
   @Test
   public void testBind() {
-    Statement.Builder builder = Statement.newBuilder("select $1");
+    ImmutableMap.Builder<String, Value> builder = ImmutableMap.builder();
     new JsonbParser("{\"key\": \"value\"}".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
         .bind(builder, "p1");
-    assertEquals("{\"key\": \"value\"}", builder.build().getParameters().get("p1").getString());
+    ImmutableMap<String, Value> parameters = builder.build();
+    Value value = parameters.get("p1");
+    assertNotNull(value);
+    assertEquals("{\"key\": \"value\"}", value.getString());
   }
 }

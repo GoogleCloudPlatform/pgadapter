@@ -19,10 +19,11 @@ import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharSource;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -180,7 +181,7 @@ public class BinaryParser extends Parser<ByteArray> {
   }
 
   @Override
-  public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+    parametersBuilder.put(name, Value.bytes(this.item));
   }
 }

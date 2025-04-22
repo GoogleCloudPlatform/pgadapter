@@ -16,13 +16,14 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.common.collect.ImmutableMap;
 import com.google.spanner.v1.TypeAnnotationCode;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -519,5 +520,5 @@ public abstract class Parser<T> {
   /** Used to parse data type onto binary. Override this to change binary representation. */
   protected abstract byte[] binaryParse();
 
-  public abstract void bind(Statement.Builder statementBuilder, String name);
+  public abstract void bind(ImmutableMap.Builder<String, Value> statementBuilder, String name);
 }
