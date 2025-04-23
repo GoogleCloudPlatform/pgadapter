@@ -14,7 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.DEFAULT_DATA_MODEL;
+import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.DEFAULT_DATA_MODEL_WITHOUT_COL_INTERVAL;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -117,7 +117,7 @@ public class ITPsqlTest implements IntegrationTest {
     database =
         testEnv.createDatabase(
             ImmutableList.<String>builder()
-                .addAll(DEFAULT_DATA_MODEL)
+                .addAll(DEFAULT_DATA_MODEL_WITHOUT_COL_INTERVAL)
                 .add(
                     "create table if not exists singers (\n"
                         + "    id         varchar not null primary key,\n"
@@ -282,7 +282,7 @@ public class ITPsqlTest implements IntegrationTest {
           "-c",
           // We need to change the `col_int int` column definition into `col_int bigint` to make the
           // local PostgreSQL database match the actual data model of the Cloud Spanner database.
-          DEFAULT_DATA_MODEL.stream()
+          DEFAULT_DATA_MODEL_WITHOUT_COL_INTERVAL.stream()
                   .map(s -> s.replace("col_int int", "col_int bigint"))
                   .map(s -> s.replace("col_array_int int[]", "col_array_int bigint[]"))
                   .collect(Collectors.joining(";"))
@@ -496,11 +496,13 @@ public class ITPsqlTest implements IntegrationTest {
             + " _date\n"
             + " timestamptz\n"
             + " _timestamptz\n"
+            + " interval\n"
+            + " _interval\n"
             + " _numeric\n"
             + " numeric\n"
             + " jsonb\n"
             + " _jsonb\n"
-            + "(29 rows)\n",
+            + "(31 rows)\n",
         output);
   }
 
@@ -1151,7 +1153,7 @@ public class ITPsqlTest implements IntegrationTest {
     String output;
 
     String createForeignTablesCommand =
-        DEFAULT_DATA_MODEL.stream()
+        DEFAULT_DATA_MODEL_WITHOUT_COL_INTERVAL.stream()
             .map(s -> s.replace("create table ", "create foreign table f_"))
             .map(s -> s.replace("primary key", ""))
             .map(s -> s.replace("col_int int", "col_int bigint"))

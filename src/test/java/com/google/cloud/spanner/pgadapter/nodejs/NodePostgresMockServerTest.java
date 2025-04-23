@@ -481,6 +481,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_int\":\"100\","
             + "\"col_numeric\":\"6.626\","
             + "\"col_timestamptz\":\"2022-02-16T13:18:02.123Z\","
+            + "\"col_interval\":{\"months\":14,\"days\":3},"
             + "\"col_date\":\"2022-03-29\","
             + "\"col_varchar\":\"test\","
             + "\"col_jsonb\":{\"key\":\"value\"},"
@@ -492,6 +493,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_array_int\":[\"-100\",null,\"-200\"],"
             + "\"col_array_numeric\":[6.626,null,-3.14],"
             + "\"col_array_timestamptz\":[\"2022-02-16T16:18:02.123Z\",null,\"2000-01-01T00:00:00.000Z\"],"
+            + "\"col_array_interval\":[{\"months\":-100,\"hours\":34,\"minutes\":17,\"seconds\":36,\"milliseconds\":789},null,{\"months\":12}],"
             + "\"col_array_date\":\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\","
             + "\"col_array_varchar\":[\"string1\",null,\"string2\"],"
             + "\"col_array_jsonb\":[{\"key\":\"value1\"},null,{\"key\":\"value2\"}]}\n",
@@ -523,6 +525,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_int\":null,"
             + "\"col_numeric\":null,"
             + "\"col_timestamptz\":null,"
+            + "\"col_interval\":null,"
             + "\"col_date\":null,"
             + "\"col_varchar\":null,"
             + "\"col_jsonb\":null,"
@@ -534,6 +537,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_array_int\":null,"
             + "\"col_array_numeric\":null,"
             + "\"col_array_timestamptz\":null,"
+            + "\"col_array_interval\":null,"
             + "\"col_array_date\":null,"
             + "\"col_array_varchar\":null,"
             + "\"col_array_jsonb\":null}\n",
@@ -618,10 +622,11 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t14 mons 3 days 04:05:6.789000\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
             + "{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t"
             + "{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
             + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
+            + "{-100 mons 0 days 34:17:36.789000,NULL,12 mons 0 days 00:00:0.000000}\t"
             + "{\"2023-02-20\",NULL,\"2000-01-01\"}\t"
             + "{\"string1\",NULL,\"string2\"}\t"
             + "{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n",

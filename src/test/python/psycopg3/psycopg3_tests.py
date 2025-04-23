@@ -114,23 +114,23 @@ def insert_all_data_types(conn_string: str):
     curs = conn.execute(
       "INSERT INTO all_types "
       "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-      "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-      "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+      "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+      "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
       (100, True, bytearray(b'test_bytes'), 3.14, 3.14, 100, Decimal("6.626"),
        datetime(year=2022, month=3, day=24, hour=6, minute=39, second=10,
-                microsecond=123456, tzinfo=pytz.UTC),
+                microsecond=123456, tzinfo=pytz.UTC), "P1Y2M3DT4H5M6.789S",
        date(2022, 4, 2), "test_string", Jsonb({"key": "value"}),))
     print("Insert count:", curs.rowcount)
 
 
 def insert_all_data_types_binary(conn_string: str):
   insert_all_data_types_with_format(
-    conn_string, "(%b, %b, %b, %b, %b, %b, %b, %b, %b, %b, %b)")
+    conn_string, "(%b, %b, %b, %b, %b, %b, %b, %b, %b, %b, %b, %b)")
 
 
 def insert_all_data_types_text(conn_string: str):
   insert_all_data_types_with_format(
-    conn_string, "(%t, %t, %t, %t, %t, %t, %t, %t, %t, %t, %t)")
+    conn_string, "(%t, %t, %t, %t, %t, %t, %t, %t, %t, %t, %t, %t)")
 
 
 def insert_all_data_types_with_format(conn_string: str, params_string: str):
@@ -139,11 +139,11 @@ def insert_all_data_types_with_format(conn_string: str, params_string: str):
     curs = conn.execute(
       "INSERT INTO all_types "
       "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-      "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+      "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
       "values " + params_string,
       (100, True, bytearray(b'test_bytes'), 3.14, 3.14, 100, Decimal("6.626"),
        datetime(year=2022, month=3, day=24, hour=6, minute=39, second=10,
-                microsecond=123456, tzinfo=pytz.UTC),
+                microsecond=123456, tzinfo=pytz.UTC), "P1Y2M3DT4H5M6.789S",
        date(2022, 4, 2), "test_string", Jsonb({"key": "value"}),))
     print("Insert count:", curs.rowcount)
 
@@ -154,9 +154,9 @@ def insert_nulls_all_data_types(conn_string: str):
     curs = conn.execute(
       "INSERT INTO all_types "
       "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-      "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-      "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-      (100, None, None, None, None, None, None, None, None, None, None,))
+      "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+      "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+      (100, None, None, None, None, None, None, None, None, None, None, None,))
     print("Insert count:", curs.rowcount)
 
 
@@ -166,11 +166,11 @@ def insert_all_data_types_returning(conn_string: str):
     curs = conn.execute(
       "INSERT INTO all_types "
       "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-      "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-      "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) returning *",
+      "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+      "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) returning *",
       (1, True, bytearray(b'test'), 3.14, 3.14, 100, Decimal("6.626"),
        datetime(year=2022, month=2, day=16, hour=13, minute=18, second=2,
-                microsecond=123456, tzinfo=None),
+                microsecond=123456, tzinfo=None), "P1Y2M3DT4H5M6.789S",
        date(2022, 3, 29), "test", Jsonb({"key": "value"}),))
     print_all_types(curs.fetchone())
 
@@ -184,8 +184,8 @@ def insert_batch(conn_string: str):
     curs.executemany(
       "INSERT INTO all_types "
       "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-      "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-      "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", values)
+      "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+      "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", values)
     print("Insert count:", curs.rowcount)
 
 
@@ -200,8 +200,8 @@ def mixed_batch(conn_string: str):
       insert_curs.executemany(
         "INSERT INTO all_types "
         "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-        "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", values)
+        "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", values)
       select_curs.execute(
         "select count(*) from all_types where col_bool=%s", (True,))
       update_curs.execute(
@@ -220,8 +220,8 @@ def batch_execution_error(conn_string: str):
       curs.executemany(
         "INSERT INTO all_types "
         "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-        "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", values)
+        "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", values)
       print("Insert count:", curs.rowcount)
     except Exception as exception:
       print("Executing batch failed with error:", exception)
@@ -403,19 +403,19 @@ def binary_copy_out(conn_string: str):
     with conn.cursor() as cur:
       with cur.copy("COPY all_types (col_bigint, col_bool, col_bytea, "
                     "col_float4, col_float8, col_int, col_numeric, "
-                    "col_timestamptz, col_date, col_varchar, col_jsonb,"
+                    "col_timestamptz, col_interval, col_date, col_varchar, col_jsonb,"
                     "col_array_bigint, col_array_bool, col_array_bytea, "
                     "col_array_float4, col_array_float8, col_array_int, "
-                    "col_array_numeric, col_array_timestamptz, col_array_date, "
+                    "col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, "
                     "col_array_varchar, col_array_jsonb) "
                     "TO STDOUT (FORMAT BINARY)") as copy:
         # We must instruct psycopg3 exactly which types we are using when using
         # binary copy.
         copy.set_types(["bigint", "boolean", "bytea", "float4", "float8",
-                        "bigint", "numeric", "timestamptz", "date", "varchar",
+                        "bigint", "numeric", "timestamptz", "varchar", "date", "varchar",
                         "jsonb", "bigint[]", "boolean[]", "bytea[]", "float4[]",
                         "float8[]", "bigint[]", "numeric[]", "timestamptz[]",
-                        "date[]", "varchar[]", "jsonb[]"])
+                        "varchar[]", "date[]", "varchar[]", "jsonb[]"])
         for row in copy.rows():
           print_all_types(row)
 
@@ -426,16 +426,16 @@ def text_copy_out(conn_string: str):
     with conn.cursor() as cur:
       with cur.copy("COPY all_types (col_bigint, col_bool, col_bytea, "
                     "col_float4, col_float8, col_int, col_numeric, "
-                    "col_timestamptz, col_date, col_varchar, col_jsonb,"
+                    "col_timestamptz, col_interval, col_date, col_varchar, col_jsonb,"
                     "col_array_bigint, col_array_bool, col_array_bytea, "
                     "col_array_float4, col_array_float8, col_array_int, "
-                    "col_array_numeric, col_array_timestamptz, col_array_date, "
+                    "col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, "
                     "col_array_varchar, col_array_jsonb) TO STDOUT") as copy:
         copy.set_types(["bigint", "boolean", "bytea", "float4", "float8",
-                        "bigint", "numeric", "timestamptz", "date", "varchar",
+                        "bigint", "numeric", "timestamptz", "varchar", "date", "varchar",
                         "jsonb", "bigint[]", "boolean[]", "bytea[]", "float4[]",
                         "float8[]", "bigint[]", "numeric[]", "timestamptz[]",
-                        "date[]", "varchar[]", "jsonb[]"])
+                        "varchar[]", "date[]", "varchar[]", "jsonb[]"])
         for row in copy.rows():
           print_all_types(row)
 
@@ -460,22 +460,22 @@ def int8_param(conn_string: str):
 def read_write_transaction(conn_string: str):
   insert_sql = "INSERT INTO all_types " \
         "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, " \
-        "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " \
-        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) " \
+        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
   with psycopg.connect(conn_string) as conn:
     print(conn.execute("SELECT 1").fetchone())
     curs = conn.execute(
       insert_sql,
       (10, True, bytearray(b'test_bytes'), 3.14, 3.14, 100, Decimal("6.626"),
        datetime(year=2022, month=3, day=24, hour=6, minute=39, second=10,
-                microsecond=123456, tzinfo=None),
+                microsecond=123456, tzinfo=None), "P1Y2M3DT4H5M6.789S",
        date(2022, 4, 2), "test_string", Jsonb({"key": "value"}),))
     print("Insert count:", curs.rowcount)
     curs = conn.execute(
       insert_sql,
       (20, True, bytearray(b'test_bytes'), 3.14, 3.14, 100, Decimal("6.626"),
        datetime(year=2022, month=3, day=24, hour=6, minute=39, second=10,
-                microsecond=123456, tzinfo=None),
+                microsecond=123456, tzinfo=None), "P1Y2M3DT4H5M6.789S",
        date(2022, 4, 2), "test_string", Jsonb({"key": "value"}),))
     print("Insert count:", curs.rowcount)
     conn.commit()
@@ -538,7 +538,7 @@ def create_batch_insert_values(batch_size: int):
       (100+i, i % 2 == 0, bytearray(b'%dtest_bytes' % i), 3.14 + i, 3.14 + i, i,
        Decimal(i) + Decimal("0.123"),
        datetime(year=2022, month=3, day=24, hour=i, minute=39, second=10,
-                microsecond=123456, tzinfo=None),
+                microsecond=123456, tzinfo=None), "P1Y2M3DT4H5M6.789S",
        date(2022, 4, i + 1), "test_string%d" % i,
        Jsonb({"key": "value%d" % i}),)
     )
@@ -554,20 +554,22 @@ def print_all_types(row):
   print("col_int:",         row[5])
   print("col_numeric:",     row[6])
   print("col_timestamptz:", None if row[7] is None else row[7].astimezone(pytz.UTC))
-  print("col_date:",        row[8])
-  print("col_string:",      row[9])
-  print("col_jsonb:",       row[10])
-  print("col_array_bigint:",      row[11])
-  print("col_array_bool:",        row[12])
-  print("col_array_bytea:",       None if row[13] is None else list(map(lambda x: None if x is None else bytes(x), row[13])))
-  print("col_array_float4:",      row[14])
-  print("col_array_float8:",      row[15])
-  print("col_array_int:",         row[16])
-  print("col_array_numeric:",     row[17])
-  print("col_array_timestamptz:", None if row[18] is None else list(map(lambda x: None if x is None else x.astimezone(pytz.UTC), row[18])))
-  print("col_array_date:",        row[19])
-  print("col_array_string:",      row[20])
-  print("col_array_jsonb:",       row[21])
+  print("col_interval:",    row[8])
+  print("col_date:",        row[9])
+  print("col_string:",      row[10])
+  print("col_jsonb:",       row[11])
+  print("col_array_bigint:",      row[12])
+  print("col_array_bool:",        row[13])
+  print("col_array_bytea:",       None if row[14] is None else list(map(lambda x: None if x is None else bytes(x), row[14])))
+  print("col_array_float4:",      row[15])
+  print("col_array_float8:",      row[16])
+  print("col_array_int:",         row[17])
+  print("col_array_numeric:",     row[18])
+  print("col_array_timestamptz:", None if row[19] is None else list(map(lambda x: None if x is None else x.astimezone(pytz.UTC), row[19])))
+  print("col_array_interval:",    row[20])
+  print("col_array_date:",        row[21])
+  print("col_array_string:",      row[22])
+  print("col_array_jsonb:",       row[23])
 
 
 parser = argparse.ArgumentParser(description='Run psycopg3 test.')

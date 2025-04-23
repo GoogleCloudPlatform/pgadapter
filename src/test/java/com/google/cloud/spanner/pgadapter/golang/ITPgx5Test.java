@@ -25,6 +25,7 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.Key;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
@@ -143,6 +144,8 @@ public class ITPgx5Test implements IntegrationTest {
                 .to(new BigDecimal("6.626"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123456789+01:00"))
+                .set("col_interval")
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .set("col_date")
                 .to(Date.parseDate("2022-03-29"))
                 .set("col_varchar")

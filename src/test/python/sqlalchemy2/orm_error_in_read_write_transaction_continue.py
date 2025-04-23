@@ -18,6 +18,7 @@ with Session(engine) as session:
       col_int=100,
       col_numeric=decimal.Decimal("6.626"),
       col_timestamptz=datetime.fromisoformat("2011-11-04T00:05:23.123456+00:00"),
+      col_interval="P1Y2M3DT4H5M6.789S",
       col_date=date.fromisoformat("2011-11-04"),
       col_varchar="test string",
       col_jsonb={"key1": "value1", "key2": "value2"}

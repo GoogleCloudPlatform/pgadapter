@@ -76,6 +76,10 @@ import org.postgresql.util.ByteConverter;
 public class Psycopg3MockServerTest extends AbstractMockServerTest {
   static final String DIRECTORY_NAME = "./src/test/python/psycopg3";
 
+  private static final ResultSet ALL_TYPES_RESULTSET =
+      createAllTypesResultSet("1", "", true, true, true);
+  private static final ResultSetMetadata ALL_TYPES_METADATA = ALL_TYPES_RESULTSET.getMetadata();
+
   @Parameter public String host;
 
   @Parameters(name = "host = {0}")
@@ -283,6 +287,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -294,6 +299,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -328,6 +334,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -339,6 +346,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -388,6 +396,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -402,6 +411,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -530,10 +540,12 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-04-02"))
+                .to("P1Y2M3DT4H5M6.789S")
                 .bind("p10")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p11")
+                .to("test_string")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             1L));
@@ -587,10 +599,12 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-04-02"))
+                .to("P1Y2M3DT4H5M6.789S")
                 .bind("p10")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p11")
+                .to("test_string")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             1L));
@@ -620,12 +634,19 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             .collect(Collectors.toList());
     assertEquals(1, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(11, bindMessage.getFormatCodes().length);
-    assertArrayEquals(new short[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, bindMessage.getFormatCodes());
+    assertEquals(12, bindMessage.getFormatCodes().length);
+    assertArrayEquals(
+        new short[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, bindMessage.getFormatCodes());
   }
 
   @Test
   public void testInsertAllDataTypesText() throws Exception {
+    // INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int,
+    // col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)
+    // values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    // {p12: {"key": "value"}, p1: 100, p11: test_string, p2: true, p3: dGVzdF9ieXRlcw==, p4: 3.14,
+    // p5: 3.14, p6: 100, p7: 6.626, p8: 2022-03-24T06:39:10.123456000Z,
+    // p9: P1Y2M3DT4H5M6.789S, p10: 2022-04-02}
     String sql = getInsertAllTypesSql();
     addDescribeInsertAllTypesResult();
     mockSpanner.putStatementResult(
@@ -640,16 +661,20 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
-                .to(100)
+                .to(3.14d)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(100)
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to("test_string")
+                .to("P1Y2M3DT4H5M6.789S")
                 .bind("p10")
+                .to(Date.parseDate("2022-04-02"))
+                .bind("p11")
+                .to("test_string")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             1L));
@@ -686,8 +711,9 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             .collect(Collectors.toList());
     assertEquals(1, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
-    assertEquals(11, bindMessage.getFormatCodes().length);
-    assertArrayEquals(new short[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, bindMessage.getFormatCodes());
+    assertEquals(12, bindMessage.getFormatCodes().length);
+    assertArrayEquals(
+        new short[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, bindMessage.getFormatCodes());
   }
 
   @Test
@@ -717,6 +743,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p10")
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p11")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p12")
                 .to((com.google.cloud.spanner.Value) null)
                 .build(),
             1L));
@@ -754,6 +782,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
+                            TypeCode.STRING,
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.JSON))
@@ -786,10 +815,12 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-03-29"))
+                .to("P1Y2M3DT4H5M6.789S")
                 .bind("p10")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p11")
+                .to("test")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             ResultSet.newBuilder()
@@ -808,6 +839,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -819,6 +851,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -1052,10 +1085,10 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(
                 "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-                    + "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+                    + "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb, "
                     + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, "
                     + "col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, "
-                    + "col_array_date, col_array_varchar, col_array_jsonb from all_types"),
+                    + "col_array_interval, col_array_date, col_array_varchar, col_array_jsonb from all_types"),
             ALL_TYPES_RESULTSET.toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
                 .build()));
@@ -1073,6 +1106,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -1084,6 +1118,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
@@ -1095,6 +1130,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: None\n"
             + "col_numeric: None\n"
             + "col_timestamptz: None\n"
+            + "col_interval: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
             + "col_jsonb: None\n"
@@ -1106,6 +1142,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
+            + "col_array_interval: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
             + "col_array_jsonb: None\n",
@@ -1118,10 +1155,10 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(
                 "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, "
-                    + "col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+                    + "col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb, "
                     + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, "
                     + "col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, "
-                    + "col_array_date, col_array_varchar, col_array_jsonb from all_types"),
+                    + "col_array_interval, col_array_date, col_array_varchar, col_array_jsonb from all_types"),
             ALL_TYPES_RESULTSET.toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
                 .build()));
@@ -1139,6 +1176,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -1150,6 +1188,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
@@ -1161,6 +1200,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: None\n"
             + "col_numeric: None\n"
             + "col_timestamptz: None\n"
+            + "col_interval: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
             + "col_jsonb: None\n"
@@ -1172,6 +1212,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
+            + "col_array_interval: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
             + "col_array_jsonb: None\n",
@@ -1198,6 +1239,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -1209,6 +1251,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
@@ -1220,6 +1263,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: None\n"
             + "col_numeric: None\n"
             + "col_timestamptz: None\n"
+            + "col_interval: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
             + "col_jsonb: None\n"
@@ -1231,6 +1275,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
+            + "col_array_interval: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
             + "col_array_jsonb: None\n",
@@ -1313,10 +1358,12 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                   .bind("p8")
                   .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                   .bind("p9")
-                  .to(Date.parseDate("2022-04-02"))
+                  .to("P1Y2M3DT4H5M6.789S")
                   .bind("p10")
-                  .to("test_string")
+                  .to(Date.parseDate("2022-04-02"))
                   .bind("p11")
+                  .to("test_string")
+                  .bind("p12")
                   .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                   .build(),
               1L));
@@ -1393,6 +1440,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -1404,6 +1452,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -1430,6 +1479,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -1441,6 +1491,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: ['P-100MT123456.789S', None, 'P1Y']\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -1466,8 +1517,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
 
   private static String getInsertAllTypesSql() {
     return "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, "
-        + "col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+        + "col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
   }
 
   private static Statement createBatchInsertStatement(int index) {
@@ -1489,10 +1540,12 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         .bind("p8")
         .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", index)))
         .bind("p9")
-        .to(Date.parseDate(String.format("2022-04-%02d", index + 1)))
+        .to("P1Y2M3DT4H5M6.789S")
         .bind("p10")
-        .to("test_string" + index)
+        .to(Date.parseDate(String.format("2022-04-%02d", index + 1)))
         .bind("p11")
+        .to("test_string" + index)
+        .bind("p12")
         .to(com.google.cloud.spanner.Value.pgJsonb(String.format("{\"key\": \"value%d\"}", index)))
         .build();
   }
@@ -1513,6 +1566,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
+                            TypeCode.STRING,
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.JSON)))

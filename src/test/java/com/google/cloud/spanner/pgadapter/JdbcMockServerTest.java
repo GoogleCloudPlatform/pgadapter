@@ -33,6 +33,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.MockServerHelper;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
@@ -114,6 +115,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PGInterval;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 
@@ -141,6 +143,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
     addRandomResultResults();
     setupJsonbResults();
+    setupIntervalResults();
   }
 
   private static void addRandomResultResults() {
@@ -151,6 +154,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   static void setupJsonbResults() {
     setupJsonbResults(mockSpanner);
+  }
+
+  static void setupIntervalResults() {
+    setupIntervalResults(mockSpanner);
   }
 
   static void setupJsonbResults(MockSpannerServiceImpl mockSpanner) {
@@ -389,6 +396,305 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("3807").build())
                         .build())
                 .build()));
+  }
+
+  static void setupIntervalResults(MockSpannerServiceImpl mockSpanner) {
+    //    mockSpanner.putStatementResult(
+    //        StatementResult.query(
+    //            Statement.newBuilder(
+    //                    "with "
+    //                        + PG_TYPE_PREFIX
+    //                        + "\nSELECT t.oid, t.typname   "
+    //                        + "FROM pg_type t  "
+    //                        + "JOIN pg_namespace n ON t.typnamespace = n.oid "
+    //                        + "WHERE t.typelem = (SELECT oid FROM pg_type WHERE typname = $1) AND
+    // substring(t.typname, 1, 1) = '_' AND t.typlen = -1 AND (n.nspname = $2 OR $3 AND n.nspname
+    // IN ('pg_catalog', 'public')) "
+    //                        + "ORDER BY t.typelem DESC LIMIT 1")
+    //                .bind("p1")
+    //                .to("jsonb")
+    //                .bind("p2")
+    //                .to((String) null)
+    //                .bind("p3")
+    //                .to(true)
+    //                .build(),
+    //            com.google.spanner.v1.ResultSet.newBuilder()
+    //                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64,
+    // TypeCode.STRING)))
+    //                .addRows(
+    //                    ListValue.newBuilder()
+    //                        .addValues(Value.newBuilder().setStringValue("3807").build())
+    //                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+    //                        .build())
+    //                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(1186L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("interval").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(1187L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("_interval").build())
+                        .build())
+                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT e.typdelim FROM pg_type t, pg_type e WHERE t.oid = $1 and t.typelem = e.oid")
+                .bind("p1")
+                .to(Oid.INTERVAL_ARRAY)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(",").build())
+                        .build())
+                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT e.oid, n.nspname  IN ('pg_catalog', 'public'), n.nspname, e.typname "
+                        + "FROM pg_type t JOIN pg_type e ON t.typelem = e.oid "
+                        + "JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(Oid.INTERVAL_ARRAY)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("3802").build())
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                        .build())
+                .build()));
+    //
+    //    mockSpanner.putStatementResult(
+    //        StatementResult.query(
+    //            Statement.newBuilder(
+    //                    "with "
+    //                        + PG_TYPE_PREFIX
+    //                        + "\nSELECT t.typarray, arr.typname   "
+    //                        + "FROM pg_type t  "
+    //                        + "JOIN pg_namespace n ON t.typnamespace = n.oid  "
+    //                        + "JOIN pg_type arr ON arr.oid = t.typarray "
+    //                        + "WHERE t.typname = $1 "
+    //                        + "AND (n.nspname = $2 OR $3 AND n.nspname  IN ('pg_catalog',
+    // 'public')) "
+    //                        + "ORDER BY t.oid DESC LIMIT 1")
+    //                .bind("p1")
+    //                .to("jsonb")
+    //                .bind("p2")
+    //                .to((String) null)
+    //                .bind("p3")
+    //                .to(true)
+    //                .build(),
+    //            com.google.spanner.v1.ResultSet.newBuilder()
+    //                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64,
+    // TypeCode.STRING)))
+    //                .addRows(
+    //                    ListValue.newBuilder()
+    //                        .addValues(Value.newBuilder().setStringValue("3807").build())
+    //                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+    //                        .build())
+    //                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .bind("p1")
+                .to(1187L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("_interval").build())
+                        .addValues(Value.newBuilder().setStringValue("1187").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .bind("p1")
+                .to(1186L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(false).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("interval").build())
+                        .addValues(Value.newBuilder().setStringValue("1186").build())
+                        .build())
+                .build()));
+    //    mockSpanner.putStatementResult(
+    //        StatementResult.query(
+    //            Statement.newBuilder(
+    //                    "with "
+    //                        + PG_TYPE_PREFIX
+    //                        + "\nSELECT typinput='pg_catalog.array_in'::regproc as is_array,
+    // typtype, typname, pg_type.oid   "
+    //                        + "FROM pg_type   "
+    //                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from
+    // pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname
+    //               from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r
+    //         using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+    //                        + "WHERE pg_type.oid = $1  "
+    //                        + "ORDER BY sp.r, pg_type.oid DESC")
+    //                .build(),
+    //            com.google.spanner.v1.ResultSet.newBuilder()
+    //                .setMetadata(
+    //                    ResultSetMetadata.newBuilder()
+    //                        .setRowType(
+    //                            StructType.newBuilder()
+    //                                .addFields(
+    //                                    Field.newBuilder()
+    //                                        .setName("is_array")
+    //
+    // .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+    //                                        .build())
+    //                                .addFields(
+    //                                    Field.newBuilder()
+    //                                        .setName("typtype")
+    //
+    // .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+    //                                        .build())
+    //                                .addFields(
+    //                                    Field.newBuilder()
+    //                                        .setName("typename")
+    //
+    // .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+    //                                        .build())
+    //                                .addFields(
+    //                                    Field.newBuilder()
+    //                                        .setName("oid")
+    //
+    // .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+    //                                        .build())
+    //                                .build())
+    //                        .build())
+    //                .addRows(
+    //                    ListValue.newBuilder()
+    //                        .addValues(Value.newBuilder().setBoolValue(true).build())
+    //                        .addValues(Value.newBuilder().setStringValue("b").build())
+    //                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+    //                        .addValues(Value.newBuilder().setStringValue("3807").build())
+    //                        .build())
+    //                .build()));
   }
 
   /**
@@ -1248,7 +1554,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -1258,11 +1564,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_float8=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
+            + "and col_interval=? "
             + "and col_date=? "
             + "and col_varchar=? "
             + "and col_jsonb=?";
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=$1 "
             + "and col_bool=$2 "
@@ -1272,9 +1579,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_float8=$6 "
             + "and col_numeric=$7 "
             + "and col_timestamptz=$8 "
-            + "and col_date=$9 "
-            + "and col_varchar=$10 "
-            + "and col_jsonb=$11";
+            + "and col_interval=$9 "
+            + "and col_date=$10 "
+            + "and col_varchar=$11 "
+            + "and col_jsonb=$12";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1296,10 +1604,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .bind("p10")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p11")
+                .to("test")
+                .bind("p12")
                 .to("{\"key\": \"value\"}")
                 .build(),
             ALL_TYPES_RESULTSET));
@@ -1307,6 +1617,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     OffsetDateTime offsetDateTime =
         LocalDateTime.of(2022, 2, 16, 13, 18, 2, 123456789).atOffset(ZoneOffset.UTC);
     OffsetDateTime truncatedOffsetDateTime = offsetDateTime.truncatedTo(ChronoUnit.MICROS);
+    PGInterval pgInterval = new PGInterval();
+    pgInterval.setValue("1 year 2 mons 3 days 04:05:06.789");
 
     // Threshold 5 is the default. Use a named prepared statement if it is executed 5 times or more.
     // Threshold 1 means always use a named prepared statement.
@@ -1326,6 +1638,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           preparedStatement.setDouble(++index, 3.14d);
           preparedStatement.setBigDecimal(++index, new BigDecimal("6.626"));
           preparedStatement.setObject(++index, offsetDateTime);
+          preparedStatement.setObject(++index, pgInterval);
           preparedStatement.setObject(++index, LocalDate.of(2022, 3, 29));
           preparedStatement.setString(++index, "test");
           preparedStatement.setString(++index, "{\"key\": \"value\"}");
@@ -1341,6 +1654,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
             assertEquals(
                 truncatedOffsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
+            assertEquals(
+                new PGInterval("14 mons 3 days 4 hours 5 mins 6.789 secs"),
+                resultSet.getObject(++index, PGInterval.class));
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
             assertEquals("test", resultSet.getString(++index));
             assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
@@ -1390,11 +1706,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals("6.626", params.get("p7").getStringValue());
       assertEquals(TypeCode.TIMESTAMP, types.get("p8").getCode());
       assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p8").getStringValue());
-      assertEquals(TypeCode.DATE, types.get("p9").getCode());
-      assertEquals("2022-03-29", params.get("p9").getStringValue());
-      assertEquals(TypeCode.STRING, types.get("p10").getCode());
-      assertEquals("test", params.get("p10").getStringValue());
-      assertEquals("{\"key\": \"value\"}", params.get("p11").getStringValue());
+      assertEquals(TypeCode.INTERVAL, types.get("p9").getCode());
+      assertEquals("P1Y2M3DT4H5M6.789S", params.get("p9").getStringValue());
+      assertEquals(TypeCode.DATE, types.get("p10").getCode());
+      assertEquals("2022-03-29", params.get("p10").getStringValue());
+      assertEquals(TypeCode.STRING, types.get("p11").getCode());
+      assertEquals("test", params.get("p11").getStringValue());
+      assertEquals("{\"key\": \"value\"}", params.get("p12").getStringValue());
 
       mockSpanner.clearRequests();
     }
@@ -3007,13 +3325,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testPreparedStatementReturning() throws SQLException {
     String pgSql =
         "insert into all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) "
             + "returning *";
     String sql =
         "insert into all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+            + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             + "returning *";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -3032,6 +3350,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
                                         TypeCode.TIMESTAMP,
+                                        TypeCode.INTERVAL,
                                         TypeCode.DATE,
                                         TypeCode.STRING,
                                         TypeCode.JSON))
@@ -3059,10 +3378,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .bind("p10")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p11")
+                .to("test")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             com.google.spanner.v1.ResultSet.newBuilder()
@@ -3073,11 +3394,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
     OffsetDateTime zonedDateTime =
         LocalDateTime.of(2022, 2, 16, 13, 18, 2, 123456789).atOffset(ZoneOffset.UTC);
+    PGInterval pgInterval = new PGInterval("1 year 2 mons, 3 days 4 hours 5 mins 6.789 secs");
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         ParameterMetaData parameterMetaData = statement.getParameterMetaData();
         int index = 0;
-        assertEquals(11, parameterMetaData.getParameterCount());
+        assertEquals(12, parameterMetaData.getParameterCount());
         assertEquals(Types.BIGINT, parameterMetaData.getParameterType(++index));
         assertEquals(Types.BIT, parameterMetaData.getParameterType(++index));
         assertEquals(Types.BINARY, parameterMetaData.getParameterType(++index));
@@ -3086,12 +3408,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.BIGINT, parameterMetaData.getParameterType(++index));
         assertEquals(Types.NUMERIC, parameterMetaData.getParameterType(++index));
         assertEquals(Types.TIMESTAMP, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.OTHER, parameterMetaData.getParameterType(++index));
         assertEquals(Types.DATE, parameterMetaData.getParameterType(++index));
         assertEquals(Types.VARCHAR, parameterMetaData.getParameterType(++index));
         assertEquals(Types.OTHER, parameterMetaData.getParameterType(++index));
 
         ResultSetMetaData metadata = statement.getMetaData();
-        assertEquals(22, metadata.getColumnCount());
+        assertEquals(24, metadata.getColumnCount());
         index = 0;
         assertEquals(Types.BIGINT, metadata.getColumnType(++index));
         assertEquals(Types.BIT, metadata.getColumnType(++index));
@@ -3101,10 +3424,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.BIGINT, metadata.getColumnType(++index));
         assertEquals(Types.NUMERIC, metadata.getColumnType(++index));
         assertEquals(Types.TIMESTAMP, metadata.getColumnType(++index));
+        assertEquals(Types.OTHER, metadata.getColumnType(++index));
         assertEquals(Types.DATE, metadata.getColumnType(++index));
         assertEquals(Types.VARCHAR, metadata.getColumnType(++index));
         assertEquals(Types.OTHER, metadata.getColumnType(++index));
 
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
@@ -3126,6 +3451,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         statement.setInt(++index, 100);
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
         statement.setObject(++index, zonedDateTime);
+        statement.setObject(++index, pgInterval);
         statement.setObject(++index, LocalDate.of(2022, 3, 29));
         statement.setString(++index, "test");
         statement.setObject(++index, createJdbcPgJsonbObject("{\"key\": \"value\"}"));
@@ -3323,7 +3649,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         Oid.FLOAT8,
                         Oid.INT8,
                         Oid.DATE,
-                        Oid.TIMESTAMPTZ)
+                        Oid.TIMESTAMPTZ,
+                        Oid.INTERVAL)
                     .stream()
                     .map(String::valueOf)
                     .collect(Collectors.joining(","));
@@ -3398,25 +3725,23 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
           List<ExecuteMessage> executeMessages =
               getWireMessagesOfType(ExecuteMessage.class).stream()
-                  .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-                  .filter(message -> !message.getSql().startsWith("set spanner."))
+                  .filter(message -> message.getSql().equals(SELECT_RANDOM.getSql()))
                   .collect(Collectors.toList());
           int expectedExecuteMessageCount =
               RANDOM_RESULTS_ROW_COUNT / fetchSize
-                  + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
-                  + 2;
+                  + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0);
           assertEquals(expectedExecuteMessageCount, executeMessages.size());
-          assertEquals("", executeMessages.get(0).getName());
           for (ExecuteMessage executeMessage :
               executeMessages.subList(1, executeMessages.size() - 1)) {
             assertEquals(fetchSize, executeMessage.getMaxRows());
           }
-          assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
 
           List<ParseMessage> parseMessages =
               getWireMessagesOfType(ParseMessage.class).stream()
-                  .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-                  .filter(message -> !message.getSql().startsWith("set spanner."))
+                  .filter(
+                      message ->
+                          ImmutableList.of("BEGIN", SELECT_RANDOM.getSql(), "COMMIT")
+                              .contains(message.getSql()))
                   .collect(Collectors.toList());
           assertEquals(3, parseMessages.size());
           assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());

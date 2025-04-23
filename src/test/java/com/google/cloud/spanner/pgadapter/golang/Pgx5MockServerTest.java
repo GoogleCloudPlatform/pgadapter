@@ -25,6 +25,7 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
@@ -239,7 +240,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryAllDataTypes() {
     String sql =
-        "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1";
+        "SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, col_array_varchar, col_array_jsonb FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
     // Request the data of each column once in both text and binary format to ensure that we support
@@ -256,6 +257,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
           Oid.NUMERIC,
           Oid.DATE,
           Oid.TIMESTAMPTZ,
+          Oid.INTERVAL,
           Oid.VARCHAR,
           Oid.JSONB,
         }) {
@@ -322,7 +324,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .bind("p6")
                 .to(1L)
                 .bind("p7")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
@@ -394,7 +396,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .bind("p5")
                 .to(1L)
                 .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p7")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p8")
@@ -415,7 +417,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .bind("p15")
                 .toInt64Array(Arrays.asList(-1L, null, -2L))
                 .bind("p16")
-                .toPgNumericArray(Arrays.asList("-6626e-3", null, "314e-2"))
+                .toPgNumericArray(Arrays.asList("-6.626", null, "3.14"))
                 .bind("p17")
                 .toTimestampArray(
                     Arrays.asList(
@@ -428,7 +430,8 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .bind("p19")
                 .toStringArray(Arrays.asList("string1", null, "string2"))
                 .bind("p20")
-                .toPgJsonbArray(Arrays.asList("{\"key\":\"value1\"}", null, "{\"key\":\"value2\"}"))
+                .toPgJsonbArray(
+                    Arrays.asList("{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"))
                 .build(),
             1L));
 
@@ -453,8 +456,8 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
   public void testInsertAllDataTypesReturning() {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *";
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning *";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -472,6 +475,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
                                         TypeCode.TIMESTAMP,
+                                        TypeCode.INTERVAL,
                                         TypeCode.DATE,
                                         TypeCode.STRING,
                                         TypeCode.JSON))
@@ -494,14 +498,16 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                 .bind("p6")
                 .to(1L)
                 .bind("p7")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .bind("p10")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p11")
+                .to("test_string")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             ResultSet.newBuilder()
@@ -518,6 +524,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
                                         TypeCode.TIMESTAMP,
+                                        TypeCode.INTERVAL,
                                         TypeCode.DATE,
                                         TypeCode.STRING,
                                         TypeCode.JSON))
@@ -584,7 +591,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                   .bind("p5")
                   .to(i)
                   .bind("p6")
-                  .to(com.google.cloud.spanner.Value.pgNumeric(i == 0 ? "123e-3" : i + "123e-3"))
+                  .to(com.google.cloud.spanner.Value.pgNumeric(i + ".123"))
                   .bind("p7")
                   .to(
                       Timestamp.parseTimestamp(
@@ -967,7 +974,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
               .bind("p5")
               .to(i)
               .bind("p6")
-              .to(com.google.cloud.spanner.Value.pgNumeric(i == 0 ? "123e-3" : i + "123e-3"))
+              .to(com.google.cloud.spanner.Value.pgNumeric(i + ".123"))
               .bind("p7")
               .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", i)))
               .bind("p8")
@@ -1223,7 +1230,7 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
                   .bind("p5")
                   .to(1L)
                   .bind("p6")
-                  .to(com.google.cloud.spanner.Value.pgNumeric("6626e-3"))
+                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                   .bind("p7")
                   .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                   .bind("p8")

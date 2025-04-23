@@ -119,6 +119,8 @@ public class ArrayParser extends Parser<List<?>> {
         return value.getStringArray();
       case TIMESTAMP:
         return value.getTimestampArray();
+      case INTERVAL:
+        return value.getIntervalArray();
       case FLOAT32:
         return value.getFloat32Array();
       case FLOAT64:

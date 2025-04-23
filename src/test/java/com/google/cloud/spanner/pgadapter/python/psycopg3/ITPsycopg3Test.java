@@ -26,6 +26,7 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.Key;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
@@ -115,6 +116,8 @@ public class ITPsycopg3Test implements IntegrationTest {
                 .to(new BigDecimal("6.626"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123456789+01:00"))
+                .set("col_interval")
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .set("col_date")
                 .to(Date.parseDate("2022-03-29"))
                 .set("col_varchar")
@@ -195,6 +198,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -206,6 +210,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: None\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -224,6 +229,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -235,6 +241,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: None\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -270,6 +277,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -284,6 +292,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: None\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n",
@@ -356,6 +365,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -367,6 +377,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
+            + "col_array_interval: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
             + "col_array_jsonb: None\n",
@@ -550,6 +561,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -561,6 +573,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: None\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n";
@@ -573,6 +586,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: None\n"
             + "col_numeric: None\n"
             + "col_timestamptz: None\n"
+            + "col_interval: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
             + "col_jsonb: None\n"
@@ -584,6 +598,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
+            + "col_array_interval: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
             + "col_array_jsonb: None\n";
@@ -610,6 +625,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -621,6 +637,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: None\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n";
@@ -633,6 +650,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: None\n"
             + "col_numeric: None\n"
             + "col_timestamptz: None\n"
+            + "col_interval: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
             + "col_jsonb: None\n"
@@ -644,6 +662,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
+            + "col_array_interval: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
             + "col_array_jsonb: None\n";
@@ -670,6 +689,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
             + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_interval: P1Y2M3DT4H5M6.789S\n"
             + "col_date: 2022-03-29\n"
             + "col_string: test\n"
             + "col_jsonb: {'key': 'value'}\n"
@@ -681,6 +701,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: [-100, None, -200]\n"
             + "col_array_numeric: [Decimal('6.626'), None, Decimal('-3.14')]\n"
             + "col_array_timestamptz: [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=<UTC>), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=<UTC>)]\n"
+            + "col_array_interval: None\n"
             + "col_array_date: [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)]\n"
             + "col_array_string: ['string1', None, 'string2']\n"
             + "col_array_jsonb: [{'key': 'value1'}, None, {'key': 'value2'}]\n"
@@ -692,6 +713,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_int: None\n"
             + "col_numeric: None\n"
             + "col_timestamptz: None\n"
+            + "col_interval: None\n"
             + "col_date: None\n"
             + "col_string: None\n"
             + "col_jsonb: None\n"
@@ -703,6 +725,7 @@ public class ITPsycopg3Test implements IntegrationTest {
             + "col_array_int: None\n"
             + "col_array_numeric: None\n"
             + "col_array_timestamptz: None\n"
+            + "col_array_interval: None\n"
             + "col_array_date: None\n"
             + "col_array_string: None\n"
             + "col_array_jsonb: None\n",

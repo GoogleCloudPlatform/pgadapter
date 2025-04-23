@@ -95,6 +95,8 @@ public abstract class Parser<T> {
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return new TimestampParser(item, formatCode, sessionState);
+      case Oid.INTERVAL:
+        return new IntervalParser(item, formatCode);
       case Oid.JSONB:
         return new JsonbParser(item, formatCode);
 
@@ -113,6 +115,7 @@ public abstract class Parser<T> {
       case Oid.UUID_ARRAY:
       case Oid.TIMESTAMP_ARRAY:
       case Oid.TIMESTAMPTZ_ARRAY:
+      case Oid.INTERVAL_ARRAY:
       case Oid.JSONB_ARRAY:
         int elementOid = getArrayElementOid(oidType);
         return new ArrayParser(item, formatCode, sessionState, toType(elementOid), elementOid);
@@ -159,6 +162,8 @@ public abstract class Parser<T> {
         return Oid.TIMESTAMP;
       case Oid.TIMESTAMPTZ_ARRAY:
         return Oid.TIMESTAMPTZ;
+      case Oid.INTERVAL_ARRAY:
+        return Oid.INTERVAL;
       case Oid.JSONB_ARRAY:
         return Oid.JSONB;
       default:
@@ -196,6 +201,8 @@ public abstract class Parser<T> {
         return new StringParser(result, columnarPosition);
       case TIMESTAMP:
         return new TimestampParser(result, columnarPosition, sessionState);
+      case INTERVAL:
+        return new IntervalParser(result, columnarPosition);
       case PG_JSONB:
         return new JsonbParser(result, columnarPosition);
       case ARRAY:
@@ -236,6 +243,8 @@ public abstract class Parser<T> {
         return new StringParser(result);
       case TIMESTAMP:
         return new TimestampParser(result, sessionState);
+      case INTERVAL:
+        return new IntervalParser(result);
       case PG_JSONB:
         return new JsonbParser(result);
       case NUMERIC:
@@ -274,6 +283,8 @@ public abstract class Parser<T> {
         return Oid.BYTEA;
       case TIMESTAMP:
         return Oid.TIMESTAMPTZ;
+      case INTERVAL:
+        return Oid.INTERVAL;
       case DATE:
         return Oid.DATE;
       case ARRAY:
@@ -298,6 +309,8 @@ public abstract class Parser<T> {
             return Oid.BYTEA_ARRAY;
           case TIMESTAMP:
             return Oid.TIMESTAMPTZ_ARRAY;
+          case INTERVAL:
+            return Oid.INTERVAL_ARRAY;
           case DATE:
             return Oid.DATE_ARRAY;
           case NUMERIC:
@@ -346,6 +359,8 @@ public abstract class Parser<T> {
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return Type.timestamp();
+      case Oid.INTERVAL:
+        return Type.interval();
       case Oid.JSONB:
         return Type.pgJsonb();
 
@@ -364,6 +379,7 @@ public abstract class Parser<T> {
       case Oid.UUID_ARRAY:
       case Oid.TIMESTAMP_ARRAY:
       case Oid.TIMESTAMPTZ_ARRAY:
+      case Oid.INTERVAL_ARRAY:
       case Oid.JSONB_ARRAY:
         return Type.array(toType(getArrayElementOid(oid)));
 
@@ -403,6 +419,8 @@ public abstract class Parser<T> {
         return Oid.BYTEA;
       case TIMESTAMP:
         return Oid.TIMESTAMPTZ;
+      case INTERVAL:
+        return Oid.INTERVAL;
       case DATE:
         return Oid.DATE;
       case ARRAY:
@@ -428,6 +446,8 @@ public abstract class Parser<T> {
             return Oid.BYTEA_ARRAY;
           case TIMESTAMP:
             return Oid.TIMESTAMPTZ_ARRAY;
+          case INTERVAL:
+            return Oid.INTERVAL_ARRAY;
           case DATE:
             return Oid.DATE_ARRAY;
           case ARRAY:
