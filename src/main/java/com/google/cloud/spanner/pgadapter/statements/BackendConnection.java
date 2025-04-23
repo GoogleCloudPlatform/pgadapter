@@ -345,7 +345,7 @@ public class BackendConnection {
           // Ignore the statement as it is a no-op to execute COMMIT/ROLLBACK when we are not in a
           // transaction. TODO: Return a warning.
           result.set(NO_RESULT);
-        } else if (parsedStatement.getSqlWithoutComments().isEmpty()) {
+        } else if (SimpleParser.isEmpty(statement.getSql())) {
           result.set(NO_RESULT);
         } else if (parsedStatement.isDdl()) {
           if (analyze) {
@@ -542,7 +542,7 @@ public class BackendConnection {
           || (parsedStatement.getType() == StatementType.CLIENT_SIDE
               && parsedStatement.getClientSideStatementType()
                   == ClientSideStatementType.RESET_ALL)) {
-        return SessionStatementParser.parse(parsedStatement);
+        return SessionStatementParser.parse(parsedStatement, statement.getSql());
       }
       return null;
     }
@@ -1077,9 +1077,10 @@ public class BackendConnection {
         // Special case: If the setting is one that is handled by the Connection API, then we need
         // to execute the statement on the connection instead.
         try {
-          ParsedStatement parsedStatement = statementParser.parse(Statement.of("set " + command));
+          Statement statement = Statement.of("set " + command);
+          ParsedStatement parsedStatement = statementParser.parse(statement);
           if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
-            this.spannerConnection.execute(Statement.of(parsedStatement.getSqlWithoutComments()));
+            this.spannerConnection.execute(Statement.of(statement.getSql()));
             continue;
           }
         } catch (Throwable ignore) {

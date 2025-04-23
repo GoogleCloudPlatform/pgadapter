@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.ResetStatement;
+import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SetStatement;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.ShowStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -34,163 +35,108 @@ public class SessionStatementParserTest {
   private static final AbstractStatementParser PG_PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
+  static SessionStatement parse(String sql) {
+    return SessionStatementParser.parse(PG_PARSER.parse(Statement.of(sql)), sql);
+  }
+
   @Test
   public void testParseShowAll() {
-    assertEquals(
-        ShowStatement.createShowAll(),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show all"))));
+    assertEquals(ShowStatement.createShowAll(), parse("show all"));
   }
 
   @Test
   public void testParseShow() {
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo", "bar")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show foo.bar"))));
+    assertEquals(new ShowStatement(new TableOrIndexName("foo", "bar")), parse("show foo.bar"));
 
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show foo"))));
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show \"foo\""))));
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show\t\"foo\""))));
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show FOO"))));
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show \"FOO\""))));
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show\t\"FOO\""))));
+    assertEquals(new ShowStatement(new TableOrIndexName("foo")), parse("show foo"));
+    assertEquals(new ShowStatement(new TableOrIndexName("foo")), parse("show \"foo\""));
+    assertEquals(new ShowStatement(new TableOrIndexName("foo")), parse("show\t\"foo\""));
+    assertEquals(new ShowStatement(new TableOrIndexName("foo")), parse("show FOO"));
+    assertEquals(new ShowStatement(new TableOrIndexName("foo")), parse("show \"FOO\""));
+    assertEquals(new ShowStatement(new TableOrIndexName("foo")), parse("show\t\"FOO\""));
 
+    assertEquals(new ShowStatement(new TableOrIndexName("foo", "bar")), parse("show foo.bar"));
+    assertEquals(new ShowStatement(new TableOrIndexName("foo", "bar")), parse("show \"FOO\".bar"));
     assertEquals(
-        new ShowStatement(new TableOrIndexName("foo", "bar")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show foo.bar"))));
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo", "bar")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show \"FOO\".bar"))));
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("foo", "bar")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show\t\"FOO\".\"Bar\""))));
+        new ShowStatement(new TableOrIndexName("foo", "bar")), parse("show\t\"FOO\".\"Bar\""));
 
-    assertThrows(
-        SpannerException.class,
-        () -> SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show"))));
-    assertThrows(
-        SpannerException.class,
-        () -> SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show foo bar"))));
+    assertThrows(SpannerException.class, () -> parse("show"));
+    assertThrows(SpannerException.class, () -> parse("show foo bar"));
   }
 
   @Test
   public void testParseReset() {
-    assertEquals(
-        new ResetStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset foo"))));
-    assertEquals(
-        new ResetStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset \"foo\""))));
-    assertEquals(
-        new ResetStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset\t\"foo\""))));
-    assertEquals(
-        new ResetStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset FOO"))));
-    assertEquals(
-        new ResetStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset \"FOO\""))));
-    assertEquals(
-        new ResetStatement(new TableOrIndexName("foo")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset\t\"FOO\""))));
+    assertEquals(new ResetStatement(new TableOrIndexName("foo")), parse("reset foo"));
+    assertEquals(new ResetStatement(new TableOrIndexName("foo")), parse("reset \"foo\""));
+    assertEquals(new ResetStatement(new TableOrIndexName("foo")), parse("reset\t\"foo\""));
+    assertEquals(new ResetStatement(new TableOrIndexName("foo")), parse("reset FOO"));
+    assertEquals(new ResetStatement(new TableOrIndexName("foo")), parse("reset \"FOO\""));
+    assertEquals(new ResetStatement(new TableOrIndexName("foo")), parse("reset\t\"FOO\""));
 
+    assertEquals(new ResetStatement(new TableOrIndexName("foo", "bar")), parse("reset foo.bar"));
     assertEquals(
-        new ResetStatement(new TableOrIndexName("foo", "bar")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset foo.bar"))));
+        new ResetStatement(new TableOrIndexName("foo", "bar")), parse("reset \"FOO\".bar"));
     assertEquals(
-        new ResetStatement(new TableOrIndexName("foo", "bar")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset \"FOO\".bar"))));
-    assertEquals(
-        new ResetStatement(new TableOrIndexName("foo", "bar")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset\t\"FOO\".\"Bar\""))));
+        new ResetStatement(new TableOrIndexName("foo", "bar")), parse("reset\t\"FOO\".\"Bar\""));
 
-    assertThrows(
-        SpannerException.class,
-        () -> SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset"))));
-    assertThrows(
-        SpannerException.class,
-        () -> SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset foo bar"))));
+    assertThrows(SpannerException.class, () -> parse("reset"));
+    assertThrows(SpannerException.class, () -> parse("reset foo bar"));
   }
 
   @Test
   public void testParseResetAll() {
-    assertEquals(
-        ResetStatement.createResetAll(),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset all"))));
+    assertEquals(ResetStatement.createResetAll(), parse("reset all"));
   }
 
   @Test
   public void testParseSetTo() {
     assertEquals(
-        new SetStatement(false, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set foo to bar"))));
+        new SetStatement(false, new TableOrIndexName("foo"), "bar"), parse("set foo to bar"));
     assertEquals(
         new SetStatement(false, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set session foo to bar"))));
+        parse("set session foo to bar"));
     assertEquals(
-        new SetStatement(true, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set local foo to bar"))));
+        new SetStatement(true, new TableOrIndexName("foo"), "bar"), parse("set local foo to bar"));
     assertEquals(
-        new SetStatement(false, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set \"foo\" to 'bar'"))));
+        new SetStatement(false, new TableOrIndexName("foo"), "bar"), parse("set \"foo\" to 'bar'"));
     assertEquals(
         new SetStatement(false, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set \"foo\" to \"bar\""))));
+        parse("set \"foo\" to \"bar\""));
     assertEquals(
-        new SetStatement(false, new TableOrIndexName("foo"), null),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set foo to default"))));
+        new SetStatement(false, new TableOrIndexName("foo"), null), parse("set foo to default"));
   }
 
   @Test
   public void testParseSetEquals() {
     assertEquals(
-        new SetStatement(false, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set foo = bar"))));
+        new SetStatement(false, new TableOrIndexName("foo"), "bar"), parse("set foo = bar"));
     assertEquals(
         new SetStatement(false, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set session foo = bar"))));
+        parse("set session foo = bar"));
     assertEquals(
-        new SetStatement(true, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set local foo = bar"))));
+        new SetStatement(true, new TableOrIndexName("foo"), "bar"), parse("set local foo = bar"));
     assertEquals(
-        new SetStatement(false, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set \"foo\" = 'bar'"))));
+        new SetStatement(false, new TableOrIndexName("foo"), "bar"), parse("set \"foo\" = 'bar'"));
     assertEquals(
         new SetStatement(false, new TableOrIndexName("foo"), "bar"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set \"foo\" = \"bar\""))));
+        parse("set \"foo\" = \"bar\""));
     assertEquals(
-        new SetStatement(false, new TableOrIndexName("foo"), null),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set foo = default"))));
+        new SetStatement(false, new TableOrIndexName("foo"), null), parse("set foo = default"));
   }
 
   @Test
   public void testSetTimeZone() {
     assertEquals(
         new SetStatement(false, new TableOrIndexName("TIMEZONE"), "'UTC'"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set time zone 'UTC'"))));
+        parse("set time zone 'UTC'"));
     assertEquals(
         new SetStatement(false, new TableOrIndexName("TIMEZONE"), "'UTC'"),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set TIME ZONE 'UTC'"))));
+        parse("set TIME ZONE 'UTC'"));
   }
 
   @Test
   public void testShowTimeZone() {
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("timezone")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show time zone"))));
-    assertEquals(
-        new ShowStatement(new TableOrIndexName("timezone")),
-        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show TIME ZONE"))));
+    assertEquals(new ShowStatement(new TableOrIndexName("timezone")), parse("show time zone"));
+    assertEquals(new ShowStatement(new TableOrIndexName("timezone")), parse("show TIME ZONE"));
   }
 }

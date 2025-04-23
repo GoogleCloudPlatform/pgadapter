@@ -19,6 +19,7 @@ import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isComma
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
@@ -72,23 +73,25 @@ public class SimpleQueryStatement {
     for (Statement originalStatement : this.statements) {
       boolean isFirst = this.statements.get(0) == originalStatement;
       try {
-        ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
-        ParsedStatement parsedStatement = originalParsedStatement;
+        ParsedStatement parsedStatement = PARSER.parse(originalStatement);
+        Statement statement = originalStatement;
         if (options.requiresMatcher()
             || connectionHandler.getWellKnownClient() == WellKnownClient.PSQL) {
-          parsedStatement = translatePotentialMetadataCommand(parsedStatement, connectionHandler);
+          statement = translatePotentialMetadataCommand(statement, connectionHandler);
         }
-        parsedStatement =
+        Tuple<Boolean, String> potentiallyReplacedStatement =
             replaceKnownUnsupportedQueries(
-                this.connectionHandler.getWellKnownClient(), this.options, parsedStatement);
-        if (parsedStatement != originalParsedStatement) {
+                this.connectionHandler.getWellKnownClient(), this.options, statement.getSql());
+        if (potentiallyReplacedStatement.x()
+            && !potentiallyReplacedStatement.y().equals(statement.getSql())) {
           // The original statement was replaced.
-          originalStatement = Statement.of(parsedStatement.getSqlWithoutComments());
+          statement = Statement.of(potentiallyReplacedStatement.y());
+          parsedStatement = PARSER.parse(statement);
         }
         // We need to flush the entire pipeline if we encounter a COPY statement, as COPY statements
         // require additional messages to be sent back and forth, and this ensures that we get
         // everything in the correct order.
-        boolean isCopy = isCommand(COPY, parsedStatement.getSqlWithoutComments());
+        boolean isCopy = isCommand(COPY, statement.getSql());
         if (!isFirst && isCopy) {
           new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
           if (connectionHandler
@@ -99,7 +102,7 @@ public class SimpleQueryStatement {
             break;
           }
         }
-        new ParseMessage(connectionHandler, parsedStatement, originalStatement).send();
+        new ParseMessage(connectionHandler, parsedStatement, statement).send();
         new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
         new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
         new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
@@ -112,17 +115,13 @@ public class SimpleQueryStatement {
   }
 
   /** Replaces any known unsupported query (e.g. JDBC metadata queries). */
-  static ParsedStatement replaceKnownUnsupportedQueries(
-      WellKnownClient client, OptionsMetadata options, ParsedStatement parsedStatement) {
+  static Tuple<Boolean, String> replaceKnownUnsupportedQueries(
+      WellKnownClient client, OptionsMetadata options, String sql) {
     if ((options.isReplaceJdbcMetadataQueries() || client == WellKnownClient.JDBC)
-        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
-            parsedStatement.getSqlWithoutComments())) {
-      return PARSER.parse(
-          Statement.of(
-              JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(
-                  parsedStatement.getSqlWithoutComments())));
+        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
+      return Tuple.of(Boolean.TRUE, JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql));
     }
-    return parsedStatement;
+    return Tuple.of(Boolean.FALSE, sql);
   }
 
   /**
@@ -134,24 +133,24 @@ public class SimpleQueryStatement {
    *     returns the original Statement.
    */
   @VisibleForTesting
-  static ParsedStatement translatePotentialMetadataCommand(
-      ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
+  static Statement translatePotentialMetadataCommand(
+      Statement parsedStatement, ConnectionHandler connectionHandler) {
     Tracer tracer = connectionHandler.getExtendedQueryProtocolHandler().getTracer();
     Span span =
         tracer
             .spanBuilder("translatePotentialMetadataCommand")
             .setAttribute(
                 "pgadapter.connection_id", connectionHandler.getTraceConnectionId().toString())
-            .setAttribute(DB_STATEMENT, parsedStatement.getSqlWithoutComments())
+            .setAttribute(DB_STATEMENT, parsedStatement.getSql())
             .startSpan();
     try (Scope ignore = span.makeCurrent()) {
       for (Command currentCommand :
           Command.getCommands(
-              parsedStatement.getSqlWithoutComments(),
+              parsedStatement.getSql(),
               connectionHandler.getSpannerConnection(),
               connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
         if (currentCommand.is()) {
-          return PARSER.parse(Statement.of(currentCommand.translate()));
+          return Statement.of(currentCommand.translate());
         }
       }
       return parsedStatement;

@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.statements.MoveStatement.MOVE_C
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
@@ -98,19 +99,22 @@ public class IntermediateStatement {
       Statement originalStatement) {
     this.connectionHandler = connectionHandler;
     this.options = options;
-    ParsedStatement potentiallyReplacedStatement =
+    Tuple<Boolean, String> potentiallyReplacedStatement =
         SimpleQueryStatement.replaceKnownUnsupportedQueries(
-            this.connectionHandler.getWellKnownClient(), this.options, parsedStatement);
+            this.connectionHandler.getWellKnownClient(), this.options, originalStatement.getSql());
     // Check if we need to create a new 'original' statement. The original statement is what will be
     // sent to Cloud Spanner, as the statement might include query hints in comments.
-    if (potentiallyReplacedStatement == parsedStatement) {
-      this.originalStatement = originalStatement;
+    if (potentiallyReplacedStatement.x()
+        && !originalStatement.getSql().equals(potentiallyReplacedStatement.y())) {
+      this.originalStatement = Statement.of(potentiallyReplacedStatement.y());
+      this.parsedStatement =
+          AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(this.originalStatement);
     } else {
-      this.originalStatement = Statement.of(potentiallyReplacedStatement.getSqlWithoutComments());
+      this.originalStatement = originalStatement;
+      this.parsedStatement = parsedStatement;
     }
-    this.parsedStatement = potentiallyReplacedStatement;
     this.connection = connectionHandler.getSpannerConnection();
-    this.command = parseCommand(this.parsedStatement.getSqlWithoutComments());
+    this.command = parseCommand(this.originalStatement.getSql());
     this.commandTag = this.command;
     this.outputStream = connectionHandler.getConnectionMetadata().getOutputStream();
   }
@@ -243,7 +247,7 @@ public class IntermediateStatement {
   }
 
   public String getStatement() {
-    return this.parsedStatement.getSqlWithoutComments();
+    return this.originalStatement.getSql();
   }
 
   @VisibleForTesting
@@ -287,7 +291,7 @@ public class IntermediateStatement {
   }
 
   public String getSql() {
-    return this.parsedStatement.getSqlWithoutComments();
+    return this.originalStatement.getSql();
   }
 
   /** Returns any execution exception registered for this statement. */
