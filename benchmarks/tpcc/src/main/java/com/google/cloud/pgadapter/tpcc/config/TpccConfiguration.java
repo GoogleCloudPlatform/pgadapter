@@ -54,8 +54,6 @@ public class TpccConfiguration {
   /** --- Optimizations --- */
   private boolean useReadOnlyTransactions;
 
-  private boolean lockScannedRanges;
-
   public boolean isLoadData() {
     return loadData;
   }
@@ -150,13 +148,5 @@ public class TpccConfiguration {
 
   public void setUseReadOnlyTransactions(boolean useReadOnlyTransactions) {
     this.useReadOnlyTransactions = useReadOnlyTransactions;
-  }
-
-  public boolean isLockScannedRanges() {
-    return lockScannedRanges;
-  }
-
-  public void setLockScannedRanges(boolean lockScannedRanges) {
-    this.lockScannedRanges = lockScannedRanges;
   }
 }
