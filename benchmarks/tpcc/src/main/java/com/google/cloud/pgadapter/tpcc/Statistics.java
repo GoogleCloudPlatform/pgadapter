@@ -49,7 +49,6 @@ class Statistics {
                 \rNum threads:    %d\t
                 \rDuration:       %s\t
                 \rRead-only tx:   %s\t
-                \rExclusive lock: %s\t
                 \r
                 \rNew orders:     %d (%.2f/s)\t
                 \rPayments:       %d (%.2f/s)\t
@@ -67,7 +66,6 @@ class Statistics {
         tpccConfiguration.getBenchmarkThreads(),
         runtime,
         tpccConfiguration.isUseReadOnlyTransactions(),
-        tpccConfiguration.isLockScannedRanges(),
         getNewOrder(),
         getNewOrderPerSecond(runtime),
         getPayment(),

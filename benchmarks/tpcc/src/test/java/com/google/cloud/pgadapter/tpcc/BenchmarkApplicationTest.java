@@ -77,7 +77,6 @@ public class BenchmarkApplicationTest {
       System.setProperty("tpcc.run-benchmark", "false");
       System.setProperty("tpcc.benchmark-runner", "pgadapter");
       System.setProperty("tpcc.use-read-only-transactions", "true");
-      System.setProperty("tpcc.lock-scanned-ranges", "false");
       System.setProperty("spanner.project", "test-project");
       System.setProperty("spanner.instance", "test-instance");
       System.setProperty("spanner.database", "tpcc");
