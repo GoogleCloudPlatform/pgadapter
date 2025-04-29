@@ -108,9 +108,7 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameter;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
@@ -119,8 +117,9 @@ import org.postgresql.util.PGInterval;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
+  private static final String pgVersion = "14.1";
   private static final int RANDOM_RESULTS_ROW_COUNT = 10;
   private static final Statement SELECT_RANDOM = Statement.of("select * from random_table");
   private static final ImmutableList<String> JDBC_STARTUP_STATEMENTS =
@@ -128,13 +127,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           "SET extra_float_digits = 2",
           "SET extra_float_digits = 3",
           "SET application_name = 'PostgreSQL JDBC Driver'");
-
-  @Parameter public String pgVersion;
-
-  @Parameters(name = "pgVersion = {0}")
-  public static Object[] data() {
-    return new Object[] {"1.0", "14.1"};
-  }
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -399,35 +391,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   static void setupIntervalResults(MockSpannerServiceImpl mockSpanner) {
-    //    mockSpanner.putStatementResult(
-    //        StatementResult.query(
-    //            Statement.newBuilder(
-    //                    "with "
-    //                        + PG_TYPE_PREFIX
-    //                        + "\nSELECT t.oid, t.typname   "
-    //                        + "FROM pg_type t  "
-    //                        + "JOIN pg_namespace n ON t.typnamespace = n.oid "
-    //                        + "WHERE t.typelem = (SELECT oid FROM pg_type WHERE typname = $1) AND
-    // substring(t.typname, 1, 1) = '_' AND t.typlen = -1 AND (n.nspname = $2 OR $3 AND n.nspname
-    // IN ('pg_catalog', 'public')) "
-    //                        + "ORDER BY t.typelem DESC LIMIT 1")
-    //                .bind("p1")
-    //                .to("jsonb")
-    //                .bind("p2")
-    //                .to((String) null)
-    //                .bind("p3")
-    //                .to(true)
-    //                .build(),
-    //            com.google.spanner.v1.ResultSet.newBuilder()
-    //                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64,
-    // TypeCode.STRING)))
-    //                .addRows(
-    //                    ListValue.newBuilder()
-    //                        .addValues(Value.newBuilder().setStringValue("3807").build())
-    //                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
-    //                        .build())
-    //                .build()));
-
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
@@ -515,36 +478,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("jsonb").build())
                         .build())
                 .build()));
-    //
-    //    mockSpanner.putStatementResult(
-    //        StatementResult.query(
-    //            Statement.newBuilder(
-    //                    "with "
-    //                        + PG_TYPE_PREFIX
-    //                        + "\nSELECT t.typarray, arr.typname   "
-    //                        + "FROM pg_type t  "
-    //                        + "JOIN pg_namespace n ON t.typnamespace = n.oid  "
-    //                        + "JOIN pg_type arr ON arr.oid = t.typarray "
-    //                        + "WHERE t.typname = $1 "
-    //                        + "AND (n.nspname = $2 OR $3 AND n.nspname  IN ('pg_catalog',
-    // 'public')) "
-    //                        + "ORDER BY t.oid DESC LIMIT 1")
-    //                .bind("p1")
-    //                .to("jsonb")
-    //                .bind("p2")
-    //                .to((String) null)
-    //                .bind("p3")
-    //                .to(true)
-    //                .build(),
-    //            com.google.spanner.v1.ResultSet.newBuilder()
-    //                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64,
-    // TypeCode.STRING)))
-    //                .addRows(
-    //                    ListValue.newBuilder()
-    //                        .addValues(Value.newBuilder().setStringValue("3807").build())
-    //                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
-    //                        .build())
-    //                .build()));
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
@@ -641,60 +574,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("1186").build())
                         .build())
                 .build()));
-    //    mockSpanner.putStatementResult(
-    //        StatementResult.query(
-    //            Statement.newBuilder(
-    //                    "with "
-    //                        + PG_TYPE_PREFIX
-    //                        + "\nSELECT typinput='pg_catalog.array_in'::regproc as is_array,
-    // typtype, typname, pg_type.oid   "
-    //                        + "FROM pg_type   "
-    //                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from
-    // pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname
-    //               from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r
-    //         using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
-    //                        + "WHERE pg_type.oid = $1  "
-    //                        + "ORDER BY sp.r, pg_type.oid DESC")
-    //                .build(),
-    //            com.google.spanner.v1.ResultSet.newBuilder()
-    //                .setMetadata(
-    //                    ResultSetMetadata.newBuilder()
-    //                        .setRowType(
-    //                            StructType.newBuilder()
-    //                                .addFields(
-    //                                    Field.newBuilder()
-    //                                        .setName("is_array")
-    //
-    // .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
-    //                                        .build())
-    //                                .addFields(
-    //                                    Field.newBuilder()
-    //                                        .setName("typtype")
-    //
-    // .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-    //                                        .build())
-    //                                .addFields(
-    //                                    Field.newBuilder()
-    //                                        .setName("typename")
-    //
-    // .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-    //                                        .build())
-    //                                .addFields(
-    //                                    Field.newBuilder()
-    //                                        .setName("oid")
-    //
-    // .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-    //                                        .build())
-    //                                .build())
-    //                        .build())
-    //                .addRows(
-    //                    ListValue.newBuilder()
-    //                        .addValues(Value.newBuilder().setBoolValue(true).build())
-    //                        .addValues(Value.newBuilder().setStringValue("b").build())
-    //                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
-    //                        .addValues(Value.newBuilder().setStringValue("3807").build())
-    //                        .build())
-    //                .build()));
   }
 
   /**
@@ -3650,7 +3529,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         Oid.INT8,
                         Oid.DATE,
                         Oid.TIMESTAMPTZ,
-                        Oid.INTERVAL)
+                        Oid.INTERVAL,
+                        Oid.UUID)
                     .stream()
                     .map(String::valueOf)
                     .collect(Collectors.joining(","));
@@ -3679,7 +3559,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   //       type (jsonb is not one of the types that the JDBC driver will load
                   //       automatically).
                   final int jsonbColumnIndex = 6;
-                  final int jsonbArrayColumnIndex = 17;
+                  final int jsonbArrayColumnIndex = 18;
                   if (col == jsonbColumnIndex || col == jsonbArrayColumnIndex) {
                     resultSet.getString(col + 1);
                   } else {
@@ -5076,8 +4956,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     UUID uuid = UUID.randomUUID();
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.newBuilder(pgSql).bind("p1").to(uuid.toString()).build(),
-            ALL_TYPES_RESULTSET));
+            Statement.newBuilder(pgSql).bind("p1").to(uuid).build(), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(jdbcSql)) {

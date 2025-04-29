@@ -117,6 +117,8 @@ public class ArrayParser extends Parser<List<?>> {
         // Get numeric arrays as a string array instead of as an array of BigDecimal, as numeric
         // arrays could contain 'NaN' values, which are not supported by BigDecimal.
         return value.getStringArray();
+      case UUID:
+        return value.getUuidArray();
       case TIMESTAMP:
         return value.getTimestampArray();
       case INTERVAL:

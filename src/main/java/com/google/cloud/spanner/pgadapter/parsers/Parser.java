@@ -199,6 +199,8 @@ public abstract class Parser<T> {
         return new NumericParser(result, columnarPosition);
       case STRING:
         return new StringParser(result, columnarPosition);
+      case UUID:
+        return new UuidParser(result, columnarPosition);
       case TIMESTAMP:
         return new TimestampParser(result, columnarPosition, sessionState);
       case INTERVAL:
@@ -241,6 +243,8 @@ public abstract class Parser<T> {
         return new NumericParser(result);
       case STRING:
         return new StringParser(result);
+      case UUID:
+        return new UuidParser(result);
       case TIMESTAMP:
         return new TimestampParser(result, sessionState);
       case INTERVAL:
@@ -277,6 +281,8 @@ public abstract class Parser<T> {
         return Oid.FLOAT8;
       case STRING:
         return Oid.VARCHAR;
+      case UUID:
+        return Oid.UUID;
       case PG_JSONB:
         return Oid.JSONB;
       case BYTES:
@@ -303,6 +309,8 @@ public abstract class Parser<T> {
             return Oid.FLOAT8_ARRAY;
           case STRING:
             return Oid.VARCHAR_ARRAY;
+          case UUID:
+            return Oid.UUID_ARRAY;
           case PG_JSONB:
             return Oid.JSONB_ARRAY;
           case BYTES:
@@ -354,8 +362,9 @@ public abstract class Parser<T> {
         return Type.pgNumeric();
       case Oid.TEXT:
       case Oid.VARCHAR:
-      case Oid.UUID:
         return Type.string();
+      case Oid.UUID:
+        return Type.uuid();
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return Type.timestamp();
@@ -413,6 +422,8 @@ public abstract class Parser<T> {
         return Oid.FLOAT8;
       case STRING:
         return Oid.VARCHAR;
+      case UUID:
+        return Oid.UUID;
       case JSON:
         return Oid.JSONB;
       case BYTES:
@@ -440,6 +451,8 @@ public abstract class Parser<T> {
             return Oid.FLOAT8_ARRAY;
           case STRING:
             return Oid.VARCHAR_ARRAY;
+          case UUID:
+            return Oid.UUID_ARRAY;
           case JSON:
             return Oid.JSONB_ARRAY;
           case BYTES:
