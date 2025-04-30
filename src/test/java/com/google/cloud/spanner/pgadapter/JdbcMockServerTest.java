@@ -4951,9 +4951,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String jdbcSql = "SELECT * FROM all_types WHERE col_uuid=?";
     String pgSql = "SELECT * FROM all_types WHERE col_uuid=$1";
     UUID uuid = UUID.randomUUID();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(pgSql).bind("p1").to(uuid).build(), ALL_TYPES_RESULTSET));
+    mockSpanner.putPartialStatementResult(
+        StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(jdbcSql)) {
@@ -4966,6 +4965,11 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(1, request.getParams().getFieldsCount());
+    // UUIDs should be sent to Spanner as untyped values, so Spanner can infer the correct data
+    // type. This allows clients to use UUID query parameters with both STRING and UUID columns.
+    assertEquals(0, request.getParamTypesCount());
   }
 
   @Test

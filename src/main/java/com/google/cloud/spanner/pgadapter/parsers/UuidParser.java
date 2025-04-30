@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.NullValue;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -30,6 +31,9 @@ import org.postgresql.util.ByteConverter;
 /** Translate from wire protocol to UUID. */
 @InternalApi
 public class UuidParser extends Parser<UUID> {
+  private static final Value NULL_VALUE =
+      Value.untyped(
+          com.google.protobuf.Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build());
 
   UuidParser(Object item) {
     this.item = (UUID) item;
@@ -131,6 +135,15 @@ public class UuidParser extends Parser<UUID> {
 
   @Override
   public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
-    parametersBuilder.put(name, Value.uuid(this.item));
+    // Send UUIDs to Spanner as untyped string values, so these can be used with both varchar and
+    // UUID columns.
+    parametersBuilder.put(
+        name,
+        this.item == null
+            ? NULL_VALUE
+            : Value.untyped(
+                com.google.protobuf.Value.newBuilder()
+                    .setStringValue(this.item.toString())
+                    .build()));
   }
 }
