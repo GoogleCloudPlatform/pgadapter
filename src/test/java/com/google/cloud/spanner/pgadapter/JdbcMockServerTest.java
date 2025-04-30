@@ -24,7 +24,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -4949,8 +4948,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testUUIDParameter() throws SQLException {
-    assumeTrue(pgVersion.equals("14.1"));
-
     String jdbcSql = "SELECT * FROM all_types WHERE col_uuid=?";
     String pgSql = "SELECT * FROM all_types WHERE col_uuid=$1";
     UUID uuid = UUID.randomUUID();
