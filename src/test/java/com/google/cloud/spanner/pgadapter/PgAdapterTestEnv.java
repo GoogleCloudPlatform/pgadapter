@@ -140,9 +140,7 @@ public class PgAdapterTestEnv {
               + "col_array_interval varchar[], "
               + "col_array_date date[], "
               + "col_array_varchar varchar(100)[], "
-              + "col_array_jsonb jsonb[])",
-          // TODO: Change type to UUID once supported.
-          "create table uuid_values (id bigint primary key, col_varchar varchar, col_uuid varchar)");
+              + "col_array_jsonb jsonb[])");
 
   public static final ImmutableList<String> DEFAULT_DATA_MODEL_WITHOUT_COL_INTERVAL =
       DEFAULT_DATA_MODEL.stream()

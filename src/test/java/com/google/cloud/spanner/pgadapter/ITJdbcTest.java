@@ -1233,6 +1233,11 @@ public class ITJdbcTest implements IntegrationTest {
     assumeTrue(preferQueryMode.equals("extended"));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      // TODO: Change type to UUID once supported.
+      connection
+          .createStatement()
+          .execute(
+              "create table if not exists uuid_values (id bigint primary key, col_varchar varchar, col_uuid varchar)");
       connection.createStatement().execute("truncate uuid_values");
       // It should be possible to use UUID query parameters with both UUID and varchar columns.
       try (PreparedStatement statement =

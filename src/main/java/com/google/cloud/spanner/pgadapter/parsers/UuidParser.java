@@ -136,7 +136,8 @@ public class UuidParser extends Parser<UUID> {
   @Override
   public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
     // Send UUIDs to Spanner as untyped string values, so these can be used with both varchar and
-    // UUID columns.
+    // UUID columns. This ensures backwards compatibility, as PGAdapter would send UUID values as
+    // strings to Spanner before UUID type support was added to Spanner.
     parametersBuilder.put(
         name,
         this.item == null
