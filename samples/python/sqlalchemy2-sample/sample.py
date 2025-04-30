@@ -90,7 +90,7 @@ def run_sample():
   if random_boolean():
     singer_id = session.query(Singer).first().id
   else:
-    singer_id = uuid.uuid4()
+    singer_id = str(uuid.uuid4())
   insert_or_update_singer(singer_id, random_first_name(), random_last_name())
 
   print()

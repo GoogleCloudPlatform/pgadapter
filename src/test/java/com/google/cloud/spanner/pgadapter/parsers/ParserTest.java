@@ -706,7 +706,7 @@ public class ParserTest {
     assertEquals(Type.pgNumeric(), Parser.toType(Oid.NUMERIC));
     assertEquals(Type.string(), Parser.toType(Oid.VARCHAR));
     assertEquals(Type.string(), Parser.toType(Oid.TEXT));
-    assertEquals(Type.string(), Parser.toType(Oid.UUID));
+    assertEquals(Type.uuid(), Parser.toType(Oid.UUID));
     assertEquals(Type.pgJsonb(), Parser.toType(Oid.JSONB));
 
     assertEquals(Type.array(Type.int64()), Parser.toType(Oid.INT2_ARRAY));
@@ -723,7 +723,7 @@ public class ParserTest {
     assertEquals(Type.array(Type.pgNumeric()), Parser.toType(Oid.NUMERIC_ARRAY));
     assertEquals(Type.array(Type.string()), Parser.toType(Oid.VARCHAR_ARRAY));
     assertEquals(Type.array(Type.string()), Parser.toType(Oid.TEXT_ARRAY));
-    assertEquals(Type.array(Type.string()), Parser.toType(Oid.UUID_ARRAY));
+    assertEquals(Type.array(Type.uuid()), Parser.toType(Oid.UUID_ARRAY));
     assertEquals(Type.array(Type.pgJsonb()), Parser.toType(Oid.JSONB_ARRAY));
 
     assertThrows(PGException.class, () -> Parser.toType(-1000));
