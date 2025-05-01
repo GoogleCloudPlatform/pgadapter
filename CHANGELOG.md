@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.47.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.47.0...v0.47.1) (2025-05-01)
+
+
+### Bug Fixes
+
+* encoded string too long could be returned ([#3238](https://github.com/GoogleCloudPlatform/pgadapter/issues/3238)) ([12ff70c](https://github.com/GoogleCloudPlatform/pgadapter/commit/12ff70c99c39651f9302945ab4051c2e373c6d58)), closes [#3235](https://github.com/GoogleCloudPlatform/pgadapter/issues/3235)
+* send error for invalid startup message ([#3240](https://github.com/GoogleCloudPlatform/pgadapter/issues/3240)) ([71a49a3](https://github.com/GoogleCloudPlatform/pgadapter/commit/71a49a3d25e5565fffe2a75cccf5045beecea4d9)), closes [#3237](https://github.com/GoogleCloudPlatform/pgadapter/issues/3237)
+* send UUID values as untyped strings to Spanner ([#3236](https://github.com/GoogleCloudPlatform/pgadapter/issues/3236)) ([00cf1f2](https://github.com/GoogleCloudPlatform/pgadapter/commit/00cf1f211a189bfafc0a3794042d8124088d9d5d))
+
+
+### Dependencies
+
+* update dependency psycopg to v3.2.7 ([#3228](https://github.com/GoogleCloudPlatform/pgadapter/issues/3228)) ([a076b35](https://github.com/GoogleCloudPlatform/pgadapter/commit/a076b358bf656b34c2955066f45d9380c3bb7555))
+* update dependency psycopg-binary to v3.2.7 ([#3229](https://github.com/GoogleCloudPlatform/pgadapter/issues/3229)) ([e72c53c](https://github.com/GoogleCloudPlatform/pgadapter/commit/e72c53cf1c4f507690f254136cb564377135ec6c))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 681c208 ([#3225](https://github.com/GoogleCloudPlatform/pgadapter/issues/3225)) ([25272b0](https://github.com/GoogleCloudPlatform/pgadapter/commit/25272b0701011aa3ed14d7080772e3953c1d80bc))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to bdcc1fb ([#3193](https://github.com/GoogleCloudPlatform/pgadapter/issues/3193)) ([d31eab4](https://github.com/GoogleCloudPlatform/pgadapter/commit/d31eab4f20cf21b9f887633e4328629a9506c78c))
+
 ## [0.47.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.46.2...v0.47.0) (2025-04-30)
 
 
