@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -51,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -1220,6 +1222,33 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals("spanner_sys", namespaces.getString(1));
 
         assertFalse(namespaces.next());
+      }
+    }
+  }
+
+  @Test
+  public void testUUID() throws SQLException {
+    // UUIDs are only supported in extended query mode.
+    // In simple mode, the PG driver will try to cast a literal to UUID.
+    assumeTrue(preferQueryMode.equals("extended"));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      // TODO: Change type to UUID once supported.
+      connection
+          .createStatement()
+          .execute(
+              "create table if not exists uuid_values (id bigint primary key, col_varchar varchar, col_uuid varchar)");
+      connection.createStatement().execute("truncate uuid_values");
+      // It should be possible to use UUID query parameters with both UUID and varchar columns.
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              "insert into uuid_values (id, col_varchar, col_uuid) values (?, ?, ?)")) {
+        UUID uuid = UUID.randomUUID();
+        // Verify that we can insert a UUID value into both a varchar and a UUID column.
+        statement.setLong(1, 1L);
+        statement.setObject(2, uuid);
+        statement.setObject(3, uuid);
+        assertEquals(1, statement.executeUpdate());
       }
     }
   }
