@@ -684,6 +684,86 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testLargeString() throws SQLException {
+    String sql = "select large_varchar from test";
+    Random rand = new Random();
+    for (int size : new int[] {100, rand.nextInt(100_000) + 1}) {
+      byte[] bytes = new byte[size];
+      rand.nextBytes(bytes);
+      String value = new String(bytes);
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of(sql),
+              com.google.spanner.v1.ResultSet.newBuilder()
+                  .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                  .addRows(
+                      ListValue.newBuilder()
+                          .addValues(Value.newBuilder().setStringValue(value).build())
+                          .build())
+                  .build()));
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+        for (int bufferSize : new int[] {0, 32}) {
+          connection
+              .createStatement()
+              .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+          try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+            assertTrue(resultSet.next());
+            assertEquals(value, resultSet.getString(1));
+            assertFalse(resultSet.next());
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testLargeJsonb() throws SQLException {
+    String sql = "select large_jsonb from test";
+    Random rand = new Random();
+    for (int size : new int[] {100, rand.nextInt(100_000) + 1}) {
+      byte[] bytes = new byte[size];
+      rand.nextBytes(bytes);
+      String json = String.format("{\"key\": \"%s\"}", Base64.getEncoder().encodeToString(bytes));
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of(sql),
+              com.google.spanner.v1.ResultSet.newBuilder()
+                  .setMetadata(createMetadata(ImmutableList.of(TypeCode.JSON)))
+                  .addRows(
+                      ListValue.newBuilder()
+                          .addValues(Value.newBuilder().setStringValue(json).build())
+                          .build())
+                  .build()));
+
+      for (String binaryTransfer : new String[] {"", "&binaryTransferEnable=" + Oid.JSONB}) {
+        try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransfer)) {
+          connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+          for (int bufferSize : new int[] {0, 32}) {
+            connection
+                .createStatement()
+                .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+            try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+              assertTrue(resultSet.next());
+              if (binaryTransfer.isEmpty()) {
+                assertEquals(json, resultSet.getString(1));
+              } else {
+                byte[] receivedBytes = resultSet.getBytes(1);
+                assertNotNull(receivedBytes);
+                assertTrue(receivedBytes.length > 0);
+                String receivedString = new String(receivedBytes, 1, receivedBytes.length - 1);
+                assertEquals(json, receivedString);
+              }
+              assertFalse(resultSet.next());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   public void testGetCatalogs() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(
