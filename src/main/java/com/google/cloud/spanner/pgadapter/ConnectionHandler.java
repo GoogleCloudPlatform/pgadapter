@@ -402,6 +402,13 @@ public class ConnectionHandler implements Runnable {
         // message. This also prevents probers that just check for an open TCP port to cause errors
         // to be logged.
         return result;
+      } catch (Exception exception) {
+        this.handleError(
+            PGException.newBuilder(exception)
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.InternalError)
+                .build());
+        throw exception;
       }
       try {
         if (!ssl
