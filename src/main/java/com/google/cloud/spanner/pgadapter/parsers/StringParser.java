@@ -91,25 +91,13 @@ public class StringParser extends Parser<String> {
   static void writeToPG(
       SessionState sessionState, DataOutputStream dataOutputStream, String value, byte[] header) {
     int bufferSize = sessionState.getStringConversionBufferSize();
-    // Skip getting the length if we don't need it.
-    int length = bufferSize <= 0 ? 0 : value.length();
+    int length = value.length();
     try {
       if (bufferSize <= 0 || length < bufferSize) {
-        // Just use the writeUTF method of DataOutputStream if there is no header that needs to be
-        // written.
-        if (header.length == 0) {
-          // PG expects the length be 4 bytes.
-          // writeUTF writes the length as 2 bytes.
-          // So in order to get the correct length written to the stream, we first write 2 bytes
-          // containing all zeros.
-          dataOutputStream.writeShort(0);
-          dataOutputStream.writeUTF(value);
-        } else {
-          byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-          dataOutputStream.writeInt(bytes.length + header.length);
-          dataOutputStream.write(header);
-          dataOutputStream.write(bytes);
-        }
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        dataOutputStream.writeInt(bytes.length + header.length);
+        dataOutputStream.write(header);
+        dataOutputStream.write(bytes);
       } else {
         try (OutputStreamWriter writer =
             new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
