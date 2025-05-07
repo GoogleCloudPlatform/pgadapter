@@ -11,7 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/montanaflynn/stats v0.7.0
 	github.com/testcontainers/testcontainers-go v0.37.0
-	golang.org/x/oauth2 v0.29.0
+	golang.org/x/oauth2 v0.30.0
 	google.golang.org/api v0.231.0
 )
 
