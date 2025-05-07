@@ -19,7 +19,7 @@ jobs:
       - run: java -version
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.2'
+          go-version: '1.24.3'
       - run: go version
       - uses: actions/setup-python@v5
         with:
@@ -75,7 +75,7 @@ jobs:
       - run: java -version
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.2'
+          go-version: '1.24.3'
       - run: go version
       - uses: actions/setup-python@v5
         with:
