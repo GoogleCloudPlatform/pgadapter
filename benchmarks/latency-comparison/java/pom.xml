@@ -41,13 +41,6 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>libraries-bom</artifactId>
-        <version>26.59.0</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
         <version>1.49.0</version>
@@ -66,6 +59,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-jdbc</artifactId>
+      <version>2.30.0</version>
       <exclusions>
         <exclusion>
           <groupId>io.opentelemetry</groupId>
@@ -76,7 +70,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.46.2</version>
+      <version>0.47.1</version>
       <exclusions>
         <exclusion>
           <groupId>io.opentelemetry</groupId>
