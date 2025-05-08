@@ -38,6 +38,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
+import com.google.cloud.spanner.connection.ConnectionProperties;
 import com.google.cloud.spanner.connection.PGAdapterConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.SavepointSupport;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -200,9 +201,10 @@ public class ConnectionHandler implements Runnable {
   }
 
   @InternalApi
-  public void connectToSpanner(String database, @Nullable Credentials credentials) {
+  public void connectToSpanner(
+      String database, @Nullable Credentials credentials, Map<String, String> parameters) {
     OptionsMetadata options = getServer().getOptions();
-    String uri = buildConnectionURL(database, options, getServer().getProperties());
+    String uri = buildConnectionURL(database, options, getServer().getProperties(), parameters);
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
     connectionOptionsBuilder =
         PGAdapterConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
@@ -279,12 +281,16 @@ public class ConnectionHandler implements Runnable {
 
   @VisibleForTesting
   static String buildConnectionURL(
-      String database, OptionsMetadata options, Properties properties) {
+      String database,
+      OptionsMetadata options,
+      Properties properties,
+      Map<String, String> startupParameters) {
     String uri =
         options.hasDefaultConnectionUrl()
             ? options.getDefaultConnectionUrl()
             : options.buildConnectionURL(database);
     uri = appendPropertiesToUrl(uri, properties);
+    uri = appendStartupParametersToUrl(uri, startupParameters);
     // We add 'dialect=postgresql' here in all cases, although it is only being used if
     // 'autoConfigEmulator=true' has also been set in the connection URL. This dialect property is
     // only used to determine what dialect the database should have that is being created on the
@@ -329,6 +335,40 @@ public class ConnectionHandler implements Runnable {
       }
     }
     return result.toString();
+  }
+
+  /**
+   * Adds parameters to the connection URL that have been added as 'options=-c ...' to the
+   * PostgreSQL connection string.
+   */
+  static String appendStartupParametersToUrl(String url, Map<String, String> startupParameters) {
+    if (startupParameters == null || startupParameters.isEmpty()) {
+      return url;
+    }
+    StringBuilder result = new StringBuilder(url);
+    for (Map.Entry<String, String> entry : startupParameters.entrySet()) {
+      if ("options".equalsIgnoreCase(entry.getKey()) && entry.getValue() != null) {
+        String[] commands = entry.getValue().split("-c[\\s+]+");
+        for (String command : commands) {
+          String[] keyValue = command.split("=", 2);
+          if (keyValue.length == 2
+              && isValidConnectionProperty(keyValue[0])
+              && keyValue[1] != null) {
+            result.append(";").append(keyValue[0]).append("=").append(keyValue[1].trim());
+          }
+        }
+      }
+    }
+    return result.toString();
+  }
+
+  static boolean isValidConnectionProperty(String name) {
+    if (Strings.isNullOrEmpty(name)) {
+      return false;
+    }
+    String key = name.toLowerCase();
+    return ConnectionProperties.VALID_CONNECTION_PROPERTIES.stream()
+        .anyMatch(property -> property.getKey().equals(key));
   }
 
   /**

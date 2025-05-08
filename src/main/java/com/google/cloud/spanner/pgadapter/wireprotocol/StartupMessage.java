@@ -72,7 +72,7 @@ public class StartupMessage extends BootstrapMessage {
       Map<String, String> parameters,
       @Nullable Credentials credentials)
       throws Exception {
-    connection.connectToSpanner(database, credentials);
+    connection.connectToSpanner(database, credentials, parameters);
     for (Entry<String, String> parameter : parameters.entrySet()) {
       connection
           .getExtendedQueryProtocolHandler()
