@@ -44,7 +44,7 @@ public class Metrics {
     List<Double> rpcMillisBucketBoundaries = new ArrayList<Double>(MAX_NUM_FINITE_BUCKETS);
     for (int i = 0; i < MAX_NUM_FINITE_BUCKETS && bucketValue <= MAX_VALUE; i++) {
       rpcMillisBucketBoundaries.add(bucketValue);
-      bucketValue = SCALE_FACTOR * BASE;
+      bucketValue *= BASE;
     }
     return rpcMillisBucketBoundaries;
   }
