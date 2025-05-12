@@ -36,15 +36,15 @@ public class Metrics {
 
   public static List<Double> getMetricLatencyMillisBuckets() {
     final int MAX_NUM_FINITE_BUCKETS = 50;
-    final double BASE = 1.25;
-    final double SCALE_FACTOR = 0.25;
+    final double BASE = 0.25;
+    final double SCALE_FACTOR = 1.25;
     final double MAX_VALUE = 600;
-    double bucketValue = SCALE_FACTOR;
+    double bucketValue = BASE;
 
     List<Double> rpcMillisBucketBoundaries = new ArrayList<Double>(MAX_NUM_FINITE_BUCKETS);
     for (int i = 0; i < MAX_NUM_FINITE_BUCKETS && bucketValue <= MAX_VALUE; i++) {
       rpcMillisBucketBoundaries.add(bucketValue);
-      bucketValue *= BASE;
+      bucketValue *= SCALE_FACTOR;
     }
     return rpcMillisBucketBoundaries;
   }
