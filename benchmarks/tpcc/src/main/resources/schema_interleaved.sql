@@ -88,7 +88,7 @@ create table IF NOT EXISTS new_orders (
     d_id int not null,
     c_id int not null,
     o_id int not null,
-    PRIMARY KEY(w_id, d_id, c_id, o_id)
+    PRIMARY KEY(w_id, d_id, o_id, c_id)
 ) interleave in parent orders;
 
 create table IF NOT EXISTS order_line (
@@ -103,7 +103,7 @@ create table IF NOT EXISTS order_line (
     ol_quantity int,
     ol_amount decimal,
     ol_dist_info varchar(24),
-    PRIMARY KEY(w_id, d_id, c_id, o_id, ol_number)
+    PRIMARY KEY(w_id, d_id, o_id, c_id, ol_number)
 ) interleave in parent orders;
 
 -- STOCK table
@@ -139,7 +139,7 @@ create table IF NOT EXISTS item (
 );
 
 CREATE INDEX idx_customer ON customer (w_id,d_id,c_last,c_first);
-
+CREATE INDEX idx_orders ON orders (w_id,d_id,o_id);
 ALTER TABLE history ADD CONSTRAINT fkey_history_2_ FOREIGN KEY(h_w_id,h_d_id) REFERENCES district(w_id,d_id);
 ALTER TABLE order_line ADD CONSTRAINT fkey_order_line_2_ FOREIGN KEY(ol_supply_w_id,ol_i_id) REFERENCES stock(w_id,s_i_id);
 ALTER TABLE stock ADD CONSTRAINT fkey_stock_2_ FOREIGN KEY(s_i_id) REFERENCES item(i_id);
