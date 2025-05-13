@@ -1,4 +1,4 @@
-psycopg-binary==3.2.8
+psycopg-binary==3.2.9
 pytz==2025.2
 Django==5.2.1
 google==3.0.0
