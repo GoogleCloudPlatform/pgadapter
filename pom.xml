@@ -76,16 +76,16 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>google-cloud-spanner-bom</artifactId>
-        <version>6.92.0</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>1.50.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>io.opentelemetry</groupId>
-        <artifactId>opentelemetry-bom</artifactId>
-        <version>1.50.0</version>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>26.60.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -232,7 +232,6 @@
       <artifactId>gax-grpc</artifactId>
       <classifier>testlib</classifier>
       <scope>test</scope>
-      <version>2.65.0</version>
     </dependency>
     <dependency>
       <groupId>net.java.dev.jna</groupId>
