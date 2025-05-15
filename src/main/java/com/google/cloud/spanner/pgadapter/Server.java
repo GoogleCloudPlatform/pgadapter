@@ -19,6 +19,7 @@ import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
 import com.google.cloud.spanner.pgadapter.logging.DefaultLogConfiguration;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -238,6 +239,7 @@ public class Server {
       AutoConfiguredOpenTelemetrySdkBuilder openTelemetryBuilder =
           AutoConfiguredOpenTelemetrySdk.builder();
       if (optionsMetadata.isEnableOpenTelemetry()) {
+        SpannerOptions.enableOpenTelemetryTraces();
         TraceConfiguration.Builder builder =
             TraceConfiguration.builder().setDeadline(Duration.ofSeconds(60L));
         if (projectId != null) {
@@ -269,6 +271,7 @@ public class Server {
                     .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build()));
       }
       if (optionsMetadata.isEnableOpenTelemetryMetrics()) {
+        SpannerOptions.enableOpenTelemetryMetrics();
         MetricExporter cloudMonitoringExporter =
             GoogleCloudMetricExporter.createWithConfiguration(
                 MetricConfiguration.builder()

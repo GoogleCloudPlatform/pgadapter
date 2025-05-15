@@ -31,7 +31,6 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -228,8 +227,7 @@ public class ConnectionHandler implements Runnable {
                     options.getSessionPoolOptions().toBuilder())
                 .build();
     connectionOptionsBuilder.setSessionPoolOptions(sessionPoolOptions);
-    if (options.isEnableOpenTelemetryMetrics()) {
-      SpannerOptions.enableOpenTelemetryMetrics();
+    if (options.isEnableOpenTelemetry() || options.isEnableOpenTelemetryMetrics()) {
       connectionOptionsBuilder =
           connectionOptionsBuilder.setOpenTelemetry(server.getOpenTelemetry());
     }
