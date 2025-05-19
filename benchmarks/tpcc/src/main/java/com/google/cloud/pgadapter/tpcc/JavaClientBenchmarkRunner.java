@@ -270,8 +270,7 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
                     .setMinSessions(pgAdapterConfiguration.getMinSessions())
                     .setMaxSessions(pgAdapterConfiguration.getMaxSessions())
                     .build());
-    if (SpannerConfiguration.REPEATABLE_READ_ISOLATION_LEVEL.equals(
-        spannerConfiguration.getIsolationLevel())) {
+    if (IsolationLevel.REPEATABLE_READ.name().equals(spannerConfiguration.getIsolationLevel())) {
       builder.setDefaultTransactionOptions(
           DefaultReadWriteTransactionOptions.newBuilder()
               .setIsolationLevel(IsolationLevel.REPEATABLE_READ)

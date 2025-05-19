@@ -18,6 +18,8 @@ import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.spanner.Dialect;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Strings;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -29,7 +31,6 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +61,7 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
 
   void setup() throws SQLException, IOException {
     Connection connection = DriverManager.getConnection(connectionUrl);
-    if (StringUtils.isNotBlank(spannerConfiguration.getIsolationLevel())) {
+    if (!Strings.isNullOrEmpty(spannerConfiguration.getIsolationLevel())) {
       connection.setTransactionIsolation(
           getTransactionIsolationLevel(spannerConfiguration.getIsolationLevel()));
     }
@@ -167,11 +168,9 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
   }
 
   private int getTransactionIsolationLevel(String isolationLevel) {
-    return switch (isolationLevel) {
-      case SpannerConfiguration.SERIALIZABLE_ISOLATION_LEVEL -> Connection.TRANSACTION_SERIALIZABLE;
-      case SpannerConfiguration.REPEATABLE_READ_ISOLATION_LEVEL ->
-          Connection.TRANSACTION_REPEATABLE_READ;
-      default -> Connection.TRANSACTION_NONE;
-    };
+    if (IsolationLevel.REPEATABLE_READ.name().equals(isolationLevel)) {
+      return Connection.TRANSACTION_REPEATABLE_READ;
+    }
+    return Connection.TRANSACTION_SERIALIZABLE;
   }
 }

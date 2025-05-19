@@ -13,18 +13,17 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc.config;
 
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @ConfigurationProperties(prefix = "spanner")
 public class SpannerConfiguration {
-  public static final String REPEATABLE_READ_ISOLATION_LEVEL = "REPEATABLE_READ";
-  public static final String SERIALIZABLE_ISOLATION_LEVEL = "SERIALIZABLE";
   private String project;
   private String instance;
   private String database;
-  private String isolationLevel = SERIALIZABLE_ISOLATION_LEVEL;
+  private String isolationLevel = IsolationLevel.SERIALIZABLE.name();
 
   public String getProject() {
     return project;
