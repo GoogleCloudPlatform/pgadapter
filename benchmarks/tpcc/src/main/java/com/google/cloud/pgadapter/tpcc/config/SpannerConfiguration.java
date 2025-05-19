@@ -19,9 +19,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "spanner")
 public class SpannerConfiguration {
+  public static final String REPEATABLE_READ_ISOLATION_LEVEL = "REPEATABLE_READ";
+  public static final String SERIALIZABLE_ISOLATION_LEVEL = "SERIALIZABLE";
   private String project;
   private String instance;
   private String database;
+  private String isolationLevel = SERIALIZABLE_ISOLATION_LEVEL;
 
   public String getProject() {
     return project;
@@ -45,5 +48,13 @@ public class SpannerConfiguration {
 
   public void setDatabase(String database) {
     this.database = database;
+  }
+
+  public String getIsolationLevel() {
+    return isolationLevel;
+  }
+
+  public void setIsolationLevel(String isolationLevel) {
+    this.isolationLevel = isolationLevel;
   }
 }

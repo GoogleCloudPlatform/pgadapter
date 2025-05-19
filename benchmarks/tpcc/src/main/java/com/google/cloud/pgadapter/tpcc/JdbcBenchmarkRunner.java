@@ -29,6 +29,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +59,12 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
   }
 
   void setup() throws SQLException, IOException {
-    connectionThreadLocal.set(DriverManager.getConnection(connectionUrl));
+    Connection connection = DriverManager.getConnection(connectionUrl);
+    if (StringUtils.isNotBlank(spannerConfiguration.getIsolationLevel())) {
+      connection.setTransactionIsolation(
+          getTransactionIsolationLevel(spannerConfiguration.getIsolationLevel()));
+    }
+    connectionThreadLocal.set(connection);
     statementThreadLocal.set(connectionThreadLocal.get().createStatement());
   }
 
@@ -158,5 +164,14 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
       }
     }
     return results;
+  }
+
+  private int getTransactionIsolationLevel(String isolationLevel) {
+    return switch (isolationLevel) {
+      case SpannerConfiguration.SERIALIZABLE_ISOLATION_LEVEL -> Connection.TRANSACTION_SERIALIZABLE;
+      case SpannerConfiguration.REPEATABLE_READ_ISOLATION_LEVEL ->
+          Connection.TRANSACTION_REPEATABLE_READ;
+      default -> Connection.TRANSACTION_NONE;
+    };
   }
 }
