@@ -18,6 +18,8 @@ import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
 import com.google.cloud.spanner.Dialect;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Strings;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -58,7 +60,12 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
   }
 
   void setup() throws SQLException, IOException {
-    connectionThreadLocal.set(DriverManager.getConnection(connectionUrl));
+    Connection connection = DriverManager.getConnection(connectionUrl);
+    if (!Strings.isNullOrEmpty(spannerConfiguration.getIsolationLevel())) {
+      connection.setTransactionIsolation(
+          getTransactionIsolationLevel(spannerConfiguration.getIsolationLevel()));
+    }
+    connectionThreadLocal.set(connection);
     statementThreadLocal.set(connectionThreadLocal.get().createStatement());
   }
 
@@ -158,5 +165,12 @@ class JdbcBenchmarkRunner extends AbstractBenchmarkRunner {
       }
     }
     return results;
+  }
+
+  private int getTransactionIsolationLevel(String isolationLevel) {
+    if (IsolationLevel.REPEATABLE_READ.name().equals(isolationLevel)) {
+      return Connection.TRANSACTION_REPEATABLE_READ;
+    }
+    return Connection.TRANSACTION_SERIALIZABLE;
   }
 }

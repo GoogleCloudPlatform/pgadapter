@@ -24,6 +24,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
+import com.google.cloud.spanner.SpannerOptions.Builder.DefaultReadWriteTransactionOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.TransactionContext;
 import com.google.cloud.spanner.TransactionManager;
@@ -31,6 +32,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -268,6 +270,12 @@ class JavaClientBenchmarkRunner extends AbstractBenchmarkRunner {
                     .setMinSessions(pgAdapterConfiguration.getMinSessions())
                     .setMaxSessions(pgAdapterConfiguration.getMaxSessions())
                     .build());
+    if (IsolationLevel.REPEATABLE_READ.name().equals(spannerConfiguration.getIsolationLevel())) {
+      builder.setDefaultTransactionOptions(
+          DefaultReadWriteTransactionOptions.newBuilder()
+              .setIsolationLevel(IsolationLevel.REPEATABLE_READ)
+              .build());
+    }
     if (!Strings.isNullOrEmpty(pgAdapterConfiguration.getCredentials())) {
       builder.setCredentials(
           GoogleCredentials.fromStream(
