@@ -65,7 +65,7 @@ func runSample(project, instance, database string, emulator bool) (string, error
 	// PGAdapter will by default be started as a Java application if Java is available on this host.
 	// Otherwise, it will fall back to starting PGAdapter in a Docker test container.
 	ctx := context.Background()
-	pg, err := pgadapter.Start(ctx, pgadapter.Config{Project: project, Instance: instance, ConnectToEmulator: emulator})
+	pg, err := pgadapter.Start(ctx, pgadapter.Config{Project: project, Instance: instance, ConnectToEmulator: emulator, Version: "0.46.2"})
 	if err != nil {
 		fmt.Printf("failed to start PGAdapter: %v\n", err)
 		return "", err
