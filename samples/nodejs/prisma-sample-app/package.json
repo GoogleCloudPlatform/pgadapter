@@ -18,6 +18,6 @@
   "dependencies": {
     "@prisma/client": "^6.5.0",
     "yargs": "^17.5.1",
-    "testcontainers": "^10.7.1"
+    "testcontainers": "^11.0.0"
   }
 }
