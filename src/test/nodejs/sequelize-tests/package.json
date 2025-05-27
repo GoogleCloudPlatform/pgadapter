@@ -11,7 +11,7 @@
   "dependencies": {
     "pg": "^8.11.3",
     "sequelize": "^6.34.0",
-    "yargs": "^17.5.1"
+    "yargs": "^18.0.0"
   },
   "scripts": {
     "start": "ts-node src/index.ts"
