@@ -17,7 +17,7 @@
   "dependencies": {
     "@types/pg-copy-streams": "^1.2.5",
     "pg": "^8.11.5",
-    "pg-copy-streams": "^6.0.6",
+    "pg-copy-streams": "^7.0.0",
     "yargs": "^17.7.2"
   },
   "scripts": {
