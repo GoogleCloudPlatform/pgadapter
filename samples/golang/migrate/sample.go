@@ -66,7 +66,7 @@ func runSample() (string, error) {
 	//            in the connection string!
 	applicationName := "golang-migrate"
 
-	connString := fmt.Sprintf("postgres://localhost:%d/%s?sslmode=disable&fallback_application_name=%s", port, database, applicationName)
+	connString := fmt.Sprintf("postgres://127.0.0.1:%d/%s?sslmode=disable&fallback_application_name=%s", port, database, applicationName)
 	m, err := migrate.New("file://migrations", connString)
 	if err != nil {
 		return "", err

@@ -36,7 +36,7 @@ async function main() {
 
     // Connect to PGAdapter on localhost and the randomly assigned port that is mapped to port 5432
     // in the test container.
-    host: 'localhost',
+    host: '127.0.0.1',
     port: pgAdapter.getMappedPort(5432),
     ssl: false,
 

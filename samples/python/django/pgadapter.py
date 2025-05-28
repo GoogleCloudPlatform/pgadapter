@@ -94,7 +94,7 @@ def start_pgadapter(project: str,
   global in_process_pgadapter_host
   global in_process_pgadapter_port
   in_process_pgadapter_port = port
-  in_process_pgadapter_host = "localhost"
+  in_process_pgadapter_host = "127.0.0.1"
 
   return container, port
 

@@ -94,7 +94,7 @@ def start_pgadapter(project: str,
   global in_process_pgadapter_host
   global in_process_pgadapter_port
   in_process_pgadapter_port = port
-  in_process_pgadapter_host = "localhost"
+  in_process_pgadapter_host = "127.0.0.1"
 
   return container, port
 
@@ -123,7 +123,7 @@ def _wait_for_port(port: int, poll_interval: float = 0.1, timeout: float = 5.0):
   start = time.time()
   while True:
     try:
-      with socket.create_connection(("localhost", port), timeout=timeout):
+      with socket.create_connection(("127.0.0.1", port), timeout=timeout):
         break
     except OSError:
       duration = time.time() - start

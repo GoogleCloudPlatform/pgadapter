@@ -63,7 +63,7 @@ func extractArguments() (host string, port int, sample, database string) {
 	}
 	sample = os.Args[1]
 	database = os.Args[2]
-	host = "localhost"
+	host = "127.0.0.1"
 	port = 5432
 	if len(os.Args) == 4 {
 		if !strings.Contains(os.Args[3], ":") {
