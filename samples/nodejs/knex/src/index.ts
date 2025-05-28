@@ -30,7 +30,7 @@ async function main() {
   const knex = require('knex')({
     client: 'pg',
     connection: {
-      host: 'localhost',
+      host: '127.0.0.1',
       port: pgAdapter.getMappedPort(5432),
       database: 'knex-sample',
       ssl: false,

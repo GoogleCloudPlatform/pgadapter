@@ -205,7 +205,7 @@ func runSample(project, instance, database string, emulator, isOpenSourcePG bool
 		}
 		// Use the fully-qualified database name, as PGAdapter was started without any specific project, instance or
 		// database in the command line arguments.
-		connString = fmt.Sprintf("host=localhost port=%d database=projects/%s/instances/%s/databases/%s", port, project, instance, database)
+		connString = fmt.Sprintf("host=127.0.0.1 port=%d database=projects/%s/instances/%s/databases/%s", port, project, instance, database)
 	}
 	fmt.Printf("Connecting to %s\n", connString)
 	return RunSample(connString, isOpenSourcePG)

@@ -83,7 +83,7 @@ func runSample(project, instance, database string, emulator bool) (string, error
 		return "", err
 	}
 	// Connect to Cloud Spanner through PGAdapter.
-	connString := fmt.Sprintf("postgres://uid:pwd@localhost:%d/%s?sslmode=disable", port, database)
+	connString := fmt.Sprintf("postgres://uid:pwd@127.0.0.1:%d/%s?sslmode=disable", port, database)
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		fmt.Printf("failed to connect to PGAdapter: %v\n", err)

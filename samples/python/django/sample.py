@@ -231,7 +231,7 @@ if __name__ == "__main__":
                                     "test-instance",
                                     True,
                                     None)
-  os.environ.setdefault("PGHOST", "localhost")
+  os.environ.setdefault("PGHOST", "127.0.0.1")
   os.environ.setdefault("PGPORT", str(port))
 
   tables_created = False
