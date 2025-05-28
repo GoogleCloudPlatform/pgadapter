@@ -18,7 +18,7 @@
     "@types/pg-copy-streams": "^1.2.5",
     "pg": "^8.11.5",
     "pg-copy-streams": "^7.0.0",
-    "yargs": "^17.7.2"
+    "yargs": "^18.0.0"
   },
   "scripts": {
     "start": "ts-node src/index.ts",

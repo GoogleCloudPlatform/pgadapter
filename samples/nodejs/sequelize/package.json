@@ -14,7 +14,7 @@
     "pg": "^8.11.3",
     "sequelize": "^6.36.0",
     "umzug": "^3.6.1",
-    "yargs": "^17.5.1"
+    "yargs": "^18.0.0"
   },
   "scripts": {
     "start": "ts-node src/index.ts"
