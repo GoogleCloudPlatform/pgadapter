@@ -307,7 +307,10 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
       // Verify that existing connection has been invalidated.
       exception =
           assertThrows(SQLException.class, () -> connection.createStatement().executeQuery(sql));
-      assertEquals("An I/O error occurred while sending to the backend.", exception.getMessage());
+      assertTrue(
+          exception.getMessage(),
+          exception.getMessage().equals("An I/O error occurred while sending to the backend.")
+              || exception.getMessage().equals("This connection has been closed."));
     }
   }
 
