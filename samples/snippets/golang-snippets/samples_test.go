@@ -17,7 +17,10 @@ func TestSamples(t *testing.T) {
 		AlwaysPullImage: true,
 		Image:           "gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator",
 		ExposedPorts:    []string{"5432/tcp"},
-		WaitingFor:      wait.ForListeningPort("5432/tcp"),
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("5432/tcp"),
+			wait.ForLog("Server started on port 5432"),
+		),
 		HostConfigModifier: func(hostConfig *container.HostConfig) {
 			hostConfig.AutoRemove = true
 		},
