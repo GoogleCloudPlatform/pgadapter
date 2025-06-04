@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.ConnectionHandler.appendPropert
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.buildConnectionURL;
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.listDatabasesOrInstances;
 import static com.google.cloud.spanner.pgadapter.EmulatedPsqlMockServerTest.newStatusResourceNotFoundException;
+import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -329,30 +330,35 @@ public class ConnectionHandlerTest {
     ConnectionHandler connectionHandlerToCancel =
         new ConnectionHandler(server, socket, spannerConnection);
     connectionHandlerToCancel.setThread(mock(Thread.class));
+    CONNECTION_HANDLERS.put(connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel);
 
-    // Cancelling yourself is not allowed.
-    assertFalse(
-        connectionHandler.cancelActiveStatement(
-            connectionHandler.getConnectionId(), connectionHandler.getSecret()));
-    // Cancelling a random non-existing connection should not work.
-    assertFalse(connectionHandler.cancelActiveStatement(100, 100));
-    // Cancelling another connecting using the wrong secret is not allowed.
-    assertFalse(
-        connectionHandler.cancelActiveStatement(
-            connectionHandlerToCancel.getConnectionId(),
-            connectionHandlerToCancel.getSecret() - 1));
+    try {
+      // Cancelling yourself is not allowed.
+      assertFalse(
+          connectionHandler.cancelActiveStatement(
+              connectionHandler.getConnectionId(), connectionHandler.getSecret()));
+      // Cancelling a random non-existing connection should not work.
+      assertFalse(connectionHandler.cancelActiveStatement(100, 100));
+      // Cancelling another connecting using the wrong secret is not allowed.
+      assertFalse(
+          connectionHandler.cancelActiveStatement(
+              connectionHandlerToCancel.getConnectionId(),
+              connectionHandlerToCancel.getSecret() - 1));
 
-    assertTrue(
-        connectionHandler.cancelActiveStatement(
-            connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
+      assertTrue(
+          connectionHandler.cancelActiveStatement(
+              connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
 
-    // The method should just return false if an error occurs.
-    doThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "test error"))
-        .when(spannerConnection)
-        .cancel();
-    assertFalse(
-        connectionHandler.cancelActiveStatement(
-            connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
+      // The method should just return false if an error occurs.
+      doThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "test error"))
+          .when(spannerConnection)
+          .cancel();
+      assertFalse(
+          connectionHandler.cancelActiveStatement(
+              connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
+    } finally {
+      CONNECTION_HANDLERS.remove(connectionHandlerToCancel.getConnectionId());
+    }
   }
 
   @Test

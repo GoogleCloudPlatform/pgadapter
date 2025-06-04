@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
+
 import com.google.api.core.InternalApi;
 import com.google.auth.Credentials;
 import com.google.cloud.spanner.Database;
@@ -90,7 +92,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -123,8 +124,6 @@ public class ConnectionHandler implements Runnable {
           .concurrencyLevel(1)
           .build();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
-  private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
-      new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
   private Thread thread;
   private final int connectionId;
@@ -165,7 +164,6 @@ public class ConnectionHandler implements Runnable {
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
     this.connectionId = incrementingConnectionId.incrementAndGet();
-    CONNECTION_HANDLERS.put(this.connectionId, this);
     this.spannerConnection = spannerConnection;
   }
 
@@ -384,6 +382,7 @@ public class ConnectionHandler implements Runnable {
                 String.format(
                     "Connection handler with ID %s starting for client %s with thread %s",
                     getName(), socket.getInetAddress().getHostAddress(), thread.toString())));
+    CONNECTION_HANDLERS.put(this.connectionId, this);
     if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
       logger.log(
           Level.INFO,
@@ -522,6 +521,7 @@ public class ConnectionHandler implements Runnable {
                       String.format(
                           "Exception while closing connection handler with ID %s", getName())));
         } finally {
+          CONNECTION_HANDLERS.remove(this.connectionId);
           this.server.deregister(this);
           logger.log(
               Level.INFO,
