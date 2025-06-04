@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
 import static org.junit.Assert.assertArrayEquals;
@@ -649,6 +650,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         }
       }
     }
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    // The cleanup of the connection is async, so it can take a few milliseconds to reach the state
+    // that we expect.
+    //noinspection StatementWithEmptyBody
+    while (stopwatch.elapsed(TimeUnit.SECONDS) < 3 && !CONNECTION_HANDLERS.isEmpty()) {}
+    assertEquals(0, CONNECTION_HANDLERS.size());
   }
 
   @Test
