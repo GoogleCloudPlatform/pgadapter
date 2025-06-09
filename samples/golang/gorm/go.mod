@@ -2,7 +2,7 @@ module gorm
 
 go 1.23.0
 
-toolchain go1.24.3
+toolchain go1.24.4
 
 require (
 	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250604172038-2e3b181acd7c
