@@ -15,13 +15,30 @@
 package com.google.cloud.postgres;
 
 import java.time.LocalDateTime;
-import org.hibernate.Session;
-import org.hibernate.tuple.ValueGenerator;
+import java.util.Arrays;
+import java.util.EnumSet;
+import org.hibernate.engine.spi.SharedSessionContractImplementor;
+import org.hibernate.generator.BeforeExecutionGenerator;
+import org.hibernate.generator.EventType;
 
-public class CurrentLocalDateTimeGenerator implements ValueGenerator<LocalDateTime> {
+public class CurrentLocalDateTimeGenerator implements BeforeExecutionGenerator {
+  private final EnumSet<EventType> eventTypes;
+
+  public CurrentLocalDateTimeGenerator(GeneratedLocalDateTime annotation) {
+    eventTypes = EnumSet.copyOf(Arrays.asList(annotation.eventTypes()));
+  }
 
   @Override
-  public LocalDateTime generateValue(Session session, Object entity) {
+  public Object generate(
+      SharedSessionContractImplementor session,
+      Object owner,
+      Object currentValue,
+      EventType eventType) {
     return LocalDateTime.now();
+  }
+
+  @Override
+  public EnumSet<EventType> getEventTypes() {
+    return this.eventTypes;
   }
 }
