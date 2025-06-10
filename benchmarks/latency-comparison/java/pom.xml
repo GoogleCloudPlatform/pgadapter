@@ -35,7 +35,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.16.0</version>
+    <version>1.16.1</version>
   </parent>
 
   <dependencyManagement>
@@ -43,7 +43,7 @@
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.50.0</version>
+        <version>1.51.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -70,7 +70,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.48.0</version>
+      <version>0.48.2</version>
       <exclusions>
         <exclusion>
           <groupId>io.opentelemetry</groupId>
@@ -81,7 +81,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.5</version>
+      <version>42.7.6</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -108,7 +108,7 @@
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.49.3</version>
+      <version>3.49.4</version>
     </dependency>
 
     <dependency>

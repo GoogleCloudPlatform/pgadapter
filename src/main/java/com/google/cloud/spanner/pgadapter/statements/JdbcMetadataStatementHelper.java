@@ -81,7 +81,8 @@ class JdbcMetadataStatementHelper {
         return replaceGetTablesQuery(sql, PgJdbcCatalog.PG_JDBC_GET_TABLES_REPLACEMENT);
       }
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_V42_7_5)
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_V42_7_6)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_V42_7_5)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_2)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_3)
@@ -92,7 +93,8 @@ class JdbcMetadataStatementHelper {
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_4_1)) {
       return replaceGetColumnsQuery(sql);
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_V42_7_5)
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_V42_7_6)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_V42_7_5)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_2)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_3)
@@ -106,12 +108,14 @@ class JdbcMetadataStatementHelper {
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_2)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_3)) {
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_3)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_42_7_6)) {
       return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1_1)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_V42_7_5)) {
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_V42_7_5)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_V42_7_6)) {
       return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_BEST_ROW_IDENTIFIER_PREFIX)) {
@@ -124,7 +128,8 @@ class JdbcMetadataStatementHelper {
       return PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX_V42_7_5)) {
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX_V42_7_5)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX_V42_7_6)) {
       return PgJdbcCatalog.PG_JDBC_GET_FUNCTION_COLUMNS_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PROCEDURES_PREFIX)) {

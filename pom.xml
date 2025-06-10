@@ -43,7 +43,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.48.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.48.3-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -55,7 +55,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.16.0</version>
+    <version>1.16.1</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -78,7 +78,7 @@
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.50.0</version>
+        <version>1.51.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -110,7 +110,7 @@
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <version>3.49.3</version>
+      <version>3.49.4</version>
     </dependency>
     <dependency>
       <groupId>io.opentelemetry</groupId>
@@ -159,7 +159,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.5</version>
+      <version>42.7.6</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
@@ -206,12 +206,12 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.9.9</version>
+      <version>3.9.10</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.80</version>
+      <version>1.81</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.mojo</groupId>

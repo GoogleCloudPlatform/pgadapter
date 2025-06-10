@@ -14,13 +14,17 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.TestOptionsMetadataBuilder;
+import com.google.common.base.Stopwatch;
 import java.net.Socket;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -30,16 +34,24 @@ public class ProxyServerTest {
 
   @Test
   public void testProbeConnection() throws Exception {
+    assertEquals(0, CONNECTION_HANDLERS.size());
     // This test verifies that doing a simple TCP aliveness probe to check whether PGAdapter is
     // running can be done without any errors.
     ProxyServer server = new ProxyServer(OptionsMetadata.newBuilder().setPort(0).build());
     server.startServer();
     server.awaitRunning();
 
-    //noinspection EmptyTryBlock
     try (Socket ignore = new Socket("localhost", server.getLocalPort())) {
       // Do nothing, just verify that we can connect without any errors.
+      Stopwatch stopwatch = Stopwatch.createStarted();
+      //noinspection StatementWithEmptyBody
+      while (stopwatch.elapsed(TimeUnit.SECONDS) < 3 && CONNECTION_HANDLERS.isEmpty()) {}
+      assertEquals(1, CONNECTION_HANDLERS.size());
     }
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    //noinspection StatementWithEmptyBody
+    while (stopwatch.elapsed(TimeUnit.SECONDS) < 3 && !CONNECTION_HANDLERS.isEmpty()) {}
+    assertEquals(0, CONNECTION_HANDLERS.size());
     server.stopServer();
     server.awaitTerminated();
   }

@@ -21,7 +21,7 @@
       <dependency>
         <groupId>org.testcontainers</groupId>
         <artifactId>testcontainers-bom</artifactId>
-        <version>1.21.0</version>
+        <version>1.21.1</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -33,7 +33,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.48.0</version>
+      <version>0.48.2</version>
     </dependency>
     <!-- Hibernate core dependency -->
     <dependency>
@@ -45,7 +45,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.5</version>
+      <version>42.7.6</version>
     </dependency>
     <!-- Add Spanner Hibernate tools for access to the batch compatible bit-reversed sequence generator. -->
     <dependency>

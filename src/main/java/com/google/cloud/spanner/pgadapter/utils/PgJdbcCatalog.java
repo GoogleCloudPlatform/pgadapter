@@ -126,6 +126,9 @@ public class PgJdbcCatalog {
   public static final String PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX_V42_7_5 =
       "SELECT current_database(), n.nspname,p.proname,p.prorettype,p.proargtypes, t.typtype,t.typrelid, "
           + " p.proargnames, p.proargmodes, p.proallargtypes, p.oid ";
+  public static final String PG_JDBC_GET_FUNCTION_COLUMNS_PREFIX_V42_7_6 =
+      "SELECT current_database() AS current_database, n.nspname,p.proname,p.prorettype,p.proargtypes, t.typtype,t.typrelid, "
+          + " p.proargnames, p.proargmodes, p.proallargtypes, p.oid ";
   public static final String PG_JDBC_GET_FUNCTION_COLUMNS_REPLACEMENT =
       "select * from (\n"
           + "\tselect ''::varchar as FUNCTION_CAT, ''::varchar as FUNCTION_SCHEM, ''::varchar as FUNCTION_NAME, ''::varchar as COLUMN_NAME, 0::bigint as COLUMN_TYPE,\n"
@@ -180,7 +183,10 @@ public class PgJdbcCatalog {
           + "       NULL AS \"SELF_REFERENCING_COL_NAME\", NULL AS \"REF_GENERATION\"\n"
           + "FROM INFORMATION_SCHEMA.TABLES AS T\n";
 
-  // This prefix is used for versions [42.7.5, ...).
+  // This prefix is used for versions [42.7.6, ...).
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_V42_7_6 =
+      "SELECT * FROM (SELECT current_database() AS current_database, n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull  OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,row_number() OVER (PARTITION BY a.attrelid ORDER BY a.attnum) AS attnum, nullif(a.attidentity, '') as attidentity,nullif(a.attgenerated, '') as attgenerated,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  // This prefix is used for versions 42.7.5.
   public static final String PG_JDBC_GET_COLUMNS_PREFIX_V42_7_5 =
       "SELECT * FROM (SELECT current_database(), n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull  OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,row_number() OVER (PARTITION BY a.attrelid ORDER BY a.attnum) AS attnum, nullif(a.attidentity, '') as attidentity,nullif(a.attgenerated, '') as attgenerated,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
   // This prefix is used for versions [42.3.2, 42.7.4].
@@ -315,6 +321,29 @@ public class PgJdbcCatalog {
           + "        END AS \"IS_GENERATEDCOLUMN\"\n"
           + "FROM INFORMATION_SCHEMA.COLUMNS C\n";
 
+  public static final String PG_JDBC_GET_INDEXES_PREFIX_V42_7_6 =
+      "SELECT"
+          + "     tmp.TABLE_CAT AS \"TABLE_CAT\","
+          + "     tmp.TABLE_SCHEM AS \"TABLE_SCHEM\","
+          + "     tmp.TABLE_NAME AS \"TABLE_NAME\","
+          + "     tmp.NON_UNIQUE AS \"NON_UNIQUE\","
+          + "     tmp.INDEX_QUALIFIER AS \"INDEX_QUALIFIER\","
+          + "     tmp.INDEX_NAME AS \"INDEX_NAME\","
+          + "     tmp.TYPE AS \"TYPE\","
+          + "     tmp.ORDINAL_POSITION AS \"ORDINAL_POSITION\","
+          + "     trim(both '\"' from pg_catalog.pg_get_indexdef(tmp.CI_OID, tmp.ORDINAL_POSITION, false)) AS \"COLUMN_NAME\","
+          + "   CASE tmp.AM_NAME"
+          + "     WHEN 'btree' THEN CASE tmp.I_INDOPTION[tmp.ORDINAL_POSITION - 1] & 1::smallint"
+          + "       WHEN 1 THEN 'D'"
+          + "       ELSE 'A'"
+          + "     END"
+          + "     ELSE NULL"
+          + "   END AS \"ASC_OR_DESC\","
+          + "     tmp.CARDINALITY AS \"CARDINALITY\","
+          + "     tmp.PAGES AS \"PAGES\","
+          + "     tmp.FILTER_CONDITION AS \"FILTER_CONDITION\","
+          + "     tmp.REMARKS AS \"REMARKS\""
+          + "FROM (";
   public static final String PG_JDBC_GET_INDEXES_PREFIX_V42_7_5 =
       "SELECT"
           + "     tmp.TABLE_CAT AS \"TABLE_CAT\","
@@ -427,7 +456,8 @@ public class PgJdbcCatalog {
           + "       ORDINAL_POSITION AS \"ORDINAL_POSITION\", COLUMN_NAME AS \"COLUMN_NAME\", SUBSTR(COLUMN_ORDERING, 1, 1) AS \"ASC_OR_DESC\",\n"
           + "       -1 AS \"CARDINALITY\", -- Not supported\n"
           + "       -1 AS \"PAGES\", -- Not supported\n"
-          + "       NULL AS \"FILTER_CONDITION\"\n"
+          + "       NULL AS \"FILTER_CONDITION\","
+          + "       NULL AS \"REMARKS\"\n"
           + "FROM INFORMATION_SCHEMA.INDEXES IDX\n"
           + "INNER JOIN INFORMATION_SCHEMA.INDEX_COLUMNS COL\n"
           + "            ON  COALESCE(IDX.TABLE_CATALOG, '')=COALESCE(COL.TABLE_CATALOG, '')\n"
@@ -457,6 +487,8 @@ public class PgJdbcCatalog {
       "SELECT n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.relkind = 'r'";
   public static final String PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_3 =
       "SELECT current_database(), n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r ";
+  public static final String PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_42_7_6 =
+      "SELECT current_database() AS current_database, n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r ";
   public static final String PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT =
       "select '' as current_database, '' as nspname, '' as relname, '' as rolname, '' as relacl from (select 1) t where false";
   public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1 =
@@ -465,6 +497,8 @@ public class PgJdbcCatalog {
       "SELECT n.nspname,c.relname,r.rolname,c.relacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.oid = a.attrelid  AND c.relkind = 'r'  AND a.attnum > 0 AND NOT a.attisdropped";
   public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_V42_7_5 =
       "SELECT current_database(), n.nspname,c.relname,r.rolname,c.relacl, a.attacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a";
+  public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_V42_7_6 =
+      "SELECT current_database() AS current_database, n.nspname,c.relname,r.rolname,c.relacl, a.attacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a";
   public static final String PG_JDBC_GET_BEST_ROW_IDENTIFIER_REPLACEMENT =
       "select '' as attname, 0 as atttypid, -1 as atttypmod from (select 1) t where false";
 

@@ -47,13 +47,13 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.5</version>
+      <version>42.7.6</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.48.0</version>
+      <version>0.48.2</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>

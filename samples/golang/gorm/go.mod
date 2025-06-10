@@ -2,17 +2,17 @@ module gorm
 
 go 1.23.0
 
-toolchain go1.24.3
+toolchain go1.24.4
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250507134409-ce16c7c2aad9
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250604172038-2e3b181acd7c
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgtype v1.14.4
 	github.com/shopspring/decimal v1.4.0
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.37.0
 	gorm.io/datatypes v1.2.5
-	gorm.io/driver/postgres v1.5.11
+	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.30.0
 )
 
@@ -23,12 +23,14 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
+	github.com/containerd/errdefs v1.0.0 // indirect
+	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/docker v28.1.1+incompatible // indirect
+	github.com/docker/docker v28.2.2+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect
@@ -41,9 +43,9 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
-	github.com/jackc/pgx/v5 v5.5.5 // indirect
-	github.com/jackc/puddle/v2 v2.2.1 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgx/v5 v5.6.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
