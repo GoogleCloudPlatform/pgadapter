@@ -6024,51 +6024,124 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCancel() throws Exception {
-    ExecutorService executor = Executors.newSingleThreadExecutor();
+  public void testCancelQuery() throws Exception {
+    String sql = "SELECT 1";
+    for (boolean autocommit : new boolean[] {true, false}) {
+      ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    try (Connection connection = DriverManager.getConnection(createUrl());
-        java.sql.Statement statement = connection.createStatement()) {
-      mockSpanner.freeze();
-      Future<Long> queryResult =
-          executor.submit(
-              () -> {
-                try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
-                  if (resultSet.next()) {
-                    return resultSet.getLong(1);
+      try (Connection connection = DriverManager.getConnection(createUrl());
+          java.sql.Statement statement = connection.createStatement()) {
+        connection.setAutoCommit(autocommit);
+        mockSpanner.freeze();
+        Future<Long> queryResult =
+            executor.submit(
+                () -> {
+                  try (ResultSet resultSet = statement.executeQuery(sql)) {
+                    if (resultSet.next()) {
+                      return resultSet.getLong(1);
+                    }
+                    return 0L;
                   }
-                  return 0L;
-                }
-              });
-      // Wait for the request to have landed on the server.
-      mockSpanner.waitForRequestsToContain(
-          msg -> {
-            if (!(msg instanceof ExecuteSqlRequest)) {
-              return false;
-            }
-            ExecuteSqlRequest executeSqlRequest = (ExecuteSqlRequest) msg;
-            return executeSqlRequest.getSql().equals("SELECT 1");
-          },
-          1000L);
-      // Cancel the statement.
-      statement.cancel();
-      ExecutionException exception = assertThrows(ExecutionException.class, queryResult::get);
-      assertEquals(PSQLException.class, exception.getCause().getClass());
-      PSQLException psqlException = (PSQLException) exception.getCause();
-      assertNotNull(psqlException.getServerErrorMessage());
-      assertEquals(
-          SQLState.QueryCanceled.toString(), psqlException.getServerErrorMessage().getSQLState());
+                });
+        // Wait for the request to have landed on the server.
+        mockSpanner.waitForRequestsToContain(
+            msg -> {
+              if (!(msg instanceof ExecuteSqlRequest)) {
+                return false;
+              }
+              ExecuteSqlRequest executeSqlRequest = (ExecuteSqlRequest) msg;
+              return executeSqlRequest.getSql().equals(sql);
+            },
+            1000L);
+        // Cancel the statement.
+        statement.cancel();
+        ExecutionException exception = assertThrows(ExecutionException.class, queryResult::get);
+        assertEquals(PSQLException.class, exception.getCause().getClass());
+        PSQLException psqlException = (PSQLException) exception.getCause();
+        assertNotNull(psqlException.getServerErrorMessage());
+        assertEquals(
+            SQLState.QueryCanceled.toString(), psqlException.getServerErrorMessage().getSQLState());
 
-      mockSpanner.unfreeze();
-      // Verify that the connection is still usable.
-      try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
-        assertTrue(resultSet.next());
-        assertEquals(1L, resultSet.getLong(1));
-        assertFalse(resultSet.next());
+        mockSpanner.unfreeze();
+        if (!autocommit) {
+          // The transaction is invalid due to the cancelled query.
+          psqlException = assertThrows(PSQLException.class, () -> statement.executeQuery(sql));
+          assertNotNull(psqlException.getServerErrorMessage());
+          assertEquals(
+              SQLState.InFailedSqlTransaction.toString(),
+              psqlException.getServerErrorMessage().getSQLState());
+          // Rolling back should make the connection usable again.
+          connection.rollback();
+        }
+        // Verify that the connection is still usable.
+        assertTrue(connection.isValid(5000));
+        try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      } finally {
+        mockSpanner.unfreeze();
+        mockSpanner.clearRequests();
+        executor.shutdown();
       }
-    } finally {
-      mockSpanner.unfreeze();
-      executor.shutdown();
+    }
+  }
+
+  @Test
+  public void testCancelDml() throws Exception {
+    String sql = "update test set foo=1";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    for (boolean autocommit : new boolean[] {false, true}) {
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+      try (Connection connection = DriverManager.getConnection(createUrl());
+          java.sql.Statement statement = connection.createStatement()) {
+        connection.setAutoCommit(autocommit);
+        mockSpanner.freeze();
+        Future<Long> queryResult = executor.submit(() -> statement.executeLargeUpdate(sql));
+        // Wait for the request to have landed on the server.
+        mockSpanner.waitForRequestsToContain(
+            msg -> {
+              if (!(msg instanceof ExecuteSqlRequest)) {
+                return false;
+              }
+              ExecuteSqlRequest executeSqlRequest = (ExecuteSqlRequest) msg;
+              return executeSqlRequest.getSql().equals(sql);
+            },
+            1000L);
+        // Cancel the statement.
+        statement.cancel();
+        ExecutionException exception = assertThrows(ExecutionException.class, queryResult::get);
+        assertEquals(PSQLException.class, exception.getCause().getClass());
+        PSQLException psqlException = (PSQLException) exception.getCause();
+        assertNotNull(psqlException.getServerErrorMessage());
+        assertEquals(
+            SQLState.QueryCanceled.toString(), psqlException.getServerErrorMessage().getSQLState());
+
+        mockSpanner.unfreeze();
+        // The connection should still be valid.
+        assertTrue(connection.isValid(5000));
+
+        if (!autocommit) {
+          // The transaction is invalid due to the cancelled query.
+          psqlException =
+              assertThrows(PSQLException.class, () -> statement.executeLargeUpdate(sql));
+          assertNotNull(psqlException.getServerErrorMessage());
+          assertEquals(
+              SQLState.InFailedSqlTransaction.toString(),
+              psqlException.getServerErrorMessage().getSQLState());
+          // Rolling back should make the connection usable again.
+          connection.rollback();
+        }
+
+        // Verify that the connection is still usable.
+        assertEquals(1L, connection.createStatement().executeLargeUpdate(sql));
+      } finally {
+        mockSpanner.unfreeze();
+        mockSpanner.clearRequests();
+        executor.shutdown();
+      }
     }
   }
 

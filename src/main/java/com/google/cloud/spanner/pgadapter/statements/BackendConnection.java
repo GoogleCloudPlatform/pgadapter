@@ -182,6 +182,28 @@ public class BackendConnection {
     return pgException;
   }
 
+  static boolean isQueryCancelled(SpannerException spannerException) {
+    if (Thread.interrupted()) {
+      return true;
+    }
+    if (spannerException.getErrorCode() == ErrorCode.CANCELLED) {
+      return true;
+    }
+    final int maxDepth = 100;
+    Throwable cause = spannerException.getCause();
+    Throwable prevCause = null;
+    int depth = 0;
+    while (cause != null && cause != prevCause && depth < maxDepth) {
+      if (cause instanceof InterruptedException) {
+        return true;
+      }
+      prevCause = cause;
+      cause = cause.getCause();
+      depth++;
+    }
+    return false;
+  }
+
   boolean shouldReplaceStatement(Statement statement) {
     if (!localStatements.get().isEmpty() && localStatements.get().containsKey(statement.getSql())) {
       LocalStatement localStatement = localStatements.get().get(statement.getSql());
@@ -397,7 +419,7 @@ public class BackendConnection {
             throw setAndReturn(result, exception);
           }
         }
-        if (spannerException.getErrorCode() == ErrorCode.CANCELLED || Thread.interrupted()) {
+        if (isQueryCancelled(spannerException)) {
           throw setAndReturn(result, PGExceptionFactory.newQueryCancelledException());
         } else {
           throw setAndReturn(result, spannerException);
