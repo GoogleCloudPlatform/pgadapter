@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.extractDdlUpdateCounts;
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.isQueryCancelled;
 import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -992,5 +993,51 @@ public class BackendConnectionTest {
     verify(connection).execute(statement);
     verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
     verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testIsQueryCancelled() {
+    // InterruptedExceptions should be treated as 'Query cancelled' errors, also when it is
+    // somewhere deep down the stack.
+    assertTrue(
+        isQueryCancelled(SpannerExceptionFactory.propagateInterrupt(new InterruptedException())));
+    assertTrue(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.UNKNOWN, "test", new InterruptedException())));
+    assertTrue(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "test",
+                new IllegalArgumentException("test", new InterruptedException()))));
+    // Error code CANCELLED should be translated to 'Query cancelled'.
+    assertTrue(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.CANCELLED, "Query was cancelled")));
+
+    // Other Spanner errors should not be considered as 'Query cancelled' errors.
+    assertFalse(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test")));
+
+    // If the thread has been interrupted, then any error should be treated as if the query was
+    // cancelled, and the interrupted flag should be cleared.
+    Thread.currentThread().interrupt();
+    assertTrue(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test")));
+    assertFalse(Thread.currentThread().isInterrupted());
+
+    // A circular set of causes should not lead to an eternal loop.
+    Exception e1 = new Exception("test");
+    Exception e2 = new Exception("test", e1);
+    Exception e3 = new Exception("test", e2);
+    Exception e4 = new Exception("test", e3);
+    e1.initCause(e4);
+    SpannerException spannerException =
+        SpannerExceptionFactory.newSpannerException(ErrorCode.UNKNOWN, "test", e4);
+    assertFalse(isQueryCancelled(spannerException));
   }
 }
