@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.48.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.48.2...v0.48.3) (2025-06-11)
+
+
+### Bug Fixes
+
+* query cancelled was returned as a generic Interrupted error for DML ([#3429](https://github.com/GoogleCloudPlatform/pgadapter/issues/3429)) ([96dfef8](https://github.com/GoogleCloudPlatform/pgadapter/commit/96dfef84ec5e7c63c82c4dec9b5ac206f0eb4e7a))
+
+
+### Dependencies
+
+* update dependency @types/node to v24 ([#3431](https://github.com/GoogleCloudPlatform/pgadapter/issues/3431)) ([183aa40](https://github.com/GoogleCloudPlatform/pgadapter/commit/183aa40da0d06aa1c6780f0565096fd021821ff0))
+* update dependency django to v5.2.2 ([#3408](https://github.com/GoogleCloudPlatform/pgadapter/issues/3408)) ([d1836ed](https://github.com/GoogleCloudPlatform/pgadapter/commit/d1836ed01eb0450954bcf9133a07d76454946ecb))
+* update dependency django to v5.2.3 ([#3434](https://github.com/GoogleCloudPlatform/pgadapter/issues/3434)) ([d703b0e](https://github.com/GoogleCloudPlatform/pgadapter/commit/d703b0ec061030d3b70ecc549a8d306a4f2e9f97))
+* update dependency go to v1.24.4 ([#3419](https://github.com/GoogleCloudPlatform/pgadapter/issues/3419)) ([30fa388](https://github.com/GoogleCloudPlatform/pgadapter/commit/30fa388ce0ecf92a8bbee8153c56af8e4e1de2d7))
+* update dependency google.auth to v2.40.3 ([#3411](https://github.com/GoogleCloudPlatform/pgadapter/issues/3411)) ([52740f0](https://github.com/GoogleCloudPlatform/pgadapter/commit/52740f0945946603fc8db0c160ba67c913a2cb88))
+* update dependency io.hypersistence:hypersistence-utils-hibernate-63 to v3.10.0 ([#3430](https://github.com/GoogleCloudPlatform/pgadapter/issues/3430)) ([d3104b3](https://github.com/GoogleCloudPlatform/pgadapter/commit/d3104b39c2896131607f08c8216a42b6d42ba99d))
+* update dependency io.hypersistence:hypersistence-utils-hibernate-63 to v3.9.11 ([#3424](https://github.com/GoogleCloudPlatform/pgadapter/issues/3424)) ([ffbe529](https://github.com/GoogleCloudPlatform/pgadapter/commit/ffbe529223e2c0452b9173de12298cea639a5d03))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.51.0 ([#3422](https://github.com/GoogleCloudPlatform/pgadapter/issues/3422)) ([d88476a](https://github.com/GoogleCloudPlatform/pgadapter/commit/d88476a888f224db35c9f308ed7ec93ccc9130ce))
+* update dependency org.hibernate.orm:hibernate-core to v7.0.1.final ([#3436](https://github.com/GoogleCloudPlatform/pgadapter/issues/3436)) ([7149ee4](https://github.com/GoogleCloudPlatform/pgadapter/commit/7149ee416767cf74f35804e537498348b27cf47f))
+* update dependency pandas to v2.3.0 ([#3412](https://github.com/GoogleCloudPlatform/pgadapter/issues/3412)) ([0369af8](https://github.com/GoogleCloudPlatform/pgadapter/commit/0369af861e1296fd98d4c8da5bdbb8ef95437e8f))
+* update dependency requests to v2.32.4 ([#3428](https://github.com/GoogleCloudPlatform/pgadapter/issues/3428)) ([7710d61](https://github.com/GoogleCloudPlatform/pgadapter/commit/7710d61c1d9df0c420c673f6a155fda73c99c3fd))
+* update dependency testcontainers to 4.5.0 ([#3425](https://github.com/GoogleCloudPlatform/pgadapter/issues/3425)) ([66f337b](https://github.com/GoogleCloudPlatform/pgadapter/commit/66f337baf524886e0122ac73a45c1893b8230aa3))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 094f5b1 ([#3415](https://github.com/GoogleCloudPlatform/pgadapter/issues/3415)) ([0735656](https://github.com/GoogleCloudPlatform/pgadapter/commit/07356568ba5d16385d42e154e22eaad0995f4afc))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 2e3b181 ([#3393](https://github.com/GoogleCloudPlatform/pgadapter/issues/3393)) ([df82e10](https://github.com/GoogleCloudPlatform/pgadapter/commit/df82e10c16cf9ae2d3665408c91e5e5ca6b80d4c))
+* update golang docker tag to v1.24.4 ([#3421](https://github.com/GoogleCloudPlatform/pgadapter/issues/3421)) ([50e2321](https://github.com/GoogleCloudPlatform/pgadapter/commit/50e232153ca911bf3262044b7dd69b7440196342))
+
 ## [0.48.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.48.1...v0.48.2) (2025-06-04)
 
 
