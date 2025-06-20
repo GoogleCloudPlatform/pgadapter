@@ -3469,9 +3469,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           getWireMessagesOfType(ExecuteMessage.class).stream()
               .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
               .collect(Collectors.toList());
-      assertEquals(5, executeMessages.size());
-      assertEquals("", executeMessages.get(0).getName());
-      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
+      assertEquals(4, executeMessages.size());
+      for (ExecuteMessage executeMessage : executeMessages.subList(0, executeMessages.size() - 1)) {
         assertEquals(describeMessage.getName(), executeMessage.getName());
         assertEquals(2, executeMessage.getMaxRows());
       }
@@ -3481,10 +3480,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           getWireMessagesOfType(ParseMessage.class).stream()
               .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
               .collect(Collectors.toList());
-      assertEquals(3, parseMessages.size());
-      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
-      assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+      assertEquals(2, parseMessages.size());
+      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(0).getStatement().getSql());
+      assertEquals("COMMIT", parseMessages.get(1).getStatement().getSql());
     }
   }
 
@@ -3513,11 +3511,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
     assertEquals(SELECT_FIVE_ROWS.getSql(), executeRequest.getSql());
 
-    // PGAdapter should receive 4 Execute messages:
-    // 1. BEGIN
-    // 2. Execute - fetch row 1
-    // 3. Execute - fetch row 2 -- This fails with a DATA_LOSS error
-    // The JDBC driver does not send a ROLLBACK
+    // PGAdapter should receive 3 Execute messages:
+    // 1. Execute - fetch row 1
+    // 2. Execute - fetch row 2 -- This fails with a DATA_LOSS error
+    // 3. ROLLBACK
+    // The driver also sends a BEGIN statement, but that uses the simple query protocol,
+    // so it only sends a single Query message.
     if (pgServer != null) {
       List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
       assertEquals(1, describeMessages.size());
@@ -3528,9 +3527,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           getWireMessagesOfType(ExecuteMessage.class).stream()
               .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
               .collect(Collectors.toList());
-      assertEquals(4, executeMessages.size());
-      assertEquals("", executeMessages.get(0).getName());
-      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
+      assertEquals(3, executeMessages.size());
+      for (ExecuteMessage executeMessage : executeMessages.subList(0, executeMessages.size() - 1)) {
         assertEquals(describeMessage.getName(), executeMessage.getName());
         assertEquals(1, executeMessage.getMaxRows());
       }
@@ -3540,10 +3538,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           getWireMessagesOfType(ParseMessage.class).stream()
               .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
               .collect(Collectors.toList());
-      assertEquals(3, parseMessages.size());
-      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
-      assertEquals("ROLLBACK", parseMessages.get(2).getStatement().getSql());
+      assertEquals(2, parseMessages.size());
+      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(0).getStatement().getSql());
+      assertEquals("ROLLBACK", parseMessages.get(1).getStatement().getSql());
     }
   }
 
@@ -3673,12 +3670,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
         assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
 
-        // PGAdapter should receive 5 Execute messages:
-        // 1. BEGIN
+        // PGAdapter should receive 4 Execute messages:
         // 2. Execute - fetch rows 1, 2
         // 3. Execute - fetch rows 3, 4
         // 4. Execute - fetch rows 5
         // 5. COMMIT
+        // PGAdapter also receives a BEGIN statement, but that statement uses the simple query
+        // protocol and only sends a single Query message.
         if (pgServer != null) {
           List<DescribeMessage> describeMessages =
               getWireMessagesOfType(DescribeMessage.class).stream()
@@ -3709,10 +3707,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                           ImmutableList.of("BEGIN", SELECT_RANDOM.getSql(), "COMMIT")
                               .contains(message.getSql()))
                   .collect(Collectors.toList());
-          assertEquals(3, parseMessages.size());
-          assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-          assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
-          assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+          assertEquals(2, parseMessages.size());
+          assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(0).getStatement().getSql());
+          assertEquals("COMMIT", parseMessages.get(1).getStatement().getSql());
         }
         mockSpanner.clearRequests();
         pgServer.clearDebugMessages();
