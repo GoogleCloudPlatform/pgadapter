@@ -11,7 +11,7 @@
   "dependencies": {
     "@google-cloud/spanner": "^8.0.0",
     "@types/pg": "^8.11.6",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.0.0",
     "pg": "^8.11.3",
     "testcontainers": "^11.0.0",
     "ts-node": "^10.9.2",
