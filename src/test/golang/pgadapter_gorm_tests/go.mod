@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/jackc/pgtype v1.14.4
 	github.com/shopspring/decimal v1.4.0
-	gorm.io/datatypes v1.2.5
+	gorm.io/datatypes v1.2.6
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.30.0
 )
