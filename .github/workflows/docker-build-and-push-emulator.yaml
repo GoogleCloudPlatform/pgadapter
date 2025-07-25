@@ -1,0 +1,45 @@
+name: Build and Push Docker Emulator Image to Google Artifact Registry
+
+on:
+  # This allows manual activation of this action for testing.
+  workflow_dispatch:
+
+env:
+  GITHUB_SHA: ${{ github.sha }}
+  GITHUB_REF: ${{ github.ref }}
+  IMAGE: pgadapter
+  GCR_HOSTNAME: gcr.io/cloud-spanner-pg-adapter
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, and Publish
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      # Configure docker to use the gcloud command-line tool as a credential helper
+      - run: gcloud auth configure-docker gcr.io
+
+      # Build and Publish the Docker image
+      - name: Build and Publish
+        run: |
+          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $TAG
+          docker buildx create --name multi_platform --use
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            . -f build/emulator/Dockerfile \
+            -t "$GCR_HOSTNAME"/"$IMAGE"-emulator:"$TAG" \
+            -t "$GCR_HOSTNAME"/"$IMAGE"-emulator:latest \
+            --push \
+            --build-arg GITHUB_SHA="$GITHUB_SHA" \
+            --build-arg GITHUB_REF="$GITHUB_REF"
