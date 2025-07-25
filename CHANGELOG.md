@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.48.5](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.48.4...v0.48.5) (2025-07-25)
+
+
+### Dependencies
+
+* update dependency django to v5.2.4 ([#3517](https://github.com/GoogleCloudPlatform/pgadapter/issues/3517)) ([f6ac587](https://github.com/GoogleCloudPlatform/pgadapter/commit/f6ac58766b8faf753266fdf495ecaf636274bfbf))
+* update dependency go to v1.24.5 ([#3531](https://github.com/GoogleCloudPlatform/pgadapter/issues/3531)) ([1a1afc2](https://github.com/GoogleCloudPlatform/pgadapter/commit/1a1afc29af8d9b3504fa1963536cc900dc2fad75))
+* update dependency io.hypersistence:hypersistence-utils-hibernate-63 to v3.10.3 ([#3521](https://github.com/GoogleCloudPlatform/pgadapter/issues/3521)) ([8630b76](https://github.com/GoogleCloudPlatform/pgadapter/commit/8630b7617acb4c3de394a3a2d668d1746a735d06))
+* update dependency io.hypersistence:hypersistence-utils-hibernate-70 to v3.10.3 ([#3522](https://github.com/GoogleCloudPlatform/pgadapter/issues/3522)) ([41a069d](https://github.com/GoogleCloudPlatform/pgadapter/commit/41a069d734e467f113f150c8c4f8fb912e6b3d28))
+* update dependency pandas to v2.3.1 ([#3529](https://github.com/GoogleCloudPlatform/pgadapter/issues/3529)) ([ceb89b4](https://github.com/GoogleCloudPlatform/pgadapter/commit/ceb89b40549d2f7d005c3ec7aadeb498b28811cb))
+* update golang docker tag to v1.24.5 ([#3535](https://github.com/GoogleCloudPlatform/pgadapter/issues/3535)) ([d8513f1](https://github.com/GoogleCloudPlatform/pgadapter/commit/d8513f11cb50325ad386235523689bfee4556feb))
+* update module github.com/docker/docker to v28.3.2+incompatible ([#3518](https://github.com/GoogleCloudPlatform/pgadapter/issues/3518)) ([d21879e](https://github.com/GoogleCloudPlatform/pgadapter/commit/d21879ec69926af63f5bb8099bba212f06dc9ae1))
+* update module google.golang.org/api to v0.243.0 ([#3516](https://github.com/GoogleCloudPlatform/pgadapter/issues/3516)) ([ac71226](https://github.com/GoogleCloudPlatform/pgadapter/commit/ac712268a7a7c5372f296d4fbf2f2c488468d4ca))
+
 ## [0.48.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.48.3...v0.48.4) (2025-07-01)
 
 
