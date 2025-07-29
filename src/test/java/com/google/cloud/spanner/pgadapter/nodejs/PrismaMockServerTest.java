@@ -1904,7 +1904,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  from information_schema.schemata\n"
             + ")\n"
             + "\n"
-            + "                SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name\n"
+            + "                SELECT replace(tbl.relname, 'prisma_migrations', '_prisma_migrations') AS table_name, namespace.nspname AS table_namespace\n"
             + "                FROM pg_class AS tbl\n"
             + "                INNER JOIN pg_namespace AS namespace ON namespace.oid = tbl.relnamespace\n"
             + "                WHERE tbl.relkind = 'r' AND namespace.nspname = ANY ( $1 )\n"
@@ -1916,6 +1916,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                     .addFields(
                         Field.newBuilder()
                             .setName("table_name")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("table_namespace")
                             .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                             .build())
                     .build())
