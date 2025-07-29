@@ -19,7 +19,6 @@ import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
-import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
 import com.google.cloud.spanner.pgadapter.logging.DefaultLogConfiguration;
@@ -89,7 +88,7 @@ public class Server {
         if (optionsMetadata.getDefaultDatabaseId() != null) {
           database = optionsMetadata.getDefaultDatabaseId().getDatabase();
         }
-        runCommand(proxyServer, optionsMetadata.getCommand(), database);
+        runCommand(proxyServer, database, optionsMetadata.getCommand());
         proxyServer.stopServer();
       } else {
         // Create a shutdown handler and register signal handlers for the signals that should
@@ -102,7 +101,8 @@ public class Server {
   }
 
   @VisibleForTesting
-  public static void runCommand(ProxyServer proxyServer, String command, @Nullable String database)
+  public static void runCommand(
+      ProxyServer proxyServer, @Nullable String database, String... command)
       throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(command);
