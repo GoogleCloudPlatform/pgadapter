@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.49.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.48.5...v0.49.0) (2025-07-29)
+
+
+### Features
+
+* add command option for tools ([#3570](https://github.com/GoogleCloudPlatform/pgadapter/issues/3570)) ([69a4967](https://github.com/GoogleCloudPlatform/pgadapter/commit/69a49672f8948c899bdbe2793be2de6f4e4e4c99))
+
+
+### Bug Fixes
+
+* typo in native image build script ([#3177](https://github.com/GoogleCloudPlatform/pgadapter/issues/3177)) ([c9e6e69](https://github.com/GoogleCloudPlatform/pgadapter/commit/c9e6e69287aac736f7b5455ba0edd70907de1d02))
+
+
+### Dependencies
+
+* update alpine docker tag to v3.22.1 ([#3561](https://github.com/GoogleCloudPlatform/pgadapter/issues/3561)) ([3eddc06](https://github.com/GoogleCloudPlatform/pgadapter/commit/3eddc06e0332cc268c7b6cb3ac0cc1f3df5d1ed0))
+* update dependency com.google.googlejavaformat:google-java-format to v1.28.0 ([#3566](https://github.com/GoogleCloudPlatform/pgadapter/issues/3566)) ([eab421f](https://github.com/GoogleCloudPlatform/pgadapter/commit/eab421f23366c528c5b8d6d0dd5c48ecead7df61))
+* update dependency org.hibernate.orm:hibernate-core to v7.0.8.final ([#3572](https://github.com/GoogleCloudPlatform/pgadapter/issues/3572)) ([632544c](https://github.com/GoogleCloudPlatform/pgadapter/commit/632544cd2febcf77b6df7e0e1d42f3b1086bfb14))
+* update dependency org.springframework.boot:spring-boot-starter-parent to v3.5.4 ([#3562](https://github.com/GoogleCloudPlatform/pgadapter/issues/3562)) ([e6ab659](https://github.com/GoogleCloudPlatform/pgadapter/commit/e6ab6592a22c1a0a577ee121b207058143dc30e8))
+* update dependency testcontainers to v4.12.0 ([#3574](https://github.com/GoogleCloudPlatform/pgadapter/issues/3574)) ([0daba42](https://github.com/GoogleCloudPlatform/pgadapter/commit/0daba428e8797af76f386fffc9c1670f58c64986))
+* update maven docker tag to v3.9.11 ([#3563](https://github.com/GoogleCloudPlatform/pgadapter/issues/3563)) ([7f9e4f0](https://github.com/GoogleCloudPlatform/pgadapter/commit/7f9e4f0390b556a310b3cba5e7e25ba370a26604))
+* update module github.com/testcontainers/testcontainers-go to v0.38.0 ([#3576](https://github.com/GoogleCloudPlatform/pgadapter/issues/3576)) ([0861218](https://github.com/GoogleCloudPlatform/pgadapter/commit/086121864f312cb7afe5f7ca2be767887cbfd9f6))
+* update spring-boot.version to v3.5.4 ([#3564](https://github.com/GoogleCloudPlatform/pgadapter/issues/3564)) ([62eb13d](https://github.com/GoogleCloudPlatform/pgadapter/commit/62eb13d64417c5e92cdef5be7db85511b8cebc63))
+
 ## [0.48.5](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.48.4...v0.48.5) (2025-07-25)
 
 
