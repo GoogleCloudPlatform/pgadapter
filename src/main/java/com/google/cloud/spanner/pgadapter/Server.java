@@ -19,10 +19,12 @@ import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceConfiguration;
 import com.google.cloud.opentelemetry.trace.TraceExporter;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer.ShutdownMode;
 import com.google.cloud.spanner.pgadapter.logging.DefaultLogConfiguration;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.cloudtrace.v2.AttributeValue;
 import com.google.devtools.cloudtrace.v2.TruncatableString;
@@ -54,6 +56,7 @@ import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
@@ -80,12 +83,37 @@ public class Server {
       ProxyServer proxyServer = new ProxyServer(optionsMetadata, openTelemetry);
       proxyServer.startServer();
 
-      // Create a shutdown handler and register signal handlers for the signals that should
-      // terminate the server.
-      Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
+      if (optionsMetadata.hasCommand()) {
+        DefaultLogConfiguration.disableLogging();
+        String database = null;
+        if (optionsMetadata.getDefaultDatabaseId() != null) {
+          database = optionsMetadata.getDefaultDatabaseId().getDatabase();
+        }
+        runCommand(proxyServer, optionsMetadata.getCommand(), database);
+        proxyServer.stopServer();
+      } else {
+        // Create a shutdown handler and register signal handlers for the signals that should
+        // terminate the server.
+        Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
+      }
     } catch (Exception e) {
       printError(e, System.err, System.out);
     }
+  }
+
+  @VisibleForTesting
+  public static void runCommand(ProxyServer proxyServer, String command, @Nullable String database)
+      throws IOException, InterruptedException {
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(command);
+    builder.environment().put("PGHOST", "localhost");
+    builder.environment().put("PGPORT", String.valueOf(proxyServer.getLocalPort()));
+    if (database != null) {
+      builder.environment().put("PGDATABASE", database);
+    }
+    builder.inheritIO();
+    Process process = builder.start();
+    process.waitFor();
   }
 
   /**
