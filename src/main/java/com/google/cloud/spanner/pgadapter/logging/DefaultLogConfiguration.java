@@ -40,5 +40,13 @@ public class DefaultLogConfiguration {
                     arg -> arg.equals("--enable_legacy_logging") || arg.equals("-legacy_logging")));
   }
 
+  public static void disableLogging() throws IOException {
+    LogManager.getLogManager()
+        .readConfiguration(
+            DefaultLogConfiguration.class
+                .getClassLoader()
+                .getResourceAsStream("disable-logging.properties"));
+  }
+
   private DefaultLogConfiguration() {}
 }

@@ -259,6 +259,12 @@ The following list contains the most frequently used startup options for PGAdapt
   * Determines the behavior of the proxy when DDL statements are executed in transactions.
     See DDL options for more information.
 
+-cmd <command>
+  * Run this command or tool and connect it to PGAdapter. This can be used to quickly start a PostgreSQL
+    tool along with PGAdapter, and connect to Spanner. The following command will for example start
+    PGAdapter and psql, and automatically connect psql to PGAdapter:
+    java -jar pgadapter.jar -p my-project -i my-instance -d my-database -cmd psql
+
 -a
   * Turns on authentication for the proxy server. Clients are then requested
     to supply a username and password during a connection request.
@@ -306,6 +312,16 @@ psql -h localhost
 ```
 
 The psql `-d` command line argument will be ignored. The psql `\c` meta-command will have no effect.
+
+#### Example - Start PGAdapter and psql together
+
+This example starts PGAdapter and psql together and automatically connects psql to PGAdapter:
+
+```shell
+java -jar pgadapter.jar \
+     -p <project-id> -i <instance-id> -d <database-id> \
+     -cmd psql
+```
 
 #### Example - Require Authentication and Fully Qualified Database Name
 

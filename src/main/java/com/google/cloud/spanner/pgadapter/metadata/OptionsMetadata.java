@@ -658,6 +658,7 @@ public class OptionsMetadata {
   private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
   private static final String OPTION_LOG_GRPC_MESSAGES = "log_grpc_messages";
   private static final String OPTION_ALLOW_SHUTDOWN_STATEMENT = "allow_shutdown_statement";
+  private static final String OPTION_COMMAND = "cmd";
 
   private final Map<String, String> environment;
   private final String osName;
@@ -691,6 +692,7 @@ public class OptionsMetadata {
   private final Duration startupTimeout;
   private final boolean logGrpcMessages;
   private final boolean allowShutdownStatement;
+  private final String command;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -798,6 +800,7 @@ public class OptionsMetadata {
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
     this.logGrpcMessages = commandLine.hasOption(OPTION_LOG_GRPC_MESSAGES);
     this.allowShutdownStatement = commandLine.hasOption(OPTION_ALLOW_SHUTDOWN_STATEMENT);
+    this.command = commandLine.getOptionValue(OPTION_COMMAND);
     this.startupTimeout = startupTimeout;
   }
 
@@ -874,6 +877,7 @@ public class OptionsMetadata {
     this.debugMode = false;
     this.logGrpcMessages = false;
     this.allowShutdownStatement = false;
+    this.command = null;
     this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
 
@@ -1449,6 +1453,13 @@ public class OptionsMetadata {
         false,
         "Enables legacy logging using the default java.util.logging configuration.\n"
             + "This sends all log output to stderr.");
+    options.addOption(
+        OPTION_COMMAND,
+        "command",
+        true,
+        "This option instructs PGAdapter to run the given command as a PostgreSQL tool"
+            + "and connect it to PGAdapter. Use this option to directly start for example psql and "
+            + "PGAdapter in one go.");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);
@@ -1729,6 +1740,14 @@ public class OptionsMetadata {
   /** Returns true if the OS is Windows. */
   public boolean isWindows() {
     return osName.toLowerCase().startsWith("windows");
+  }
+
+  public boolean hasCommand() {
+    return this.command != null;
+  }
+
+  public String getCommand() {
+    return this.command;
   }
 
   /**
