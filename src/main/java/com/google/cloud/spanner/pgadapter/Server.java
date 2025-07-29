@@ -83,16 +83,22 @@ public class Server {
       proxyServer.startServer();
 
       if (optionsMetadata.hasCommand()) {
+        // A command (tool) has been specified. This should be started and connected to PGAdapter.
+        // This will take over stdin and stdout, so we disable PGAdapter logging to prevent it from
+        // polluting standard output.
         DefaultLogConfiguration.disableLogging();
         String database = null;
         if (optionsMetadata.getDefaultDatabaseId() != null) {
           database = optionsMetadata.getDefaultDatabaseId().getDatabase();
         }
+        // runCommand will block until the command has finished (e.g. when the user exits psql).
         runCommand(proxyServer, database, optionsMetadata.getCommand());
+        // Shut down PGAdapter when the command has finished.
         proxyServer.stopServer();
       } else {
-        // Create a shutdown handler and register signal handlers for the signals that should
-        // terminate the server.
+        // There's no command that should be executed against PGAdapter, so we should keep it
+        // running in the background. Create a shutdown handler and register signal handlers for the
+        // signals that should terminate the server.
         Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
       }
     } catch (Exception e) {

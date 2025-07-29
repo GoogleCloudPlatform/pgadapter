@@ -40,6 +40,12 @@
     using psql from one of these distributions, you either need to use 'psql -h /tmp'
     or change the default Unix domain socket directory used by PGAdapter to '/var/run/postgresql'.
 
+-cmd <command>
+  * Run this command or tool and connect it to PGAdapter. This can be used to quickly start a PostgreSQL
+    tool along with PGAdapter, and connect to Spanner. The following command will for example start
+    PGAdapter and psql, and automatically connect psql to PGAdapter:
+    java -jar pgadapter.jar -p my-project -i my-instance -d my-database -cmd psql
+
 -ddl <ddl-transaction-mode>
   * Sets the way PGAdapter should handle DDL statements in implicit and explicit
     transactions. Cloud Spanner does not support DDL transactions. The possible modes are:
