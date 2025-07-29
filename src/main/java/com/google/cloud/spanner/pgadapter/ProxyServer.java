@@ -26,7 +26,9 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
+import com.google.cloud.spanner.pgadapter.wireprotocol.MessageReader;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Tracer;
@@ -42,6 +44,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -64,11 +67,16 @@ import org.newsclub.net.unix.AFUNIXSocketAddress;
 public class ProxyServer extends AbstractApiService {
 
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
+
+  @VisibleForTesting
+  static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS = new ConcurrentHashMap<>();
+
   private final OptionsMetadata options;
   private final OpenTelemetry openTelemetry;
   private final Metrics metrics;
   private final Properties properties;
   private final List<ConnectionHandler> handlers = new LinkedList<>();
+  private final MessageReader messageReader;
 
   /**
    * Latch that is closed when the TCP server has started. We need this to know the exact port that
@@ -162,6 +170,7 @@ public class ProxyServer extends AbstractApiService {
   public ProxyServer(
       OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties) {
     this.options = optionsMetadata;
+    this.messageReader = new MessageReader(optionsMetadata);
     this.openTelemetry = openTelemetry;
     this.metrics =
         optionsMetadata.isEnableOpenTelemetryMetrics()
@@ -174,6 +183,10 @@ public class ProxyServer extends AbstractApiService {
         ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory(
             "ConnectionHandler", optionsMetadata.isUseVirtualThreads());
     addConnectionProperties();
+  }
+
+  public MessageReader getMessageReader() {
+    return this.messageReader;
   }
 
   private void addConnectionProperties() {

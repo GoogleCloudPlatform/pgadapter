@@ -14,13 +14,12 @@
 
 package com.google.cloud.postgres.models;
 
-import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
+import com.google.cloud.postgres.GeneratedLocalDateTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import java.time.LocalDateTime;
-import org.hibernate.annotations.GenerationTime;
-import org.hibernate.annotations.GeneratorType;
+import org.hibernate.generator.EventType;
 
 @Entity
 public class Tracks {
@@ -34,10 +33,11 @@ public class Tracks {
   @Column(name = "sample_rate")
   private double sampleRate;
 
+  @GeneratedLocalDateTime(eventTypes = {EventType.INSERT})
   @Column(name = "created_at", columnDefinition = "timestamptz")
   private LocalDateTime createdAt;
 
-  @GeneratorType(type = CurrentLocalDateTimeGenerator.class, when = GenerationTime.ALWAYS)
+  @GeneratedLocalDateTime(eventTypes = {EventType.INSERT, EventType.UPDATE})
   @Column(name = "updated_at", columnDefinition = "timestamptz")
   private LocalDateTime updatedAt;
 

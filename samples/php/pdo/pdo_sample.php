@@ -29,7 +29,7 @@ use Testcontainers\Wait\WaitForLog;
 [$pg_adapter, $port] = start_pg_adapter();
 
 // Connect to PGAdapter using the PostgreSQL PDO driver.
-$dsn = sprintf("pgsql:host=localhost;port=%s;dbname=test", $port);
+$dsn = sprintf("pgsql:host=127.0.0.1;port=%s;dbname=test", $port);
 $connection = new PDO($dsn);
 
 // Execute a query on Spanner through PGAdapter.

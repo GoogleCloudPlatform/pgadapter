@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements.local;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
@@ -51,7 +52,7 @@ public class SelectCurrentDatabaseStatement implements LocalStatement {
   }
 
   @Override
-  public StatementResult execute(BackendConnection backendConnection) {
+  public StatementResult execute(BackendConnection backendConnection, Statement statement) {
     ResultSet resultSet =
         ClientSideResultSet.forRows(
             Type.struct(StructField.of("current_database", Type.string())),

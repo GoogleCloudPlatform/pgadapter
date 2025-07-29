@@ -46,7 +46,7 @@ public class AbortTransaction implements LocalStatement {
   }
 
   @Override
-  public StatementResult execute(BackendConnection backendConnection) {
+  public StatementResult execute(BackendConnection backendConnection, Statement statement) {
     // This should not be possible.
     throw new UnsupportedOperationException();
   }

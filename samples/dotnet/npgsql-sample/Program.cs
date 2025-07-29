@@ -26,7 +26,7 @@ internal static class Sample
         // Start PGAdapter and the Spanner emulator in a Docker container.
         var pgadapter = await StartPGAdapterAndEmulator();
         
-        var connectionString = $"Host=localhost;Port={pgadapter.GetMappedPublicPort(5432)};Database=my-database;SSL Mode=Disable";
+        var connectionString = $"Host=127.0.0.1;Port={pgadapter.GetMappedPublicPort(5432)};Database=my-database;SSL Mode=Disable";
         using var connection = new NpgsqlConnection(connectionString);
         connection.Open();
 

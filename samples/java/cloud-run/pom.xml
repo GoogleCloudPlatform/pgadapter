@@ -36,7 +36,7 @@
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
-        <version>3.4.4</version>
+        <version>3.5.4</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -47,13 +47,13 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.5</version>
+      <version>42.7.7</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.46.2</version>
+      <version>0.48.2</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
@@ -96,7 +96,7 @@
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
         <artifactId>jib-maven-plugin</artifactId>
-        <version>3.4.5</version>
+        <version>3.4.6</version>
         <configuration>
           <to>
             <image>gcr.io/PROJECT_ID/pgadapter-example</image>
@@ -106,7 +106,7 @@
       <plugin>
         <groupId>com.spotify.fmt</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.25</version>
+        <version>2.27</version>
         <executions>
           <execution>
             <goals>

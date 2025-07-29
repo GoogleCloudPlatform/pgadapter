@@ -142,7 +142,7 @@ class DdlExecutor {
    * into one that is supported by the backend.
    */
   Statement translate(ParsedStatement parsedStatement, Statement statement) {
-    SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
+    SimpleParser parser = new SimpleParser(statement.getSql());
     if (parser.eatKeyword("create")) {
       statement = translateCreate(parser, statement);
     }
@@ -158,9 +158,7 @@ class DdlExecutor {
   }
 
   Statement maybeRemovePrimaryKeyConstraintName(Statement createTableStatement) {
-    ParsedStatement parsedStatement =
-        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(createTableStatement);
-    SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
+    SimpleParser parser = new SimpleParser(createTableStatement.getSql());
     parser.eatKeyword("create", "table", "if", "not", "exists");
     TableOrIndexName tableName = parser.readTableOrIndexName();
     if (tableName == null) {

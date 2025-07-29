@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
+
 import com.google.api.core.InternalApi;
 import com.google.auth.Credentials;
 import com.google.cloud.spanner.Database;
@@ -31,13 +33,13 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
+import com.google.cloud.spanner.connection.ConnectionProperties;
 import com.google.cloud.spanner.connection.PGAdapterConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.SavepointSupport;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -90,7 +92,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -123,8 +124,6 @@ public class ConnectionHandler implements Runnable {
           .concurrencyLevel(1)
           .build();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
-  private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
-      new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
   private Thread thread;
   private final int connectionId;
@@ -165,7 +164,6 @@ public class ConnectionHandler implements Runnable {
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
     this.connectionId = incrementingConnectionId.incrementAndGet();
-    CONNECTION_HANDLERS.put(this.connectionId, this);
     this.spannerConnection = spannerConnection;
   }
 
@@ -200,9 +198,10 @@ public class ConnectionHandler implements Runnable {
   }
 
   @InternalApi
-  public void connectToSpanner(String database, @Nullable Credentials credentials) {
+  public void connectToSpanner(
+      String database, @Nullable Credentials credentials, Map<String, String> parameters) {
     OptionsMetadata options = getServer().getOptions();
-    String uri = buildConnectionURL(database, options, getServer().getProperties());
+    String uri = buildConnectionURL(database, options, getServer().getProperties(), parameters);
     ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
     connectionOptionsBuilder =
         PGAdapterConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
@@ -226,8 +225,7 @@ public class ConnectionHandler implements Runnable {
                     options.getSessionPoolOptions().toBuilder())
                 .build();
     connectionOptionsBuilder.setSessionPoolOptions(sessionPoolOptions);
-    if (options.isEnableOpenTelemetryMetrics()) {
-      SpannerOptions.enableOpenTelemetryMetrics();
+    if (options.isEnableOpenTelemetry() || options.isEnableOpenTelemetryMetrics()) {
       connectionOptionsBuilder =
           connectionOptionsBuilder.setOpenTelemetry(server.getOpenTelemetry());
     }
@@ -279,12 +277,16 @@ public class ConnectionHandler implements Runnable {
 
   @VisibleForTesting
   static String buildConnectionURL(
-      String database, OptionsMetadata options, Properties properties) {
+      String database,
+      OptionsMetadata options,
+      Properties properties,
+      Map<String, String> startupParameters) {
     String uri =
         options.hasDefaultConnectionUrl()
             ? options.getDefaultConnectionUrl()
             : options.buildConnectionURL(database);
     uri = appendPropertiesToUrl(uri, properties);
+    uri = appendStartupParametersToUrl(uri, startupParameters);
     // We add 'dialect=postgresql' here in all cases, although it is only being used if
     // 'autoConfigEmulator=true' has also been set in the connection URL. This dialect property is
     // only used to determine what dialect the database should have that is being created on the
@@ -332,6 +334,40 @@ public class ConnectionHandler implements Runnable {
   }
 
   /**
+   * Adds parameters to the connection URL that have been added as 'options=-c ...' to the
+   * PostgreSQL connection string.
+   */
+  static String appendStartupParametersToUrl(String url, Map<String, String> startupParameters) {
+    if (startupParameters == null || startupParameters.isEmpty()) {
+      return url;
+    }
+    StringBuilder result = new StringBuilder(url);
+    for (Map.Entry<String, String> entry : startupParameters.entrySet()) {
+      if ("options".equalsIgnoreCase(entry.getKey()) && entry.getValue() != null) {
+        String[] commands = entry.getValue().split("-c[\\s+]+");
+        for (String command : commands) {
+          String[] keyValue = command.split("=", 2);
+          if (keyValue.length == 2
+              && isValidConnectionProperty(keyValue[0])
+              && keyValue[1] != null) {
+            result.append(";").append(keyValue[0]).append("=").append(keyValue[1].trim());
+          }
+        }
+      }
+    }
+    return result.toString();
+  }
+
+  static boolean isValidConnectionProperty(String name) {
+    if (Strings.isNullOrEmpty(name)) {
+      return false;
+    }
+    String key = name.toLowerCase();
+    return ConnectionProperties.VALID_CONNECTION_PROPERTIES.stream()
+        .anyMatch(property -> property.getKey().equals(key));
+  }
+
+  /**
    * Simple runner starts a loop which keeps taking inbound messages, processing them, sending them
    * to Spanner, getting a result, processing that result, and replying to the client (in that
    * order). Also instantiates input and output streams from the client and handles auth.
@@ -346,6 +382,7 @@ public class ConnectionHandler implements Runnable {
                 String.format(
                     "Connection handler with ID %s starting for client %s with thread %s",
                     getName(), socket.getInetAddress().getHostAddress(), thread.toString())));
+    CONNECTION_HANDLERS.put(this.connectionId, this);
     if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
       logger.log(
           Level.INFO,
@@ -402,6 +439,13 @@ public class ConnectionHandler implements Runnable {
         // message. This also prevents probers that just check for an open TCP port to cause errors
         // to be logged.
         return result;
+      } catch (Exception exception) {
+        this.handleError(
+            PGException.newBuilder(exception)
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.InternalError)
+                .build());
+        throw exception;
       }
       try {
         if (!ssl
@@ -477,6 +521,7 @@ public class ConnectionHandler implements Runnable {
                       String.format(
                           "Exception while closing connection handler with ID %s", getName())));
         } finally {
+          CONNECTION_HANDLERS.remove(this.connectionId);
           this.server.deregister(this);
           logger.log(
               Level.INFO,

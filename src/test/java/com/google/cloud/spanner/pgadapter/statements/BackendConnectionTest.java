@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.extractDdlUpdateCounts;
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.isQueryCancelled;
 import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -23,6 +24,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -385,12 +387,12 @@ public class BackendConnectionTest {
     ListDatabasesStatement listDatabasesStatement = mock(ListDatabasesStatement.class);
     when(listDatabasesStatement.getSql())
         .thenReturn(new String[] {ListDatabasesStatement.LIST_DATABASES_SQL});
-    when(listDatabasesStatement.execute(any(BackendConnection.class)))
+    when(listDatabasesStatement.execute(
+            any(BackendConnection.class),
+            eq(Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL))))
         .thenReturn(listDatabasesResult);
     ImmutableList<LocalStatement> localStatements = ImmutableList.of(listDatabasesStatement);
     ParsedStatement parsedListDatabasesStatement = mock(ParsedStatement.class);
-    when(parsedListDatabasesStatement.getSqlWithoutComments())
-        .thenReturn(ListDatabasesStatement.LIST_DATABASES_SQL);
 
     BackendConnection backendConnection =
         new BackendConnection(
@@ -412,7 +414,8 @@ public class BackendConnectionTest {
             Function.identity());
     backendConnection.flush();
 
-    verify(listDatabasesStatement).execute(backendConnection);
+    verify(listDatabasesStatement)
+        .execute(backendConnection, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
     assertTrue(resultFuture.isDone());
     assertEquals(listDatabasesResult, resultFuture.get());
   }
@@ -430,7 +433,6 @@ public class BackendConnectionTest {
     when(statementResult.getResultType()).thenReturn(ResultType.RESULT_SET);
     ParsedStatement parsedStatement = mock(ParsedStatement.class);
     String sql = "SELECT * FROM foo";
-    when(parsedStatement.getSqlWithoutComments()).thenReturn(sql);
     Statement statement = Statement.of(sql);
     when(connection.execute(statement)).thenReturn(statementResult);
 
@@ -450,7 +452,7 @@ public class BackendConnectionTest {
         backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
-    verify(listDatabasesStatement, never()).execute(backendConnection);
+    verify(listDatabasesStatement, never()).execute(backendConnection, statement);
     assertTrue(resultFuture.isDone());
     assertEquals(statementResult, resultFuture.get());
   }
@@ -471,7 +473,6 @@ public class BackendConnectionTest {
     Connection connection = mock(Connection.class);
     Statement statement = Statement.of("select foo from bar");
     ParsedStatement parsedStatement = mock(ParsedStatement.class);
-    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
     RuntimeException error = new RuntimeException("test error");
     when(connection.execute(statement)).thenThrow(error);
 
@@ -503,7 +504,6 @@ public class BackendConnectionTest {
 
     Statement statement = Statement.of("insert into foo (id) values (1)");
     ParsedStatement parsedStatement = mock(ParsedStatement.class);
-    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
     RuntimeException error = new RuntimeException("test error");
     when(connection.execute(statement)).thenThrow(error);
 
@@ -540,7 +540,6 @@ public class BackendConnectionTest {
 
     Statement commitStatement = Statement.of("commit");
     ParsedStatement parsedCommitStatement = mock(ParsedStatement.class);
-    when(parsedCommitStatement.getSqlWithoutComments()).thenReturn(commitStatement.getSql());
     when(parsedCommitStatement.getType()).thenReturn(StatementType.CLIENT_SIDE);
     when(parsedCommitStatement.getClientSideStatementType())
         .thenReturn(ClientSideStatementType.COMMIT);
@@ -585,7 +584,6 @@ public class BackendConnectionTest {
 
     Statement rollbackStatement = Statement.of("rollback");
     ParsedStatement parsedRollbackStatement = mock(ParsedStatement.class);
-    when(parsedRollbackStatement.getSqlWithoutComments()).thenReturn(rollbackStatement.getSql());
     when(parsedRollbackStatement.getType()).thenReturn(StatementType.CLIENT_SIDE);
     when(parsedRollbackStatement.getClientSideStatementType())
         .thenReturn(ClientSideStatementType.ROLLBACK);
@@ -628,7 +626,6 @@ public class BackendConnectionTest {
     Connection connection = mock(Connection.class);
     Statement statement = Statement.of("select foo from bar");
     ParsedStatement parsedStatement = mock(ParsedStatement.class);
-    when(parsedStatement.getSqlWithoutComments()).thenReturn(statement.getSql());
     SpannerException error =
         SpannerExceptionFactory.newSpannerException(ErrorCode.CANCELLED, "query cancelled");
     when(connection.execute(statement)).thenThrow(error);
@@ -664,11 +661,9 @@ public class BackendConnectionTest {
     Connection connection = mock(Connection.class);
     ParsedStatement parsedStatement1 = mock(ParsedStatement.class);
     when(parsedStatement1.getType()).thenReturn(StatementType.DDL);
-    when(parsedStatement1.getSqlWithoutComments()).thenReturn(sql1);
 
     ParsedStatement parsedStatement2 = mock(ParsedStatement.class);
     when(parsedStatement2.getType()).thenReturn(StatementType.DDL);
-    when(parsedStatement2.getSqlWithoutComments()).thenReturn(sql2);
 
     Statement statement1 = Statement.of(sql1);
     Statement statement2 = Statement.of(sql2);
@@ -998,5 +993,51 @@ public class BackendConnectionTest {
     verify(connection).execute(statement);
     verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
     verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testIsQueryCancelled() {
+    // InterruptedExceptions should be treated as 'Query cancelled' errors, also when it is
+    // somewhere deep down the stack.
+    assertTrue(
+        isQueryCancelled(SpannerExceptionFactory.propagateInterrupt(new InterruptedException())));
+    assertTrue(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.UNKNOWN, "test", new InterruptedException())));
+    assertTrue(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "test",
+                new IllegalArgumentException("test", new InterruptedException()))));
+    // Error code CANCELLED should be translated to 'Query cancelled'.
+    assertTrue(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.CANCELLED, "Query was cancelled")));
+
+    // Other Spanner errors should not be considered as 'Query cancelled' errors.
+    assertFalse(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test")));
+
+    // If the thread has been interrupted, then any error should be treated as if the query was
+    // cancelled, and the interrupted flag should be cleared.
+    Thread.currentThread().interrupt();
+    assertTrue(
+        isQueryCancelled(
+            SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test")));
+    assertFalse(Thread.currentThread().isInterrupted());
+
+    // A circular set of causes should not lead to an eternal loop.
+    Exception e1 = new Exception("test");
+    Exception e2 = new Exception("test", e1);
+    Exception e3 = new Exception("test", e2);
+    Exception e4 = new Exception("test", e3);
+    e1.initCause(e4);
+    SpannerException spannerException =
+        SpannerExceptionFactory.newSpannerException(ErrorCode.UNKNOWN, "test", e4);
+    assertFalse(isQueryCancelled(spannerException));
   }
 }

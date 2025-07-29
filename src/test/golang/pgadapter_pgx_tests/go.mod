@@ -1,6 +1,8 @@
 module cloud.google.com/pgadapter_pgx_tests
 
-go 1.17
+go 1.23.0
+
+toolchain go1.24.2
 
 require (
 	github.com/jackc/pgconn v1.14.3

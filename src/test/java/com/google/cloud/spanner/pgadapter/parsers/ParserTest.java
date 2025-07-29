@@ -27,6 +27,7 @@ import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
@@ -41,11 +42,13 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
+import org.postgresql.util.PGInterval;
 
 /**
  * Testing for data format parsing; specifically anything that inherits from the {@link Parser}
@@ -273,6 +276,33 @@ public class ParserTest {
   }
 
   @Test
+  public void testIntervalParsingBinary() {
+    Interval value = Interval.parseFromString("P10Y5M3DT10H4M10.1S");
+    PGInterval pgInterval = new PGInterval();
+    pgInterval.setYears(10);
+    pgInterval.setMonths(5);
+    pgInterval.setDays(3);
+    pgInterval.setHours(10);
+    pgInterval.setMinutes(4);
+    pgInterval.setSeconds(10.1d);
+
+    byte[] byteResult = new byte[16];
+    long micros = pgInterval.getMicroSeconds();
+    micros += TimeUnit.HOURS.toMicros(pgInterval.getHours());
+    micros += TimeUnit.MINUTES.toMicros(pgInterval.getMinutes());
+    micros += TimeUnit.SECONDS.toMicros(pgInterval.getWholeSeconds());
+    ByteConverter.int8(byteResult, 0, micros);
+    ByteConverter.int4(byteResult, 8, pgInterval.getDays());
+    ByteConverter.int4(byteResult, 12, 12 * pgInterval.getYears() + pgInterval.getMonths());
+
+    IntervalParser parsedValue = new IntervalParser(value);
+
+    byte[] got = parsedValue.parse(DataFormat.POSTGRESQL_BINARY);
+    assertArrayEquals(byteResult, got);
+    validateCreateBinary(byteResult, Oid.INTERVAL, value);
+  }
+
+  @Test
   public void testBinaryParsing() {
     ByteArray value = ByteArray.copyFrom(new byte[] {(byte) 0b01010101, (byte) 0b10101010});
     byte[] byteResult = {(byte) 0b01010101, (byte) 0b10101010};
@@ -411,6 +441,7 @@ public class ParserTest {
     assertEquals(Oid.JSONB, toOid(createType(TypeCode.JSON)));
     assertEquals(Oid.FLOAT8, toOid(createType(TypeCode.FLOAT64)));
     assertEquals(Oid.TIMESTAMPTZ, toOid(createType(TypeCode.TIMESTAMP)));
+    assertEquals(Oid.INTERVAL, toOid(createType(TypeCode.INTERVAL)));
     assertEquals(Oid.DATE, toOid(createType(TypeCode.DATE)));
     assertEquals(Oid.NUMERIC, toOid(createType(TypeCode.NUMERIC)));
     assertEquals(Oid.BYTEA, toOid(createType(TypeCode.BYTES)));
@@ -421,6 +452,7 @@ public class ParserTest {
     assertEquals(Oid.JSONB_ARRAY, toOid(createArrayType(TypeCode.JSON)));
     assertEquals(Oid.FLOAT8_ARRAY, toOid(createArrayType(TypeCode.FLOAT64)));
     assertEquals(Oid.TIMESTAMPTZ_ARRAY, toOid(createArrayType(TypeCode.TIMESTAMP)));
+    assertEquals(Oid.INTERVAL_ARRAY, toOid(createArrayType(TypeCode.INTERVAL)));
     assertEquals(Oid.DATE_ARRAY, toOid(createArrayType(TypeCode.DATE)));
     assertEquals(Oid.NUMERIC_ARRAY, toOid(createArrayType(TypeCode.NUMERIC)));
     assertEquals(Oid.BYTEA_ARRAY, toOid(createArrayType(TypeCode.BYTES)));
@@ -630,6 +662,22 @@ public class ParserTest {
   }
 
   @Test
+  public void testParseIntervalArray() {
+    assertEquals(
+        Arrays.asList(
+            Interval.parseFromString("P1Y-1M2DT10H-10M1.234S"),
+            null,
+            Interval.parseFromString("P1Y")),
+        Parser.create(
+                mock(SessionState.class),
+                "{\"1 year -1 month 2 days 10 hours -10 minutes 1.234 seconds\",null,\"1 year\"}"
+                    .getBytes(StandardCharsets.UTF_8),
+                Oid.INTERVAL_ARRAY,
+                FormatCode.TEXT)
+            .getItem());
+  }
+
+  @Test
   public void testParseJsonbArray() {
     assertEquals(
         Arrays.asList("{\"key\": \"value\"}", null, "{\"key\": [0, 1]}"),
@@ -652,12 +700,13 @@ public class ParserTest {
     assertEquals(Type.date(), Parser.toType(Oid.DATE));
     assertEquals(Type.timestamp(), Parser.toType(Oid.TIMESTAMP));
     assertEquals(Type.timestamp(), Parser.toType(Oid.TIMESTAMPTZ));
+    assertEquals(Type.interval(), Parser.toType(Oid.INTERVAL));
     assertEquals(Type.float32(), Parser.toType(Oid.FLOAT4));
     assertEquals(Type.float64(), Parser.toType(Oid.FLOAT8));
     assertEquals(Type.pgNumeric(), Parser.toType(Oid.NUMERIC));
     assertEquals(Type.string(), Parser.toType(Oid.VARCHAR));
     assertEquals(Type.string(), Parser.toType(Oid.TEXT));
-    assertEquals(Type.string(), Parser.toType(Oid.UUID));
+    assertEquals(Type.uuid(), Parser.toType(Oid.UUID));
     assertEquals(Type.pgJsonb(), Parser.toType(Oid.JSONB));
 
     assertEquals(Type.array(Type.int64()), Parser.toType(Oid.INT2_ARRAY));
@@ -668,12 +717,13 @@ public class ParserTest {
     assertEquals(Type.array(Type.date()), Parser.toType(Oid.DATE_ARRAY));
     assertEquals(Type.array(Type.timestamp()), Parser.toType(Oid.TIMESTAMP_ARRAY));
     assertEquals(Type.array(Type.timestamp()), Parser.toType(Oid.TIMESTAMPTZ_ARRAY));
+    assertEquals(Type.array(Type.interval()), Parser.toType(Oid.INTERVAL_ARRAY));
     assertEquals(Type.array(Type.float32()), Parser.toType(Oid.FLOAT4_ARRAY));
     assertEquals(Type.array(Type.float64()), Parser.toType(Oid.FLOAT8_ARRAY));
     assertEquals(Type.array(Type.pgNumeric()), Parser.toType(Oid.NUMERIC_ARRAY));
     assertEquals(Type.array(Type.string()), Parser.toType(Oid.VARCHAR_ARRAY));
     assertEquals(Type.array(Type.string()), Parser.toType(Oid.TEXT_ARRAY));
-    assertEquals(Type.array(Type.string()), Parser.toType(Oid.UUID_ARRAY));
+    assertEquals(Type.array(Type.uuid()), Parser.toType(Oid.UUID_ARRAY));
     assertEquals(Type.array(Type.pgJsonb()), Parser.toType(Oid.JSONB_ARRAY));
 
     assertThrows(PGException.class, () -> Parser.toType(-1000));
@@ -740,6 +790,7 @@ public class ParserTest {
     assertEquals(Oid.UUID, getArrayElementOid(Oid.UUID_ARRAY));
     assertEquals(Oid.TIMESTAMP, getArrayElementOid(Oid.TIMESTAMP_ARRAY));
     assertEquals(Oid.TIMESTAMPTZ, getArrayElementOid(Oid.TIMESTAMPTZ_ARRAY));
+    assertEquals(Oid.INTERVAL, getArrayElementOid(Oid.INTERVAL_ARRAY));
     assertEquals(Oid.UNSPECIFIED, getArrayElementOid(Integer.MAX_VALUE));
   }
 
@@ -754,6 +805,7 @@ public class ParserTest {
     assertEquals(Oid.NUMERIC, toOid(Type.pgNumeric()));
     assertEquals(Oid.VARCHAR, toOid(Type.string()));
     assertEquals(Oid.TIMESTAMPTZ, toOid(Type.timestamp()));
+    assertEquals(Oid.INTERVAL, toOid(Type.interval()));
 
     assertEquals(Oid.BOOL_ARRAY, toOid(Type.array(Type.bool())));
     assertEquals(Oid.BYTEA_ARRAY, toOid(Type.array(Type.bytes())));
@@ -764,6 +816,7 @@ public class ParserTest {
     assertEquals(Oid.NUMERIC_ARRAY, toOid(Type.array(Type.pgNumeric())));
     assertEquals(Oid.VARCHAR_ARRAY, toOid(Type.array(Type.string())));
     assertEquals(Oid.TIMESTAMPTZ_ARRAY, toOid(Type.array(Type.timestamp())));
+    assertEquals(Oid.INTERVAL_ARRAY, toOid(Type.array(Type.interval())));
 
     assertThrows(PGException.class, () -> toOid(Type.array(Type.struct())));
     assertThrows(PGException.class, () -> toOid(Type.struct()));

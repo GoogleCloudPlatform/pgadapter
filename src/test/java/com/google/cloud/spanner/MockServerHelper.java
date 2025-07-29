@@ -27,4 +27,9 @@ public class MockServerHelper {
   public static Session getSession(MockSpannerServiceImpl server, String sessionName) {
     return server.getSession(sessionName);
   }
+
+  @InternalApi
+  public static void resetActiveTracingFramework() {
+    SpannerOptions.resetActiveTracingFramework();
+  }
 }

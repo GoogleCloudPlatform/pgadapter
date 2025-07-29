@@ -172,7 +172,10 @@ public class NpgsqlTest
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
 
-        using var cmd = new NpgsqlCommand("SELECT * FROM all_types WHERE col_bigint=1", connection);
+        using var cmd = new NpgsqlCommand("SELECT col_bigint, col_bool, col_bytea, col_float4, col_float8, " +
+                                          "col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, " +
+                                          "col_varchar, col_jsonb " +
+                                          "FROM all_types WHERE col_bigint=1", connection);
         using (var reader = cmd.ExecuteReader())
         {
             while (reader.Read())
@@ -225,6 +228,12 @@ public class NpgsqlTest
                 {
                     var format = "yyyyMMddTHHmmssFFFFFFF";
                     Console.WriteLine($"Value mismatch: Got '{gotTimestamp.ToString(format)}', Want: '{wantTimestamp.ToString(format)}'");
+                    return;
+                }
+                if (!reader.GetFieldValue<NpgsqlInterval>(++index).Equals(new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)))
+                {
+                    NpgsqlInterval interval = reader.GetFieldValue<NpgsqlInterval>(index);
+                    Console.WriteLine($"Value mismatch: Got '{interval.Months}M{interval.Days}DT{interval.Time}MU', Want: 'P1Y2M3DT4H5M6.789S'");
                     return;
                 }
                 if (reader.GetDateTime(++index) != DateTime.Parse("2022-03-29"))
@@ -287,8 +296,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
@@ -301,6 +310,7 @@ public class NpgsqlTest
                 new () {Value = 100},
                 new () {Value = 6.626m},
                 new () {Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime(), DbType = DbType.DateTimeOffset},
+                new () {Value = new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)},
                 new () {Value = DateTime.Parse("2022-04-02"), DbType = DbType.Date},
                 new () {Value = "test_string"},
                 new () {Value = JsonDocument.Parse("{\"key\":\"value\"}")},
@@ -322,13 +332,14 @@ public class NpgsqlTest
 
         var sql =
             "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
             {
                 new () {Value = 100L},
+                new () {Value = DBNull.Value},
                 new () {Value = DBNull.Value},
                 new () {Value = DBNull.Value},
                 new () {Value = DBNull.Value},
@@ -356,8 +367,9 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
+            "returning col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
@@ -370,6 +382,7 @@ public class NpgsqlTest
                 new () {Value = 100},
                 new () {Value = 6.626m},
                 new () {Value = DateTime.Parse("2022-02-16T13:18:02.123456789Z").ToUniversalTime(), DbType = DbType.DateTimeOffset},
+                new () {Value = new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)},
                 new () {Value = DateTime.Parse("2022-03-29"), DbType = DbType.Date},
                 new () {Value = "test"},
                 new () {Value = JsonDocument.Parse("{\"key\":\"value\"}")},
@@ -428,6 +441,12 @@ public class NpgsqlTest
                     Console.WriteLine($"Timestamp value mismatch: Got '{gotTimestamp.ToString(format)}', Want: '{wantTimestamp.ToString(format)}'");
                     return;
                 }
+                if (!reader.GetFieldValue<NpgsqlInterval>(++index).Equals(new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)))
+                {
+                    NpgsqlInterval interval = reader.GetFieldValue<NpgsqlInterval>(index);
+                    Console.WriteLine($"Value mismatch: Got '{interval.Months}M{interval.Days}DT{interval.Time}MU', Want: 'P1Y2M3DT4H5M6.789S'");
+                    return;
+                }
                 if (reader.GetDateTime(++index) != DateTime.Parse("2022-03-29"))
                 {
                     Console.WriteLine($"Date value mismatch: Got '{reader.GetDateTime(index)}', Want: '2022-03-29'");
@@ -454,8 +473,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
 
         var batchSize = 10;
         using var batch = new NpgsqlBatch(connection);
@@ -473,6 +492,7 @@ public class NpgsqlTest
                     new () {Value = i},
                     new () {Value = i + 0.123m},
                     new () {Value = DateTime.Parse($"2022-03-24 {i:D2}:39:10.123456000+00").ToUniversalTime(), DbType = DbType.DateTimeOffset},
+                    new () {Value = new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)},
                     new () {Value = DateTime.Parse($"2022-04-{i+1:D2}"), DbType = DbType.Date},
                     new () {Value = "test_string" + i},
                     new () {Value = JsonDocument.Parse($"{{\"key\":\"value{i}\"}}")},
@@ -494,8 +514,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
 
         var batchSize = 5;
         using var batch = new NpgsqlBatch(connection);
@@ -513,6 +533,7 @@ public class NpgsqlTest
                     new () {Value = i},
                     new () {Value = i + 0.123m},
                     new () {Value = DateTime.Parse($"2022-03-24 {i:D2}:39:10.123456000+00").ToUniversalTime(), DbType = DbType.DateTimeOffset},
+                    new () {Value = new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)},
                     new () {Value = DateTime.Parse($"2022-04-{i+1:D2}"), DbType = DbType.Date},
                     new () {Value = "test_string" + i},
                     new () {Value = JsonDocument.Parse($"{{\"key\":\"value{i}\"}}")},
@@ -580,8 +601,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
 
         var batchSize = 3;
         using var batch = new NpgsqlBatch(connection);
@@ -599,6 +620,7 @@ public class NpgsqlTest
                     new () {Value = i},
                     new () {Value = i + 0.123m},
                     new () {Value = DateTime.Parse($"2022-03-24 {i:D2}:39:10.123456000+00").ToUniversalTime(), DbType = DbType.DateTimeOffset},
+                    new () {Value = new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)},
                     new () {Value = DateTime.Parse($"2022-04-{i+1:D2}"), DbType = DbType.Date},
                     new () {Value = "test_string" + i},
                     new () {Value = JsonDocument.Parse($"{{\"key\":\"value{i}\"}}")},
@@ -850,7 +872,7 @@ public class NpgsqlTest
         connection.Open();
         
         using (var reader =
-               connection.BeginBinaryExport("COPY (select * from all_types order by col_bigint) " +
+               connection.BeginBinaryExport("COPY (select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, col_array_varchar, col_array_jsonb from all_types order by col_bigint) " +
                                             "TO STDOUT (FORMAT BINARY)"))
         {
             while (reader.StartRow() > -1)
@@ -933,6 +955,17 @@ public class NpgsqlTest
                 else
                 {
                     Console.Write(reader.Read<DateTime>(NpgsqlDbType.TimestampTz).ToUniversalTime().ToString("yyyyMMddTHHmmssFFFFFFF"));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var interval = reader.Read<NpgsqlInterval>(NpgsqlDbType.Interval);
+                    Console.Write($"{interval.Months}M{interval.Days}DT{interval.Time}");
                 }
                 Console.Write("\t");
                 if (reader.IsNull)
@@ -1058,6 +1091,17 @@ public class NpgsqlTest
                 }
                 else
                 {
+                    var intervals = reader.Read<List<NpgsqlInterval?>>(NpgsqlDbType.Array | NpgsqlDbType.Interval);
+                    Console.Write("[" + string.Join(", ", intervals.Select(d => d == null ? "NULL" : $"{d.Value.Months}M{d.Value.Days}DT{d.Value.Time}")) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
                     var dates = reader.Read<List<DateTime?>>(NpgsqlDbType.Array | NpgsqlDbType.Date);
                     Console.Write("[" + string.Join(", ", dates.Select(d => d?.ToString("yyyyMMdd"))) + "]");
                 }
@@ -1130,8 +1174,8 @@ public class NpgsqlTest
         for (var i = 0; i < 2; i++)
         {
             var sql =
-                "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-                + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+                "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)"
+                + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
             var cmd = new NpgsqlCommand(sql, connection);
 #pragma warning disable CS8625
             cmd.Parameters.Add(null, NpgsqlDbType.Bigint);
@@ -1142,6 +1186,7 @@ public class NpgsqlTest
             cmd.Parameters.Add(null, NpgsqlDbType.Integer);
             cmd.Parameters.Add(null, NpgsqlDbType.Numeric);
             cmd.Parameters.Add(null, NpgsqlDbType.TimestampTz);
+            cmd.Parameters.Add(null, NpgsqlDbType.Interval);
             cmd.Parameters.Add(null, NpgsqlDbType.Date);
             cmd.Parameters.Add(null, NpgsqlDbType.Varchar);
             cmd.Parameters.Add(null, NpgsqlDbType.Jsonb);
@@ -1157,6 +1202,7 @@ public class NpgsqlTest
             cmd.Parameters[index++].Value = 100;
             cmd.Parameters[index++].Value = 6.626m;
             cmd.Parameters[index++].Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime();
+            cmd.Parameters[index++].Value = new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L);
             cmd.Parameters[index++].Value = DateTime.Parse("2022-04-02");
             cmd.Parameters[index++].Value = "test_string";
             cmd.Parameters[index++].Value = JsonDocument.Parse("{\"key\":\"value\"}");
@@ -1193,8 +1239,8 @@ public class NpgsqlTest
             }
 
             var insertSql =
-                "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-                + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+                "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb)"
+                + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
             foreach (var id in new[] { 10, 20 })
             {
                 using var insertCommand = new NpgsqlCommand(insertSql, connection)
@@ -1213,6 +1259,7 @@ public class NpgsqlTest
                             Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime(),
                             DbType = DbType.DateTimeOffset
                         },
+                        new () {Value = new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)},
                         new() { Value = DateTime.Parse("2022-04-02"), DbType = DbType.Date },
                         new() { Value = "test_string" },
                         new() { Value = JsonDocument.Parse("{\"key\":\"value\"}") },

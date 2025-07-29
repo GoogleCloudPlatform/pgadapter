@@ -16,13 +16,14 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.common.collect.ImmutableMap;
 import com.google.spanner.v1.TypeAnnotationCode;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -94,6 +95,8 @@ public abstract class Parser<T> {
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return new TimestampParser(item, formatCode, sessionState);
+      case Oid.INTERVAL:
+        return new IntervalParser(item, formatCode);
       case Oid.JSONB:
         return new JsonbParser(item, formatCode);
 
@@ -112,6 +115,7 @@ public abstract class Parser<T> {
       case Oid.UUID_ARRAY:
       case Oid.TIMESTAMP_ARRAY:
       case Oid.TIMESTAMPTZ_ARRAY:
+      case Oid.INTERVAL_ARRAY:
       case Oid.JSONB_ARRAY:
         int elementOid = getArrayElementOid(oidType);
         return new ArrayParser(item, formatCode, sessionState, toType(elementOid), elementOid);
@@ -158,6 +162,8 @@ public abstract class Parser<T> {
         return Oid.TIMESTAMP;
       case Oid.TIMESTAMPTZ_ARRAY:
         return Oid.TIMESTAMPTZ;
+      case Oid.INTERVAL_ARRAY:
+        return Oid.INTERVAL;
       case Oid.JSONB_ARRAY:
         return Oid.JSONB;
       default:
@@ -193,8 +199,12 @@ public abstract class Parser<T> {
         return new NumericParser(result, columnarPosition);
       case STRING:
         return new StringParser(result, columnarPosition);
+      case UUID:
+        return new UuidParser(result, columnarPosition);
       case TIMESTAMP:
         return new TimestampParser(result, columnarPosition, sessionState);
+      case INTERVAL:
+        return new IntervalParser(result, columnarPosition);
       case PG_JSONB:
         return new JsonbParser(result, columnarPosition);
       case ARRAY:
@@ -233,8 +243,12 @@ public abstract class Parser<T> {
         return new NumericParser(result);
       case STRING:
         return new StringParser(result);
+      case UUID:
+        return new UuidParser(result);
       case TIMESTAMP:
         return new TimestampParser(result, sessionState);
+      case INTERVAL:
+        return new IntervalParser(result);
       case PG_JSONB:
         return new JsonbParser(result);
       case NUMERIC:
@@ -267,12 +281,16 @@ public abstract class Parser<T> {
         return Oid.FLOAT8;
       case STRING:
         return Oid.VARCHAR;
+      case UUID:
+        return Oid.UUID;
       case PG_JSONB:
         return Oid.JSONB;
       case BYTES:
         return Oid.BYTEA;
       case TIMESTAMP:
         return Oid.TIMESTAMPTZ;
+      case INTERVAL:
+        return Oid.INTERVAL;
       case DATE:
         return Oid.DATE;
       case ARRAY:
@@ -291,12 +309,16 @@ public abstract class Parser<T> {
             return Oid.FLOAT8_ARRAY;
           case STRING:
             return Oid.VARCHAR_ARRAY;
+          case UUID:
+            return Oid.UUID_ARRAY;
           case PG_JSONB:
             return Oid.JSONB_ARRAY;
           case BYTES:
             return Oid.BYTEA_ARRAY;
           case TIMESTAMP:
             return Oid.TIMESTAMPTZ_ARRAY;
+          case INTERVAL:
+            return Oid.INTERVAL_ARRAY;
           case DATE:
             return Oid.DATE_ARRAY;
           case NUMERIC:
@@ -340,11 +362,14 @@ public abstract class Parser<T> {
         return Type.pgNumeric();
       case Oid.TEXT:
       case Oid.VARCHAR:
-      case Oid.UUID:
         return Type.string();
+      case Oid.UUID:
+        return Type.uuid();
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return Type.timestamp();
+      case Oid.INTERVAL:
+        return Type.interval();
       case Oid.JSONB:
         return Type.pgJsonb();
 
@@ -363,6 +388,7 @@ public abstract class Parser<T> {
       case Oid.UUID_ARRAY:
       case Oid.TIMESTAMP_ARRAY:
       case Oid.TIMESTAMPTZ_ARRAY:
+      case Oid.INTERVAL_ARRAY:
       case Oid.JSONB_ARRAY:
         return Type.array(toType(getArrayElementOid(oid)));
 
@@ -396,12 +422,16 @@ public abstract class Parser<T> {
         return Oid.FLOAT8;
       case STRING:
         return Oid.VARCHAR;
+      case UUID:
+        return Oid.UUID;
       case JSON:
         return Oid.JSONB;
       case BYTES:
         return Oid.BYTEA;
       case TIMESTAMP:
         return Oid.TIMESTAMPTZ;
+      case INTERVAL:
+        return Oid.INTERVAL;
       case DATE:
         return Oid.DATE;
       case ARRAY:
@@ -421,12 +451,16 @@ public abstract class Parser<T> {
             return Oid.FLOAT8_ARRAY;
           case STRING:
             return Oid.VARCHAR_ARRAY;
+          case UUID:
+            return Oid.UUID_ARRAY;
           case JSON:
             return Oid.JSONB_ARRAY;
           case BYTES:
             return Oid.BYTEA_ARRAY;
           case TIMESTAMP:
             return Oid.TIMESTAMPTZ_ARRAY;
+          case INTERVAL:
+            return Oid.INTERVAL_ARRAY;
           case DATE:
             return Oid.DATE_ARRAY;
           case ARRAY:
@@ -499,5 +533,5 @@ public abstract class Parser<T> {
   /** Used to parse data type onto binary. Override this to change binary representation. */
   protected abstract byte[] binaryParse();
 
-  public abstract void bind(Statement.Builder statementBuilder, String name);
+  public abstract void bind(ImmutableMap.Builder<String, Value> statementBuilder, String name);
 }

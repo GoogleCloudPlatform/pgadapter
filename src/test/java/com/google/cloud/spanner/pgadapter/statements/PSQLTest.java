@@ -19,7 +19,6 @@ import static org.junit.Assert.assertEquals;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
-import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
@@ -45,10 +44,6 @@ import org.mockito.junit.MockitoRule;
 public class PSQLTest {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
-
-  private static ParsedStatement parse(String sql) {
-    return PARSER.parse(Statement.of(sql));
-  }
 
   @Rule public MockitoRule rule = MockitoJUnit.rule();
 
@@ -79,8 +74,9 @@ public class PSQLTest {
   }
 
   private String translate(String sql) {
-    return SimpleQueryStatement.translatePotentialMetadataCommand(parse(sql), connectionHandler)
-        .getSqlWithoutComments();
+    return SimpleQueryStatement.translatePotentialMetadataCommand(
+            Statement.of(sql), connectionHandler)
+        .getSql();
   }
 
   @Test
@@ -111,7 +107,7 @@ public class PSQLTest {
             + "FROM"
             + " information_schema.tables AS t "
             + "WHERE"
-            + " t.table_schema = 'public'";
+            + " t.table_schema = 'public';";
 
     assertEquals(expected, translate(sql));
   }
@@ -138,7 +134,7 @@ public class PSQLTest {
             + " WHERE"
             + " t.table_schema='public'"
             + " AND"
-            + " LOWER(t.table_name) = LOWER('users')";
+            + " LOWER(t.table_name) = LOWER('users');";
 
     assertEquals(expected, translate(sql));
   }
@@ -165,7 +161,7 @@ public class PSQLTest {
             + " WHERE"
             + " t.table_schema='public'"
             + " AND"
-            + " LOWER(t.table_name) = LOWER('bobby''; DROP TABLE USERS; SELECT''')";
+            + " LOWER(t.table_name) = LOWER('bobby''; DROP TABLE USERS; SELECT''');";
 
     assertEquals(expected, translate(sql));
   }
@@ -188,7 +184,7 @@ public class PSQLTest {
             + " false as bool2,"
             + " false as relhasoids,"
             + " '' as str1,"
-            + " '' as str2";
+            + " '' as str2;";
 
     assertEquals(expected, translate(sql));
   }
@@ -222,7 +218,7 @@ public class PSQLTest {
             + " information_schema.columns AS t"
             + " WHERE"
             + " t.table_schema='public'"
-            + " AND t.table_name = '-1'";
+            + " AND t.table_name = '-1';";
 
     assertEquals(expected, translate(sql));
   }
@@ -257,7 +253,7 @@ public class PSQLTest {
             + " information_schema.columns AS t"
             + " WHERE"
             + " t.table_schema='public'"
-            + " AND t.table_name = 'bobby''; DROP TABLE USERS; SELECT'''";
+            + " AND t.table_name = 'bobby''; DROP TABLE USERS; SELECT''';";
 
     assertEquals(expected, translate(sql));
   }
@@ -269,7 +265,7 @@ public class PSQLTest {
         "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i"
             + " WHERE c.oid=i.inhparent AND i.inhrelid = '-2264987671676060158' AND c.relkind !="
             + " 'p' ORDER BY inhseqno;";
-    String expected = "SELECT 1 LIMIT 0";
+    String expected = "SELECT 1 LIMIT 0;";
 
     assertEquals(expected, translate(sql));
   }
@@ -281,7 +277,7 @@ public class PSQLTest {
         "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i"
             + " WHERE c.oid=i.inhrelid AND i.inhparent = '-2264987671676060158' ORDER BY"
             + " c.relname;";
-    String expected = "SELECT 1 LIMIT 0";
+    String expected = "SELECT 1 LIMIT 0;";
 
     assertEquals(expected, translate(sql));
   }
@@ -352,7 +348,7 @@ public class PSQLTest {
             + "      AND n.nspname !~ '^pg_toast'\n"
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
-    String expected = "SELECT * FROM information_schema.tables";
+    String expected = "SELECT * FROM information_schema.tables;";
 
     assertEquals(expected, translate(sql));
   }
@@ -376,7 +372,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String expected =
-        "SELECT * FROM information_schema.tables WHERE table_schema='public' AND LOWER(table_name) = LOWER('users')";
+        "SELECT * FROM information_schema.tables WHERE table_schema='public' AND LOWER(table_name) = LOWER('users');";
 
     assertEquals(expected, translate(sql));
   }
@@ -401,7 +397,7 @@ public class PSQLTest {
             + "ORDER BY 1,2;";
     String expected =
         "SELECT * FROM information_schema.tables WHERE table_schema='public' AND LOWER(table_name) ="
-            + " LOWER('bobby''; DROP TABLE USERS; SELECT''')";
+            + " LOWER('bobby''; DROP TABLE USERS; SELECT''');";
 
     assertEquals(expected, translate(sql));
   }
@@ -429,7 +425,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String expected =
-        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes";
+        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes;";
 
     assertEquals(expected, translate(sql));
   }
@@ -457,7 +453,7 @@ public class PSQLTest {
             + "ORDER BY 1,2;";
     String expected =
         "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE table_schema='public' AND LOWER(index_name) ="
-            + " LOWER('index')";
+            + " LOWER('index');";
 
     assertEquals(expected, translate(sql));
   }
@@ -485,7 +481,7 @@ public class PSQLTest {
             + "ORDER BY 1,2;";
     String expected =
         "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE table_schema='public' AND LOWER(index_name) ="
-            + " LOWER('bobby''; DROP TABLE USERS; SELECT''')";
+            + " LOWER('bobby''; DROP TABLE USERS; SELECT''');";
 
     assertEquals(expected, translate(sql));
   }
@@ -499,7 +495,7 @@ public class PSQLTest {
             + "FROM pg_catalog.pg_namespace n\n"
             + "WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'\n"
             + "ORDER BY 1;";
-    String expected = "SELECT * FROM information_schema.schemata";
+    String expected = "SELECT * FROM information_schema.schemata;";
 
     assertEquals(expected, translate(sql));
   }
@@ -514,7 +510,7 @@ public class PSQLTest {
             + "WHERE n.nspname OPERATOR(pg_catalog.~) '^(schema)$'\n"
             + "ORDER BY 1;";
     String expected =
-        "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('schema')";
+        "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('schema');";
 
     assertEquals(expected, translate(sql));
   }
@@ -530,7 +526,7 @@ public class PSQLTest {
             + "ORDER BY 1;";
     String expected =
         "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('bobby''; DROP"
-            + " TABLE USERS; SELECT''')";
+            + " TABLE USERS; SELECT''');";
 
     assertEquals(expected, translate(sql));
   }
@@ -565,7 +561,7 @@ public class PSQLTest {
     String expected =
         "SELECT table_name AS quote_ident FROM information_schema.tables WHERE"
             + " table_schema = 'public' and STARTS_WITH(LOWER(table_name),"
-            + " LOWER('user')) LIMIT 1000";
+            + " LOWER('user')) LIMIT 1000;";
 
     assertEquals(expected, translate(sql));
   }
@@ -599,7 +595,7 @@ public class PSQLTest {
     String expected =
         "SELECT table_name AS quote_ident FROM information_schema.tables WHERE"
             + " table_schema = 'public' and STARTS_WITH(LOWER(table_name),"
-            + " LOWER('user')) LIMIT 1000";
+            + " LOWER('user')) LIMIT 1000;";
 
     assertEquals(expected, translate(sql));
   }
@@ -617,7 +613,7 @@ public class PSQLTest {
             + "LIMIT 1000";
     String expected =
         "SELECT column_name AS quote_ident FROM information_schema.columns WHERE"
-            + " table_schema='public' AND table_name = 'user' AND STARTS_WITH(LOWER(COLUMN_NAME), LOWER('age')) LIMIT 1000";
+            + " table_schema='public' AND table_name = 'user' AND STARTS_WITH(LOWER(COLUMN_NAME), LOWER('age')) LIMIT 1000;";
 
     assertEquals(expected, translate(sql));
   }
@@ -649,7 +645,7 @@ public class PSQLTest {
             + "LIMIT 1000";
     String expected =
         "SELECT table_name AS quote_ident FROM information_schema.tables WHERE "
-            + "table_schema = 'public' AND STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000";
+            + "table_schema = 'public' AND STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000;";
 
     assertEquals(expected, translate(sql));
   }
@@ -681,7 +677,7 @@ public class PSQLTest {
             + "LIMIT 1000";
     String expected =
         "SELECT table_name AS quote_ident FROM INFORMATION_SCHEMA.TABLES WHERE"
-            + " table_schema='public' AND STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000";
+            + " table_schema='public' AND STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000;";
 
     assertEquals(expected, translate(sql));
   }
@@ -713,7 +709,7 @@ public class PSQLTest {
             + "LIMIT 1000";
     String expected =
         "SELECT index_name AS quote_ident FROM INFORMATION_SCHEMA.INDEXES WHERE"
-            + " table_schema='public' AND STARTS_WITH(LOWER(index_name), LOWER('index')) LIMIT 1000";
+            + " table_schema='public' AND STARTS_WITH(LOWER(index_name), LOWER('index')) LIMIT 1000;";
 
     assertEquals(expected, translate(sql));
   }
@@ -727,7 +723,7 @@ public class PSQLTest {
             + "LIMIT 1000";
     String expected =
         "SELECT schema_name AS quote_ident FROM INFORMATION_SCHEMA.SCHEMATA WHERE"
-            + " STARTS_WITH(LOWER(schema_name), LOWER('schema')) LIMIT 1000";
+            + " STARTS_WITH(LOWER(schema_name), LOWER('schema')) LIMIT 1000;";
 
     assertEquals(expected, translate(sql));
   }
@@ -756,9 +752,9 @@ public class PSQLTest {
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.getCommandMetadataJSON()).thenReturn((JSONObject) parser.parse(inputJSON));
 
-    String firstSQL = "SELECT * FROM USERS;";
+    String firstSQL = "SELECT * FROM USERS";
     String expectedFirstResult = "RESULT 1";
-    String secondSQL = "SELECT name FROM USERS WHERE age = 30;";
+    String secondSQL = "SELECT name FROM USERS WHERE age = 30";
     String expectedSecondResult = "RESULT 2: selector=name, arg2=30, arg1=age";
 
     assertEquals(expectedFirstResult, translate(firstSQL));
@@ -784,7 +780,7 @@ public class PSQLTest {
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.getCommandMetadataJSON()).thenReturn((JSONObject) parser.parse(inputJSON));
 
-    String sql = "SELECT * FROM USERS;";
+    String sql = "SELECT * FROM USERS";
     String expectedResult = "TABLE: USERS, EXPRESSION: *";
 
     assertEquals(expectedResult, translate(sql));

@@ -46,7 +46,7 @@ async function runSample() {
 
     // Dynamically set the DATABASE_URL environment variable to point to the PGAdapter instance
     // that was started.
-    process.env.DATABASE_URL = `postgresql://localhost:${port}/prisma-sample?options=-c%20spanner.well_known_client=prisma`;
+    process.env.DATABASE_URL = `postgresql://127.0.0.1:${port}/prisma-sample?options=-c%20spanner.well_known_client=prisma`;
   }
   
   // Create the Prisma client.

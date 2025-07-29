@@ -358,6 +358,11 @@ public class SimpleParser {
     this.pos = pos;
   }
 
+  public static boolean isEmpty(String sql) {
+    SimpleParser parser = new SimpleParser(sql);
+    return !parser.hasMoreTokens();
+  }
+
   /** Returns the command tag of the given SQL string */
   public static String parseCommand(String sql) {
     SimpleParser parser = new SimpleParser(sql);

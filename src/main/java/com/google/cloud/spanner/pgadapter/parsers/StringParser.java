@@ -18,9 +18,10 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.base.Utf8;
+import com.google.common.collect.ImmutableMap;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -90,25 +91,13 @@ public class StringParser extends Parser<String> {
   static void writeToPG(
       SessionState sessionState, DataOutputStream dataOutputStream, String value, byte[] header) {
     int bufferSize = sessionState.getStringConversionBufferSize();
-    // Skip getting the length if we don't need it.
-    int length = bufferSize <= 0 ? 0 : value.length();
+    int length = value.length();
     try {
       if (bufferSize <= 0 || length < bufferSize) {
-        // Just use the writeUTF method of DataOutputStream if there is no header that needs to be
-        // written.
-        if (header.length == 0) {
-          // PG expects the length be 4 bytes.
-          // writeUTF writes the length as 2 bytes.
-          // So in order to get the correct length written to the stream, we first write 2 bytes
-          // containing all zeros.
-          dataOutputStream.writeShort(0);
-          dataOutputStream.writeUTF(value);
-        } else {
-          byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-          dataOutputStream.writeInt(bytes.length + header.length);
-          dataOutputStream.write(header);
-          dataOutputStream.write(bytes);
-        }
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        dataOutputStream.writeInt(bytes.length + header.length);
+        dataOutputStream.write(header);
+        dataOutputStream.write(bytes);
       } else {
         try (OutputStreamWriter writer =
             new OutputStreamWriter(dataOutputStream, StandardCharsets.UTF_8)) {
@@ -127,7 +116,7 @@ public class StringParser extends Parser<String> {
   }
 
   @Override
-  public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+    parametersBuilder.put(name, Value.string(this.item));
   }
 }

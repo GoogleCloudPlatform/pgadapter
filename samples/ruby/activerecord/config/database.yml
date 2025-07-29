@@ -1,6 +1,6 @@
 default: &default
   adapter: postgresql
-  host: <%= ENV['PGHOST'] || "localhost" %>
+  host: <%= ENV['PGHOST'] || "127.0.0.1" %>
   port: <%= ENV['PGPORT'] || "5432" %>
   database: <%= ENV['PGDATABASE'] || "projects/my-project/instances/my-instance/databases/my-database" %>
   pool: 5

@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.ConnectionHandler.appendPropert
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.buildConnectionURL;
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.listDatabasesOrInstances;
 import static com.google.cloud.spanner.pgadapter.EmulatedPsqlMockServerTest.newStatusResourceNotFoundException;
+import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -329,30 +330,35 @@ public class ConnectionHandlerTest {
     ConnectionHandler connectionHandlerToCancel =
         new ConnectionHandler(server, socket, spannerConnection);
     connectionHandlerToCancel.setThread(mock(Thread.class));
+    CONNECTION_HANDLERS.put(connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel);
 
-    // Cancelling yourself is not allowed.
-    assertFalse(
-        connectionHandler.cancelActiveStatement(
-            connectionHandler.getConnectionId(), connectionHandler.getSecret()));
-    // Cancelling a random non-existing connection should not work.
-    assertFalse(connectionHandler.cancelActiveStatement(100, 100));
-    // Cancelling another connecting using the wrong secret is not allowed.
-    assertFalse(
-        connectionHandler.cancelActiveStatement(
-            connectionHandlerToCancel.getConnectionId(),
-            connectionHandlerToCancel.getSecret() - 1));
+    try {
+      // Cancelling yourself is not allowed.
+      assertFalse(
+          connectionHandler.cancelActiveStatement(
+              connectionHandler.getConnectionId(), connectionHandler.getSecret()));
+      // Cancelling a random non-existing connection should not work.
+      assertFalse(connectionHandler.cancelActiveStatement(100, 100));
+      // Cancelling another connecting using the wrong secret is not allowed.
+      assertFalse(
+          connectionHandler.cancelActiveStatement(
+              connectionHandlerToCancel.getConnectionId(),
+              connectionHandlerToCancel.getSecret() - 1));
 
-    assertTrue(
-        connectionHandler.cancelActiveStatement(
-            connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
+      assertTrue(
+          connectionHandler.cancelActiveStatement(
+              connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
 
-    // The method should just return false if an error occurs.
-    doThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "test error"))
-        .when(spannerConnection)
-        .cancel();
-    assertFalse(
-        connectionHandler.cancelActiveStatement(
-            connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
+      // The method should just return false if an error occurs.
+      doThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "test error"))
+          .when(spannerConnection)
+          .cancel();
+      assertFalse(
+          connectionHandler.cancelActiveStatement(
+              connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
+    } finally {
+      CONNECTION_HANDLERS.remove(connectionHandlerToCancel.getConnectionId());
+    }
   }
 
   @Test
@@ -665,13 +671,15 @@ public class ConnectionHandlerTest {
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
-            buildProperties(ImmutableMap.of())));
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of()));
     assertEquals(
         "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;key1=value1;dialect=postgresql",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
-            buildProperties(ImmutableMap.of("key1", "value1"))));
+            buildProperties(ImmutableMap.of("key1", "value1")),
+            ImmutableMap.of()));
 
     // If the options contain a full database specification, then the database in the connection
     // request is ignored.
@@ -685,7 +693,8 @@ public class ConnectionHandlerTest {
                 .setInstance("test-instance")
                 .setDatabase("test-database")
                 .build(),
-            buildProperties(ImmutableMap.of())));
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of()));
     // Enable the autoConfigEmulator flag through the options builder.
     OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
     assertEquals(
@@ -693,7 +702,8 @@ public class ConnectionHandlerTest {
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             emulatorOptions,
-            buildProperties(emulatorOptions.getPropertyMap())));
+            buildProperties(emulatorOptions.getPropertyMap()),
+            ImmutableMap.of()));
 
     // Set a channel provider.
     String currentChannelProvider = System.getProperty("CHANNEL_PROVIDER");
@@ -708,7 +718,8 @@ public class ConnectionHandlerTest {
           buildConnectionURL(
               "projects/my-project/instances/my-instance/databases/my-database",
               options,
-              buildProperties(ImmutableMap.of())));
+              buildProperties(ImmutableMap.of()),
+              ImmutableMap.of()));
       assertEquals("true", System.getProperty("ENABLE_CHANNEL_PROVIDER"));
 
       // Set an invalid channel provider.
@@ -720,7 +731,8 @@ public class ConnectionHandlerTest {
               buildConnectionURL(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   options,
-                  buildProperties(ImmutableMap.of())));
+                  buildProperties(ImmutableMap.of()),
+                  ImmutableMap.of()));
       assertNull(System.getProperty("ENABLE_CHANNEL_PROVIDER"));
     } finally {
       if (currentChannelProvider == null) {
@@ -741,13 +753,15 @@ public class ConnectionHandlerTest {
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
-            buildProperties(ImmutableMap.of("useVirtualThreads", "true"))));
+            buildProperties(ImmutableMap.of("useVirtualThreads", "true")),
+            ImmutableMap.of()));
     assertEquals(
         "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;useVirtualGrpcTransportThreads=true;dialect=postgresql",
         buildConnectionURL(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
-            buildProperties(ImmutableMap.of("useVirtualGrpcTransportThreads", "true"))));
+            buildProperties(ImmutableMap.of("useVirtualGrpcTransportThreads", "true")),
+            ImmutableMap.of()));
 
     runWithSystemProperty(
         OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME,
@@ -760,7 +774,8 @@ public class ConnectionHandlerTest {
               buildConnectionURL(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   optionsWithSystemProperty,
-                  buildProperties(optionsWithSystemProperty.getPropertyMap())));
+                  buildProperties(optionsWithSystemProperty.getPropertyMap()),
+                  ImmutableMap.of()));
         });
     runWithSystemProperty(
         OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME,
@@ -773,8 +788,32 @@ public class ConnectionHandlerTest {
               buildConnectionURL(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   optionsWithSystemProperty,
-                  buildProperties(optionsWithSystemProperty.getPropertyMap())));
+                  buildProperties(optionsWithSystemProperty.getPropertyMap()),
+                  ImmutableMap.of()));
         });
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;enableEndToEndTracing=true;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c enableEndToEndTracing=true")));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;minSessions=10;numChannels=2;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c minSessions=10 -c numChannels=2")));
+
+    // Invalid options are not added to the connection URL.
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;numChannels=2;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c invalid_option=some-value -c numChannels=2")));
   }
 
   @Test

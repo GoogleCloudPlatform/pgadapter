@@ -71,7 +71,7 @@ try:
   # Connect to Cloud Spanner using connectorx by connecting to PGAdapter that is
   # running in the embedded container. The username/password combination is
   # ignored by PGAdapter.
-  postgres_url = ("postgresql://localhost:{port}/{database}?sslmode=disable"
+  postgres_url = ("postgresql://127.0.0.1:{port}/{database}?sslmode=disable"
                   .format(port=port, database=args.database))
   query = "SELECT 'Hello World!' as greeting"
   result = cx.read_sql(postgres_url, query)
@@ -86,7 +86,7 @@ try:
   # more information on PartitionQuery.
   # Add 'options=-c spanner.copy_partition_query=false' to the connection URL
   # to use ExecuteStreamingSql directly.
-  postgres_url = ("postgresql://localhost:{port}/{database}?sslmode=disable"
+  postgres_url = ("postgresql://127.0.0.1:{port}/{database}?sslmode=disable"
                   "&options=-c spanner.copy_partition_query=false"
                   .format(port=port, database=args.database))
   query = "SELECT 'Hello World - Non Partitioned!' as non_partitioned_greeting"

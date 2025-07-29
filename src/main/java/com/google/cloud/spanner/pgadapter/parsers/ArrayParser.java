@@ -20,7 +20,6 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.Value;
@@ -30,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -117,8 +117,12 @@ public class ArrayParser extends Parser<List<?>> {
         // Get numeric arrays as a string array instead of as an array of BigDecimal, as numeric
         // arrays could contain 'NaN' values, which are not supported by BigDecimal.
         return value.getStringArray();
+      case UUID:
+        return value.getUuidArray();
       case TIMESTAMP:
         return value.getTimestampArray();
+      case INTERVAL:
+        return value.getIntervalArray();
       case FLOAT32:
         return value.getFloat32Array();
       case FLOAT64:
@@ -343,70 +347,70 @@ public class ArrayParser extends Parser<List<?>> {
 
   @SuppressWarnings("unchecked")
   @Override
-  public void bind(Statement.Builder statementBuilder, String name) {
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
     switch (elementOid) {
       case Oid.BIT:
       case Oid.BOOL:
-        statementBuilder.bind(name).toBoolArray((List<Boolean>) this.item);
+        parametersBuilder.put(name, Value.boolArray((List<Boolean>) this.item));
         break;
       case Oid.INT2:
         if (this.item == null) {
-          statementBuilder.bind(name).toInt64Array((long[]) null);
+          parametersBuilder.put(name, Value.int64Array((long[]) null));
         } else {
-          statementBuilder
-              .bind(name)
-              .toInt64Array(
+          parametersBuilder.put(
+              name,
+              Value.int64Array(
                   ((List<Short>) this.item)
                       .stream()
                           .map(s -> s == null ? null : s.longValue())
-                          .collect(Collectors.toList()));
+                          .collect(Collectors.toList())));
         }
         break;
       case Oid.INT4:
         if (this.item == null) {
-          statementBuilder.bind(name).toInt64Array((long[]) null);
+          parametersBuilder.put(name, Value.int64Array((long[]) null));
         } else {
-          statementBuilder
-              .bind(name)
-              .toInt64Array(
+          parametersBuilder.put(
+              name,
+              Value.int64Array(
                   ((List<Integer>) this.item)
                       .stream()
                           .map(i -> i == null ? null : i.longValue())
-                          .collect(Collectors.toList()));
+                          .collect(Collectors.toList())));
         }
         break;
       case Oid.INT8:
-        statementBuilder.bind(name).toInt64Array((List<Long>) this.item);
+        parametersBuilder.put(name, Value.int64Array((List<Long>) this.item));
         break;
       case Oid.OID:
-        statementBuilder.bind(name).toPgOidArray((List<Long>) this.item);
+        parametersBuilder.put(name, Value.pgOidArray((List<Long>) this.item));
         break;
       case Oid.NUMERIC:
-        statementBuilder.bind(name).toPgNumericArray((List<String>) this.item);
+        parametersBuilder.put(name, Value.pgNumericArray((List<String>) this.item));
         break;
       case Oid.FLOAT4:
-        statementBuilder.bind(name).toFloat32Array((List<Float>) this.item);
+        parametersBuilder.put(name, Value.float32Array((List<Float>) this.item));
         break;
       case Oid.FLOAT8:
-        statementBuilder.bind(name).toFloat64Array((List<Double>) this.item);
+        parametersBuilder.put(name, Value.float64Array((List<Double>) this.item));
         break;
       case Oid.UUID:
       case Oid.VARCHAR:
       case Oid.TEXT:
-        statementBuilder.bind(name).toStringArray((List<String>) this.item);
+        parametersBuilder.put(name, Value.stringArray((List<String>) this.item));
         break;
       case Oid.JSONB:
-        statementBuilder.bind(name).toPgJsonbArray((List<String>) this.item);
+        parametersBuilder.put(name, Value.pgJsonbArray((List<String>) this.item));
         break;
       case Oid.BYTEA:
-        statementBuilder.bind(name).toBytesArray((List<ByteArray>) this.item);
+        parametersBuilder.put(name, Value.bytesArray((List<ByteArray>) this.item));
         break;
       case Oid.TIMESTAMPTZ:
       case Oid.TIMESTAMP:
-        statementBuilder.bind(name).toTimestampArray((List<Timestamp>) this.item);
+        parametersBuilder.put(name, Value.timestampArray((List<Timestamp>) this.item));
         break;
       case Oid.DATE:
-        statementBuilder.bind(name).toDateArray((List<Date>) this.item);
+        parametersBuilder.put(name, Value.dateArray((List<Date>) this.item));
         break;
       default:
         throw PGExceptionFactory.newPGException(

@@ -167,13 +167,9 @@ public abstract class AbstractMockServerTest {
                   .build())
           .build();
   protected static final Statement SELECT_JSONB_TYPE_BY_NAME =
-      Statement.newBuilder(
-              "with "
-                  + PG_TYPE_PREFIX
-                  + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1")
-          .bind("p1")
-          .to("jsonb")
-          .build();
+      createSelectTypeByNameStatement("jsonb");
+  protected static final Statement SELECT_INTERVAL_TYPE_BY_NAME =
+      createSelectTypeByNameStatement("interval");
   protected static final Statement SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL =
       Statement.of(
           "with "
@@ -181,29 +177,9 @@ public abstract class AbstractMockServerTest {
               + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = ('jsonb')  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
 
   protected static final ResultSet SELECT_JSONB_TYPE_BY_NAME_RESULT_SET =
-      ResultSet.newBuilder()
-          .setMetadata(
-              ResultSetMetadata.newBuilder()
-                  .setRowType(
-                      StructType.newBuilder()
-                          .addFields(
-                              Field.newBuilder()
-                                  .setName("oid")
-                                  .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                                  .build())
-                          .addFields(
-                              Field.newBuilder()
-                                  .setName("typname")
-                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                                  .build())
-                          .build())
-                  .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue("3802").build())
-                  .addValues(Value.newBuilder().setStringValue("jsonb").build())
-                  .build())
-          .build();
+      createSelectTypeByNameResultSet(Oid.JSONB, "jsonb");
+  protected static final ResultSet SELECT_INTERVAL_TYPE_BY_NAME_RESULT_SET =
+      createSelectTypeByNameResultSet(Oid.INTERVAL, "interval");
   protected static final Statement SELECT_JSONB_TYPE_INFO =
       Statement.newBuilder(
               "with "
@@ -281,6 +257,42 @@ public abstract class AbstractMockServerTest {
                   .build())
           .build();
 
+  protected static Statement createSelectTypeByNameStatement(String name) {
+    return Statement.newBuilder(
+            "with "
+                + PG_TYPE_PREFIX
+                + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1")
+        .bind("p1")
+        .to(name)
+        .build();
+  }
+
+  protected static ResultSet createSelectTypeByNameResultSet(int oid, String name) {
+    return ResultSet.newBuilder()
+        .setMetadata(
+            ResultSetMetadata.newBuilder()
+                .setRowType(
+                    StructType.newBuilder()
+                        .addFields(
+                            Field.newBuilder()
+                                .setName("oid")
+                                .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                .build())
+                        .addFields(
+                            Field.newBuilder()
+                                .setName("typname")
+                                .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                .build())
+                        .build())
+                .build())
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(Value.newBuilder().setStringValue(String.valueOf(oid)).build())
+                .addValues(Value.newBuilder().setStringValue(name).build())
+                .build())
+        .build();
+  }
+
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
   protected static final Statement SELECT2 = Statement.of("SELECT 2");
   protected static final Statement SELECT_FIVE_ROWS =
@@ -345,7 +357,8 @@ public abstract class AbstractMockServerTest {
   protected static final Statement INVALID_DML = Statement.of("INSERT INTO FOO VALUES ('abc')");
   protected static final Statement INVALID_DDL = Statement.of("CREATE TABLE FOO (id int64)");
 
-  protected static final ResultSetMetadata ALL_TYPES_METADATA = createAllTypesResultSetMetadata("");
+  protected static final ResultSetMetadata ALL_TYPES_METADATA =
+      createAllTypesResultSetMetadata("", false);
   protected static final com.google.spanner.v1.ResultSet ALL_TYPES_RESULTSET =
       createAllTypesResultSet("");
   protected static final com.google.spanner.v1.ResultSet ALL_TYPES_NULLS_RESULTSET =
@@ -368,13 +381,17 @@ public abstract class AbstractMockServerTest {
 
   protected static ResultSet createAllTypesResultSet(
       String id, String columnPrefix, boolean microsTimestamp) {
-    return createAllTypesResultSet(id, columnPrefix, microsTimestamp, true);
+    return createAllTypesResultSet(id, columnPrefix, microsTimestamp, true, false);
   }
 
   protected static ResultSet createAllTypesResultSet(
-      String id, String columnPrefix, boolean microsTimestamp, boolean nullValueInArrays) {
+      String id,
+      String columnPrefix,
+      boolean microsTimestamp,
+      boolean nullValueInArrays,
+      boolean intervalAsString) {
     return ResultSet.newBuilder()
-        .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
+        .setMetadata(createAllTypesResultSetMetadata(columnPrefix, intervalAsString))
         .addRows(
             ListValue.newBuilder()
                 .addValues(Value.newBuilder().setStringValue(id).build())
@@ -396,6 +413,7 @@ public abstract class AbstractMockServerTest {
                                 ? "2022-02-16T13:18:02.123456Z"
                                 : "2022-02-16T13:18:02.123456789Z")
                         .build())
+                .addValues(Value.newBuilder().setStringValue("P1Y2M3DT4H5M6.789S").build())
                 .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
                 .addValues(Value.newBuilder().setStringValue("test").build())
                 .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
@@ -533,6 +551,22 @@ public abstract class AbstractMockServerTest {
                                     Value.newBuilder()
                                         .setStringValue("2000-01-01T00:00:00Z")
                                         .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder().setStringValue("P-100MT123456.789S").build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue("P-100MT123456.789S")
+                                            .build())
+                                .addValues(Value.newBuilder().setStringValue("P1Y").build())
                                 .build()))
                 .addValues(
                     Value.newBuilder()
@@ -727,7 +761,7 @@ public abstract class AbstractMockServerTest {
 
   protected static ResultSet createAllTypesNullResultSet(String columnPrefix, Long colBigInt) {
     return com.google.spanner.v1.ResultSet.newBuilder()
-        .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
+        .setMetadata(createAllTypesResultSetMetadata(columnPrefix, false))
         .addRows(
             ListValue.newBuilder()
                 .addValues(
@@ -744,7 +778,9 @@ public abstract class AbstractMockServerTest {
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 // Arrays
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -788,6 +824,11 @@ public abstract class AbstractMockServerTest {
   }
 
   protected static ResultSetMetadata createAllTypesResultSetMetadata(String columnPrefix) {
+    return createAllTypesResultSetMetadata(columnPrefix, false);
+  }
+
+  protected static ResultSetMetadata createAllTypesResultSetMetadata(
+      String columnPrefix, boolean intervalAsString) {
     return ResultSetMetadata.newBuilder()
         .setRowType(
             StructType.newBuilder()
@@ -827,6 +868,13 @@ public abstract class AbstractMockServerTest {
                     Field.newBuilder()
                         .setName(columnPrefix + "col_timestamptz")
                         .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_interval")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(intervalAsString ? TypeCode.STRING : TypeCode.INTERVAL)
+                                .build()))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_date")
@@ -910,6 +958,17 @@ public abstract class AbstractMockServerTest {
                                 .setCode(TypeCode.ARRAY)
                                 .setArrayElementType(
                                     Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_interval")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder()
+                                        .setCode(
+                                            intervalAsString ? TypeCode.STRING : TypeCode.INTERVAL)
+                                        .build())))
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_array_date")
@@ -1229,6 +1288,9 @@ public abstract class AbstractMockServerTest {
         StatementResult.query(SELECT_JSONB_TYPE_BY_OID, SELECT_JSONB_TYPE_BY_OID_RESULT_SET));
     mockSpanner.putStatementResult(
         StatementResult.query(SELECT_JSONB_TYPE_BY_NAME, SELECT_JSONB_TYPE_BY_NAME_RESULT_SET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            SELECT_INTERVAL_TYPE_BY_NAME, SELECT_INTERVAL_TYPE_BY_NAME_RESULT_SET));
     mockSpanner.putStatementResult(
         StatementResult.query(
             SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL, SELECT_JSONB_TYPE_BY_NAME_RESULT_SET));

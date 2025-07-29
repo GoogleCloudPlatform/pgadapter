@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
 import pytz
-from sqlalchemy import Column, Integer, String, Boolean, LargeBinary, Float,\
-  Numeric, DateTime, Date
+from sqlalchemy import Column, Integer, String, Boolean, LargeBinary, Float, \
+    Numeric, DateTime, Date
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY, REAL
 from sqlalchemy.orm import registry
 
@@ -21,6 +21,7 @@ class AllTypes(Base):
   col_int = Column(Integer)
   col_numeric = Column(Numeric)
   col_timestamptz = Column(DateTime(timezone=True))
+  col_interval = Column(String)
   col_date = Column(Date)
   col_varchar = Column(String)
   col_jsonb = Column(JSONB)
@@ -33,6 +34,7 @@ class AllTypes(Base):
   col_array_int = Column(ARRAY(Integer))
   col_array_numeric = Column(ARRAY(Numeric))
   col_array_timestamptz = Column(ARRAY(DateTime(timezone=True)))
+  col_array_interval = Column(ARRAY(String))
   col_array_date = Column(ARRAY(Date))
   col_array_varchar = Column(ARRAY(String))
   col_array_jsonb = Column(ARRAY(JSONB))
@@ -47,6 +49,7 @@ class AllTypes(Base):
            f"col_int=        {self.col_int!r}\n" \
            f"col_numeric=    {self.col_numeric!r}\n" \
            f"col_timestamptz={format_timestamp(self.col_timestamptz)!r}\n" \
+           f"col_interval=   {self.col_interval!r}\n" \
            f"col_date=       {self.col_date!r}\n" \
            f"col_varchar=    {self.col_varchar!r}\n" \
            f"col_jsonb=      {self.col_jsonb!r}\n" \
@@ -58,6 +61,7 @@ class AllTypes(Base):
            f"col_array_int=        {self.col_array_int!r}\n" \
            f"col_array_numeric=    {self.col_array_numeric!r}\n" \
            f"col_array_timestamptz={format_timestamps(self.col_array_timestamptz)!r}\n" \
+           f"col_array_ineterval=  {self.col_array_interval!r}\n" \
            f"col_array_date=       {self.col_array_date!r}\n" \
            f"col_array_varchar=    {self.col_array_varchar!r}\n" \
            f"col_array_jsonb=      {self.col_array_jsonb!r}\n" \

@@ -33,6 +33,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.BatchCreateSessionsRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
@@ -935,5 +936,16 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       statement.execute("run batch");
       statement.execute("commit");
     }
+  }
+
+  @Test
+  public void testStartupConnectionPropertiesInUrl() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "&options=-c%20minSessions=10-c%20numChannels=1")) {}
+    assertEquals(1, mockSpanner.countRequestsOfType(BatchCreateSessionsRequest.class));
+    assertEquals(
+        10,
+        mockSpanner.getRequestsOfType(BatchCreateSessionsRequest.class).get(0).getSessionCount());
   }
 }

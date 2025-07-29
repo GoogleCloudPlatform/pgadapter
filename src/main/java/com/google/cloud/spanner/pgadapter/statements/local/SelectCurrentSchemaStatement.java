@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements.local;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
@@ -46,20 +47,24 @@ public class SelectCurrentSchemaStatement implements LocalStatement {
       "SELECT * FROM current_schema()",
       "SELECT * FROM CURRENT_SCHEMA()",
       "select * from current_schema",
-      "SELECT * FROM current_schema"
+      "SELECT * FROM current_schema",
+      "SELECT CURRENT_SCHEMA() AS SCHEMA"
     };
   }
 
   @Override
-  public StatementResult execute(BackendConnection backendConnection) {
+  public StatementResult execute(BackendConnection backendConnection, Statement statement) {
+    String alias = "current_schema";
+    if (statement.getSql().equals("SELECT CURRENT_SCHEMA() AS SCHEMA")) {
+      // PostgreSQL folds all identifiers to lower-case, so even though the select statement uses
+      // upper-case, the alias will be returned in lower-case.
+      alias = "schema";
+    }
     ResultSet resultSet =
         ClientSideResultSet.forRows(
-            Type.struct(StructField.of("current_schema", Type.string())),
+            Type.struct(StructField.of(alias, Type.string())),
             ImmutableList.of(
-                Struct.newBuilder()
-                    .set("current_schema")
-                    .to(backendConnection.getCurrentSchema())
-                    .build()));
+                Struct.newBuilder().set(alias).to(backendConnection.getCurrentSchema()).build()));
     return new QueryResult(resultSet);
   }
 }

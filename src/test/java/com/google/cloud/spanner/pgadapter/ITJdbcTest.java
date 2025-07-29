@@ -22,11 +22,13 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Value;
@@ -50,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -137,6 +140,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(new BigDecimal("3.14"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00"))
+                .set("col_interval")
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .set("col_date")
                 .to(Date.parseDate("2022-05-23"))
                 .set("col_varchar")
@@ -164,6 +169,8 @@ public class ITJdbcTest implements IntegrationTest {
                         Timestamp.parseTimestamp("2000-01-01T00:00:00Z"),
                         null,
                         Timestamp.parseTimestamp("1970-01-01T00:00:00Z")))
+                .set("col_array_interval")
+                .toStringArray(Collections.singletonList("P1Y2M3DT4H5M6.789S"))
                 .set("col_array_date")
                 .toDateArray(
                     Arrays.asList(Date.parseDate("2000-01-01"), null, Date.parseDate("1970-01-01")))
@@ -426,9 +433,9 @@ public class ITJdbcTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
-                  + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb, "
+                  + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, col_array_varchar, col_array_jsonb) "
+                  + "values (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setBoolean(++index, true);
@@ -449,6 +456,7 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
         statement.setTimestamp(
             ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
+        statement.setObject(++index, "P1Y2M3DT4H5M6.789S");
         statement.setObject(++index, LocalDate.parse("2000-02-29"));
         statement.setString(++index, "string_test");
         statement.setObject(++index, "{\"key1\": \"value1\", \"key2\": \"value2\"}", Types.OTHER);
@@ -493,6 +501,8 @@ public class ITJdbcTest implements IntegrationTest {
                   Timestamp.parseTimestamp("2000-01-01T00:00:00Z").toSqlTimestamp()
                 }));
         statement.setArray(
+            ++index, connection.createArrayOf("varchar", new String[] {"P1Y2M3DT4H5M6.789S"}));
+        statement.setArray(
             ++index,
             connection.createArrayOf(
                 "date",
@@ -530,7 +540,7 @@ public class ITJdbcTest implements IntegrationTest {
           connection.createStatement().executeQuery("select * from all_types where col_bigint=2")) {
         assertTrue(resultSet.next());
 
-        assertEquals(22, resultSet.getMetaData().getColumnCount());
+        assertEquals(24, resultSet.getMetaData().getColumnCount());
         int index = 0;
         assertEquals(2, resultSet.getLong(++index));
         assertTrue(resultSet.getBoolean(++index));
@@ -547,6 +557,7 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(
             Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp(),
             resultSet.getTimestamp(++index));
+        assertEquals("P1Y2M3DT4H5M6.789S", resultSet.getString(++index));
         assertEquals(LocalDate.of(2000, 2, 29), resultSet.getObject(++index, LocalDate.class));
         assertEquals("string_test", resultSet.getString(++index));
         assertEquals("{\"key1\": \"value1\", \"key2\": \"value2\"}", resultSet.getString(++index));
@@ -592,6 +603,8 @@ public class ITJdbcTest implements IntegrationTest {
               },
               (java.sql.Timestamp[]) resultSet.getArray(++index).getArray());
         }
+        assertArrayEquals(
+            new String[] {"P1Y2M3DT4H5M6.789S"}, (String[]) resultSet.getArray(++index).getArray());
         assertArrayEquals(
             new java.sql.Date[] {
               java.sql.Date.valueOf("2000-01-01"), null, java.sql.Date.valueOf("1970-01-01")
@@ -688,6 +701,7 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123457+01:00").toSqlTimestamp(),
             resultSet.getTimestamp(++index));
+        assertEquals("P1Y2M3DT4H5M6.789S", resultSet.getString(++index));
         assertEquals(LocalDate.parse("2000-01-01"), resultSet.getObject(++index, LocalDate.class));
         assertEquals("updated", resultSet.getString(++index));
         assertEquals(
@@ -1213,6 +1227,33 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testUUID() throws SQLException {
+    // UUIDs are only supported in extended query mode.
+    // In simple mode, the PG driver will try to cast a literal to UUID.
+    assumeTrue(preferQueryMode.equals("extended"));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      // TODO: Change type to UUID once supported.
+      connection
+          .createStatement()
+          .execute(
+              "create table if not exists uuid_values (id bigint primary key, col_varchar varchar, col_uuid varchar)");
+      connection.createStatement().execute("truncate uuid_values");
+      // It should be possible to use UUID query parameters with both UUID and varchar columns.
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              "insert into uuid_values (id, col_varchar, col_uuid) values (?, ?, ?)")) {
+        UUID uuid = UUID.randomUUID();
+        // Verify that we can insert a UUID value into both a varchar and a UUID column.
+        statement.setLong(1, 1L);
+        statement.setObject(2, uuid);
+        statement.setObject(3, uuid);
+        assertEquals(1, statement.executeUpdate());
+      }
+    }
+  }
+
+  @Test
   public void testSelectTypes() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (ResultSet types =
@@ -1295,6 +1336,12 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(Oid.TIMESTAMPTZ_ARRAY, types.getInt(1));
         assertEquals("_timestamptz", types.getString(2));
         assertTrue(types.next());
+        assertEquals(Oid.INTERVAL, types.getInt(1));
+        assertEquals("interval", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INTERVAL_ARRAY, types.getInt(1));
+        assertEquals("_interval", types.getString(2));
+        assertTrue(types.next());
         assertEquals(Oid.NUMERIC_ARRAY, types.getInt(1));
         assertEquals("_numeric", types.getString(2));
         assertTrue(types.next());
@@ -1333,6 +1380,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(new BigDecimal("-3.14"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-04-22T19:27:30+02:00"))
+                .set("col_interval")
+                .to(Interval.parseFromString("P1Y"))
                 .set("col_date")
                 .to(Date.parseDate("2000-01-01"))
                 .set("col_varchar")
@@ -1360,6 +1409,8 @@ public class ITJdbcTest implements IntegrationTest {
                         Timestamp.parseTimestamp("2000-01-01T00:00:00Z"),
                         null,
                         Timestamp.parseTimestamp("1970-01-01T00:00:00Z")))
+                .set("col_array_interval")
+                .toIntervalArray(Collections.singletonList(Interval.parseFromString("P1Y")))
                 .set("col_array_date")
                 .toDateArray(
                     Arrays.asList(Date.parseDate("2000-01-01"), null, Date.parseDate("1970-01-01")))
@@ -1386,6 +1437,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to((BigDecimal) null)
                 .set("col_timestamptz")
                 .to((Timestamp) null)
+                .set("col_interval")
+                .to((Interval) null)
                 .set("col_date")
                 .to((Date) null)
                 .set("col_varchar")
@@ -1409,6 +1462,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_array_timestamptz")
                 .toTimestampArray(null)
                 .set("col_array_date")
+                .toIntervalArray(null)
+                .set("col_array_interval")
                 .toDateArray(null)
                 .set("col_array_varchar")
                 .toStringArray(null)
@@ -1432,6 +1487,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(BigDecimal.ZERO)
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("0001-01-01T00:00:00Z"))
+                .set("col_interval")
+                .to(Interval.parseFromString("P0Y"))
                 .set("col_date")
                 .to(Date.parseDate("0001-01-01"))
                 .set("col_varchar")
@@ -1454,6 +1511,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .toPgNumericArray(ImmutableList.of())
                 .set("col_array_timestamptz")
                 .toTimestampArray(ImmutableList.of())
+                .set("col_array_interval")
+                .toIntervalArray(ImmutableList.of())
                 .set("col_array_date")
                 .toDateArray(ImmutableList.of())
                 .set("col_array_varchar")
@@ -1478,6 +1537,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(BigDecimal.ZERO)
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("0001-01-01T00:00:00Z"))
+                .set("col_interval")
+                .to(Interval.parseFromString("P0Y"))
                 .set("col_date")
                 .to(Date.parseDate("0001-01-01"))
                 .set("col_varchar")
@@ -1500,6 +1561,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .toPgNumericArray(ImmutableList.of())
                 .set("col_array_timestamptz")
                 .toTimestampArray(ImmutableList.of())
+                .set("col_array_interval")
+                .toIntervalArray(ImmutableList.of())
                 .set("col_array_date")
                 .toDateArray(ImmutableList.of())
                 .set("col_array_varchar")

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
 import static org.junit.Assert.assertArrayEquals;
@@ -24,7 +25,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -33,6 +33,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.MockServerHelper;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
@@ -107,18 +108,18 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameter;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PGInterval;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
+  private static final String pgVersion = "14.1";
   private static final int RANDOM_RESULTS_ROW_COUNT = 10;
   private static final Statement SELECT_RANDOM = Statement.of("select * from random_table");
   private static final ImmutableList<String> JDBC_STARTUP_STATEMENTS =
@@ -127,13 +128,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           "SET extra_float_digits = 3",
           "SET application_name = 'PostgreSQL JDBC Driver'");
 
-  @Parameter public String pgVersion;
-
-  @Parameters(name = "pgVersion = {0}")
-  public static Object[] data() {
-    return new Object[] {"1.0", "14.1"};
-  }
-
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
     // Make sure the PG JDBC driver is loaded.
@@ -141,6 +135,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
     addRandomResultResults();
     setupJsonbResults();
+    setupIntervalResults();
   }
 
   private static void addRandomResultResults() {
@@ -151,6 +146,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   static void setupJsonbResults() {
     setupJsonbResults(mockSpanner);
+  }
+
+  static void setupIntervalResults() {
+    setupIntervalResults(mockSpanner);
   }
 
   static void setupJsonbResults(MockSpannerServiceImpl mockSpanner) {
@@ -391,6 +390,192 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .build()));
   }
 
+  static void setupIntervalResults(MockSpannerServiceImpl mockSpanner) {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(1186L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("interval").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(1187L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("_interval").build())
+                        .build())
+                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT e.typdelim FROM pg_type t, pg_type e WHERE t.oid = $1 and t.typelem = e.oid")
+                .bind("p1")
+                .to(Oid.INTERVAL_ARRAY)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(",").build())
+                        .build())
+                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT e.oid, n.nspname  IN ('pg_catalog', 'public'), n.nspname, e.typname "
+                        + "FROM pg_type t JOIN pg_type e ON t.typelem = e.oid "
+                        + "JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(Oid.INTERVAL_ARRAY)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("3802").build())
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .bind("p1")
+                .to(1187L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("_interval").build())
+                        .addValues(Value.newBuilder().setStringValue("1187").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .bind("p1")
+                .to(1186L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(false).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("interval").build())
+                        .addValues(Value.newBuilder().setStringValue("1186").build())
+                        .build())
+                .build()));
+  }
+
   /**
    * Creates a JDBC connection string that instructs the PG JDBC driver to use the default extended
    * mode for queries and DML statements.
@@ -465,6 +650,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         }
       }
     }
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    // The cleanup of the connection is async, so it can take a few milliseconds to reach the state
+    // that we expect.
+    //noinspection StatementWithEmptyBody
+    while (stopwatch.elapsed(TimeUnit.SECONDS) < 3 && !CONNECTION_HANDLERS.isEmpty()) {}
+    assertEquals(0, CONNECTION_HANDLERS.size());
   }
 
   @Test
@@ -494,6 +685,86 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           assertTrue(resultSet.next());
           assertNotNull(resultSet.getObject(1));
           assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testLargeString() throws SQLException {
+    String sql = "select large_varchar from test";
+    Random rand = new Random();
+    for (int size : new int[] {100, rand.nextInt(100_000) + 1}) {
+      byte[] bytes = new byte[size];
+      rand.nextBytes(bytes);
+      String value = new String(bytes);
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of(sql),
+              com.google.spanner.v1.ResultSet.newBuilder()
+                  .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                  .addRows(
+                      ListValue.newBuilder()
+                          .addValues(Value.newBuilder().setStringValue(value).build())
+                          .build())
+                  .build()));
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+        for (int bufferSize : new int[] {0, 32}) {
+          connection
+              .createStatement()
+              .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+          try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+            assertTrue(resultSet.next());
+            assertEquals(value, resultSet.getString(1));
+            assertFalse(resultSet.next());
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testLargeJsonb() throws SQLException {
+    String sql = "select large_jsonb from test";
+    Random rand = new Random();
+    for (int size : new int[] {100, rand.nextInt(100_000) + 1}) {
+      byte[] bytes = new byte[size];
+      rand.nextBytes(bytes);
+      String json = String.format("{\"key\": \"%s\"}", Base64.getEncoder().encodeToString(bytes));
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of(sql),
+              com.google.spanner.v1.ResultSet.newBuilder()
+                  .setMetadata(createMetadata(ImmutableList.of(TypeCode.JSON)))
+                  .addRows(
+                      ListValue.newBuilder()
+                          .addValues(Value.newBuilder().setStringValue(json).build())
+                          .build())
+                  .build()));
+
+      for (String binaryTransfer : new String[] {"", "&binaryTransferEnable=" + Oid.JSONB}) {
+        try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransfer)) {
+          connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+          for (int bufferSize : new int[] {0, 32}) {
+            connection
+                .createStatement()
+                .execute(String.format("set spanner.string_conversion_buffer_size=%d", bufferSize));
+            try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+              assertTrue(resultSet.next());
+              if (binaryTransfer.isEmpty()) {
+                assertEquals(json, resultSet.getString(1));
+              } else {
+                byte[] receivedBytes = resultSet.getBytes(1);
+                assertNotNull(receivedBytes);
+                assertTrue(receivedBytes.length > 0);
+                String receivedString = new String(receivedBytes, 1, receivedBytes.length - 1);
+                assertEquals(json, receivedString);
+              }
+              assertFalse(resultSet.next());
+            }
+          }
         }
       }
     }
@@ -1248,7 +1519,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -1258,11 +1529,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_float8=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
+            + "and col_interval=? "
             + "and col_date=? "
             + "and col_varchar=? "
             + "and col_jsonb=?";
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+        "select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=$1 "
             + "and col_bool=$2 "
@@ -1272,9 +1544,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_float8=$6 "
             + "and col_numeric=$7 "
             + "and col_timestamptz=$8 "
-            + "and col_date=$9 "
-            + "and col_varchar=$10 "
-            + "and col_jsonb=$11";
+            + "and col_interval=$9 "
+            + "and col_date=$10 "
+            + "and col_varchar=$11 "
+            + "and col_jsonb=$12";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1296,10 +1569,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .bind("p10")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p11")
+                .to("test")
+                .bind("p12")
                 .to("{\"key\": \"value\"}")
                 .build(),
             ALL_TYPES_RESULTSET));
@@ -1307,6 +1582,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     OffsetDateTime offsetDateTime =
         LocalDateTime.of(2022, 2, 16, 13, 18, 2, 123456789).atOffset(ZoneOffset.UTC);
     OffsetDateTime truncatedOffsetDateTime = offsetDateTime.truncatedTo(ChronoUnit.MICROS);
+    PGInterval pgInterval = new PGInterval();
+    pgInterval.setValue("1 year 2 mons 3 days 04:05:06.789");
 
     // Threshold 5 is the default. Use a named prepared statement if it is executed 5 times or more.
     // Threshold 1 means always use a named prepared statement.
@@ -1326,6 +1603,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           preparedStatement.setDouble(++index, 3.14d);
           preparedStatement.setBigDecimal(++index, new BigDecimal("6.626"));
           preparedStatement.setObject(++index, offsetDateTime);
+          preparedStatement.setObject(++index, pgInterval);
           preparedStatement.setObject(++index, LocalDate.of(2022, 3, 29));
           preparedStatement.setString(++index, "test");
           preparedStatement.setString(++index, "{\"key\": \"value\"}");
@@ -1341,6 +1619,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
             assertEquals(
                 truncatedOffsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
+            assertEquals(
+                new PGInterval("14 mons 3 days 4 hours 5 mins 6.789 secs"),
+                resultSet.getObject(++index, PGInterval.class));
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
             assertEquals("test", resultSet.getString(++index));
             assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
@@ -1390,11 +1671,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals("6.626", params.get("p7").getStringValue());
       assertEquals(TypeCode.TIMESTAMP, types.get("p8").getCode());
       assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p8").getStringValue());
-      assertEquals(TypeCode.DATE, types.get("p9").getCode());
-      assertEquals("2022-03-29", params.get("p9").getStringValue());
-      assertEquals(TypeCode.STRING, types.get("p10").getCode());
-      assertEquals("test", params.get("p10").getStringValue());
-      assertEquals("{\"key\": \"value\"}", params.get("p11").getStringValue());
+      assertEquals(TypeCode.INTERVAL, types.get("p9").getCode());
+      assertEquals("P1Y2M3DT4H5M6.789S", params.get("p9").getStringValue());
+      assertEquals(TypeCode.DATE, types.get("p10").getCode());
+      assertEquals("2022-03-29", params.get("p10").getStringValue());
+      assertEquals(TypeCode.STRING, types.get("p11").getCode());
+      assertEquals("test", params.get("p11").getStringValue());
+      assertEquals("{\"key\": \"value\"}", params.get("p12").getStringValue());
 
       mockSpanner.clearRequests();
     }
@@ -3007,13 +3290,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testPreparedStatementReturning() throws SQLException {
     String pgSql =
         "insert into all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) "
             + "returning *";
     String sql =
         "insert into all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            + "(col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval, col_date, col_varchar, col_jsonb) "
+            + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             + "returning *";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -3032,6 +3315,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                                         TypeCode.INT64,
                                         TypeCode.NUMERIC,
                                         TypeCode.TIMESTAMP,
+                                        TypeCode.INTERVAL,
                                         TypeCode.DATE,
                                         TypeCode.STRING,
                                         TypeCode.JSON))
@@ -3059,10 +3343,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p9")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Interval.parseFromString("P1Y2M3DT4H5M6.789S"))
                 .bind("p10")
-                .to("test")
+                .to(Date.parseDate("2022-03-29"))
                 .bind("p11")
+                .to("test")
+                .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             com.google.spanner.v1.ResultSet.newBuilder()
@@ -3073,11 +3359,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
     OffsetDateTime zonedDateTime =
         LocalDateTime.of(2022, 2, 16, 13, 18, 2, 123456789).atOffset(ZoneOffset.UTC);
+    PGInterval pgInterval = new PGInterval("1 year 2 mons, 3 days 4 hours 5 mins 6.789 secs");
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         ParameterMetaData parameterMetaData = statement.getParameterMetaData();
         int index = 0;
-        assertEquals(11, parameterMetaData.getParameterCount());
+        assertEquals(12, parameterMetaData.getParameterCount());
         assertEquals(Types.BIGINT, parameterMetaData.getParameterType(++index));
         assertEquals(Types.BIT, parameterMetaData.getParameterType(++index));
         assertEquals(Types.BINARY, parameterMetaData.getParameterType(++index));
@@ -3086,12 +3373,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.BIGINT, parameterMetaData.getParameterType(++index));
         assertEquals(Types.NUMERIC, parameterMetaData.getParameterType(++index));
         assertEquals(Types.TIMESTAMP, parameterMetaData.getParameterType(++index));
+        assertEquals(Types.OTHER, parameterMetaData.getParameterType(++index));
         assertEquals(Types.DATE, parameterMetaData.getParameterType(++index));
         assertEquals(Types.VARCHAR, parameterMetaData.getParameterType(++index));
         assertEquals(Types.OTHER, parameterMetaData.getParameterType(++index));
 
         ResultSetMetaData metadata = statement.getMetaData();
-        assertEquals(22, metadata.getColumnCount());
+        assertEquals(24, metadata.getColumnCount());
         index = 0;
         assertEquals(Types.BIGINT, metadata.getColumnType(++index));
         assertEquals(Types.BIT, metadata.getColumnType(++index));
@@ -3101,10 +3389,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.BIGINT, metadata.getColumnType(++index));
         assertEquals(Types.NUMERIC, metadata.getColumnType(++index));
         assertEquals(Types.TIMESTAMP, metadata.getColumnType(++index));
+        assertEquals(Types.OTHER, metadata.getColumnType(++index));
         assertEquals(Types.DATE, metadata.getColumnType(++index));
         assertEquals(Types.VARCHAR, metadata.getColumnType(++index));
         assertEquals(Types.OTHER, metadata.getColumnType(++index));
 
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
         assertEquals(Types.ARRAY, metadata.getColumnType(++index));
@@ -3126,6 +3416,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         statement.setInt(++index, 100);
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
         statement.setObject(++index, zonedDateTime);
+        statement.setObject(++index, pgInterval);
         statement.setObject(++index, LocalDate.of(2022, 3, 29));
         statement.setString(++index, "test");
         statement.setObject(++index, createJdbcPgJsonbObject("{\"key\": \"value\"}"));
@@ -3178,9 +3469,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           getWireMessagesOfType(ExecuteMessage.class).stream()
               .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
               .collect(Collectors.toList());
-      assertEquals(5, executeMessages.size());
-      assertEquals("", executeMessages.get(0).getName());
-      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
+      assertEquals(4, executeMessages.size());
+      for (ExecuteMessage executeMessage : executeMessages.subList(0, executeMessages.size() - 1)) {
         assertEquals(describeMessage.getName(), executeMessage.getName());
         assertEquals(2, executeMessage.getMaxRows());
       }
@@ -3190,10 +3480,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           getWireMessagesOfType(ParseMessage.class).stream()
               .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
               .collect(Collectors.toList());
-      assertEquals(3, parseMessages.size());
-      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
-      assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+      assertEquals(2, parseMessages.size());
+      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(0).getStatement().getSql());
+      assertEquals("COMMIT", parseMessages.get(1).getStatement().getSql());
     }
   }
 
@@ -3222,11 +3511,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
     assertEquals(SELECT_FIVE_ROWS.getSql(), executeRequest.getSql());
 
-    // PGAdapter should receive 4 Execute messages:
-    // 1. BEGIN
-    // 2. Execute - fetch row 1
-    // 3. Execute - fetch row 2 -- This fails with a DATA_LOSS error
-    // The JDBC driver does not send a ROLLBACK
+    // PGAdapter should receive 3 Execute messages:
+    // 1. Execute - fetch row 1
+    // 2. Execute - fetch row 2 -- This fails with a DATA_LOSS error
+    // 3. ROLLBACK
+    // The driver also sends a BEGIN statement, but that uses the simple query protocol,
+    // so it only sends a single Query message.
     if (pgServer != null) {
       List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
       assertEquals(1, describeMessages.size());
@@ -3237,9 +3527,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           getWireMessagesOfType(ExecuteMessage.class).stream()
               .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
               .collect(Collectors.toList());
-      assertEquals(4, executeMessages.size());
-      assertEquals("", executeMessages.get(0).getName());
-      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
+      assertEquals(3, executeMessages.size());
+      for (ExecuteMessage executeMessage : executeMessages.subList(0, executeMessages.size() - 1)) {
         assertEquals(describeMessage.getName(), executeMessage.getName());
         assertEquals(1, executeMessage.getMaxRows());
       }
@@ -3249,10 +3538,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           getWireMessagesOfType(ParseMessage.class).stream()
               .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
               .collect(Collectors.toList());
-      assertEquals(3, parseMessages.size());
-      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
-      assertEquals("ROLLBACK", parseMessages.get(2).getStatement().getSql());
+      assertEquals(2, parseMessages.size());
+      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(0).getStatement().getSql());
+      assertEquals("ROLLBACK", parseMessages.get(1).getStatement().getSql());
     }
   }
 
@@ -3323,7 +3611,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         Oid.FLOAT8,
                         Oid.INT8,
                         Oid.DATE,
-                        Oid.TIMESTAMPTZ)
+                        Oid.TIMESTAMPTZ,
+                        Oid.INTERVAL,
+                        Oid.UUID)
                     .stream()
                     .map(String::valueOf)
                     .collect(Collectors.joining(","));
@@ -3352,7 +3642,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   //       type (jsonb is not one of the types that the JDBC driver will load
                   //       automatically).
                   final int jsonbColumnIndex = 6;
-                  final int jsonbArrayColumnIndex = 17;
+                  final int jsonbArrayColumnIndex = 18;
                   if (col == jsonbColumnIndex || col == jsonbArrayColumnIndex) {
                     resultSet.getString(col + 1);
                   } else {
@@ -3380,12 +3670,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
         assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
 
-        // PGAdapter should receive 5 Execute messages:
-        // 1. BEGIN
+        // PGAdapter should receive 4 Execute messages:
         // 2. Execute - fetch rows 1, 2
         // 3. Execute - fetch rows 3, 4
         // 4. Execute - fetch rows 5
         // 5. COMMIT
+        // PGAdapter also receives a BEGIN statement, but that statement uses the simple query
+        // protocol and only sends a single Query message.
         if (pgServer != null) {
           List<DescribeMessage> describeMessages =
               getWireMessagesOfType(DescribeMessage.class).stream()
@@ -3398,30 +3689,27 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
           List<ExecuteMessage> executeMessages =
               getWireMessagesOfType(ExecuteMessage.class).stream()
-                  .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-                  .filter(message -> !message.getSql().startsWith("set spanner."))
+                  .filter(message -> message.getSql().equals(SELECT_RANDOM.getSql()))
                   .collect(Collectors.toList());
           int expectedExecuteMessageCount =
               RANDOM_RESULTS_ROW_COUNT / fetchSize
-                  + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
-                  + 2;
+                  + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0);
           assertEquals(expectedExecuteMessageCount, executeMessages.size());
-          assertEquals("", executeMessages.get(0).getName());
           for (ExecuteMessage executeMessage :
               executeMessages.subList(1, executeMessages.size() - 1)) {
             assertEquals(fetchSize, executeMessage.getMaxRows());
           }
-          assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
 
           List<ParseMessage> parseMessages =
               getWireMessagesOfType(ParseMessage.class).stream()
-                  .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-                  .filter(message -> !message.getSql().startsWith("set spanner."))
+                  .filter(
+                      message ->
+                          ImmutableList.of("BEGIN", SELECT_RANDOM.getSql(), "COMMIT")
+                              .contains(message.getSql()))
                   .collect(Collectors.toList());
-          assertEquals(3, parseMessages.size());
-          assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-          assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
-          assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+          assertEquals(2, parseMessages.size());
+          assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(0).getStatement().getSql());
+          assertEquals("COMMIT", parseMessages.get(1).getStatement().getSql());
         }
         mockSpanner.clearRequests();
         pgServer.clearDebugMessages();
@@ -4744,15 +5032,11 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testUUIDParameter() throws SQLException {
-    assumeTrue(pgVersion.equals("14.1"));
-
     String jdbcSql = "SELECT * FROM all_types WHERE col_uuid=?";
     String pgSql = "SELECT * FROM all_types WHERE col_uuid=$1";
     UUID uuid = UUID.randomUUID();
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.newBuilder(pgSql).bind("p1").to(uuid.toString()).build(),
-            ALL_TYPES_RESULTSET));
+    mockSpanner.putPartialStatementResult(
+        StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(jdbcSql)) {
@@ -4765,6 +5049,11 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(1, request.getParams().getFieldsCount());
+    // UUIDs should be sent to Spanner as untyped values, so Spanner can infer the correct data
+    // type. This allows clients to use UUID query parameters with both STRING and UUID columns.
+    assertEquals(0, request.getParamTypesCount());
   }
 
   @Test
@@ -5732,51 +6021,124 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCancel() throws Exception {
-    ExecutorService executor = Executors.newSingleThreadExecutor();
+  public void testCancelQuery() throws Exception {
+    String sql = "SELECT 1";
+    for (boolean autocommit : new boolean[] {true, false}) {
+      ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    try (Connection connection = DriverManager.getConnection(createUrl());
-        java.sql.Statement statement = connection.createStatement()) {
-      mockSpanner.freeze();
-      Future<Long> queryResult =
-          executor.submit(
-              () -> {
-                try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
-                  if (resultSet.next()) {
-                    return resultSet.getLong(1);
+      try (Connection connection = DriverManager.getConnection(createUrl());
+          java.sql.Statement statement = connection.createStatement()) {
+        connection.setAutoCommit(autocommit);
+        mockSpanner.freeze();
+        Future<Long> queryResult =
+            executor.submit(
+                () -> {
+                  try (ResultSet resultSet = statement.executeQuery(sql)) {
+                    if (resultSet.next()) {
+                      return resultSet.getLong(1);
+                    }
+                    return 0L;
                   }
-                  return 0L;
-                }
-              });
-      // Wait for the request to have landed on the server.
-      mockSpanner.waitForRequestsToContain(
-          msg -> {
-            if (!(msg instanceof ExecuteSqlRequest)) {
-              return false;
-            }
-            ExecuteSqlRequest executeSqlRequest = (ExecuteSqlRequest) msg;
-            return executeSqlRequest.getSql().equals("SELECT 1");
-          },
-          1000L);
-      // Cancel the statement.
-      statement.cancel();
-      ExecutionException exception = assertThrows(ExecutionException.class, queryResult::get);
-      assertEquals(PSQLException.class, exception.getCause().getClass());
-      PSQLException psqlException = (PSQLException) exception.getCause();
-      assertNotNull(psqlException.getServerErrorMessage());
-      assertEquals(
-          SQLState.QueryCanceled.toString(), psqlException.getServerErrorMessage().getSQLState());
+                });
+        // Wait for the request to have landed on the server.
+        mockSpanner.waitForRequestsToContain(
+            msg -> {
+              if (!(msg instanceof ExecuteSqlRequest)) {
+                return false;
+              }
+              ExecuteSqlRequest executeSqlRequest = (ExecuteSqlRequest) msg;
+              return executeSqlRequest.getSql().equals(sql);
+            },
+            1000L);
+        // Cancel the statement.
+        statement.cancel();
+        ExecutionException exception = assertThrows(ExecutionException.class, queryResult::get);
+        assertEquals(PSQLException.class, exception.getCause().getClass());
+        PSQLException psqlException = (PSQLException) exception.getCause();
+        assertNotNull(psqlException.getServerErrorMessage());
+        assertEquals(
+            SQLState.QueryCanceled.toString(), psqlException.getServerErrorMessage().getSQLState());
 
-      mockSpanner.unfreeze();
-      // Verify that the connection is still usable.
-      try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
-        assertTrue(resultSet.next());
-        assertEquals(1L, resultSet.getLong(1));
-        assertFalse(resultSet.next());
+        mockSpanner.unfreeze();
+        if (!autocommit) {
+          // The transaction is invalid due to the cancelled query.
+          psqlException = assertThrows(PSQLException.class, () -> statement.executeQuery(sql));
+          assertNotNull(psqlException.getServerErrorMessage());
+          assertEquals(
+              SQLState.InFailedSqlTransaction.toString(),
+              psqlException.getServerErrorMessage().getSQLState());
+          // Rolling back should make the connection usable again.
+          connection.rollback();
+        }
+        // Verify that the connection is still usable.
+        assertTrue(connection.isValid(5000));
+        try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      } finally {
+        mockSpanner.unfreeze();
+        mockSpanner.clearRequests();
+        executor.shutdown();
       }
-    } finally {
-      mockSpanner.unfreeze();
-      executor.shutdown();
+    }
+  }
+
+  @Test
+  public void testCancelDml() throws Exception {
+    String sql = "update test set foo=1";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    for (boolean autocommit : new boolean[] {false, true}) {
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+      try (Connection connection = DriverManager.getConnection(createUrl());
+          java.sql.Statement statement = connection.createStatement()) {
+        connection.setAutoCommit(autocommit);
+        mockSpanner.freeze();
+        Future<Long> queryResult = executor.submit(() -> statement.executeLargeUpdate(sql));
+        // Wait for the request to have landed on the server.
+        mockSpanner.waitForRequestsToContain(
+            msg -> {
+              if (!(msg instanceof ExecuteSqlRequest)) {
+                return false;
+              }
+              ExecuteSqlRequest executeSqlRequest = (ExecuteSqlRequest) msg;
+              return executeSqlRequest.getSql().equals(sql);
+            },
+            1000L);
+        // Cancel the statement.
+        statement.cancel();
+        ExecutionException exception = assertThrows(ExecutionException.class, queryResult::get);
+        assertEquals(PSQLException.class, exception.getCause().getClass());
+        PSQLException psqlException = (PSQLException) exception.getCause();
+        assertNotNull(psqlException.getServerErrorMessage());
+        assertEquals(
+            SQLState.QueryCanceled.toString(), psqlException.getServerErrorMessage().getSQLState());
+
+        mockSpanner.unfreeze();
+        // The connection should still be valid.
+        assertTrue(connection.isValid(5000));
+
+        if (!autocommit) {
+          // The transaction is invalid due to the cancelled query.
+          psqlException =
+              assertThrows(PSQLException.class, () -> statement.executeLargeUpdate(sql));
+          assertNotNull(psqlException.getServerErrorMessage());
+          assertEquals(
+              SQLState.InFailedSqlTransaction.toString(),
+              psqlException.getServerErrorMessage().getSQLState());
+          // Rolling back should make the connection usable again.
+          connection.rollback();
+        }
+
+        // Verify that the connection is still usable.
+        assertEquals(1L, connection.createStatement().executeLargeUpdate(sql));
+      } finally {
+        mockSpanner.unfreeze();
+        mockSpanner.clearRequests();
+        executor.shutdown();
+      }
     }
   }
 
@@ -5815,7 +6177,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           assertTrue(request.hasTransaction());
           assertTrue(request.getTransaction().hasBegin());
           assertEquals(
-              translationIsolationLevel(isolation),
+              translateIsolationLevel(isolation),
               request.getTransaction().getBegin().getIsolationLevel());
 
           mockSpanner.clearRequests();
@@ -5838,7 +6200,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           assertTrue(request.hasTransaction());
           assertTrue(request.getTransaction().hasBegin());
           assertEquals(
-              translationIsolationLevel(isolation),
+              translateIsolationLevel(isolation),
               request.getTransaction().getBegin().getIsolationLevel());
 
           mockSpanner.clearRequests();
@@ -5865,7 +6227,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           // TODO: Change this when https://github.com/googleapis/java-spanner/pull/3718 has been
           // released and merged into PGAdapter.
           assertEquals(
-              IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
+              translateIsolationLevel(isolation),
               request.getTransaction().getBegin().getIsolationLevel());
 
           mockSpanner.clearRequests();
@@ -5874,7 +6236,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  private static IsolationLevel translationIsolationLevel(int jdbcLevel) {
+  private static IsolationLevel translateIsolationLevel(int jdbcLevel) {
     switch (jdbcLevel) {
       case Connection.TRANSACTION_SERIALIZABLE:
         return IsolationLevel.SERIALIZABLE;

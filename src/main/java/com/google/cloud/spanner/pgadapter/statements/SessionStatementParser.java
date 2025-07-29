@@ -265,13 +265,13 @@ public class SessionStatementParser {
     return value;
   }
 
-  public static @Nullable SessionStatement parse(ParsedStatement parsedStatement) {
+  public static @Nullable SessionStatement parse(ParsedStatement parsedStatement, String sql) {
     if (parsedStatement.getType() == StatementType.CLIENT_SIDE
         && parsedStatement.getClientSideStatementType() != ClientSideStatementType.RESET_ALL) {
       // This statement is handled by the Connection API.
       return null;
     }
-    SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
+    SimpleParser parser = new SimpleParser(sql);
     if (parser.eatKeyword("set")) {
       return parseSetStatement(parser);
     }

@@ -88,7 +88,7 @@ create table IF NOT EXISTS new_orders (
     c_id int not null,
     d_id int not null,
     w_id int not null,
-    PRIMARY KEY(w_id, d_id, c_id, o_id)
+    PRIMARY KEY(w_id, d_id, o_id, c_id)
 );
 
 create table IF NOT EXISTS order_line (
@@ -103,7 +103,7 @@ create table IF NOT EXISTS order_line (
     ol_quantity int,
     ol_amount decimal,
     ol_dist_info varchar(24),
-    PRIMARY KEY(w_id, d_id, c_id, o_id, ol_number)
+    PRIMARY KEY(w_id, d_id, o_id, c_id, ol_number)
 );
 
 -- STOCK table
@@ -139,7 +139,7 @@ create table IF NOT EXISTS item (
 );
 
 CREATE INDEX idx_customer ON customer (w_id,d_id,c_last,c_first);
-CREATE INDEX idx_orders ON orders (w_id,d_id,c_id,o_id);
+CREATE INDEX idx_orders ON orders (w_id,d_id,o_id);
 CREATE INDEX fkey_stock_2 ON stock (s_i_id);
 CREATE INDEX fkey_order_line_2 ON order_line (ol_supply_w_id,ol_i_id);
 CREATE INDEX fkey_history_1 ON history (w_id,d_id,c_id);

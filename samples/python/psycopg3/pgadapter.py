@@ -113,7 +113,7 @@ def _wait_for_port(port: int, poll_interval: float = 0.1, timeout: float = 5.0):
   start = time.time()
   while True:
     try:
-      with socket.create_connection(("localhost", port), timeout=timeout):
+      with socket.create_connection(("127.0.0.1", port), timeout=timeout):
         break
     except OSError:
       duration = time.time() - start

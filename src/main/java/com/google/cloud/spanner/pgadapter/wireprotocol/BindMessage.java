@@ -47,9 +47,9 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     super(connection);
     this.portalName = this.readString();
     this.statementName = this.readString();
-    this.formatCodes = getFormatCodes(this.inputStream);
+    this.formatCodes = MessageReader.getFormatCodes(this.inputStream);
     this.parameters = getParameters(this.inputStream);
-    this.resultFormatCodes = getFormatCodes(this.inputStream);
+    this.resultFormatCodes = MessageReader.getFormatCodes(this.inputStream);
     IntermediatePreparedStatement statement = connection.getStatement(statementName);
     this.statement =
         statement.createPortal(

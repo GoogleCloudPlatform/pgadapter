@@ -28,11 +28,13 @@ import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
 import com.google.cloud.spanner.pgadapter.parsers.FloatParser;
+import com.google.cloud.spanner.pgadapter.parsers.IntervalParser;
 import com.google.cloud.spanner.pgadapter.parsers.JsonbParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.cloud.spanner.pgadapter.parsers.UuidParser;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
@@ -177,8 +179,12 @@ public class Converter implements AutoCloseable {
         return NumericParser.convertToPG(result, position, format);
       case STRING:
         return StringParser.convertToPG(sessionState, outputStream, result, position);
+      case UUID:
+        return UuidParser.convertToPG(result, position, format);
       case TIMESTAMP:
         return TimestampParser.convertToPG(result, position, format, sessionState.getTimezone());
+      case INTERVAL:
+        return IntervalParser.convertToPG(result, position, format);
       case PG_JSONB:
         return JsonbParser.convertToPG(sessionState, outputStream, result, position, format);
       case ARRAY:

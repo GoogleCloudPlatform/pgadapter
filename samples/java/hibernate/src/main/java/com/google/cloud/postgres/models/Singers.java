@@ -14,7 +14,7 @@
 
 package com.google.cloud.postgres.models;
 
-import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
+import com.google.cloud.postgres.GeneratedLocalDateTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,8 +22,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.Generated;
-import org.hibernate.annotations.GenerationTime;
-import org.hibernate.annotations.GeneratorType;
+import org.hibernate.generator.EventType;
 
 @Entity
 public class Singers {
@@ -40,15 +39,16 @@ public class Singers {
   private String lastName;
 
   @Column(name = "full_name", insertable = false)
-  @Generated(GenerationTime.ALWAYS)
+  @Generated(event = {EventType.INSERT, EventType.UPDATE})
   private String fullName;
 
   private boolean active;
 
+  @GeneratedLocalDateTime(eventTypes = {EventType.INSERT})
   @Column(name = "created_at", columnDefinition = "timestamptz")
   private LocalDateTime createdAt;
 
-  @GeneratorType(type = CurrentLocalDateTimeGenerator.class, when = GenerationTime.ALWAYS)
+  @GeneratedLocalDateTime(eventTypes = {EventType.INSERT, EventType.UPDATE})
   @Column(name = "updated_at", columnDefinition = "timestamptz")
   private LocalDateTime updatedAt;
 

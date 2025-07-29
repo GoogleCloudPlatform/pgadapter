@@ -25,7 +25,7 @@ if (args.Length < 2 || args.Length > 3)
 
 var sample = args[0];
 var database = args[1];
-var hostPort = args.Length == 3 ? args[2] : "localhost:5432";
+var hostPort = args.Length == 3 ? args[2] : "127.0.0.1:5432";
 if (!hostPort.Contains(':'))
 {
     Console.WriteLine("Missing ':' in host:port argument");

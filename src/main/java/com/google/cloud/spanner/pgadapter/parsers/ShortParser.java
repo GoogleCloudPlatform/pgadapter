@@ -14,8 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
-import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.common.collect.ImmutableMap;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import org.postgresql.util.ByteConverter;
@@ -65,7 +66,7 @@ class ShortParser extends Parser<Short> {
   }
 
   @Override
-  public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item == null ? null : this.item.longValue());
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+    parametersBuilder.put(name, Value.int64(this.item == null ? null : this.item.longValue()));
   }
 }

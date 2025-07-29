@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.MockServerHelper.resetActiveTracingFramework;
 import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.NoCredentials;
@@ -44,6 +45,7 @@ public class OpenTelemetryMockServerTest extends AbstractMockServerTest {
             .setEnableOpenTelemetry()
             .setOpenTelemetryTraceRatio(1.0)
             .build();
+    resetActiveTracingFramework();
     OpenTelemetry openTelemetry = Server.setupOpenTelemetry(options);
     doStartMockSpannerAndPgAdapterServers(
         createMockSpannerThatReturnsOneQueryPartition(), "d", configurator -> {}, openTelemetry);
@@ -62,7 +64,7 @@ public class OpenTelemetryMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         while (resultSet.next()) {
-          assertEquals(22, resultSet.getMetaData().getColumnCount());
+          assertEquals(24, resultSet.getMetaData().getColumnCount());
         }
       }
     }

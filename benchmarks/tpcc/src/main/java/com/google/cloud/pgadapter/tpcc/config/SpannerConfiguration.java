@@ -13,6 +13,7 @@
 // limitations under the License.
 package com.google.cloud.pgadapter.tpcc.config;
 
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,6 +23,7 @@ public class SpannerConfiguration {
   private String project;
   private String instance;
   private String database;
+  private String isolationLevel = IsolationLevel.SERIALIZABLE.name();
 
   public String getProject() {
     return project;
@@ -45,5 +47,13 @@ public class SpannerConfiguration {
 
   public void setDatabase(String database) {
     this.database = database;
+  }
+
+  public String getIsolationLevel() {
+    return isolationLevel;
+  }
+
+  public void setIsolationLevel(String isolationLevel) {
+    this.isolationLevel = isolationLevel;
   }
 }

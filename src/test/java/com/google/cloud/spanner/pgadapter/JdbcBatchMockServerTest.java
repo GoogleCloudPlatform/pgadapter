@@ -35,7 +35,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -573,7 +572,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
         assertFalse(
             statement.execute(
                 String.format(
-                    "%s; %s;",
+                    "%s;%s;",
                     "CREATE TABLE FOO (id bigint primary key)",
                     "CREATE TABLE BAR (id bigint primary key)")));
         assertEquals(0, statement.getUpdateCount());
@@ -601,7 +600,6 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
     assertEquals("CREATE TABLE BAR (id bigint primary key)", request.getStatements(1));
   }
 
-  @Ignore("https://github.com/pgjdbc/pgjdbc/issues/3007")
   @Test
   public void testBeginTransactionWithOptions() throws SQLException {
     String sql = "BEGIN TRANSACTION; SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;";

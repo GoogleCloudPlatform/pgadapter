@@ -24,6 +24,7 @@ import com.google.api.gax.rpc.PermissionDeniedException;
 import com.google.api.gax.rpc.ResourceExhaustedException;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.SpannerOptionsHelper;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.trace.v1.TraceServiceClient;
 import com.google.cloud.trace.v1.TraceServiceClient.ListTracesPagedResponse;
@@ -66,6 +67,7 @@ public class ITOpenTelemetryTest implements IntegrationTest {
       openTelemetryOptionsBuilder.setCredentials(
           GoogleCredentials.fromStream(Files.newInputStream(Paths.get(testEnv.getCredentials()))));
     }
+    SpannerOptionsHelper.resetActiveTracingFramework();
     OpenTelemetry openTelemetry = Server.setupOpenTelemetry(openTelemetryOptionsBuilder.build());
 
     testEnv.setUp();

@@ -70,7 +70,7 @@ try:
 
   # Connect to Cloud Spanner using psycopg3 by connecting to PGAdapter that is
   # running in the embedded container.
-  with psycopg.connect("host=localhost port={port} "
+  with psycopg.connect("host=127.0.0.1 port={port} "
                        "dbname={database} "
                        "sslmode=disable"
                            .format(port=port, database=args.database)) as conn:

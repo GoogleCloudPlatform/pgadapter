@@ -1,6 +1,6 @@
 connectorx==0.4.3
-pandas==2.2.3
+pandas==2.3.1
 testcontainers~=4.10.0
-requests==2.32.3
+requests==2.32.4
 google~=3.0.0
-google.auth~=2.39.0
+google.auth~=2.40.1

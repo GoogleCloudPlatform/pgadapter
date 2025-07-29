@@ -239,7 +239,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
             + "\tfullname VARCHAR, \n"
             + "\tPRIMARY KEY (id)\n"
             + ")",
-        requests.get(0).getStatements(0));
+        requests.get(0).getStatements(0).trim());
     assertEquals(
         "CREATE TABLE address (\n"
             + "\tid SERIAL NOT NULL, \n"
@@ -248,7 +248,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
             + "\tPRIMARY KEY (id), \n"
             + "\tFOREIGN KEY(user_id) REFERENCES user_account (id)\n"
             + ")",
-        requests.get(0).getStatements(1));
+        requests.get(0).getStatements(1).trim());
   }
 
   @Test
