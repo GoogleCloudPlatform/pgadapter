@@ -89,6 +89,7 @@ jobs:
           npm start
         env:
           TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+          TESTCONTAINERS_RYUK_DISABLED: true
       - name: Run Sequelize Sample tests
         working-directory: ./samples/nodejs/sequelize
         run: |
@@ -96,6 +97,7 @@ jobs:
           npm start
         env:
           TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+          TESTCONTAINERS_RYUK_DISABLED: true
       - name: Run Prisma Sample tests
         working-directory: ./samples/nodejs/prisma-sample-app
         run: |
@@ -103,6 +105,7 @@ jobs:
           npm start
         env:
           TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+          TESTCONTAINERS_RYUK_DISABLED: true
   ruby-samples:
     runs-on: ubuntu-latest
     steps:
