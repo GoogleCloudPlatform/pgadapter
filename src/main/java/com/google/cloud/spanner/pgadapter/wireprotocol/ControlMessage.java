@@ -318,7 +318,7 @@ public abstract class ControlMessage extends WireMessage {
       executorService.shutdownNow();
       throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     } finally {
-      batchReadOnlyTransaction.cleanup();
+      batchReadOnlyTransaction.close();
     }
   }
 

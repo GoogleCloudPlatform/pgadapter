@@ -5864,7 +5864,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testUsesRegularSessionForDmlInAutoCommit() throws SQLException {
+  public void testUsesMultiplexedSessionForDmlInAutoCommit() throws SQLException {
     String sql = "insert into foo (id) values (1)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
@@ -5884,11 +5884,11 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String sessionId = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSession();
     Session session = MockServerHelper.getSession(mockSpanner, sessionId);
     assertNotNull(session);
-    assertFalse(session.getMultiplexed());
+    assertTrue(session.getMultiplexed());
   }
 
   @Test
-  public void testUsesRegularSessionForQueryInTransaction() throws SQLException {
+  public void testUsesMultiplexedSessionForQueryInTransaction() throws SQLException {
     String sql = "SELECT 1";
     try (Connection connection =
         DriverManager.getConnection(createUrl(UUID.randomUUID().toString()))) {
@@ -5914,7 +5914,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String sessionId = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSession();
     Session session = MockServerHelper.getSession(mockSpanner, sessionId);
     assertNotNull(session);
-    assertFalse(session.getMultiplexed());
+    assertTrue(session.getMultiplexed());
   }
 
   @Test
