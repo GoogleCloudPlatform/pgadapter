@@ -78,3 +78,4 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
           SPANNER_EMULATOR_HOST: localhost:9010
+          GOOGLE_CLOUD_SPANNER_MULTIPLEXED_SESSIONS_FOR_RW: false
