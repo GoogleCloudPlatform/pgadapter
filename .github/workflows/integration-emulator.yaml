@@ -30,7 +30,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       emulator:
-        image: gcr.io/cloud-spanner-emulator/emulator
+        image: gcr.io/cloud-spanner-emulator/emulator:1.5.38
         ports:
           - 9010:9010
           - 9020:9020
@@ -78,4 +78,3 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
           SPANNER_EMULATOR_HOST: localhost:9010
-          GOOGLE_CLOUD_SPANNER_MULTIPLEXED_SESSIONS_FOR_RW: false
