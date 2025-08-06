@@ -676,6 +676,7 @@ public class PgAdapterTestEnv {
     if (!isUseExistingDb()) {
       for (Database db : databases) {
         try {
+          System.out.println("Dropping database " + db.getId().getName());
           db.drop();
         } catch (Exception e) {
           logger.log(Level.WARNING, "Failed to drop test database " + db.getId(), e);
