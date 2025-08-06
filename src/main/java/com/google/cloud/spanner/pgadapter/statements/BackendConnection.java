@@ -1737,7 +1737,7 @@ public class BackendConnection {
     }
 
     public void cleanup() {
-      this.transaction.cleanup();
+      this.transaction.close();
     }
 
     public BatchTransactionId getBatchTransactionId() {
