@@ -1,2 +1,0 @@
-psycopg[binary]==3.2.6
-pytz==2025.1
