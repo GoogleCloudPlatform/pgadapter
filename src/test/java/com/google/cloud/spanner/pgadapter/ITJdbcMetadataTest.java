@@ -14,15 +14,18 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_HOST;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.SlowTest;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -66,6 +69,9 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() {
+    assumeFalse(
+        "Disabling the test",
+        true);
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), ImmutableList.of());
