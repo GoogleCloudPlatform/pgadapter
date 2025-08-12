@@ -57,17 +57,21 @@ SSL modes `Enabled` and `Required` require that a private key and a public certi
 the Java keystore. See [SSL Connections](ssl.md) for more information.
 
 ### How can I configure the number of sessions and/or number of gRPC channels that PGAdapter should use?
+PGAdapter uses a single [multiplexed session](https://cloud.google.com/spanner/docs/sessions#multiplexed_sessions)
+for all operations. One multiplexed session can handle any number of concurrent transactions.
+You do not need to provision a session pool.
+
 You can use the `-r` command line argument when starting PGAdapter to specify additional connection
 properties that PGAdapter should use when it is connecting to Cloud Spanner. All connection properties
 that are [supported by the JDBC driver for Cloud Spanner](https://github.com/googleapis/java-spanner-jdbc#connection-url-properties)
 are also supported by PGAdapter.
 
-Example: Use the following arguments to instruct PGAdapter to use a session pool with
-`MinSessions=200`, `MaxSessions=1600` and `NumChannels=16` (number of gRPC channels).
+Example: Use the following arguments to instruct PGAdapter to use a gRPC channel pool with
+`NumChannels=16` (number of gRPC channels).
 
 ```shell
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database \
-     -r="minSessions=200;maxSessions=1600;numChannels=16"
+     -r="numChannels=16"
 ```
 
 ## Docker

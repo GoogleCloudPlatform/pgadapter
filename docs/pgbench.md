@@ -90,23 +90,23 @@ pgbench "host=/tmp port=5432 dbname=my-database" \
         --protocol=extended
 ```
 
-Note that PGAdapter by default creates an internal Cloud Spanner session pool containing at most
-400 sessions. Running `pgbench` with more than 400 clients requires more sessions.
+Note that PGAdapter by default uses a gRPC channel pool with 4 channels.
+Running `pgbench` with more than 400 clients efficiently requires more channels.
 
-Starting PGAdapter using Java with a larger session pool:
+Starting PGAdapter using Java with a larger gRPC channel pool:
 
 ```shell
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database \
-     -r="minSessions=800;maxSessions=800;numChannels=16"
+     -r="numChannels=16"
 ```
 
-Starting PGAdapter using Docker with a larger session pool:
+Starting PGAdapter using Docker with a larger gRPC channel pool:
 
 ```shell
 docker run -p 5432:5432 \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -x \
-  -r="minSessions=800;maxSessions=800;numChannels=16"
+  -r="numChannels=16"
 ```
 
 ```shell

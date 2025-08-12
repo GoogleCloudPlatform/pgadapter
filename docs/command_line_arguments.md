@@ -92,7 +92,9 @@
     additional properties that will be used with that internal JDBC connection. All connection properties
     that are supported by the Cloud Spanner JDBC driver can also be used with this option.
     They should be in the format <key1>=<value1>;<key2>=<value2>;...
-  * Example: -r minSessions=500;maxSessions=1000;numChannels=10
+  * Example: -r numChannels=10;databaserole=my-role
+  * See https://github.com/googleapis/java-spanner-jdbc/blob/main/documentation/connection_properties.md
+    for a full list of supported properties.
 
 -v
   * This option specifies what server_version PGAdapter should claim to be. If not specified
