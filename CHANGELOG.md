@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.50.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.49.0...v0.50.0) (2025-08-12)
+
+
+### Features
+
+* a single multiplexed session is used for all operations ([#3636](https://github.com/GoogleCloudPlatform/pgadapter/issues/3636)) ([3cfe7ca](https://github.com/GoogleCloudPlatform/pgadapter/commit/3cfe7ca6a47cfb50e2e9a05fbd323701a0cc0023))
+
+
+### Dependencies
+
+* update dependency commons-cli:commons-cli to v1.10.0 ([#3610](https://github.com/GoogleCloudPlatform/pgadapter/issues/3610)) ([d30e446](https://github.com/GoogleCloudPlatform/pgadapter/commit/d30e4468fb0adee23d6a990fa0eab92054bacec4))
+* update dependency django to v5.2.5 ([#3618](https://github.com/GoogleCloudPlatform/pgadapter/issues/3618)) ([f8e39d5](https://github.com/GoogleCloudPlatform/pgadapter/commit/f8e39d529eb145ae686a0d9f9f63371ad5696139))
+* update dependency go to v1.24.6 ([#3622](https://github.com/GoogleCloudPlatform/pgadapter/issues/3622)) ([272c015](https://github.com/GoogleCloudPlatform/pgadapter/commit/272c0152723febcf3321651d1b37d58ec40aa93f))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.52.0 ([#3567](https://github.com/GoogleCloudPlatform/pgadapter/issues/3567)) ([3bdbefc](https://github.com/GoogleCloudPlatform/pgadapter/commit/3bdbefc4b8ecc2ecfa260faed64777a61178c3cd))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.53.0 ([#3627](https://github.com/GoogleCloudPlatform/pgadapter/issues/3627)) ([86305aa](https://github.com/GoogleCloudPlatform/pgadapter/commit/86305aaad149d3e6aba5a5d4577e3b71cc52a601))
+* update dependency node to v22 ([#3634](https://github.com/GoogleCloudPlatform/pgadapter/issues/3634)) ([a6bb952](https://github.com/GoogleCloudPlatform/pgadapter/commit/a6bb952bd0b1e8f59c298f713f18f5927d951cc8))
+* update dependency nunit to 4.4.0 ([#3632](https://github.com/GoogleCloudPlatform/pgadapter/issues/3632)) ([3863e56](https://github.com/GoogleCloudPlatform/pgadapter/commit/3863e564c972020cdaff6db4cc181bc50eb592e4))
+* update dependency nunit.analyzers to 4.10.0 ([#3628](https://github.com/GoogleCloudPlatform/pgadapter/issues/3628)) ([4409096](https://github.com/GoogleCloudPlatform/pgadapter/commit/4409096f00a75a3821ccbb5cf6ef8c0c519d6491))
+* update dependency nunit3testadapter to 5.1.0 ([#3633](https://github.com/GoogleCloudPlatform/pgadapter/issues/3633)) ([d304477](https://github.com/GoogleCloudPlatform/pgadapter/commit/d304477b4fca85a866f4849bca7bc0a791b5a17a))
+* update dependency org.hibernate.orm:hibernate-core to v7.0.9.final ([#3609](https://github.com/GoogleCloudPlatform/pgadapter/issues/3609)) ([a5833a8](https://github.com/GoogleCloudPlatform/pgadapter/commit/a5833a81cccf351722d06b3d2ebe3e0fc91b80e4))
+* update dependency sqlalchemy to v2.0.42 ([#3580](https://github.com/GoogleCloudPlatform/pgadapter/issues/3580)) ([d0d0ddd](https://github.com/GoogleCloudPlatform/pgadapter/commit/d0d0dddcb050de748b616c5d66ed8cb7f197114e))
+* update dependency typescript to v5.9.2 ([#3604](https://github.com/GoogleCloudPlatform/pgadapter/issues/3604)) ([ae1f039](https://github.com/GoogleCloudPlatform/pgadapter/commit/ae1f0397c50f929bec3cfd4b41609fb9c4166555))
+* update golang docker tag to v1.24.6 ([#3623](https://github.com/GoogleCloudPlatform/pgadapter/issues/3623)) ([89e780e](https://github.com/GoogleCloudPlatform/pgadapter/commit/89e780eae9ba295472dae3ffc0e42c8b7ad901e5))
+* update module cloud.google.com/go/spanner to v1.84.0 ([#3615](https://github.com/GoogleCloudPlatform/pgadapter/issues/3615)) ([0f0d1f9](https://github.com/GoogleCloudPlatform/pgadapter/commit/0f0d1f9c30d12be6813106f39754932aacdf7e95))
+* update module cloud.google.com/go/spanner to v1.84.1 ([#3624](https://github.com/GoogleCloudPlatform/pgadapter/issues/3624)) ([f914484](https://github.com/GoogleCloudPlatform/pgadapter/commit/f9144848646f8f305afdb6f8fc71d8e2062ccc7f))
+* update module google.golang.org/api to v0.244.0 ([#3597](https://github.com/GoogleCloudPlatform/pgadapter/issues/3597)) ([7fa96e9](https://github.com/GoogleCloudPlatform/pgadapter/commit/7fa96e9a4a2d57f9c19cb429d88ff60f8fb60e1f))
+* update module google.golang.org/api to v0.245.0 ([#3617](https://github.com/GoogleCloudPlatform/pgadapter/issues/3617)) ([3f9e567](https://github.com/GoogleCloudPlatform/pgadapter/commit/3f9e567fd960ca70721ea229367e0833f4894277))
+* update module google.golang.org/api to v0.246.0 ([#3621](https://github.com/GoogleCloudPlatform/pgadapter/issues/3621)) ([cd0d884](https://github.com/GoogleCloudPlatform/pgadapter/commit/cd0d8841186f3eed7a705e86098932994af110b4))
+
 ## [0.49.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.48.5...v0.49.0) (2025-07-29)
 
 
