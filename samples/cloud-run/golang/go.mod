@@ -2,7 +2,7 @@ module pgadapter-cloud-run
 
 go 1.23.0
 
-toolchain go1.24.6
+toolchain go1.25.0
 
 require github.com/jackc/pgx/v5 v5.7.5
 
