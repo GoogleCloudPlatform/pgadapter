@@ -1,0 +1,50 @@
+################################################################################
+#                                     BUILD                                    #
+################################################################################
+
+# maven:3-eclipse-temurin-21
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/maven@sha256:8472bdbac39626b70d2efcf87e23468ff0bea9ba48c35181b07e6932b5fda001 AS build
+
+# Copy over build files to docker image.
+COPY LICENSE ./
+COPY CONTRIBUTING.md ./
+COPY README.md ./
+COPY NOTIFICATIONS.md ./
+COPY logging.properties ./
+COPY src src/
+COPY pom.xml ./
+COPY license-checks.xml ./
+COPY java.header ./
+
+COPY settings_wagon_moss.xml /root/.m2/settings_wagon_moss.xml
+# Download the artifactregistry-maven-wagon
+RUN mvn -B -s /root/.m2/settings_wagon_moss.xml dependency:get -Dartifact="com.google.cloud.artifactregistry:artifactregistry-maven-wagon:2.2.4"
+
+# Copy airlock settings
+COPY settings_moss.xml /root/.m2/settings.xml
+
+COPY extensions_moss.xml .mvn/extensions.xml
+
+# Download dependencies from airlock
+RUN mvn -B -s /root/.m2/settings.xml dependency:go-offline
+
+# Build from source.
+RUN mvn -B -s /root/.m2/settings.xml package -Passembly -DskipTests
+
+################################################################################
+#                                   RELEASE                                    #
+################################################################################
+
+FROM gcr.io/distroless/java21-debian12:nonroot
+
+COPY --from=build --chown=nonroot target/pgadapter /home/pgadapter
+COPY --from=build --chown=nonroot LICENSE /home/pgadapter/
+COPY --from=build --chown=nonroot CONTRIBUTING.md /home/pgadapter/
+COPY --from=build --chown=nonroot README.md /home/pgadapter/
+COPY --from=build --chown=nonroot NOTIFICATIONS.md /home/pgadapter/
+COPY --from=build --chown=nonroot logging.properties /home/pgadapter/
+
+# Run as nonroot
+USER 65532
+WORKDIR /home/pgadapter
+ENTRYPOINT ["/usr/bin/java", "-jar", "pgadapter.jar"]
