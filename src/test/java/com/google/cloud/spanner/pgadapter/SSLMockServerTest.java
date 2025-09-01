@@ -14,9 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest.readAll;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl;
@@ -25,8 +27,11 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import io.opentelemetry.api.OpenTelemetry;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -44,6 +49,10 @@ public class SSLMockServerTest extends AbstractMockServerTest {
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     assumeTrue("This test requires psql to be installed", isPsqlAvailable());
     assumeTrue("This test requires keytool to be installed", isKeytoolAvailable());
+    assumeTrue("This test requires an RSA key generator", isKeyPairGeneratorAvailable("RSA"));
+    assumeFalse(
+        "Host names containing an underscore are not allowed",
+        InetAddress.getLocalHost().getHostName().contains("_"));
 
     String keystore = generateSSLKey();
     publicKeyFile = exportPublicKey(keystore);
@@ -57,6 +66,15 @@ public class SSLMockServerTest extends AbstractMockServerTest {
         "d",
         builder -> builder.setSslMode(SslMode.Require),
         OpenTelemetry.noop());
+  }
+
+  private static boolean isKeyPairGeneratorAvailable(String generator) {
+    try {
+      KeyPairGenerator.getInstance(generator);
+    } catch (NoSuchAlgorithmException ignore) {
+      return false;
+    }
+    return true;
   }
 
   @AfterClass
@@ -99,9 +117,24 @@ public class SSLMockServerTest extends AbstractMockServerTest {
         };
     keytoolBuilder.command(keytoolCommand);
     Process keytoolProcess = keytoolBuilder.start();
+    InputStream outputStream = keytoolProcess.getInputStream();
+    InputStream errorStream = keytoolProcess.getErrorStream();
 
     int res = keytoolProcess.waitFor();
-    assertEquals(0, res);
+    String output = readAll(outputStream);
+    String errors = readAll(errorStream);
+    assertEquals(
+        "INFO:\n"
+            + output
+            + "\n\nERROR:\n"
+            + errors
+            + "\n\nHOST: "
+            + InetAddress.getLocalHost().getHostName()
+            + " ("
+            + InetAddress.getLocalHost().getHostAddress()
+            + ")",
+        0,
+        res);
 
     return keystore.getAbsolutePath();
   }
@@ -264,18 +297,20 @@ public class SSLMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSSLVerifyFull() throws Exception {
     for (String host :
-        new String[] {
-          InetAddress.getLocalHost().getHostName(),
-          InetAddress.getLocalHost().getHostAddress(),
-          "localhost"
-        }) {
+        System.getProperty("os.name").contains("Mac")
+            ? new String[] {InetAddress.getLocalHost().getHostAddress()}
+            : new String[] {
+              InetAddress.getLocalHost().getHostName(),
+              InetAddress.getLocalHost().getHostAddress(),
+              "localhost"
+            }) {
       ProcessBuilder builder = new ProcessBuilder();
       String[] psqlCommand =
           new String[] {
             "psql",
             String.format(
                 "sslmode=verify-full sslrootcert=%s host=%s port=%d",
-                publicKeyFile, InetAddress.getLocalHost().getHostName(), pgServer.getLocalPort()),
+                publicKeyFile, host, pgServer.getLocalPort()),
             "-c",
             "SELECT 1;"
           };
@@ -295,7 +330,8 @@ public class SSLMockServerTest extends AbstractMockServerTest {
 
       // Ignore known errors on some Macs on GitHub Actions.
       if (!(System.getProperty("os.name").contains("Mac")
-          && errors.contains("error: could not translate host name \""))) {
+          && (errors.contains("error: could not translate host name \"")
+              || errors.contains("does not match host name")))) {
         assertEquals(host, "", errors);
         assertEquals(" C \n---\n 1\n(1 row)\n", output);
         int res = process.waitFor();
