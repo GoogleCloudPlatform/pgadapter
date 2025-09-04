@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.50.1...v0.50.2) (2025-09-04)
+
+
+### Bug Fixes
+
+* v0.50.1 docker images are corrupted ([#3702](https://github.com/GoogleCloudPlatform/pgadapter/issues/3702)) ([3018f2d](https://github.com/GoogleCloudPlatform/pgadapter/commit/3018f2d2152c7525535b0f890a1b8a87aa2e485c))
+
 ## [0.50.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.50.0...v0.50.1) (2025-09-04)
 
 
