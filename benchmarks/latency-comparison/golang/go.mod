@@ -1,6 +1,6 @@
 module cloud.google.com/pgadapter-latency-benchmark
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.25.1
 
@@ -11,7 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/montanaflynn/stats v0.7.0
 	github.com/testcontainers/testcontainers-go v0.38.0
-	golang.org/x/oauth2 v0.30.0
+	golang.org/x/oauth2 v0.31.0
 	google.golang.org/api v0.248.0
 )
 
