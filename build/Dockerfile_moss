@@ -36,8 +36,8 @@ RUN mvn -B -s /root/.m2/settings.xml package -Passembly -DskipTests
 #                                   RELEASE                                    #
 ################################################################################
 
-#eclipse-temurin:21-jre-alpine
-FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/eclipse-temurin@sha256:f05c742dd20051b104b939370f7db4d6eb420cc7fd842aeb4e2446837da3bd03
+#eclipse-temurin:21-jdk
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/eclipse-temurin@sha256:3d92c3222b9d376e420e7099054604dc0d7bafbebbcb4f79ffd77763cd6a1bcd
 
 COPY --from=build target/pgadapter /home/pgadapter
 COPY --from=build LICENSE /home/pgadapter/
