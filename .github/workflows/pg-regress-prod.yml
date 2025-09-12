@@ -1,0 +1,76 @@
+on:
+  workflow_dispatch:
+  schedule:
+    # Run at 09:36UTC every day.
+    - cron: '36 9 * * *'
+name: pg_regress_prod
+jobs:
+  pg-regress-prod:
+    timeout-minutes: 600
+    # Disable for now.
+    if: false
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
+      GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
+      GOOGLE_CLOUD_DATABASE: "pg_regress"
+      GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
+    steps:
+      - name: Checkout PGAdapter repo
+        uses: actions/checkout@v5
+        with:
+          path: pgadapter
+      - name: Checkout OSS PG repo
+        uses: actions/checkout@v5
+        with:
+          repository: postgres/postgres
+          path: postgres
+          ref: REL_16_0
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v3'
+        with:
+          credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
+          export_environment_variables: true
+      - name: Randomize database name
+        run: echo GOOGLE_CLOUD_DATABASE=${GOOGLE_CLOUD_DATABASE}_$(date +%s) >> $GITHUB_ENV
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v3'
+        with:
+          project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Start PGAdapter container
+        run: |
+          docker run \
+                -d -p 5432:5432 \
+                -v ${{env.GOOGLE_APPLICATION_CREDENTIALS}}:/credentials.json:ro \
+                -e GOOGLE_APPLICATION_CREDENTIALS=/credentials.json \
+                gcr.io/cloud-spanner-pg-adapter/pgadapter \
+                -p ${{env.GOOGLE_CLOUD_PROJECT}} -i ${{env.GOOGLE_CLOUD_INSTANCE}} -d ${{env.GOOGLE_CLOUD_DATABASE}} \
+                -x
+      - name: Setup psql
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client-17
+      - name: Copy patch and script files
+        run: |
+          cp pgadapter/benchmarks/pg_regress/*.patch postgres/src/test/regress/
+          cp pgadapter/benchmarks/pg_regress/start_test.py postgres/src/test/regress/
+          cp pgadapter/benchmarks/pg_regress/compare_results.py postgres/src/test/regress/
+      - name: Apply patches
+        working-directory: ./postgres/src/test/regress/
+        run: |
+          git apply expected.patch
+          git apply sql.patch
+          git apply code.patch
+      - name: Run test
+        working-directory: ./postgres/src/test/regress/
+        run: |
+          python start_test.py spanner_prod --skip-container \
+                --project ${{env.GOOGLE_CLOUD_PROJECT}} \
+                --instance ${{env.GOOGLE_CLOUD_INSTANCE}} \
+                --database ${{env.GOOGLE_CLOUD_DATABASE}}
+          python compare_results.py expected/ results/

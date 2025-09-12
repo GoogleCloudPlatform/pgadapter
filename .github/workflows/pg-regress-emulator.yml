@@ -1,0 +1,91 @@
+on:
+  workflow_dispatch:
+  schedule:
+    # Run at 08:36UTC every day.
+    - cron: '36 8 * * *'
+name: pg_regress_emulator
+jobs:
+  pg-regress-emulator:
+    services:
+      emulator:
+        image: gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+        ports:
+          - 5432:5432
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    env:
+      GCS_BUCKET_PATH: "gs://pgadapter-pg-regress/emulator-results"
+    steps:
+      - name: Checkout PGAdapter repo
+        uses: actions/checkout@v5
+        with:
+          path: pgadapter
+      - name: Checkout OSS PG repo
+        uses: actions/checkout@v5
+        with:
+          repository: postgres/postgres
+          path: postgres
+          ref: REL_16_0
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v3'
+        with:
+          credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
+          export_environment_variables: true
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v3'
+        with:
+          project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Install jq
+        uses: dcarbone/install-jq-action@v3.2.0
+        with:
+          version: '1.7.1'
+      - name: Setup psql
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client-17
+      - name: Copy patch and script files
+        run: |
+          cp pgadapter/benchmarks/pg_regress/*.patch postgres/src/test/regress/
+          cp pgadapter/benchmarks/pg_regress/start_test.py postgres/src/test/regress/
+          cp pgadapter/benchmarks/pg_regress/compare_results.py postgres/src/test/regress/
+      - name: Apply patches
+        working-directory: ./postgres/src/test/regress/
+        run: |
+          git apply expected.patch
+          git apply sql.patch
+          git apply code.patch
+      - name: Run test
+        working-directory: ./postgres/src/test/regress/
+        run: |
+          python start_test.py spanner_emulator --skip-container
+          python compare_results.py expected/ results/
+      - id: latest_gcs_file
+        name: Download the previous latest result
+        working-directory: ./postgres/src/test/regress/
+        run: |
+          if gcloud storage ls ${{env.GCS_BUCKET_PATH}}/results_latest.json; then
+            gcloud storage cp ${{env.GCS_BUCKET_PATH}}/results_latest.json results_latest.json
+            echo "has_latest_file=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_latest_file=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Compare json results
+        working-directory: ./postgres/src/test/regress/
+        if: steps.latest_gcs_file.outputs.has_latest_file == 'true'
+        run: |
+          prev_passed=$(jq -r '.overall.passed' results_latest.json)
+          curr_passed=$(jq -r '.overall.passed' results.json)
+          if (( $curr_passed < $prev_passed )); then
+            echo "Fail: $curr_passed is less than $prev_passed. Please check!"
+            exit 1
+          fi
+      - name: Upload results
+        working-directory: ./postgres/src/test/regress/
+        run: |
+          gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_$(date +%s).json
+          gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_latest.json
