@@ -1,0 +1,43 @@
+diff --git a/src/test/regress/pg_regress.c b/src/test/regress/pg_regress.c
+index 60d34a40b20..6a1eea9c266 100644
+--- a/src/test/regress/pg_regress.c
++++ b/src/test/regress/pg_regress.c
+@@ -762,25 +762,25 @@ initialize_environment(void)
+ 	 * Set timezone and datestyle for datetime-related tests
+ 	 */
+ 	setenv("PGTZ", "PST8PDT", 1);
+-	setenv("PGDATESTYLE", "Postgres, MDY", 1);
++	//setenv("PGDATESTYLE", "Postgres, MDY", 1);
+ 
+ 	/*
+ 	 * Likewise set intervalstyle to ensure consistent results.  This is a bit
+ 	 * more painful because we must use PGOPTIONS, and we want to preserve the
+ 	 * user's ability to set other variables through that.
+ 	 */
+-	{
+-		const char *my_pgoptions = "-c intervalstyle=postgres_verbose";
+-		const char *old_pgoptions = getenv("PGOPTIONS");
+-		char	   *new_pgoptions;
+-
+-		if (!old_pgoptions)
+-			old_pgoptions = "";
+-		new_pgoptions = psprintf("%s %s",
+-								 old_pgoptions, my_pgoptions);
+-		setenv("PGOPTIONS", new_pgoptions, 1);
+-		free(new_pgoptions);
+-	}
++	//{
++	//	const char *my_pgoptions = "-c intervalstyle=postgres_verbose";
++	//	const char *old_pgoptions = getenv("PGOPTIONS");
++	//	char	   *new_pgoptions;
++
++	//	if (!old_pgoptions)
++	//		old_pgoptions = "";
++	//	new_pgoptions = psprintf("%s %s",
++	//							 old_pgoptions, my_pgoptions);
++	//	setenv("PGOPTIONS", new_pgoptions, 1);
++	//	free(new_pgoptions);
++	//}
+ 
+ 	if (temp_instance)
+ 	{
