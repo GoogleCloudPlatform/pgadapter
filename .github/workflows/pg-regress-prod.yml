@@ -37,7 +37,7 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v3'
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.9'
       - name: Start PGAdapter container
