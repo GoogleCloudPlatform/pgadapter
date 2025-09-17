@@ -87,5 +87,7 @@ jobs:
       - name: Upload results
         working-directory: ./postgres/src/test/regress/
         run: |
-          gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_$(date +%s).json
+          ts=$(date +%s)
+          gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_$ts.json
           gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_latest.json
+          gcloud storage cp regression.diffs ${{env.GCS_BUCKET_PATH}}/regression_$ts.diffs
