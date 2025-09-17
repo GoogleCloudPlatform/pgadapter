@@ -66,8 +66,6 @@ def main():
     total_passed_all = 0
     total_tests_all = 0
 
-    print("--- Test Summary ---")
-
     results_map = {}
 
     for filename in common_files:
@@ -78,11 +76,7 @@ def main():
         total_passed_all += passed
         total_tests_all += total
 
-        print(f"{filename}: {passed}/{total} passed")
         results_map[filename] = {"passed": passed, "total": total}
-
-    print("\n--- Overall Summary ---")
-    print(f"Total Passed: {total_passed_all}/{total_tests_all}")
 
     # Write results to a json file
     with open(json_output_path, "w") as json_file:
