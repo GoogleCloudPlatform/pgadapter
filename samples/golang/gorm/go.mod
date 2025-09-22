@@ -11,7 +11,7 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/testcontainers/testcontainers-go v0.39.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.39.0
-	gorm.io/datatypes v1.2.6
+	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.0
 )
