@@ -1,0 +1,1429 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package com.google.cloud.spanner.pgadapter.sample;
+
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PG_TYPE_CTE_EMULATED;
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import com.google.cloud.NoCredentials;
+import com.google.cloud.ServiceOptions;
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.MockSpannerServiceImpl;
+import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.admin.database.v1.MockDatabaseAdminImpl;
+import com.google.cloud.spanner.admin.instance.v1.MockInstanceAdminImpl;
+import com.google.cloud.spanner.connection.SpannerPool;
+import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgClass;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Empty;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.NullValue;
+import com.google.protobuf.Value;
+import com.google.rpc.Help;
+import com.google.rpc.Help.Link;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
+import com.google.spanner.v1.Partition;
+import com.google.spanner.v1.PartitionQueryRequest;
+import com.google.spanner.v1.PartitionResponse;
+import com.google.spanner.v1.ResultSet;
+import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.SpannerGrpc;
+import com.google.spanner.v1.StructType;
+import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.Type;
+import com.google.spanner.v1.TypeAnnotationCode;
+import com.google.spanner.v1.TypeCode;
+import io.grpc.Context;
+import io.grpc.Contexts;
+import io.grpc.Metadata;
+import io.grpc.Metadata.Key;
+import io.grpc.Server;
+import io.grpc.ServerCall;
+import io.grpc.ServerCall.Listener;
+import io.grpc.ServerCallHandler;
+import io.grpc.ServerInterceptor;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.OpenTelemetry;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.postgresql.core.Oid;
+import org.postgresql.util.PGobject;
+
+/**
+ * Abstract base class for tests that verify that PgAdapter is receiving wire protocol requests
+ * correctly, translates these correctly to Spanner RPC invocations, and correctly translates the
+ * RPC invocations back to wire protocol responses. The test starts two in-process servers for this
+ * purpose: 1. An in-process {@link MockSpannerServiceImpl}. The mock server implements the entire
+ * gRPC API of Cloud Spanner, but does not contain an actual query engine or any other
+ * implementation. Instead, all query and DML statements that the client will be executing must
+ * first be registered as mock results on the server. This makes the mock server dialect agnostic
+ * and usable for both normal Spanner requests and Spangres requests. Note that this also means that
+ * the server does NOT verify that the SQL statement is correct and valid for the specific dialect.
+ * It only verifies that the statement corresponds with one of the previously registered statements
+ * on the server. 2. An in-process PgAdapter {@link ProxyServer} that connects to the
+ * above-mentioned mock Spanner server. The in-process PgAdapter server listens on a random local
+ * port, and tests can use the client of their choosing to connect to the {@link ProxyServer}. The
+ * requests are translated by the proxy into RPC invocations on the mock Spanner server, and the
+ * responses from the mock Spanner server are translated into wire protocol responses to the client.
+ * The tests can then inspect the requests that the mock Spanner server received to verify that the
+ * server received the requests that the test expected.
+ */
+public abstract class AbstractMockServerTest {
+  private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
+
+  public static final String PG_TYPE_PREFIX = PG_NAMESPACE_CTE + ",\n" + PG_TYPE_CTE_EMULATED;
+  public static final String PG_CLASS_PREFIX = String.format(PgClass.PG_CLASS_CTE, "-1", "-1");
+  public static final String EMULATED_PG_CLASS_PREFIX =
+      String.format(
+          PgClass.PG_CLASS_CTE,
+          "'''\"' || t.table_schema || '\".\"' || t.table_name || '\"'''",
+          "'''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"'''");
+  public static final String EMULATED_PG_ATTRIBUTE_PREFIX = PgAttribute.PG_ATTRIBUTE_CTE;
+  public static final String EMULATED_PG_ATTRDEF_PREFIX = PgAttrdef.PG_ATTRDEF_CTE;
+
+  protected static final Statement SELECT_JSONB_TYPE_BY_OID =
+      Statement.newBuilder(
+              "with "
+                  + PG_TYPE_PREFIX
+                  + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   FROM pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE pg_type.oid = $1  ORDER BY sp.r, pg_type.oid DESC")
+          .bind("p1")
+          .to(Oid.JSONB)
+          .build();
+  protected static final ResultSet SELECT_JSONB_TYPE_BY_OID_RESULT_SET =
+      ResultSet.newBuilder()
+          .setMetadata(
+              ResultSetMetadata.newBuilder()
+                  .setRowType(
+                      StructType.newBuilder()
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("is_array")
+                                  .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("typtype")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("typname")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("oid")
+                                  .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                  .build())
+                          .build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                  .addValues(Value.newBuilder().setStringValue("3802").build())
+                  .build())
+          .build();
+  protected static final Statement SELECT_JSONB_TYPE_BY_NAME =
+      createSelectTypeByNameStatement("jsonb");
+  protected static final Statement SELECT_INTERVAL_TYPE_BY_NAME =
+      createSelectTypeByNameStatement("interval");
+  protected static final Statement SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL =
+      Statement.of(
+          "with "
+              + PG_TYPE_PREFIX
+              + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = ('jsonb')  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
+
+  protected static final ResultSet SELECT_JSONB_TYPE_BY_NAME_RESULT_SET =
+      createSelectTypeByNameResultSet(Oid.JSONB, "jsonb");
+  protected static final ResultSet SELECT_INTERVAL_TYPE_BY_NAME_RESULT_SET =
+      createSelectTypeByNameResultSet(Oid.INTERVAL, "interval");
+  protected static final Statement SELECT_JSONB_TYPE_INFO =
+      Statement.newBuilder(
+              "with "
+                  + PG_TYPE_PREFIX
+                  + "\nSELECT n.nspname = 'public', n.nspname, t.typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1")
+          .bind("p1")
+          .to(Oid.JSONB)
+          .build();
+  protected static final String SELECT_TYPE_INFO_MULTI_SCHEMA =
+      "with "
+          + PG_TYPE_PREFIX
+          + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1";
+  protected static final Statement SELECT_JSONB_TYPE_INFO_MULTI_SCHEMA =
+      Statement.newBuilder(SELECT_TYPE_INFO_MULTI_SCHEMA).bind("p1").to(Oid.JSONB).build();
+  protected static final Statement SELECT_JSONB_ARRAY_TYPE_INFO_MULTI_SCHEMA =
+      Statement.newBuilder(SELECT_TYPE_INFO_MULTI_SCHEMA).bind("p1").to(Oid.JSONB_ARRAY).build();
+  protected static final ResultSet SELECT_JSONB_TYPE_INFO_RESULT_SET =
+      ResultSet.newBuilder()
+          .setMetadata(
+              ResultSetMetadata.newBuilder()
+                  .setRowType(
+                      StructType.newBuilder()
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("")
+                                  .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("nspname")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("typname")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                  .build())
+                          .build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setBoolValue(true).build())
+                  .addValues(Value.newBuilder().setStringValue("public").build())
+                  .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                  .build())
+          .build();
+  protected static final ResultSet SELECT_JSONB_ARRAY_TYPE_INFO_RESULT_SET =
+      ResultSet.newBuilder()
+          .setMetadata(
+              ResultSetMetadata.newBuilder()
+                  .setRowType(
+                      StructType.newBuilder()
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("")
+                                  .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("nspname")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                  .build())
+                          .addFields(
+                              Field.newBuilder()
+                                  .setName("typname")
+                                  .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                  .build())
+                          .build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setBoolValue(true).build())
+                  .addValues(Value.newBuilder().setStringValue("public").build())
+                  .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                  .build())
+          .build();
+
+  protected static Statement createSelectTypeByNameStatement(String name) {
+    return Statement.newBuilder(
+            "with "
+                + PG_TYPE_PREFIX
+                + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1")
+        .bind("p1")
+        .to(name)
+        .build();
+  }
+
+  protected static ResultSet createSelectTypeByNameResultSet(int oid, String name) {
+    return ResultSet.newBuilder()
+        .setMetadata(
+            ResultSetMetadata.newBuilder()
+                .setRowType(
+                    StructType.newBuilder()
+                        .addFields(
+                            Field.newBuilder()
+                                .setName("oid")
+                                .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                .build())
+                        .addFields(
+                            Field.newBuilder()
+                                .setName("typname")
+                                .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                .build())
+                        .build())
+                .build())
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(Value.newBuilder().setStringValue(String.valueOf(oid)).build())
+                .addValues(Value.newBuilder().setStringValue(name).build())
+                .build())
+        .build();
+  }
+
+  protected static final Statement SELECT1 = Statement.of("SELECT 1");
+  protected static final Statement SELECT2 = Statement.of("SELECT 2");
+  protected static final Statement SELECT_FIVE_ROWS =
+      Statement.of("SELECT * FROM TableWithFiveRows");
+  protected static final Statement INVALID_SELECT = Statement.of("SELECT foo");
+  private static final ResultSetMetadata SELECT1_METADATA =
+      ResultSetMetadata.newBuilder()
+          .setRowType(
+              StructType.newBuilder()
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("C")
+                          .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                          .build())
+                  .build())
+          .build();
+  protected static final ResultSet EMPTY_RESULTSET =
+      ResultSet.newBuilder().setMetadata(SELECT1_METADATA).build();
+  protected static final ResultSet SELECT1_RESULTSET =
+      ResultSet.newBuilder()
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("1").build())
+                  .build())
+          .setMetadata(SELECT1_METADATA)
+          .build();
+  protected static final ResultSet SELECT2_RESULTSET =
+      ResultSet.newBuilder()
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("2").build())
+                  .build())
+          .setMetadata(SELECT1_METADATA)
+          .build();
+
+  private static final ResultSet SELECT_FIVE_ROWS_RESULTSET =
+      ResultSet.newBuilder()
+          .addAllRows(
+              ImmutableList.of(
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("1").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("2").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("3").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("4").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("5").build())
+                      .build()))
+          .setMetadata(SELECT1_METADATA)
+          .build();
+  protected static final Statement UPDATE_STATEMENT =
+      Statement.of("UPDATE FOO SET BAR=1 WHERE BAZ=2");
+  protected static final int UPDATE_COUNT = 2;
+  protected static final Statement INSERT_STATEMENT = Statement.of("INSERT INTO FOO VALUES (1)");
+  protected static final int INSERT_COUNT = 1;
+  protected static final Statement INVALID_DML = Statement.of("INSERT INTO FOO VALUES ('abc')");
+  protected static final Statement INVALID_DDL = Statement.of("CREATE TABLE FOO (id int64)");
+
+  protected static final ResultSetMetadata ALL_TYPES_METADATA =
+      createAllTypesResultSetMetadata("", false);
+  protected static final ResultSet ALL_TYPES_RESULTSET =
+      createAllTypesResultSet("");
+  protected static final ResultSet ALL_TYPES_NULLS_RESULTSET =
+      createAllTypesNullResultSet("");
+  protected static final ResultSet ALL_ARRAY_TYPES_RESULTSET =
+      createAllArrayTypesResultSet("1", "", true);
+  protected static final ResultSet ALL_ARRAY_TYPES_NULLS_RESULTSET =
+      createAllArrayTypesNullResultSet("");
+
+  protected static final StatusRuntimeException EXCEPTION =
+      Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException();
+
+  protected static ResultSet createAllTypesResultSet(String columnPrefix) {
+    return createAllTypesResultSet(columnPrefix, false);
+  }
+
+  protected static ResultSet createAllTypesResultSet(String columnPrefix, boolean microsTimestamp) {
+    return createAllTypesResultSet("1", columnPrefix, microsTimestamp);
+  }
+
+  protected static ResultSet createAllTypesResultSet(
+      String id, String columnPrefix, boolean microsTimestamp) {
+    return createAllTypesResultSet(id, columnPrefix, microsTimestamp, true, false);
+  }
+
+  protected static ResultSet createAllTypesResultSet(
+      String id,
+      String columnPrefix,
+      boolean microsTimestamp,
+      boolean nullValueInArrays,
+      boolean intervalAsString) {
+    return ResultSet.newBuilder()
+        .setMetadata(createAllTypesResultSetMetadata(columnPrefix, intervalAsString))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(Value.newBuilder().setStringValue(id).build())
+                .addValues(Value.newBuilder().setBoolValue(true).build())
+                .addValues(
+                    Value.newBuilder()
+                        .setStringValue(
+                            Base64.getEncoder()
+                                .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
+                        .build())
+                .addValues(Value.newBuilder().setNumberValue(3.14f).build())
+                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                .addValues(Value.newBuilder().setStringValue("100").build())
+                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                .addValues(
+                    Value.newBuilder()
+                        .setStringValue(
+                            microsTimestamp
+                                ? "2022-02-16T13:18:02.123456Z"
+                                : "2022-02-16T13:18:02.123456789Z")
+                        .build())
+                .addValues(Value.newBuilder().setStringValue("P1Y2M3DT4H5M6.789S").build())
+                .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
+                .addValues(Value.newBuilder().setStringValue("test").build())
+                .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("1").build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("1").build())
+                                .addValues(Value.newBuilder().setStringValue("2").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setBoolValue(true).build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setBoolValue(true).build())
+                                .addValues(Value.newBuilder().setBoolValue(false).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            Base64.getEncoder()
+                                                .encodeToString(
+                                                    "bytes1".getBytes(StandardCharsets.UTF_8)))
+                                        .build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue(
+                                                Base64.getEncoder()
+                                                    .encodeToString(
+                                                        "bytes1".getBytes(StandardCharsets.UTF_8)))
+                                            .build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            Base64.getEncoder()
+                                                .encodeToString(
+                                                    "bytes2".getBytes(StandardCharsets.UTF_8)))
+                                        .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setNumberValue(3.14f).build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setNumberValue(3.14f).build())
+                                .addValues(Value.newBuilder().setNumberValue(-99.99f).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setNumberValue(3.14d).build())
+                                .addValues(Value.newBuilder().setNumberValue(-99.99).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("-100").build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("-100").build())
+                                .addValues(Value.newBuilder().setStringValue("-200").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("6.626").build())
+                                .addValues(Value.newBuilder().setStringValue("-3.14").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            microsTimestamp
+                                                ? "2022-02-16T16:18:02.123456Z"
+                                                : "2022-02-16T16:18:02.123456789Z")
+                                        .build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue(
+                                                microsTimestamp
+                                                    ? "2022-02-16T16:18:02.123456Z"
+                                                    : "2022-02-16T16:18:02.123456789Z")
+                                            .build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("2000-01-01T00:00:00Z")
+                                        .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder().setStringValue("P-100MT123456.789S").build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue("P-100MT123456.789S")
+                                            .build())
+                                .addValues(Value.newBuilder().setStringValue("P1Y").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("2023-02-20").build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("2023-02-20").build())
+                                .addValues(Value.newBuilder().setStringValue("2000-01-01").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("string1").build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("string1").build())
+                                .addValues(Value.newBuilder().setStringValue("string2").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("{\"key\": \"value1\"}")
+                                        .build())
+                                .addValues(
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue("{\"key\": \"value1\"}")
+                                            .build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("{\"key\": \"value2\"}")
+                                        .build())
+                                .build()))
+                .build())
+        .build();
+  }
+
+  protected static ResultSet createAllArrayTypesResultSet(
+      String id, String columnPrefix, boolean microsTimestamp) {
+    return ResultSet.newBuilder()
+        .setMetadata(createAllArrayTypesResultSetMetadata(columnPrefix))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(Value.newBuilder().setStringValue(id).build())
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("1").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("2").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setBoolValue(true).build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setBoolValue(false).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            Base64.getEncoder()
+                                                .encodeToString(
+                                                    "bytes1".getBytes(StandardCharsets.UTF_8)))
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            Base64.getEncoder()
+                                                .encodeToString(
+                                                    "bytes2".getBytes(StandardCharsets.UTF_8)))
+                                        .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setNumberValue(-99.99).build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("-100").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("-200").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("-3.14").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(
+                                            microsTimestamp
+                                                ? "2022-02-16T16:18:02.123456Z"
+                                                : "2022-02-16T16:18:02.123456789Z")
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("2000-01-01T00:00:00Z")
+                                        .build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("2023-02-20").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("2000-01-01").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue("string1").build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(Value.newBuilder().setStringValue("string2").build())
+                                .build()))
+                .addValues(
+                    Value.newBuilder()
+                        .setListValue(
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("{\"key\": \"value1\"}")
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue("{\"key\": \"value2\"}")
+                                        .build())
+                                .build()))
+                .build())
+        .build();
+  }
+
+  protected static ResultSet createAllTypesAndArraysResultSet(
+      String id, String columnPrefix, boolean microsTimestamp) {
+    ResultSet allTypes = createAllTypesResultSet(id, columnPrefix, microsTimestamp);
+    allTypes.toBuilder().build();
+
+    return allTypes;
+  }
+
+  protected static ResultSet createAllTypesNullResultSet(String columnPrefix) {
+    return createAllTypesNullResultSet(columnPrefix, null);
+  }
+
+  protected static ResultSet createAllTypesNullResultSet(String columnPrefix, Long colBigInt) {
+    return ResultSet.newBuilder()
+        .setMetadata(createAllTypesResultSetMetadata(columnPrefix, false))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(
+                    colBigInt == null
+                        ? Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
+                        : Value.newBuilder().setStringValue(String.valueOf(colBigInt)).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                // Arrays
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .build())
+        .build();
+  }
+
+  protected static ResultSet createAllArrayTypesNullResultSet(String columnPrefix) {
+    return createAllArrayTypesNullResultSet(columnPrefix, null);
+  }
+
+  protected static ResultSet createAllArrayTypesNullResultSet(String columnPrefix, String id) {
+    return ResultSet.newBuilder()
+        .setMetadata(createAllArrayTypesResultSetMetadata(columnPrefix))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(
+                    id == null
+                        ? Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
+                        : Value.newBuilder().setStringValue(id).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .build())
+        .build();
+  }
+
+  protected static ResultSetMetadata createAllTypesResultSetMetadata(String columnPrefix) {
+    return createAllTypesResultSetMetadata(columnPrefix, false);
+  }
+
+  protected static ResultSetMetadata createAllTypesResultSetMetadata(
+      String columnPrefix, boolean intervalAsString) {
+    return ResultSetMetadata.newBuilder()
+        .setRowType(
+            StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_bigint")
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_bool")
+                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_bytea")
+                        .setType(Type.newBuilder().setCode(TypeCode.BYTES).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_float4")
+                        .setType(Type.newBuilder().setCode(TypeCode.FLOAT32).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_float8")
+                        .setType(Type.newBuilder().setCode(TypeCode.FLOAT64).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_int")
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_numeric")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.NUMERIC)
+                                .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
+                                .build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_timestamptz")
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_interval")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(intervalAsString ? TypeCode.STRING : TypeCode.INTERVAL)
+                                .build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_date")
+                        .setType(Type.newBuilder().setCode(TypeCode.DATE).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_varchar")
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_jsonb")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.JSON)
+                                .setTypeAnnotation(TypeAnnotationCode.PG_JSONB)
+                                .build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bigint")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.INT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bool")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.BOOL).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bytea")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.BYTES).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_float4")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.FLOAT32).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_float8")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.FLOAT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_int")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.INT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_numeric")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder()
+                                        .setCode(TypeCode.NUMERIC)
+                                        .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
+                                        .build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_timestamptz")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_interval")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder()
+                                        .setCode(
+                                            intervalAsString ? TypeCode.STRING : TypeCode.INTERVAL)
+                                        .build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_date")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.DATE).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_varchar")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.STRING).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_jsonb")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder()
+                                        .setCode(TypeCode.JSON)
+                                        .setTypeAnnotation(TypeAnnotationCode.PG_JSONB)
+                                        .build())))
+                .build())
+        .build();
+  }
+
+  protected static ResultSetMetadata createAllArrayTypesResultSetMetadata(String columnPrefix) {
+    return ResultSetMetadata.newBuilder()
+        .setRowType(
+            StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "id")
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bigint")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.INT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bool")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.BOOL).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bytea")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.BYTES).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_float8")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.FLOAT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_int")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.INT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_numeric")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder()
+                                        .setCode(TypeCode.NUMERIC)
+                                        .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
+                                        .build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_timestamptz")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_date")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.DATE).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_varchar")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.STRING).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_jsonb")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder()
+                                        .setCode(TypeCode.JSON)
+                                        .setTypeAnnotation(TypeAnnotationCode.PG_JSONB)
+                                        .build())))
+                .build())
+        .build();
+  }
+
+  protected static MockSpannerServiceImpl mockSpanner;
+  protected static MockDatabaseAdminImpl mockDatabaseAdmin;
+  protected static MockInstanceAdminImpl mockInstanceAdmin;
+  protected static Server spannerServer;
+
+  private static TypeAnnotationCode getTypeAnnotationCode(TypeCode type) {
+    switch (type) {
+      case NUMERIC:
+        return TypeAnnotationCode.PG_NUMERIC;
+      case JSON:
+        return TypeAnnotationCode.PG_JSONB;
+    }
+    return TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED;
+  }
+
+  protected static ResultSet createResultSetWithOnlyMetadata(ImmutableList<TypeCode> types) {
+    return ResultSet.newBuilder().setMetadata(createMetadata(types)).build();
+  }
+
+  protected static ResultSetMetadata createMetadata(ImmutableList<TypeCode> types) {
+    StructType.Builder builder = StructType.newBuilder();
+    for (int index = 0; index < types.size(); index++) {
+      builder.addFields(
+          Field.newBuilder()
+              .setType(
+                  Type.newBuilder()
+                      .setCode(types.get(index))
+                      .setTypeAnnotation(getTypeAnnotationCode(types.get(index)))
+                      .build())
+              .setName("")
+              .build());
+    }
+    return ResultSetMetadata.newBuilder().setRowType(builder.build()).build();
+  }
+
+  protected static ResultSetMetadata createParameterTypesMetadata(ImmutableList<TypeCode> types) {
+    return createParameterTypesMetadata(types, false);
+  }
+
+  protected static ResultSetMetadata createParameterTypesMetadata(
+      ImmutableList<TypeCode> types, boolean alsoAsArray) {
+    StructType.Builder builder = StructType.newBuilder();
+    for (int index = 0; index < types.size(); index++) {
+      builder.addFields(
+          Field.newBuilder()
+              .setType(
+                  Type.newBuilder()
+                      .setCode(types.get(index))
+                      .setTypeAnnotation(getTypeAnnotationCode(types.get(index)))
+                      .build())
+              .setName("p" + (index + 1))
+              .build());
+    }
+    if (alsoAsArray) {
+      for (int index = 0; index < types.size(); index++) {
+        builder.addFields(
+            Field.newBuilder()
+                .setType(
+                    Type.newBuilder()
+                        .setCode(TypeCode.ARRAY)
+                        .setArrayElementType(
+                            Type.newBuilder()
+                                .setCode(types.get(index))
+                                .setTypeAnnotation(getTypeAnnotationCode(types.get(index)))
+                                .build())
+                        .build())
+                .setName("p" + (index + types.size() + 1))
+                .build());
+      }
+    }
+    return ResultSetMetadata.newBuilder().setUndeclaredParameters(builder.build()).build();
+  }
+
+  protected static ResultSetMetadata createMetadata(
+      ImmutableList<TypeCode> types, ImmutableList<String> names) {
+    return createMetadata(types, false, names);
+  }
+
+  protected static ResultSetMetadata createMetadata(
+      ImmutableList<TypeCode> types, boolean alsoAsArrays, ImmutableList<String> names) {
+    Preconditions.checkArgument(
+        (!alsoAsArrays && types.size() == names.size())
+            || (alsoAsArrays && 2 * types.size() == names.size()),
+        "Types and names must have same length");
+    StructType.Builder builder = StructType.newBuilder();
+    for (int index = 0; index < types.size(); index++) {
+      builder.addFields(
+          Field.newBuilder()
+              .setType(
+                  Type.newBuilder()
+                      .setCode(types.get(index))
+                      .setTypeAnnotation(getTypeAnnotationCode(types.get(index)))
+                      .build())
+              .setName(names.get(index))
+              .build());
+    }
+    if (alsoAsArrays) {
+      for (int index = 0; index < types.size(); index++) {
+        builder.addFields(
+            Field.newBuilder()
+                .setType(
+                    Type.newBuilder()
+                        .setCode(TypeCode.ARRAY)
+                        .setArrayElementType(
+                            Type.newBuilder()
+                                .setCode(types.get(index))
+                                .setTypeAnnotation(getTypeAnnotationCode(types.get(index))))
+                        .build())
+                .setName(names.get(types.size() + index))
+                .build());
+      }
+    }
+    return ResultSetMetadata.newBuilder().setRowType(builder.build()).build();
+  }
+
+  protected static ResultSetMetadata createMetadata(
+      ImmutableList<TypeCode> types,
+      boolean alsoAsArrays,
+      ImmutableList<String> names,
+      ImmutableList<TypeCode> parameterTypes) {
+    return createMetadata(types, alsoAsArrays, names).toBuilder()
+        .setUndeclaredParameters(
+            createParameterTypesMetadata(parameterTypes).getUndeclaredParameters())
+        .build();
+  }
+
+  static MockSpannerServiceImpl createMockSpannerThatReturnsOneQueryPartition() {
+    return new MockSpannerServiceImpl() {
+      @Override
+      public void partitionQuery(
+          PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
+        responseObserver.onNext(
+            PartitionResponse.newBuilder()
+                .addPartitions(Partition.newBuilder().setPartitionToken(ByteString.EMPTY).build())
+                .build());
+        responseObserver.onCompleted();
+      }
+    };
+  }
+
+  @BeforeClass
+  public static void startMockSpannerAndPgAdapterServers() throws Exception {
+    doStartMockSpannerAndPgAdapterServers(
+        createMockSpannerThatReturnsOneQueryPartition(),
+        null,
+        OpenTelemetry.noop());
+  }
+
+  protected static void doStartMockSpannerAndPgAdapterServers(String defaultDatabase) throws Exception {
+    doStartMockSpannerAndPgAdapterServers(
+        createMockSpannerThatReturnsOneQueryPartition(),
+        defaultDatabase,
+        OpenTelemetry.noop());
+  }
+
+  public static PGobject createJdbcPgJsonbObject(String value) throws SQLException {
+    PGobject result = new PGobject();
+    result.setValue(value);
+    result.setType("jsonb");
+    return result;
+  }
+
+  protected static void doStartMockSpannerAndPgAdapterServers(
+      MockSpannerServiceImpl mockSpannerService,
+      String defaultDatabase,
+      OpenTelemetry openTelemetry)
+      throws Exception {
+    mockSpanner = mockSpannerService;
+    mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_JSONB_TYPE_BY_OID, SELECT_JSONB_TYPE_BY_OID_RESULT_SET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_JSONB_TYPE_BY_NAME, SELECT_JSONB_TYPE_BY_NAME_RESULT_SET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            SELECT_INTERVAL_TYPE_BY_NAME, SELECT_INTERVAL_TYPE_BY_NAME_RESULT_SET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL, SELECT_JSONB_TYPE_BY_NAME_RESULT_SET));
+    mockSpannerService.putStatementResult(
+        StatementResult.query(SELECT_JSONB_TYPE_INFO, SELECT_JSONB_TYPE_INFO_RESULT_SET));
+    mockSpannerService.putStatementResult(
+        StatementResult.query(
+            Statement.of(SELECT_TYPE_INFO_MULTI_SCHEMA), SELECT_JSONB_TYPE_INFO_RESULT_SET));
+    mockSpannerService.putStatementResult(
+        StatementResult.query(
+            SELECT_JSONB_TYPE_INFO_MULTI_SCHEMA, SELECT_JSONB_TYPE_INFO_RESULT_SET));
+    mockSpannerService.putStatementResult(
+        StatementResult.query(
+            SELECT_JSONB_ARRAY_TYPE_INFO_MULTI_SCHEMA, SELECT_JSONB_ARRAY_TYPE_INFO_RESULT_SET));
+    mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_FIVE_ROWS, SELECT_FIVE_ROWS_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.update(UPDATE_STATEMENT, UPDATE_COUNT));
+    mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
+    mockSpanner.putStatementResult(
+        StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+    mockSpanner.putStatementResult(StatementResult.exception(INVALID_SELECT, EXCEPTION));
+    mockSpanner.putStatementResult(StatementResult.exception(INVALID_DML, EXCEPTION));
+    mockSpanner.putStatementResult(StatementResult.exception(INVALID_DDL, EXCEPTION));
+
+    mockDatabaseAdmin = new MockDatabaseAdminImpl();
+    mockInstanceAdmin = new MockInstanceAdminImpl();
+
+    InetSocketAddress address = new InetSocketAddress("localhost", 0);
+    spannerServer =
+        NettyServerBuilder.forAddress(address)
+            .addService(mockSpanner)
+            .addService(mockDatabaseAdmin)
+            .addService(mockInstanceAdmin)
+            .build()
+            .start();
+  }
+
+  @AfterClass
+  public static void stopMockSpannerAndPgAdapterServers() throws Exception {
+    try {
+      SpannerPool.closeSpannerPool();
+    } catch (SpannerException exception) {
+      if (exception.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+          && exception
+              .getMessage()
+              .contains(
+                  "connection(s) still open. Close all connections before calling closeSpanner()")) {
+        // Ignore this exception for now. It is caused by the fact that the PgAdapter proxy server
+        // is not gracefully shutting down all connections when the proxy is stopped, and it also
+        // does not wait until any connections that have been requested to close, actually have
+        // closed.
+        logger.warning(String.format("Ignoring %s as this is expected", exception.getMessage()));
+      } else {
+        throw exception;
+      }
+    }
+    if (spannerServer != null) {
+      spannerServer.shutdown();
+      spannerServer.awaitTermination(10L, TimeUnit.SECONDS);
+    }
+  }
+
+  protected void closeSpannerPool() {
+    closeSpannerPool(false);
+  }
+
+  /**
+   * Closes all open Spanner instances in the pool. Use this to force the recreation of a Spanner
+   * instance for a test case. This method will ignore any errors and retry if closing fails.
+   */
+  protected void closeSpannerPool(boolean ignoreException) {
+    SpannerException exception = null;
+    for (int attempt = 0; attempt < 1000; attempt++) {
+      try {
+        SpannerPool.closeSpannerPool();
+        return;
+      } catch (SpannerException e) {
+        try {
+          Thread.sleep(1L);
+        } catch (InterruptedException interruptedException) {
+          throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+        }
+        exception = e;
+      }
+    }
+    if (!ignoreException) {
+      throw exception;
+    }
+  }
+
+  static StatusRuntimeException createTransactionMutationLimitExceededException() {
+    Key<byte[]> key = Key.of("grpc-status-details-bin", Metadata.BINARY_BYTE_MARSHALLER);
+    Help help =
+        Help.newBuilder()
+            .addLinks(
+                Link.newBuilder()
+                    .setDescription("Cloud Spanner limits documentation.")
+                    .setUrl("https://cloud.google.com/spanner/docs/limits")
+                    .build())
+            .build();
+    com.google.rpc.Status status =
+        com.google.rpc.Status.newBuilder().addDetails(Any.pack(help)).build();
+    Metadata trailers = new Metadata();
+    trailers.put(key, status.toByteArray());
+    return Status.INVALID_ARGUMENT
+        .withDescription("The transaction contains too many mutations.")
+        .asRuntimeException(trailers);
+  }
+
+  @Before
+  public void clearRequests() {
+    mockSpanner.clearRequests();
+    mockDatabaseAdmin.reset();
+    mockInstanceAdmin.reset();
+  }
+
+  protected void addDdlResponseToSpannerAdmin() {
+    mockDatabaseAdmin.addResponse(
+        Operation.newBuilder()
+            .setDone(true)
+            .setResponse(Any.pack(Empty.getDefaultInstance()))
+            .setMetadata(Any.pack(UpdateDatabaseDdlMetadata.getDefaultInstance()))
+            .build());
+  }
+
+  protected void addDdlErrorResponse(com.google.rpc.Status error) {
+    mockDatabaseAdmin.addResponse(
+        Operation.newBuilder()
+            .setMetadata(
+                Any.pack(
+                    UpdateDatabaseDdlMetadata.newBuilder()
+                        .setDatabase("projects/proj/instances/inst/databases/db")
+                        .build()))
+            .setName("projects/proj/instances/inst/databases/db/operations/1")
+            .setDone(true)
+            .setError(error)
+            .build());
+  }
+
+  protected void addDdlExceptionToSpannerAdmin() {
+    mockDatabaseAdmin.addException(
+        Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException());
+  }
+
+  protected static void addIfNotExistsDdlException() {
+    mockDatabaseAdmin.addException(
+        Status.INVALID_ARGUMENT
+            .withDescription("<IF NOT EXISTS> clause is not supported in <CREATE TABLE> statement.")
+            .asRuntimeException());
+  }
+}
