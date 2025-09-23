@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.50.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.50.2...v0.50.3) (2025-09-23)
+
+
+### Dependencies
+
+* update actions/setup-node action to v5 ([#3698](https://github.com/GoogleCloudPlatform/pgadapter/issues/3698)) ([1ec7e0e](https://github.com/GoogleCloudPlatform/pgadapter/commit/1ec7e0e14f6cd5e5955b13586eecc3cef9f90152))
+* update actions/setup-python action to v6 ([#3752](https://github.com/GoogleCloudPlatform/pgadapter/issues/3752)) ([93a01c4](https://github.com/GoogleCloudPlatform/pgadapter/commit/93a01c420aaf632cd989b899a00191851f874e50))
+* update dependency com.spotify.fmt:fmt-maven-plugin to v2.28 ([#3747](https://github.com/GoogleCloudPlatform/pgadapter/issues/3747)) ([6d4fd48](https://github.com/GoogleCloudPlatform/pgadapter/commit/6d4fd48efedbe552b3c39e9baba3d26e17ff74e2))
+* update dependency com.spotify.fmt:fmt-maven-plugin to v2.29 ([#3757](https://github.com/GoogleCloudPlatform/pgadapter/issues/3757)) ([01913db](https://github.com/GoogleCloudPlatform/pgadapter/commit/01913db2b271540d74407b9700a93e77300bd109))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.54.0 ([#3717](https://github.com/GoogleCloudPlatform/pgadapter/issues/3717)) ([13fb072](https://github.com/GoogleCloudPlatform/pgadapter/commit/13fb0729bf3127f2b95e4440f925a8afbc96b650))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.54.1 ([#3764](https://github.com/GoogleCloudPlatform/pgadapter/issues/3764)) ([f387104](https://github.com/GoogleCloudPlatform/pgadapter/commit/f387104afbcd79c6a5c4efc4d1811367c55f4afb))
+* update dependency net.java.dev.jna:jna to v5.18.0 ([#3783](https://github.com/GoogleCloudPlatform/pgadapter/issues/3783)) ([389cea5](https://github.com/GoogleCloudPlatform/pgadapter/commit/389cea5e94703e2a7435d90483b29ff655e0cc0c))
+* update dependency org.bouncycastle:bcpkix-jdk18on to v1.82 ([#3754](https://github.com/GoogleCloudPlatform/pgadapter/issues/3754)) ([1a189aa](https://github.com/GoogleCloudPlatform/pgadapter/commit/1a189aaeb8091d375285a41f0268ac7265a12351))
+* update dependency org.postgresql:postgresql to v42.7.8 ([#3765](https://github.com/GoogleCloudPlatform/pgadapter/issues/3765)) ([8a9bada](https://github.com/GoogleCloudPlatform/pgadapter/commit/8a9bada1328c92048e29991887dd7d4e48d935d7))
+* update dependency org.springframework.boot:spring-boot-dependencies to v3.5.6 ([#3761](https://github.com/GoogleCloudPlatform/pgadapter/issues/3761)) ([61dc042](https://github.com/GoogleCloudPlatform/pgadapter/commit/61dc04285a8b6f3ce8e5714dc17f7a0bb92423ec))
+* update dependency org.springframework.boot:spring-boot-starter-parent to v3.5.6 ([#3762](https://github.com/GoogleCloudPlatform/pgadapter/issues/3762)) ([77eab08](https://github.com/GoogleCloudPlatform/pgadapter/commit/77eab08fc713bcaf79aba4e6f2c2f504411fa28c))
+* update dependency psycopg to v3.2.10 ([#3742](https://github.com/GoogleCloudPlatform/pgadapter/issues/3742)) ([8a3a25d](https://github.com/GoogleCloudPlatform/pgadapter/commit/8a3a25db7ee73d57d73a113bcee960d043e06ff5))
+* update dependency psycopg-binary to v3.2.10 ([#3743](https://github.com/GoogleCloudPlatform/pgadapter/issues/3743)) ([4319033](https://github.com/GoogleCloudPlatform/pgadapter/commit/43190330be73ee604fdf610aba5a376718f5cc6b))
+* update dependency testcontainers to v4.13.0 ([#3749](https://github.com/GoogleCloudPlatform/pgadapter/issues/3749)) ([ac7ea38](https://github.com/GoogleCloudPlatform/pgadapter/commit/ac7ea3831b78dc92aa3048117e14df62c4565f6e))
+* update module cloud.google.com/go/spanner to v1.85.1 ([#3744](https://github.com/GoogleCloudPlatform/pgadapter/issues/3744)) ([8bdc94b](https://github.com/GoogleCloudPlatform/pgadapter/commit/8bdc94b47a2a87d7c69f969c381a3e957e8d96c0))
+* update module github.com/jackc/pgx/v5 to v5.7.6 ([#3745](https://github.com/GoogleCloudPlatform/pgadapter/issues/3745)) ([68935be](https://github.com/GoogleCloudPlatform/pgadapter/commit/68935be6b5315ab457c0ff602c43f943023efe71))
+* update module github.com/testcontainers/testcontainers-go to v0.39.0 ([#3766](https://github.com/GoogleCloudPlatform/pgadapter/issues/3766)) ([d180b86](https://github.com/GoogleCloudPlatform/pgadapter/commit/d180b86268cf5bf383c610209a6369c7d0faa085))
+* update module github.com/testcontainers/testcontainers-go/modules/postgres to v0.39.0 ([#3767](https://github.com/GoogleCloudPlatform/pgadapter/issues/3767)) ([097774f](https://github.com/GoogleCloudPlatform/pgadapter/commit/097774f05494499a711b2e507ba7315615c40bca))
+* update module golang.org/x/oauth2 to v0.31.0 ([#3718](https://github.com/GoogleCloudPlatform/pgadapter/issues/3718)) ([fcde25d](https://github.com/GoogleCloudPlatform/pgadapter/commit/fcde25da629e6942fe922cef3c0e185160b3452f))
+* update module google.golang.org/api to v0.249.0 ([#3750](https://github.com/GoogleCloudPlatform/pgadapter/issues/3750)) ([2ab6454](https://github.com/GoogleCloudPlatform/pgadapter/commit/2ab6454b7d3d229a3b978389bc425f06fd08d679))
+* update spring-boot.version to v3.5.6 ([#3763](https://github.com/GoogleCloudPlatform/pgadapter/issues/3763)) ([64134a8](https://github.com/GoogleCloudPlatform/pgadapter/commit/64134a86039020223adc66420f50dd59f4eda721))
+
+
+### Documentation
+
+* create recommended Hikari configuration ([#3781](https://github.com/GoogleCloudPlatform/pgadapter/issues/3781)) ([3ca4a43](https://github.com/GoogleCloudPlatform/pgadapter/commit/3ca4a43c976721b4b30da7e3611bf2141634923f))
+
 ## [0.50.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.50.1...v0.50.2) (2025-09-04)
 
 
