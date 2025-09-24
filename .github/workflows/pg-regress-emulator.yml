@@ -74,6 +74,12 @@ jobs:
           else
             echo "has_latest_file=false" >> $GITHUB_OUTPUT
           fi
+      - name: Upload results
+        working-directory: ./postgres/src/test/regress/
+        run: |
+          ts=$(date +%s)
+          gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_$ts.json
+          gcloud storage cp regression.diffs ${{env.GCS_BUCKET_PATH}}/regression_$ts.diffs
       - name: Compare json results
         working-directory: ./postgres/src/test/regress/
         if: steps.latest_gcs_file.outputs.has_latest_file == 'true'
@@ -84,10 +90,4 @@ jobs:
             echo "Fail: $curr_passed is less than $prev_passed. Please check!"
             exit 1
           fi
-      - name: Upload results
-        working-directory: ./postgres/src/test/regress/
-        run: |
-          ts=$(date +%s)
-          gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_$ts.json
           gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_latest.json
-          gcloud storage cp regression.diffs ${{env.GCS_BUCKET_PATH}}/regression_$ts.diffs
