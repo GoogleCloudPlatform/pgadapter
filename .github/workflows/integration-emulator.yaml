@@ -15,7 +15,7 @@ jobs:
     # Add a PostgreSQL Docker container and the emulator.
     services:
       postgres:
-        image: postgres:17
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
         # Set health checks to wait until postgres has started
