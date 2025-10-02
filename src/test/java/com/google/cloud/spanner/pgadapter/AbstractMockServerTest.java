@@ -23,6 +23,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.DisableDefaultMtlsProvider;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
@@ -1282,6 +1283,8 @@ public abstract class AbstractMockServerTest {
       Consumer<TestOptionsMetadataBuilder> optionsConfigurator,
       OpenTelemetry openTelemetry)
       throws Exception {
+    DisableDefaultMtlsProvider.disableDefaultMtlsProvider();
+
     mockSpanner = mockSpannerService;
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
     mockSpanner.putStatementResult(
