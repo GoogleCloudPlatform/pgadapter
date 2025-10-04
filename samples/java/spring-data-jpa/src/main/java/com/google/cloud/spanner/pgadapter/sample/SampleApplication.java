@@ -25,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.sample.service.StaleReadService;
 import com.google.cloud.spanner.pgadapter.sample.service.TicketSaleService;
 import com.google.cloud.spanner.pgadapter.sample.service.TrackService;
 import com.google.cloud.spanner.pgadapter.sample.service.VenueService;
+import com.google.common.base.Stopwatch;
 import com.google.spanner.v1.DirectedReadOptions;
 import com.google.spanner.v1.DirectedReadOptions.IncludeReplicas;
 import com.google.spanner.v1.DirectedReadOptions.ReplicaSelection;
@@ -32,6 +33,7 @@ import com.google.spanner.v1.DirectedReadOptions.ReplicaSelection.Type;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -63,12 +65,7 @@ public class SampleApplication implements CommandLineRunner {
 
   public static void main(String[] args) {
     SpringApplication application = new SpringApplication(SampleApplication.class);
-    // Add an application listener that initializes PGAdapter BEFORE any data source is created
-    // by Spring.
-    PGAdapterInitializer pgAdapterInitializer = new PGAdapterInitializer();
-    application.addListeners(pgAdapterInitializer);
     application.run(args).close();
-    pgAdapterInitializer.getPGAdapter().shutdown();
   }
 
   private final SingerService singerService;
@@ -119,6 +116,7 @@ public class SampleApplication implements CommandLineRunner {
   @Override
   public void run(String... args) {
     // First clear the current tables.
+    Stopwatch stopwatch = Stopwatch.createStarted();
     log.info("Deleting all existing data");
     ticketSaleService.deleteAllTicketSales();
     concertService.deleteAllConcerts();
@@ -145,6 +143,7 @@ public class SampleApplication implements CommandLineRunner {
     staleRead();
     // Show how to execute queries with directed read options.
     directedRead();
+    log.info("Total time spent {} seconds", stopwatch.elapsed(TimeUnit.SECONDS));
 
     // Show how to execute multiple DML statements in one Batch DML request. This reduces the number
     // of round-trips between PGAdapter and Spanner.
