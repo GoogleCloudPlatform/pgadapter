@@ -35,10 +35,13 @@ jobs:
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
+          export NON_PROD_TAG = `echo non-production-$GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $NON_PROD_TAG
           docker buildx create --name multi_platform --use
           docker buildx build --platform linux/amd64,linux/arm64 \
             . -f build/emulator/Dockerfile \
             -t "$GCR_HOSTNAME"/"$IMAGE"-emulator:"$TAG" \
+            -t "$GCR_HOSTNAME"/"$IMAGE"-emulator:"$NON_PROD_TAG" \
             -t "$GCR_HOSTNAME"/"$IMAGE"-emulator:latest \
             --push \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
