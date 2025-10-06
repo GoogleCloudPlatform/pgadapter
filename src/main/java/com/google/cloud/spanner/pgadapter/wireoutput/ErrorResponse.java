@@ -37,6 +37,7 @@ public class ErrorResponse extends WireOutput {
   private static final byte MESSAGE_FLAG = 'M';
   private static final byte SEVERITY_FLAG = 'S';
   private static final byte HINT_FLAG = 'H';
+  private static final byte DETAIL_FLAG = 'D';
   private static final byte NULL_TERMINATOR = 0;
 
   private final PGException pgException;
@@ -63,6 +64,10 @@ public class ErrorResponse extends WireOutput {
             + convertMessageToWireProtocol(pgException).length
             + NULL_TERMINATOR_LENGTH
             + NULL_TERMINATOR_LENGTH;
+    byte[] detail = convertDetailToWireProtocol(pgException);
+    if (detail.length > 0) {
+      length += FIELD_IDENTIFIER_LENGTH + detail.length + NULL_TERMINATOR_LENGTH;
+    }
     byte[] hints = convertHintsToWireProtocol(pgException, client);
     if (hints.length > 0) {
       length += FIELD_IDENTIFIER_LENGTH + hints.length + NULL_TERMINATOR_LENGTH;
@@ -80,6 +85,19 @@ public class ErrorResponse extends WireOutput {
 
   static byte[] convertMessageToWireProtocol(PGException pgException) {
     return pgException.getMessage().getBytes(StandardCharsets.UTF_8);
+  }
+
+  static byte[] convertDetailToWireProtocol(PGException pgException) {
+    if (pgException.getCause() != null
+        && !Strings.isNullOrEmpty(pgException.getCause().getMessage())) {
+      if (pgException.getCause().getMessage().equals(pgException.getMessage())) {
+        // Do not repeat the same error message in both the 'message' and 'detail' field if they
+        // are equal.
+        return EMPTY_BYTE_ARRAY;
+      }
+      return pgException.getCause().getMessage().getBytes(StandardCharsets.UTF_8);
+    }
+    return EMPTY_BYTE_ARRAY;
   }
 
   static byte[] convertHintsToWireProtocol(PGException pgException, WellKnownClient client) {
@@ -112,6 +130,12 @@ public class ErrorResponse extends WireOutput {
     this.outputStream.writeByte(MESSAGE_FLAG);
     this.outputStream.write(convertMessageToWireProtocol(pgException));
     this.outputStream.writeByte(NULL_TERMINATOR);
+    byte[] detail = convertDetailToWireProtocol(pgException);
+    if (detail.length > 0) {
+      this.outputStream.writeByte(DETAIL_FLAG);
+      this.outputStream.write(detail);
+      this.outputStream.writeByte(NULL_TERMINATOR);
+    }
     byte[] hints = convertHintsToWireProtocol(pgException, client);
     if (hints.length > 0) {
       this.outputStream.writeByte(HINT_FLAG);
