@@ -175,3 +175,22 @@ from large_table
 order by my_col;
 ```
 
+
+## How can I set a transaction timeout?
+You can set the transaction timeout that a connection should use for read/write transactions by
+executing a `set spanner.transaction_timeout=<timeout>` statement. The timeout is specified in
+milliseconds.
+
+Example:
+
+```sql
+-- Use a 10 second (10,000 milliseconds) transaction timeout.
+set spanner.transaction_timeout=10000;
+begin;
+-- Execute transaction statements. If the total time needed for these statements exceed
+-- the transaction timeout, then the transaction will fail.
+insert into my_table (id, value) values (1, 'One');
+...
+insert into my_table (id, value) values (10000, 'Ten thousand');
+commit;
+```

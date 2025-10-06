@@ -6237,8 +6237,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
           assertTrue(request.hasTransaction());
           assertTrue(request.getTransaction().hasBegin());
-          // TODO: Change this when https://github.com/googleapis/java-spanner/pull/3718 has been
-          // released and merged into PGAdapter.
           assertEquals(
               translateIsolationLevel(isolation),
               request.getTransaction().getBegin().getIsolationLevel());
@@ -6246,6 +6244,23 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           mockSpanner.clearRequests();
         }
       }
+    }
+  }
+
+  @Test
+  public void testTransactionTimeout() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      connection.createStatement().execute("set spanner.transaction_timeout='1ns'");
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () -> connection.createStatement().execute(UPDATE_STATEMENT.getSql()));
+      assertTrue(
+          exception.getMessage(),
+          exception.getMessage().startsWith("ERROR: canceling statement due to statement timeout"));
+      assertTrue(exception.getMessage(), exception.getMessage().contains("DEADLINE_EXCEEDED"));
+      assertEquals(SQLState.QueryCanceled.toString(), exception.getSQLState());
     }
   }
 

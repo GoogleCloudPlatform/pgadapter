@@ -85,6 +85,14 @@ public class PGExceptionFactory {
     return newPGException("Query cancelled", SQLState.QueryCanceled);
   }
 
+  private static PGException newQueryCancelledDueToTimeoutException(SpannerException exception) {
+    return PGException.newBuilder("canceling statement due to statement timeout")
+        .setSQLState(SQLState.QueryCanceled)
+        .setSeverity(Severity.ERROR)
+        .setCause(exception)
+        .build();
+  }
+
   /**
    * Creates a new exception that indicates that the current transaction is in the aborted state.
    */
@@ -145,6 +153,8 @@ public class PGExceptionFactory {
           .setHints(
               "Execute 'set spanner.support_drop_cascade=true' to enable 'drop {table|schema} cascade' statements.")
           .build();
+    } else if (spannerException.getErrorCode() == ErrorCode.DEADLINE_EXCEEDED) {
+      return newQueryCancelledDueToTimeoutException(spannerException);
     }
     return newPGException(extractMessage(spannerException));
   }
