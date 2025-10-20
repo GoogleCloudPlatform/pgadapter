@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.51.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.51.0...v0.51.1) (2025-10-20)
+
+
+### Dependencies
+
+* update alpine docker tag to v3.22.2 ([#3848](https://github.com/GoogleCloudPlatform/pgadapter/issues/3848)) ([a96c565](https://github.com/GoogleCloudPlatform/pgadapter/commit/a96c565934e54e4c43aadf2be33fbe3798e9de86))
+* update dependency go to v1.25.2 ([#3838](https://github.com/GoogleCloudPlatform/pgadapter/issues/3838)) ([6ee92f4](https://github.com/GoogleCloudPlatform/pgadapter/commit/6ee92f4d867a0c6beea18f6ee00d73fb6836c7d7))
+* update dependency go to v1.25.3 ([#3868](https://github.com/GoogleCloudPlatform/pgadapter/issues/3868)) ([f5c6fa3](https://github.com/GoogleCloudPlatform/pgadapter/commit/f5c6fa3228c85c3eab726344c34103f51f10d19c))
+* update dependency nunit3testadapter to 5.2.0 ([#3834](https://github.com/GoogleCloudPlatform/pgadapter/issues/3834)) ([a1da1d1](https://github.com/GoogleCloudPlatform/pgadapter/commit/a1da1d1b908c48f2c5cdfb4dfed3bbf0eaf6a0e8))
+* update dependency org.postgresql:r2dbc-postgresql to v1.1.0.release ([#3837](https://github.com/GoogleCloudPlatform/pgadapter/issues/3837)) ([f0994f1](https://github.com/GoogleCloudPlatform/pgadapter/commit/f0994f191ccae04ca3b3b049e093be5a548f4eea))
+* update dependency testcontainers to v4.13.2 ([#3839](https://github.com/GoogleCloudPlatform/pgadapter/issues/3839)) ([f1cb1f3](https://github.com/GoogleCloudPlatform/pgadapter/commit/f1cb1f3157954a3d3628490780ab55216f9b29d6))
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to a1da1d1 ([#3827](https://github.com/GoogleCloudPlatform/pgadapter/issues/3827)) ([9e0d8b2](https://github.com/GoogleCloudPlatform/pgadapter/commit/9e0d8b28b1245f8199014570dbd22e35715b67fd))
+* update golang docker tag to v1.25.2 ([#3841](https://github.com/GoogleCloudPlatform/pgadapter/issues/3841)) ([210c805](https://github.com/GoogleCloudPlatform/pgadapter/commit/210c805b4d9ef7ad522db3a8ae8648056ac266fb))
+* update module github.com/docker/docker to v28.5.1+incompatible ([#3844](https://github.com/GoogleCloudPlatform/pgadapter/issues/3844)) ([e728e12](https://github.com/GoogleCloudPlatform/pgadapter/commit/e728e121eb3a0ebe20f8bf6095138eca0a6476c3))
+* update module golang.org/x/oauth2 to v0.32.0 ([#3845](https://github.com/GoogleCloudPlatform/pgadapter/issues/3845)) ([c737ca2](https://github.com/GoogleCloudPlatform/pgadapter/commit/c737ca2203e3d4be0e0a2f3399525ffa7e7e9b4d))
+* update module google.golang.org/api to v0.252.0 ([#3842](https://github.com/GoogleCloudPlatform/pgadapter/issues/3842)) ([4570d78](https://github.com/GoogleCloudPlatform/pgadapter/commit/4570d7865c89d9bdaf027db897c34ad639f06fd8))
+
 ## [0.51.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.50.3...v0.51.0) (2025-10-06)
 
 
