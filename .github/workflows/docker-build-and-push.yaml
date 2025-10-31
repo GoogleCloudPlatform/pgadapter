@@ -34,6 +34,21 @@ jobs:
       # Configure docker to use the gcloud command-line tool as a credential helper
       - run: gcloud auth configure-docker gcr.io
 
+      # This command adds a 'no-new-use-public-image-...' tag to all existing Docker images in the
+      # artifact registry that do not already have such a tag.
+      - name: Tag existing images with no-new-use-public-image
+        run: |
+          eval "$(gcloud --verbosity=error artifacts docker images list us-docker.pkg.dev/cloud-spanner-pg-adapter/gcr.io/pgadapter 2>&1 \
+            --include-tags \
+            --filter="NOT tags:no-new-use*" \
+            | grep -v "^Listing items under project" \
+            | sed -n 's/^[^ ]* *sha256:\([^ ]*\).*$/gcloud artifacts docker tags add us-docker.pkg.dev\/cloud-spanner-pg-adapter\/gcr.io\/pgadapter@sha256:\1 us-docker.pkg.dev\/cloud-spanner-pg-adapter\/gcr.io\/pgadapter:no-new-use-public-image-\1/p')"
+          eval "$(gcloud --verbosity=error artifacts docker images list us-docker.pkg.dev/cloud-spanner-pg-adapter/gcr.io/pgadapter-distroless 2>&1 \
+            --include-tags \
+            --filter="NOT tags:no-new-use*" \
+            | grep -v "^Listing items under project" \
+            | sed -n 's/^[^ ]* *sha256:\([^ ]*\).*$/gcloud artifacts docker tags add us-docker.pkg.dev\/cloud-spanner-pg-adapter\/gcr.io\/pgadapter-distroless@sha256:\1 us-docker.pkg.dev\/cloud-spanner-pg-adapter\/gcr.io\/pgadapter-distroless:no-new-use-public-image-\1/p')"
+
       # Build and Publish the Docker images
       - name: Build and Publish
         run: |
