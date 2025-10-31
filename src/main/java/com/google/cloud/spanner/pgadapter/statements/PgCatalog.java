@@ -893,7 +893,7 @@ public class PgCatalog {
             + "       i.is_unique='YES' as indisunique, i.is_unique='YES' and i.is_null_filtered='NO' as indnullsnotdistinct,\n"
             + "       i.index_type='PRIMARY_KEY' as indisprimary, false as indisexclusion, true as indimmediate,\n"
             + "       false as indisclustered, true as indisvalid, false as indcheckxmin, true as indisready,\n"
-            + "       true as indislive, false as indisreplident, string_agg(c.ordinal_position::varchar, ' ') as indkey,\n"
+            + "       true as indislive, false as indisreplident, array_agg(c.ordinal_position) as indkey,\n"
             + "       ''::varchar as indcollation, ''::varchar as indclass, ''::varchar as indoption,"
             + "       null::varchar as indexprs, i.filter as indpred\n"
             + "from information_schema.indexes i\n"
