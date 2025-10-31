@@ -200,6 +200,22 @@ public class ClientAutoDetector {
                       + "WHERE ic.table_schema='public' and ic.table_name='$1'\n"
                       + "AND i.index_type='PRIMARY_KEY'\n"
                       + "ORDER BY ordinal_position"),
+              RegexQueryPartReplacer.replaceAndStop(
+                  Pattern.compile(
+                      "SELECT\\s+a\\.attname\\s+"
+                          + "FROM pg_index i\\s+"
+                          + "JOIN pg_attribute a\\s+"
+                          + "ON a.attrelid = i.indrelid\\s+"
+                          + "AND a.attnum = ANY\\(i.indkey\\)\\s+"
+                          + "WHERE i.indrelid = '\"?(.+?)\"?'::regclass\\s+"
+                          + "AND i.indisprimary\\s+"
+                          + "ORDER BY array_position\\(i.indkey, a.attnum\\)"),
+                  "SELECT ic.column_name as attname\n"
+                      + "FROM information_schema.index_columns ic\n"
+                      + "INNER JOIN information_schema.indexes i using (table_catalog, table_schema, table_name, index_name)\n"
+                      + "WHERE ic.table_schema='public' and ic.table_name='$1'\n"
+                      + "AND i.index_type='PRIMARY_KEY'\n"
+                      + "ORDER BY ordinal_position"),
               RegexQueryPartReplacer.replace(
                   Pattern.compile(
                       "format_type\\s*\\(\\s*a\\.atttypid\\s*,\\s*a\\.atttypmod\\s*\\)"),
