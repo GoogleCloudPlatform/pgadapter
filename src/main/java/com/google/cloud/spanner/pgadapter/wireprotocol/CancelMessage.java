@@ -17,30 +17,47 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.text.MessageFormat;
+import java.util.Arrays;
 
 /**
  * This message handles the imperative cancellation, as issues in a new connection by the PG wire
  * protocol. We expect that this message contains an ID for the connection which issues the original
  * query, as well as an auth secret.
+ *
+ * <p>In protocol 3.0, the secret is a 4-byte integer.
+ *
+ * <p>In protocol 3.2, the secret is a 32-byte array.
  */
 @InternalApi
 public class CancelMessage extends BootstrapMessage {
 
-  private static final int MESSAGE_LENGTH = 16;
+  private static final int PROTOCOL_3_0_MESSAGE_LENGTH = 16;
   public static final int IDENTIFIER = 80877102; // First Hextet: 1234, Second Hextet: 5678
 
   private final int connectionId;
-  private final int secret;
+  private final int secret; // For protocol 3.0
+  private final byte[] secretBytes; // For protocol 3.2
 
-  public CancelMessage(ConnectionHandler connection) throws Exception {
-    super(connection, MESSAGE_LENGTH);
+  public CancelMessage(ConnectionHandler connection, int length) throws Exception {
+    super(connection, length);
     this.connectionId = this.inputStream.readInt();
-    this.secret = this.inputStream.readInt();
+    if (length == PROTOCOL_3_0_MESSAGE_LENGTH) {
+      this.secret = this.inputStream.readInt();
+      this.secretBytes = null;
+    } else {
+      this.secretBytes = new byte[ConnectionHandler.DEFAULT_KEY_LENGTH_BYTES];
+      this.inputStream.readFully(secretBytes);
+      this.secret = -1;
+    }
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    this.connection.cancelActiveStatement(this.connectionId, this.secret);
+    if (this.secretBytes != null) {
+      this.connection.cancelActiveStatement(this.connectionId, this.secretBytes);
+    } else {
+      this.connection.cancelActiveStatement(this.connectionId, this.secret);
+    }
     this.connection.handleTerminate();
   }
 
@@ -51,8 +68,13 @@ public class CancelMessage extends BootstrapMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}, " + "Connection ID: {1}, " + "Secret: {2}")
-        .format(new Object[] {this.length, this.connectionId, this.secret});
+    if (this.secretBytes != null) {
+      return new MessageFormat("Length: {0}, Connection ID: {1}, Secret: {2}")
+          .format(new Object[] {this.length, this.connectionId, Arrays.toString(this.secretBytes)});
+    } else {
+      return new MessageFormat("Length: {0}, Connection ID: {1}, Secret: {2}")
+          .format(new Object[] {this.length, this.connectionId, this.secret});
+    }
   }
 
   @Override
@@ -66,5 +88,9 @@ public class CancelMessage extends BootstrapMessage {
 
   public int getSecret() {
     return secret;
+  }
+
+  public byte[] getSecretBytes() {
+    return secretBytes;
   }
 }

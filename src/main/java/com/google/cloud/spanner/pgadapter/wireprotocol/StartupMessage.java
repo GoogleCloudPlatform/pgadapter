@@ -37,14 +37,20 @@ public class StartupMessage extends BootstrapMessage {
   private static final Logger logger = Logger.getLogger(StartupMessage.class.getName());
   static final String DATABASE_KEY = "database";
   private static final String USER_KEY = "user";
-  public static final int IDENTIFIER = 196608; // First Hextet: 3 (version), Second Hextet: 0
+  // Protocol version constants
+  public static final int PROTOCOL_VERSION_3_0 = 196608;
+  public static final int PROTOCOL_VERSION_3_2 = 196610;
+  public static final int IDENTIFIER = PROTOCOL_VERSION_3_0;
 
   private final boolean authenticate;
   private final Map<String, String> parameters;
 
-  public StartupMessage(ConnectionHandler connection, int length) throws Exception {
+  /** Constructor for when the protocol version is already known. */
+  public StartupMessage(ConnectionHandler connection, int length, int protocolVersion)
+      throws Exception {
     super(connection, length);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
+    connection.setProtocolVersion(protocolVersion);
     String rawParameters = this.readAll();
     this.parameters = this.parseParameters(rawParameters);
     if (connection.getServer().getOptions().shouldAutoDetectClient()) {
@@ -108,7 +114,9 @@ public class StartupMessage extends BootstrapMessage {
     sendStartupMessage(
         connection.getConnectionMetadata().getOutputStream(),
         connection.getConnectionId(),
+        connection.getProtocolVersion(),
         connection.getSecret(),
+        connection.getSecretBytes(),
         connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState(),
         connection.getWellKnownClient().createStartupNoticeResponses(connection));
     connection.setStatus(ConnectionStatus.AUTHENTICATED);

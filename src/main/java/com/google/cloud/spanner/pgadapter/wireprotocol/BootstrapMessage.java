@@ -36,6 +36,7 @@ import java.util.Map;
  */
 @InternalApi
 public abstract class BootstrapMessage extends WireMessage {
+
   public BootstrapMessage(ConnectionHandler connection, int length) {
     super(connection, length);
   }
@@ -56,12 +57,13 @@ public abstract class BootstrapMessage extends WireMessage {
         return new SSLMessage(connection);
       case GSSENCRequestMessage.IDENTIFIER:
         return new GSSENCRequestMessage(connection);
-      case StartupMessage.IDENTIFIER:
-        return new StartupMessage(connection, length);
+      case StartupMessage.PROTOCOL_VERSION_3_0:
+      case StartupMessage.PROTOCOL_VERSION_3_2:
+        return new StartupMessage(connection, length, protocol);
       case CancelMessage.IDENTIFIER:
-        return new CancelMessage(connection);
+        return new CancelMessage(connection, length);
       default:
-        throw new IllegalStateException("Unknown message");
+        throw new IllegalStateException("Unknown message protocol: " + protocol);
     }
   }
 
@@ -106,12 +108,18 @@ public abstract class BootstrapMessage extends WireMessage {
   public static void sendStartupMessage(
       DataOutputStream output,
       int connectionId,
+      int protocolVersion,
       int secret,
+      byte[] secretBytes,
       SessionState sessionState,
       Iterable<NoticeResponse> startupNotices)
       throws Exception {
     new AuthenticationOkResponse(output).send(false);
-    new KeyDataResponse(output, connectionId, secret).send(false);
+    if (protocolVersion == StartupMessage.PROTOCOL_VERSION_3_2) {
+      new KeyDataResponse(output, connectionId, secretBytes).send(false);
+    } else {
+      new KeyDataResponse(output, connectionId, secret).send(false);
+    }
     new ParameterStatusResponse(
             output,
             "server_version".getBytes(StandardCharsets.UTF_8),

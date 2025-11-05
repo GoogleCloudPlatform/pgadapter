@@ -28,17 +28,30 @@ public class KeyDataResponse extends WireOutput {
 
   private final int processId;
   private final int secretKey;
+  private final byte[] secretBytes;
 
   public KeyDataResponse(DataOutputStream output, int processId, int secretKey) {
     super(output, 12);
     this.processId = processId;
     this.secretKey = secretKey;
+    this.secretBytes = null;
+  }
+
+  public KeyDataResponse(DataOutputStream output, int processId, byte[] secretKey) {
+    super(output, 8 + secretKey.length);
+    this.processId = processId;
+    this.secretBytes = secretKey;
+    this.secretKey = -1;
   }
 
   @Override
   public void sendPayload() throws IOException {
     this.outputStream.writeInt(this.processId);
-    this.outputStream.writeInt(this.secretKey);
+    if (this.secretBytes != null) {
+      this.outputStream.write(this.secretBytes);
+    } else {
+      this.outputStream.writeInt(this.secretKey);
+    }
   }
 
   @Override
