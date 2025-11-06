@@ -108,7 +108,7 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
@@ -117,7 +117,7 @@ import org.postgresql.util.PGInterval;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
   private static final String pgVersion = "14.1";
   private static final int RANDOM_RESULTS_ROW_COUNT = 10;
@@ -127,6 +127,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           "SET extra_float_digits = 2",
           "SET extra_float_digits = 3",
           "SET application_name = 'PostgreSQL JDBC Driver'");
+
+  @Parameterized.Parameters(name = "protocolVersion={0}")
+  public static Collection<Object[]> parameters() {
+    return Arrays.asList(new Object[][] {{"3.0"}, {"3.2"}});
+  }
+
+  private final String protocolVersion;
+
+  public JdbcMockServerTest(String protocolVersion) {
+    this.protocolVersion = protocolVersion;
+  }
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -586,8 +597,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   private String createUrl(String database) {
     return String.format(
-        "jdbc:postgresql://localhost:%d/%s?options=-c%%20server_version=%s",
-        pgServer.getLocalPort(), database, pgVersion);
+        "jdbc:postgresql://localhost:%d/%s?options=-c%%20server_version=%s&protocolVersion=%s",
+        pgServer.getLocalPort(), database, pgVersion, protocolVersion);
   }
 
   private String getExpectedInitialApplicationName() {
@@ -4095,7 +4106,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testShowGuessTypesOverwritten() throws SQLException {
     try (Connection connection =
-        DriverManager.getConnection(createUrl() + "?options=-c%20spanner.guess_types=0")) {
+        DriverManager.getConnection(createUrl() + "&options=-c%20spanner.guess_types=0")) {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("show spanner.guess_types")) {
         assertTrue(resultSet.next());
@@ -4578,7 +4589,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSetTimeZoneToDefault() throws SQLException {
     try (Connection connection =
-        DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
+        DriverManager.getConnection(createUrl() + "&options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone default");
       verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
@@ -4587,7 +4598,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSetTimeZoneToLocal() throws SQLException {
     try (Connection connection =
-        DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
+        DriverManager.getConnection(createUrl() + "&options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone local");
       verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
@@ -4751,7 +4762,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection =
         DriverManager.getConnection(
             createUrl()
-                + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
+                + "&options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
       verifySettingValue(
           connection, "spanner.ddl_transaction_mode", "AutocommitExplicitTransaction");
     }
@@ -4761,7 +4772,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testMultipleSettingsInConnectionOptions() throws SQLException {
     try (Connection connection =
         DriverManager.getConnection(
-            createUrl() + "?options=-c%20spanner.setting1=value1%20-c%20spanner.setting2=value2")) {
+            createUrl() + "&options=-c%20spanner.setting1=value1%20-c%20spanner.setting2=value2")) {
       verifySettingValue(connection, "spanner.setting1", "value1");
       verifySettingValue(connection, "spanner.setting2", "value2");
     }
@@ -4770,7 +4781,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testServerVersionInConnectionOptions() throws SQLException {
     try (Connection connection =
-        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=4.1")) {
+        DriverManager.getConnection(createUrl() + "&options=-c%20server_version=4.1")) {
       verifySettingValue(connection, "server_version", "4.1");
       verifySettingValue(connection, "server_version_num", "40001");
     }
@@ -4780,7 +4791,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testCustomServerVersionInConnectionOptions() throws SQLException {
     try (Connection connection =
         DriverManager.getConnection(
-            createUrl() + "?options=-c%20server_version=5.2 custom version")) {
+            createUrl() + "&options=-c%20server_version=5.2 custom version")) {
       verifySettingValue(connection, "server_version", "5.2 custom version");
       verifySettingValue(connection, "server_version_num", "50002");
     }
@@ -4790,7 +4801,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSetConnectionApiOptionInConnectionOptions() throws SQLException {
     try (Connection connection =
         DriverManager.getConnection(
-            createUrl() + "?options=-c%20spanner.autocommit_dml_mode='partitioned_non_atomic'")) {
+            createUrl() + "&options=-c%20spanner.autocommit_dml_mode='partitioned_non_atomic'")) {
       verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
     }
   }
@@ -4799,7 +4810,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSetInvalidConnectionApiOptionInConnectionOptions() throws SQLException {
     try (Connection connection =
         DriverManager.getConnection(
-            createUrl() + "?options=-c%20spanner.read_only_staleness='foo'")) {
+            createUrl() + "&options=-c%20spanner.read_only_staleness='foo'")) {
       verifySettingValue(connection, "spanner.read_only_staleness", "STRONG");
     }
   }
@@ -4809,7 +4820,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection =
         DriverManager.getConnection(
             createUrl()
-                + "?options=-c%20spanner.read_only_staleness='foo'"
+                + "&options=-c%20spanner.read_only_staleness='foo'"
                 + "%20-c%20spanner.autocommit_dml_mode='partitioned_non_atomic'")) {
       verifySettingValue(connection, "spanner.read_only_staleness", "STRONG");
       verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
@@ -4886,7 +4897,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testReplacePgCatalogTablesOff() throws SQLException {
     try (Connection connection =
         DriverManager.getConnection(
-            createUrl() + "?options=-c%20spanner.replace_pg_catalog_tables=off")) {
+            createUrl() + "&options=-c%20spanner.replace_pg_catalog_tables=off")) {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("show spanner.replace_pg_catalog_tables")) {
         assertTrue(resultSet.next());
@@ -6025,7 +6036,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String sql = "SELECT 1";
     for (boolean autocommit : new boolean[] {true, false}) {
       ExecutorService executor = Executors.newSingleThreadExecutor();
-
       try (Connection connection = DriverManager.getConnection(createUrl());
           java.sql.Statement statement = connection.createStatement()) {
         connection.setAutoCommit(autocommit);
