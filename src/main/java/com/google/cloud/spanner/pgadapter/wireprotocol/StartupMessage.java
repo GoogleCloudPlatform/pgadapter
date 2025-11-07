@@ -26,7 +26,6 @@ import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 /**
@@ -35,18 +34,19 @@ import javax.annotation.Nullable;
  */
 @InternalApi
 public class StartupMessage extends BootstrapMessage {
-  private static final Logger logger = Logger.getLogger(StartupMessage.class.getName());
+
   static final String DATABASE_KEY = "database";
   private static final String USER_KEY = "user";
   // Protocol version constants
-  public static final int PROTOCOL_VERSION_3_0 = 196608;
-  public static final int PROTOCOL_VERSION_3_2 = 196610;
+  public static final int PROTOCOL_VERSION_3_0 =
+      196608; // First Hextet: 3 (version), Second Hextet: 0
+  public static final int PROTOCOL_VERSION_3_2 =
+      196610; // First Hextet: 3 (version), Second Hextet: 2
   public static final int IDENTIFIER = PROTOCOL_VERSION_3_0;
 
   private final boolean authenticate;
   private final Map<String, String> parameters;
 
-  /** Constructor for when the protocol version is already known. */
   public StartupMessage(ConnectionHandler connection, int length, int protocolVersion)
       throws Exception {
     super(connection, length);
@@ -65,10 +65,9 @@ public class StartupMessage extends BootstrapMessage {
   }
 
   private void setCancelSecret(ConnectionHandler connection, int protocolVersion) {
-    SecureRandom random = new SecureRandom();
     int secretLen = StartupMessage.PROTOCOL_VERSION_3_0 == protocolVersion ? 4 : 32;
     byte[] secretBytes = new byte[secretLen];
-    random.nextBytes(secretBytes);
+    new SecureRandom().nextBytes(secretBytes);
     connection.setSecret(secretBytes);
   }
 

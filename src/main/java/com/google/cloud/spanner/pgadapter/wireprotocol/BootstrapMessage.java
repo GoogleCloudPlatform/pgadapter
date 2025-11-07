@@ -63,7 +63,7 @@ public abstract class BootstrapMessage extends WireMessage {
       case CancelMessage.IDENTIFIER:
         return new CancelMessage(connection, length);
       default:
-        throw new IllegalStateException("Unknown message protocol: " + protocol);
+        throw new IllegalStateException("Unknown message");
     }
   }
 
@@ -108,12 +108,12 @@ public abstract class BootstrapMessage extends WireMessage {
   public static void sendStartupMessage(
       DataOutputStream output,
       int connectionId,
-      byte[] secretBytes,
+      byte[] secret,
       SessionState sessionState,
       Iterable<NoticeResponse> startupNotices)
       throws Exception {
     new AuthenticationOkResponse(output).send(false);
-    new KeyDataResponse(output, connectionId, secretBytes).send(false);
+    new KeyDataResponse(output, connectionId, secret).send(false);
     new ParameterStatusResponse(
             output,
             "server_version".getBytes(StandardCharsets.UTF_8),

@@ -721,68 +721,12 @@ public class ConnectionHandler implements Runnable {
    * specific connection identified by connectionId. Since cancellation is a flimsy contract at
    * best, it is not imperative that the cancellation run, but it should be attempted nonetheless.
    *
-   * <p>This method is for protocol 3.0 which uses integer secrets.
-   *
    * @param connectionId The connection whose statement must be cancelled.
-   * @param secret The secret value linked to the connection that is being cancelled. If it does not
-   *     match, we cannot cancel.
+   * @param secret The secret byte array linked to the connection that is being cancelled. If it
+   *     does not match, we cannot cancel.
    * @return true if the statement was cancelled.
    */
-  // public boolean cancelActiveStatement(int connectionId, int secret) {
-  //   if (connectionId == this.connectionId) {
-  //     // You can't cancel your own statement.
-  //     return false;
-  //   }
-  //   ConnectionHandler connectionToCancel = CONNECTION_HANDLERS.get(connectionId);
-  //   if (connectionToCancel == null) {
-  //     logger.log(
-  //         Level.WARNING,
-  //         Logging.format(
-  //             "CancelActiveStatement",
-  //             () ->
-  //                 MessageFormat.format(
-  //                     "User attempted to cancel an unknown connection. Connection: {0}",
-  //                     connectionId)));
-  //     return false;
-  //   }
-  //   if (secret != connectionToCancel.secret) {
-  //     logger.log(
-  //         Level.WARNING,
-  //         Logging.format(
-  //             "CancelActiveStatement",
-  //             () ->
-  //                 MessageFormat.format(
-  //                     "User attempted to cancel a connection with the incorrect secret."
-  //                         + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
-  //                     connectionId, secret, connectionToCancel.secret)));
-  //     // Since the user does not accept a response, there is no need to except here: simply
-  // return.
-  //     return false;
-  //   }
-  //   // We can mostly ignore the exception since cancel does not expect any result (positive or
-  //   // otherwise)
-  //   try {
-  //     connectionToCancel.getSpannerConnection().cancel();
-  //     connectionToCancel.getThread().interrupt();
-  //     return true;
-  //   } catch (Throwable ignore) {
-  //   }
-  //   return false;
-  // }
-
-  /**
-   * To be used by a cancellation command to cancel a currently running statement, as contained in a
-   * specific connection identified by connectionId. Since cancellation is a flimsy contract at
-   * best, it is not imperative that the cancellation run, but it should be attempted nonetheless.
-   *
-   * <p>This method is for protocol 3.2 which uses byte array secrets.
-   *
-   * @param connectionId The connection whose statement must be cancelled.
-   * @param secretBytes The secret byte array linked to the connection that is being cancelled. If
-   *     it does not match, we cannot cancel.
-   * @return true if the statement was cancelled.
-   */
-  public boolean cancelActiveStatement(int connectionId, byte[] secretBytes) {
+  public boolean cancelActiveStatement(int connectionId, byte[] secret) {
     if (connectionId == this.connectionId) {
       // You can't cancel your own statement.
       return false;
@@ -801,7 +745,7 @@ public class ConnectionHandler implements Runnable {
     }
 
     if (StartupMessage.PROTOCOL_VERSION_3_0 == protocolVersion) {
-      if (secretBytes.length != 4) {
+      if (secret.length != 4) {
         throw PGExceptionFactory.newPGException(
             "protocol version 3.0 accepts only 4 bytes for the secret ",
             SQLState.ProtocolViolation);
@@ -809,26 +753,27 @@ public class ConnectionHandler implements Runnable {
     }
 
     if (StartupMessage.PROTOCOL_VERSION_3_2 == protocolVersion) {
-      if (secretBytes.length != 32) {
+      if (secret.length != 32) {
         throw PGExceptionFactory.newPGException(
             "protocol version 3.2 accepts 32 bytes for the secret ", SQLState.ProtocolViolation);
       }
     }
 
-    if (!Arrays.equals(secretBytes, connectionToCancel.getSecret())) {
+    if (!Arrays.equals(secret, connectionToCancel.getSecret())) {
       logger.log(
           Level.WARNING,
           Logging.format(
               "CancelActiveStatement",
               () ->
                   MessageFormat.format(
-                      "User attempted to cancel a connection with the incorrect secret bytes."
-                          + "Connection: {0}",
-                      connectionId)));
+                      "User attempted to cancel a connection with the incorrect secret."
+                          + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
+                      connectionId,
+                      Arrays.toString(secret),
+                      Arrays.toString(connectionToCancel.getSecret()))));
       // Since the user does not accept a response, there is no need to except here: simply return.
       return false;
     }
-
     // We can mostly ignore the exception since cancel does not expect any result (positive or
     // otherwise)
     try {

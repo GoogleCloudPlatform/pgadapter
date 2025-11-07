@@ -1874,7 +1874,7 @@ public class ProtocolTest {
     assertEquals(CancelMessage.class, message.getClass());
 
     assertEquals(1, ((CancelMessage) message).getConnectionId());
-    assertArrayEquals(secret, ((CancelMessage) message).getSecretBytes());
+    assertArrayEquals(secret, ((CancelMessage) message).getSecret());
 
     message.send();
 
@@ -1907,7 +1907,7 @@ public class ProtocolTest {
 
     CancelMessage cancel = (CancelMessage) message;
     assertEquals(1, cancel.getConnectionId());
-    assertArrayEquals(secret, cancel.getSecretBytes());
+    assertArrayEquals(secret, cancel.getSecret());
 
     message.send();
 

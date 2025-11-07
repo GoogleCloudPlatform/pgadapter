@@ -6036,6 +6036,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String sql = "SELECT 1";
     for (boolean autocommit : new boolean[] {true, false}) {
       ExecutorService executor = Executors.newSingleThreadExecutor();
+
       try (Connection connection = DriverManager.getConnection(createUrl());
           java.sql.Statement statement = connection.createStatement()) {
         connection.setAutoCommit(autocommit);

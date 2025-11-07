@@ -23,10 +23,6 @@ import java.util.Arrays;
  * This message handles the imperative cancellation, as issues in a new connection by the PG wire
  * protocol. We expect that this message contains an ID for the connection which issues the original
  * query, as well as an auth secret.
- *
- * <p>In protocol 3.0, the secret is a 4-byte integer.
- *
- * <p>In protocol 3.2, the secret is a 32-byte array.
  */
 @InternalApi
 public class CancelMessage extends BootstrapMessage {
@@ -34,19 +30,19 @@ public class CancelMessage extends BootstrapMessage {
   public static final int IDENTIFIER = 80877102; // First Hextet: 1234, Second Hextet: 5678
 
   private final int connectionId;
-  private final byte[] secretBytes;
+  private final byte[] secret;
 
   public CancelMessage(ConnectionHandler connection, int length) throws Exception {
     super(connection, length);
     int secretLen = length - 12;
     this.connectionId = this.inputStream.readInt();
-    this.secretBytes = new byte[secretLen];
-    this.inputStream.readFully(secretBytes);
+    this.secret = new byte[secretLen];
+    this.inputStream.readFully(secret);
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    this.connection.cancelActiveStatement(this.connectionId, this.secretBytes);
+    this.connection.cancelActiveStatement(this.connectionId, this.secret);
     this.connection.handleTerminate();
   }
 
@@ -58,7 +54,7 @@ public class CancelMessage extends BootstrapMessage {
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}, Connection ID: {1}, Secret: {2}")
-        .format(new Object[] {this.length, this.connectionId, Arrays.toString(this.secretBytes)});
+        .format(new Object[] {this.length, this.connectionId, Arrays.toString(this.secret)});
   }
 
   @Override
@@ -70,7 +66,7 @@ public class CancelMessage extends BootstrapMessage {
     return connectionId;
   }
 
-  public byte[] getSecretBytes() {
-    return secretBytes;
+  public byte[] getSecret() {
+    return secret;
   }
 }
