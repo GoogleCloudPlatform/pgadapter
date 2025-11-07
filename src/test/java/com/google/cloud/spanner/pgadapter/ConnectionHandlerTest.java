@@ -338,12 +338,11 @@ public class ConnectionHandlerTest {
           connectionHandler.cancelActiveStatement(
               connectionHandler.getConnectionId(), connectionHandler.getSecret()));
       // Cancelling a random non-existing connection should not work.
-      assertFalse(connectionHandler.cancelActiveStatement(100, 100));
+      assertFalse(connectionHandler.cancelActiveStatement(100, new byte[4]));
       // Cancelling another connecting using the wrong secret is not allowed.
       assertFalse(
           connectionHandler.cancelActiveStatement(
-              connectionHandlerToCancel.getConnectionId(),
-              connectionHandlerToCancel.getSecret() - 1));
+              connectionHandlerToCancel.getConnectionId(), new byte[4]));
 
       assertTrue(
           connectionHandler.cancelActiveStatement(

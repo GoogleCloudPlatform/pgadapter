@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPasswordResponse;
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -51,6 +52,7 @@ public class StartupMessage extends BootstrapMessage {
     super(connection, length);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
     connection.setProtocolVersion(protocolVersion);
+    setCancelSecret(connection, protocolVersion);
     String rawParameters = this.readAll();
     this.parameters = this.parseParameters(rawParameters);
     if (connection.getServer().getOptions().shouldAutoDetectClient()) {
@@ -60,6 +62,14 @@ public class StartupMessage extends BootstrapMessage {
     } else {
       connection.setWellKnownClient(WellKnownClient.UNSPECIFIED);
     }
+  }
+
+  private void setCancelSecret(ConnectionHandler connection, int protocolVersion) {
+    SecureRandom random = new SecureRandom();
+    int secretLen = StartupMessage.PROTOCOL_VERSION_3_0 == protocolVersion ? 4 : 32;
+    byte[] secretBytes = new byte[secretLen];
+    random.nextBytes(secretBytes);
+    connection.setSecret(secretBytes);
   }
 
   @Override
@@ -114,9 +124,7 @@ public class StartupMessage extends BootstrapMessage {
     sendStartupMessage(
         connection.getConnectionMetadata().getOutputStream(),
         connection.getConnectionId(),
-        connection.getProtocolVersion(),
         connection.getSecret(),
-        connection.getSecretBytes(),
         connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState(),
         connection.getWellKnownClient().createStartupNoticeResponses(connection));
     connection.setStatus(ConnectionStatus.AUTHENTICATED);

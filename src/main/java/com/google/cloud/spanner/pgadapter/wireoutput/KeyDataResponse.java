@@ -27,31 +27,18 @@ import java.text.MessageFormat;
 public class KeyDataResponse extends WireOutput {
 
   private final int processId;
-  private final int secretKey;
   private final byte[] secretBytes;
-
-  public KeyDataResponse(DataOutputStream output, int processId, int secretKey) {
-    super(output, 12);
-    this.processId = processId;
-    this.secretKey = secretKey;
-    this.secretBytes = null;
-  }
 
   public KeyDataResponse(DataOutputStream output, int processId, byte[] secretKey) {
     super(output, 8 + secretKey.length);
     this.processId = processId;
     this.secretBytes = secretKey;
-    this.secretKey = -1;
   }
 
   @Override
   public void sendPayload() throws IOException {
     this.outputStream.writeInt(this.processId);
-    if (this.secretBytes != null) {
-      this.outputStream.write(this.secretBytes);
-    } else {
-      this.outputStream.writeInt(this.secretKey);
-    }
+    this.outputStream.write(this.secretBytes);
   }
 
   @Override
@@ -67,6 +54,6 @@ public class KeyDataResponse extends WireOutput {
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}, " + "Process ID: {1}, " + "Secret Key: {2}")
-        .format(new Object[] {this.length, this.processId, this.secretKey});
+        .format(new Object[] {this.length, this.processId, this.secretBytes});
   }
 }

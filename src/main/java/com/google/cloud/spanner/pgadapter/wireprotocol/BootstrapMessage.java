@@ -108,18 +108,12 @@ public abstract class BootstrapMessage extends WireMessage {
   public static void sendStartupMessage(
       DataOutputStream output,
       int connectionId,
-      int protocolVersion,
-      int secret,
       byte[] secretBytes,
       SessionState sessionState,
       Iterable<NoticeResponse> startupNotices)
       throws Exception {
     new AuthenticationOkResponse(output).send(false);
-    if (protocolVersion == StartupMessage.PROTOCOL_VERSION_3_2) {
-      new KeyDataResponse(output, connectionId, secretBytes).send(false);
-    } else {
-      new KeyDataResponse(output, connectionId, secret).send(false);
-    }
+    new KeyDataResponse(output, connectionId, secretBytes).send(false);
     new ParameterStatusResponse(
             output,
             "server_version".getBytes(StandardCharsets.UTF_8),

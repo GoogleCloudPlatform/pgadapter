@@ -1618,6 +1618,10 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    when(connectionHandler.getProtocolVersion()).thenReturn(StartupMessage.PROTOCOL_VERSION_3_0);
+    byte[] secretBytes = new byte[4];
+    new SecureRandom().nextBytes(secretBytes);
+    when(connectionHandler.getSecret()).thenReturn(secretBytes);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     SessionState sessionState = mock(SessionState.class);
     PGSetting serverVersionSetting = mock(PGSetting.class);
@@ -1649,7 +1653,9 @@ public class ProtocolTest {
     assertEquals('K', outputResult.readByte());
     assertEquals(12, outputResult.readInt());
     assertEquals(1, outputResult.readInt());
-    assertEquals(0, outputResult.readInt());
+    byte[] keyBytes = new byte[4];
+    outputResult.readFully(keyBytes);
+    assertArrayEquals(secretBytes, keyBytes);
 
     // ParameterStatusResponse (x11)
     assertEquals('S', outputResult.readByte());
@@ -1749,7 +1755,7 @@ public class ProtocolTest {
     when(connectionHandler.getProtocolVersion()).thenReturn(StartupMessage.PROTOCOL_VERSION_3_2);
     byte[] secretBytes = new byte[DEFAULT_KEY_LENGTH_BYTES];
     new SecureRandom().nextBytes(secretBytes);
-    when(connectionHandler.getSecretBytes()).thenReturn(secretBytes);
+    when(connectionHandler.getSecret()).thenReturn(secretBytes);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     SessionState sessionState = mock(SessionState.class);
     PGSetting serverVersionSetting = mock(PGSetting.class);
@@ -1849,7 +1855,8 @@ public class ProtocolTest {
     byte[] length = intToBytes(16);
     byte[] protocol = intToBytes(80877102);
     byte[] connectionId = intToBytes(1);
-    byte[] secret = intToBytes(1);
+    byte[] secret = new byte[4];
+    new SecureRandom().nextBytes(secret);
 
     byte[] value = Bytes.concat(length, protocol, connectionId, secret);
 
@@ -1867,11 +1874,11 @@ public class ProtocolTest {
     assertEquals(CancelMessage.class, message.getClass());
 
     assertEquals(1, ((CancelMessage) message).getConnectionId());
-    assertEquals(1, ((CancelMessage) message).getSecret());
+    assertArrayEquals(secret, ((CancelMessage) message).getSecretBytes());
 
     message.send();
 
-    verify(connectionHandler).cancelActiveStatement(1, 1);
+    verify(connectionHandler).cancelActiveStatement(1, secret);
     verify(connectionHandler).handleTerminate();
   }
 
