@@ -597,8 +597,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   private String createUrl(String database) {
     return String.format(
-        "jdbc:postgresql://localhost:%d/%s?options=-c%%20server_version=%s%%20-c%%20protocol_version=%s",
-        pgServer.getLocalPort(), database, pgVersion, protocolVersion);
+        "jdbc:postgresql://localhost:%d/%s?protocolVersion=%s&options=-c%%20server_version=%s",
+        pgServer.getLocalPort(), database, protocolVersion, pgVersion);
   }
 
   private String getExpectedInitialApplicationName() {
