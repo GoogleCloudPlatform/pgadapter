@@ -128,8 +128,10 @@ public class ConnectionHandler implements Runnable {
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
   private Thread thread;
   private final int connectionId;
+  private int protocolVersion;
   private byte[] secret;
   public static final int DEFAULT_KEY_LENGTH_BYTES = 32;
+  public static final int PROTOCOL_30_KEY_LENGTH_BYTES = 4;
 
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
   //  32 bytes, and shouldn't be incremented on failed startups.
@@ -145,7 +147,6 @@ public class ConnectionHandler implements Runnable {
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
   private boolean hasDeterminedClientUsingQuery;
-  private int protocolVersion;
 
   /**
    * List of PARSE messages that we received before auto-detecting the client. This list can be used
@@ -722,8 +723,8 @@ public class ConnectionHandler implements Runnable {
    * best, it is not imperative that the cancellation run, but it should be attempted nonetheless.
    *
    * @param connectionId The connection whose statement must be cancelled.
-   * @param secret The secret byte array linked to the connection that is being cancelled. If it
-   *     does not match, we cannot cancel.
+   * @param secret The secret value linked to the connection that is being cancelled. If it does not
+   *     match, we cannot cancel.
    * @return true if the statement was cancelled.
    */
   public boolean cancelActiveStatement(int connectionId, byte[] secret) {
@@ -744,16 +745,16 @@ public class ConnectionHandler implements Runnable {
       return false;
     }
 
-    if (StartupMessage.PROTOCOL_VERSION_3_0 == protocolVersion) {
-      if (secret.length != 4) {
+    if (StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER == protocolVersion) {
+      if (secret.length != PROTOCOL_30_KEY_LENGTH_BYTES) {
         throw PGExceptionFactory.newPGException(
             "protocol version 3.0 accepts only 4 bytes for the secret ",
             SQLState.ProtocolViolation);
       }
     }
 
-    if (StartupMessage.PROTOCOL_VERSION_3_2 == protocolVersion) {
-      if (secret.length != 32) {
+    if (StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER == protocolVersion) {
+      if (secret.length != DEFAULT_KEY_LENGTH_BYTES) {
         throw PGExceptionFactory.newPGException(
             "protocol version 3.2 accepts 32 bytes for the secret ", SQLState.ProtocolViolation);
       }

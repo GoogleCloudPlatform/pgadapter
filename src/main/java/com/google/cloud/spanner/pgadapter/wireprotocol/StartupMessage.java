@@ -38,12 +38,12 @@ public class StartupMessage extends BootstrapMessage {
   static final String DATABASE_KEY = "database";
   private static final String USER_KEY = "user";
   // Protocol version constants
-  public static final int PROTOCOL_VERSION_3_0 =
+  public static final int PROTOCOL_VERSION_3_0_IDENTIFIER =
       196608; // First Hextet: 3 (version), Second Hextet: 0
-  public static final int PROTOCOL_VERSION_3_2 =
+  public static final int PROTOCOL_VERSION_3_2_IDENTIFIER =
       196610; // First Hextet: 3 (version), Second Hextet: 2
-  public static final int IDENTIFIER = PROTOCOL_VERSION_3_0;
 
+  private final int protocolVersion;
   private final boolean authenticate;
   private final Map<String, String> parameters;
 
@@ -51,6 +51,7 @@ public class StartupMessage extends BootstrapMessage {
       throws Exception {
     super(connection, length);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
+    this.protocolVersion = protocolVersion;
     connection.setProtocolVersion(protocolVersion);
     setCancelSecret(connection, protocolVersion);
     String rawParameters = this.readAll();
@@ -65,7 +66,10 @@ public class StartupMessage extends BootstrapMessage {
   }
 
   private void setCancelSecret(ConnectionHandler connection, int protocolVersion) {
-    int secretLen = StartupMessage.PROTOCOL_VERSION_3_0 == protocolVersion ? 4 : 32;
+    int secretLen =
+        StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER == protocolVersion
+            ? ConnectionHandler.PROTOCOL_30_KEY_LENGTH_BYTES
+            : ConnectionHandler.DEFAULT_KEY_LENGTH_BYTES;
     byte[] secretBytes = new byte[secretLen];
     new SecureRandom().nextBytes(secretBytes);
     connection.setSecret(secretBytes);
@@ -165,7 +169,7 @@ public class StartupMessage extends BootstrapMessage {
 
   @Override
   public String getIdentifier() {
-    return Integer.toString(IDENTIFIER);
+    return Integer.toString(protocolVersion);
   }
 
   public Map<String, String> getParameters() {

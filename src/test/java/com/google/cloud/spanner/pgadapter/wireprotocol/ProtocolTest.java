@@ -15,8 +15,11 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.DEFAULT_KEY_LENGTH_BYTES;
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.PROTOCOL_30_KEY_LENGTH_BYTES;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_FORMAT_CODES;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.MessageReader.MAX_INVALID_MESSAGE_COUNT;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -1583,8 +1586,8 @@ public class ProtocolTest {
   }
 
   @Test
-  public void testStartUpMessage() throws Exception {
-    byte[] protocol = intToBytes(196608);
+  public void testStartUpMessageProtocolVersion30() throws Exception {
+    byte[] protocol = intToBytes(PROTOCOL_VERSION_3_0_IDENTIFIER);
     byte[] payload =
         ("database\0"
                 + "databasename\0"
@@ -1618,8 +1621,8 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
-    when(connectionHandler.getProtocolVersion()).thenReturn(StartupMessage.PROTOCOL_VERSION_3_0);
-    byte[] secretBytes = new byte[4];
+    when(connectionHandler.getProtocolVersion()).thenReturn(PROTOCOL_VERSION_3_0_IDENTIFIER);
+    byte[] secretBytes = new byte[PROTOCOL_30_KEY_LENGTH_BYTES];
     new SecureRandom().nextBytes(secretBytes);
     when(connectionHandler.getSecret()).thenReturn(secretBytes);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
@@ -1651,9 +1654,9 @@ public class ProtocolTest {
 
     // KeyDataResponse
     assertEquals('K', outputResult.readByte());
-    assertEquals(12, outputResult.readInt());
+    assertEquals(8 + PROTOCOL_30_KEY_LENGTH_BYTES, outputResult.readInt());
     assertEquals(1, outputResult.readInt());
-    byte[] keyBytes = new byte[4];
+    byte[] keyBytes = new byte[PROTOCOL_30_KEY_LENGTH_BYTES];
     outputResult.readFully(keyBytes);
     assertArrayEquals(secretBytes, keyBytes);
 
@@ -1718,7 +1721,7 @@ public class ProtocolTest {
 
   @Test
   public void testStartUpMessageProtocolVersion32() throws Exception {
-    byte[] protocol = intToBytes(StartupMessage.PROTOCOL_VERSION_3_2);
+    byte[] protocol = intToBytes(PROTOCOL_VERSION_3_2_IDENTIFIER);
     byte[] payload =
         ("database\0"
                 + "databasename\0"
@@ -1752,7 +1755,7 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
-    when(connectionHandler.getProtocolVersion()).thenReturn(StartupMessage.PROTOCOL_VERSION_3_2);
+    when(connectionHandler.getProtocolVersion()).thenReturn(PROTOCOL_VERSION_3_2_IDENTIFIER);
     byte[] secretBytes = new byte[DEFAULT_KEY_LENGTH_BYTES];
     new SecureRandom().nextBytes(secretBytes);
     when(connectionHandler.getSecret()).thenReturn(secretBytes);
@@ -1785,9 +1788,9 @@ public class ProtocolTest {
 
     // KeyDataResponse
     assertEquals('K', outputResult.readByte());
-    assertEquals(8 + 32, outputResult.readInt());
+    assertEquals(8 + DEFAULT_KEY_LENGTH_BYTES, outputResult.readInt());
     assertEquals(1, outputResult.readInt());
-    byte[] keyBytes = new byte[32];
+    byte[] keyBytes = new byte[DEFAULT_KEY_LENGTH_BYTES];
     outputResult.readFully(keyBytes);
     assertArrayEquals(secretBytes, keyBytes);
 
@@ -1852,10 +1855,10 @@ public class ProtocolTest {
 
   @Test
   public void testCancelMessageProtocolVersion30() throws Exception {
-    byte[] length = intToBytes(16);
-    byte[] protocol = intToBytes(80877102);
+    byte[] length = intToBytes(12 + PROTOCOL_30_KEY_LENGTH_BYTES);
+    byte[] protocol = intToBytes(CancelMessage.IDENTIFIER);
     byte[] connectionId = intToBytes(1);
-    byte[] secret = new byte[4];
+    byte[] secret = new byte[PROTOCOL_30_KEY_LENGTH_BYTES];
     new SecureRandom().nextBytes(secret);
 
     byte[] value = Bytes.concat(length, protocol, connectionId, secret);
@@ -1884,10 +1887,10 @@ public class ProtocolTest {
 
   @Test
   public void testCancelMessageProtocolVersion32() throws Exception {
-    byte[] length = intToBytes(12 + 32);
-    byte[] protocol = intToBytes(80877102);
+    byte[] length = intToBytes(12 + DEFAULT_KEY_LENGTH_BYTES);
+    byte[] protocol = intToBytes(CancelMessage.IDENTIFIER);
     byte[] connectionId = intToBytes(1);
-    byte[] secret = new byte[32];
+    byte[] secret = new byte[DEFAULT_KEY_LENGTH_BYTES];
     new SecureRandom().nextBytes(secret);
 
     byte[] value = Bytes.concat(length, protocol, connectionId, secret);

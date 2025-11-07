@@ -57,8 +57,8 @@ public abstract class BootstrapMessage extends WireMessage {
         return new SSLMessage(connection);
       case GSSENCRequestMessage.IDENTIFIER:
         return new GSSENCRequestMessage(connection);
-      case StartupMessage.PROTOCOL_VERSION_3_0:
-      case StartupMessage.PROTOCOL_VERSION_3_2:
+      case StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER:
+      case StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER:
         return new StartupMessage(connection, length, protocol);
       case CancelMessage.IDENTIFIER:
         return new CancelMessage(connection, length);
