@@ -79,6 +79,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -131,7 +132,7 @@ public class ConnectionHandler implements Runnable {
   private int protocolVersion;
   private byte[] secret;
   public static final int DEFAULT_KEY_LENGTH_BYTES = 32;
-  public static final int PROTOCOL_30_KEY_LENGTH_BYTES = 4;
+  public static final int PROTOCOL_3_0_KEY_LENGTH_BYTES = 4;
 
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
   //  32 bytes, and shouldn't be incremented on failed startups.
@@ -746,7 +747,7 @@ public class ConnectionHandler implements Runnable {
     }
 
     if (StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER == connectionToCancel.getProtocolVersion()) {
-      if (secret.length != PROTOCOL_30_KEY_LENGTH_BYTES) {
+      if (secret.length != PROTOCOL_3_0_KEY_LENGTH_BYTES) {
         throw PGExceptionFactory.newPGException(
             "protocol version 3.0 accepts only 4 bytes for the secret ",
             SQLState.ProtocolViolation);
@@ -863,10 +864,6 @@ public class ConnectionHandler implements Runnable {
     return this.secret;
   }
 
-  public void setSecret(byte[] secret) {
-    this.secret = secret;
-  }
-
   public UUID getTraceConnectionId() {
     return traceConnectionId;
   }
@@ -924,8 +921,15 @@ public class ConnectionHandler implements Runnable {
     return protocolVersion;
   }
 
-  public void setProtocolVersion(int protocolVersion) {
+  public void setProtocolVersionProperties(int protocolVersion) {
     this.protocolVersion = protocolVersion;
+    int secretLen =
+        StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER == protocolVersion
+            ? ConnectionHandler.PROTOCOL_3_0_KEY_LENGTH_BYTES
+            : ConnectionHandler.DEFAULT_KEY_LENGTH_BYTES;
+    byte[] secretBytes = new byte[secretLen];
+    new SecureRandom().nextBytes(secretBytes);
+    this.secret = secretBytes;
   }
 
   public void setWellKnownClient(WellKnownClient wellKnownClient) {

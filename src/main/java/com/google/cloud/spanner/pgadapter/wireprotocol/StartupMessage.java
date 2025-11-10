@@ -22,7 +22,6 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPasswordResponse;
 import java.io.IOException;
-import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -51,11 +50,10 @@ public class StartupMessage extends BootstrapMessage {
       throws Exception {
     super(connection, length);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
-    this.protocolVersion = protocolVersion;
-    connection.setProtocolVersion(protocolVersion);
-    setCancelSecret(connection, protocolVersion);
     String rawParameters = this.readAll();
     this.parameters = this.parseParameters(rawParameters);
+    this.protocolVersion = protocolVersion;
+    connection.setProtocolVersionProperties(protocolVersion);
     if (connection.getServer().getOptions().shouldAutoDetectClient()) {
       WellKnownClient wellKnownClient =
           ClientAutoDetector.detectClient(this.parseParameterKeys(rawParameters), this.parameters);
@@ -63,16 +61,6 @@ public class StartupMessage extends BootstrapMessage {
     } else {
       connection.setWellKnownClient(WellKnownClient.UNSPECIFIED);
     }
-  }
-
-  private void setCancelSecret(ConnectionHandler connection, int protocolVersion) {
-    int secretLen =
-        StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER == protocolVersion
-            ? ConnectionHandler.PROTOCOL_30_KEY_LENGTH_BYTES
-            : ConnectionHandler.DEFAULT_KEY_LENGTH_BYTES;
-    byte[] secretBytes = new byte[secretLen];
-    new SecureRandom().nextBytes(secretBytes);
-    connection.setSecret(secretBytes);
   }
 
   @Override
