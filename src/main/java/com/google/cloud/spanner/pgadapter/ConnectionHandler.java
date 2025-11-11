@@ -64,6 +64,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -82,6 +83,7 @@ import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -127,7 +129,11 @@ public class ConnectionHandler implements Runnable {
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
   private Thread thread;
   private final int connectionId;
-  private final int secret;
+  private int protocolVersion;
+  private byte[] secret;
+  public static final int DEFAULT_KEY_LENGTH_BYTES = 32;
+  public static final int PROTOCOL_3_0_KEY_LENGTH_BYTES = 4;
+
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
   //  32 bytes, and shouldn't be incremented on failed startups.
   private static final AtomicInteger incrementingConnectionId = new AtomicInteger(0);
@@ -162,7 +168,6 @@ public class ConnectionHandler implements Runnable {
   ConnectionHandler(ProxyServer server, Socket socket, Connection spannerConnection) {
     this.server = server;
     this.socket = socket;
-    this.secret = new SecureRandom().nextInt();
     this.connectionId = incrementingConnectionId.incrementAndGet();
     this.spannerConnection = spannerConnection;
   }
@@ -723,7 +728,7 @@ public class ConnectionHandler implements Runnable {
    *     match, we cannot cancel.
    * @return true if the statement was cancelled.
    */
-  public boolean cancelActiveStatement(int connectionId, int secret) {
+  public boolean cancelActiveStatement(int connectionId, byte[] secret) {
     if (connectionId == this.connectionId) {
       // You can't cancel your own statement.
       return false;
@@ -740,7 +745,28 @@ public class ConnectionHandler implements Runnable {
                       connectionId)));
       return false;
     }
-    if (secret != connectionToCancel.secret) {
+
+    switch (connectionToCancel.getProtocolVersion()) {
+      case StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER:
+        if (secret.length != PROTOCOL_3_0_KEY_LENGTH_BYTES) {
+          throw PGExceptionFactory.newPGException(
+              "protocol version 3.0 accepts only 4 bytes for the secret ",
+              SQLState.ProtocolViolation);
+        }
+        break;
+      case StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER:
+        if (secret.length != DEFAULT_KEY_LENGTH_BYTES) {
+          throw PGExceptionFactory.newPGException(
+              "protocol version 3.2 accepts 32 bytes for the secret ", SQLState.ProtocolViolation);
+        }
+        break;
+      default:
+        throw PGExceptionFactory.newPGException(
+            "unsupported protocol version: " + connectionToCancel.getProtocolVersion(),
+            SQLState.ProtocolViolation);
+    }
+
+    if (!Arrays.equals(secret, connectionToCancel.getSecret())) {
       logger.log(
           Level.WARNING,
           Logging.format(
@@ -749,7 +775,9 @@ public class ConnectionHandler implements Runnable {
                   MessageFormat.format(
                       "User attempted to cancel a connection with the incorrect secret."
                           + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
-                      connectionId, secret, connectionToCancel.secret)));
+                      connectionId,
+                      Arrays.toString(secret),
+                      Arrays.toString(connectionToCancel.getSecret()))));
       // Since the user does not accept a response, there is no need to except here: simply return.
       return false;
     }
@@ -837,7 +865,7 @@ public class ConnectionHandler implements Runnable {
     return this.connectionId;
   }
 
-  public int getSecret() {
+  public byte[] getSecret() {
     return this.secret;
   }
 
@@ -892,6 +920,21 @@ public class ConnectionHandler implements Runnable {
 
   public WellKnownClient getWellKnownClient() {
     return wellKnownClient;
+  }
+
+  public int getProtocolVersion() {
+    return protocolVersion;
+  }
+
+  public void setProtocolVersionProperties(int protocolVersion) {
+    this.protocolVersion = protocolVersion;
+    int secretLen =
+        StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER == protocolVersion
+            ? ConnectionHandler.PROTOCOL_3_0_KEY_LENGTH_BYTES
+            : ConnectionHandler.DEFAULT_KEY_LENGTH_BYTES;
+    byte[] secretBytes = new byte[secretLen];
+    new SecureRandom().nextBytes(secretBytes);
+    this.secret = secretBytes;
   }
 
   public void setWellKnownClient(WellKnownClient wellKnownClient) {

@@ -66,7 +66,7 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
       try (DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         // Send a startup message and then quit.
         outputStream.writeInt(8); // length == 8
-        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
         outputStream.flush();
       }
     }
@@ -96,7 +96,7 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         // Request startup.
         outputStream.writeInt(17);
-        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
         outputStream.writeBytes("user");
         outputStream.writeByte(0);
         outputStream.writeBytes("foo");
@@ -118,7 +118,7 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         // Request startup.
         outputStream.writeInt(17);
-        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
         outputStream.writeBytes("user");
         outputStream.writeByte(0);
         outputStream.writeBytes("foo");
@@ -156,7 +156,7 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         // Request startup.
         outputStream.writeInt(17);
-        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
         outputStream.writeBytes("user");
         outputStream.writeByte(0);
         outputStream.writeBytes("foo");
@@ -258,7 +258,7 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         // Request startup.
         outputStream.writeInt(17);
-        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
         outputStream.writeBytes("user");
         outputStream.writeByte(0);
         outputStream.writeBytes("foo");
@@ -396,7 +396,7 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         // Request startup.
         outputStream.writeInt(17);
-        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
         outputStream.writeBytes("user");
         outputStream.writeByte(0);
         outputStream.writeBytes("foo");

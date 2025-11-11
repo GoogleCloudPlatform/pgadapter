@@ -36,6 +36,7 @@ import java.util.Map;
  */
 @InternalApi
 public abstract class BootstrapMessage extends WireMessage {
+
   public BootstrapMessage(ConnectionHandler connection, int length) {
     super(connection, length);
   }
@@ -56,10 +57,11 @@ public abstract class BootstrapMessage extends WireMessage {
         return new SSLMessage(connection);
       case GSSENCRequestMessage.IDENTIFIER:
         return new GSSENCRequestMessage(connection);
-      case StartupMessage.IDENTIFIER:
-        return new StartupMessage(connection, length);
+      case StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER:
+      case StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER:
+        return new StartupMessage(connection, length, protocol);
       case CancelMessage.IDENTIFIER:
-        return new CancelMessage(connection);
+        return new CancelMessage(connection, length);
       default:
         throw new IllegalStateException("Unknown message");
     }
@@ -106,7 +108,7 @@ public abstract class BootstrapMessage extends WireMessage {
   public static void sendStartupMessage(
       DataOutputStream output,
       int connectionId,
-      int secret,
+      byte[] secret,
       SessionState sessionState,
       Iterable<NoticeResponse> startupNotices)
       throws Exception {

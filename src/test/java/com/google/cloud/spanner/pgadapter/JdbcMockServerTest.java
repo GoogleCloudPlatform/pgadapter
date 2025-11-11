@@ -108,7 +108,7 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
@@ -117,7 +117,7 @@ import org.postgresql.util.PGInterval;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
   private static final String pgVersion = "14.1";
   private static final int RANDOM_RESULTS_ROW_COUNT = 10;
@@ -127,6 +127,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           "SET extra_float_digits = 2",
           "SET extra_float_digits = 3",
           "SET application_name = 'PostgreSQL JDBC Driver'");
+
+  @Parameterized.Parameters(name = "protocolVersion={0}")
+  public static Collection<Object[]> parameters() {
+    return Arrays.asList(new Object[][] {{"3.0"}, {"3.2"}});
+  }
+
+  private final String protocolVersion;
+
+  public JdbcMockServerTest(String protocolVersion) {
+    this.protocolVersion = protocolVersion;
+  }
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -586,8 +597,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   private String createUrl(String database) {
     return String.format(
-        "jdbc:postgresql://localhost:%d/%s?options=-c%%20server_version=%s",
-        pgServer.getLocalPort(), database, pgVersion);
+        "jdbc:postgresql://localhost:%d/%s?protocolVersion=%s&options=-c%%20server_version=%s",
+        pgServer.getLocalPort(), database, protocolVersion, pgVersion);
   }
 
   private String getExpectedInitialApplicationName() {

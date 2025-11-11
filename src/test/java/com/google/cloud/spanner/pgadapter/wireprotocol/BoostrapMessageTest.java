@@ -65,7 +65,7 @@ public class BoostrapMessageTest {
     // length
     dataOutputStream.writeInt(1024);
     // identifier
-    dataOutputStream.writeInt(StartupMessage.IDENTIFIER);
+    dataOutputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
     dataOutputStream.write(new byte[1024]);
 
     BootstrapMessage message = BootstrapMessage.create(connection);

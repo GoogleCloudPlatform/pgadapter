@@ -14,8 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.DEFAULT_KEY_LENGTH_BYTES;
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.PROTOCOL_3_0_KEY_LENGTH_BYTES;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_FORMAT_CODES;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.MessageReader.MAX_INVALID_MESSAGE_COUNT;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -72,6 +76,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
@@ -1581,8 +1586,8 @@ public class ProtocolTest {
   }
 
   @Test
-  public void testStartUpMessage() throws Exception {
-    byte[] protocol = intToBytes(196608);
+  public void testStartUpMessageProtocolVersion30() throws Exception {
+    byte[] protocol = intToBytes(PROTOCOL_VERSION_3_0_IDENTIFIER);
     byte[] payload =
         ("database\0"
                 + "databasename\0"
@@ -1616,6 +1621,10 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    when(connectionHandler.getProtocolVersion()).thenReturn(PROTOCOL_VERSION_3_0_IDENTIFIER);
+    byte[] secretBytes = new byte[PROTOCOL_3_0_KEY_LENGTH_BYTES];
+    new SecureRandom().nextBytes(secretBytes);
+    when(connectionHandler.getSecret()).thenReturn(secretBytes);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     SessionState sessionState = mock(SessionState.class);
     PGSetting serverVersionSetting = mock(PGSetting.class);
@@ -1645,9 +1654,11 @@ public class ProtocolTest {
 
     // KeyDataResponse
     assertEquals('K', outputResult.readByte());
-    assertEquals(12, outputResult.readInt());
+    assertEquals(8 + PROTOCOL_3_0_KEY_LENGTH_BYTES, outputResult.readInt());
     assertEquals(1, outputResult.readInt());
-    assertEquals(0, outputResult.readInt());
+    byte[] keyBytes = new byte[PROTOCOL_3_0_KEY_LENGTH_BYTES];
+    outputResult.readFully(keyBytes);
+    assertArrayEquals(secretBytes, keyBytes);
 
     // ParameterStatusResponse (x11)
     assertEquals('S', outputResult.readByte());
@@ -1709,11 +1720,146 @@ public class ProtocolTest {
   }
 
   @Test
-  public void testCancelMessage() throws Exception {
-    byte[] length = intToBytes(16);
-    byte[] protocol = intToBytes(80877102);
+  public void testStartUpMessageProtocolVersion32() throws Exception {
+    byte[] protocol = intToBytes(PROTOCOL_VERSION_3_2_IDENTIFIER);
+    byte[] payload =
+        ("database\0"
+                + "databasename\0"
+                + "application_name\0"
+                + "psql\0"
+                + "client_encoding\0"
+                + "UTF8\0"
+                + "server_version\0"
+                + "13.4\0"
+                + "user\0"
+                + "me\0")
+            .getBytes();
+    byte[] length = intToBytes(8 + payload.length);
+
+    byte[] value = Bytes.concat(length, protocol, payload);
+
+    Map<String, String> expectedParameters = new HashMap<>();
+    expectedParameters.put("database", "databasename");
+    expectedParameters.put("application_name", "psql");
+    expectedParameters.put("client_encoding", "UTF8");
+    expectedParameters.put("server_version", "13.4");
+    expectedParameters.put("user", "me");
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getConnectionId()).thenReturn(1);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    when(connectionHandler.getProtocolVersion()).thenReturn(PROTOCOL_VERSION_3_2_IDENTIFIER);
+    byte[] secretBytes = new byte[DEFAULT_KEY_LENGTH_BYTES];
+    new SecureRandom().nextBytes(secretBytes);
+    when(connectionHandler.getSecret()).thenReturn(secretBytes);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    SessionState sessionState = mock(SessionState.class);
+    PGSetting serverVersionSetting = mock(PGSetting.class);
+    when(serverVersionSetting.getSetting()).thenReturn("13.4");
+    when(sessionState.get(null, "server_version")).thenReturn(serverVersionSetting);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
+    when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(options.shouldAuthenticate()).thenReturn(false);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = BootstrapMessage.create(connectionHandler);
+    assertEquals(StartupMessage.class, message.getClass());
+
+    assertEquals(expectedParameters, ((StartupMessage) message).getParameters());
+
+    message.send();
+
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    verify(connectionHandler).connectToSpanner("databasename", null, expectedParameters);
+
+    // AuthenticationOkResponse
+    assertEquals('R', outputResult.readByte());
+    assertEquals(8, outputResult.readInt());
+    assertEquals(0, outputResult.readInt());
+
+    // KeyDataResponse
+    assertEquals('K', outputResult.readByte());
+    assertEquals(8 + DEFAULT_KEY_LENGTH_BYTES, outputResult.readInt());
+    assertEquals(1, outputResult.readInt());
+    byte[] keyBytes = new byte[DEFAULT_KEY_LENGTH_BYTES];
+    outputResult.readFully(keyBytes);
+    assertArrayEquals(secretBytes, keyBytes);
+
+    // ParameterStatusResponse (x11)
+    assertEquals('S', outputResult.readByte());
+    assertEquals(24, outputResult.readInt());
+    assertEquals("server_version\0", readUntil(outputResult, "server_version\0".length()));
+    assertEquals("13.4\0", readUntil(outputResult, "13.4\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(31, outputResult.readInt());
+    assertEquals("application_name\0", readUntil(outputResult, "application_name\0".length()));
+    assertEquals("PGAdapter\0", readUntil(outputResult, "PGAdapter\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(23, outputResult.readInt());
+    assertEquals("is_superuser\0", readUntil(outputResult, "is_superuser\0".length()));
+    assertEquals("false\0", readUntil(outputResult, "false\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(36, outputResult.readInt());
+    assertEquals(
+        "session_authorization\0", readUntil(outputResult, "session_authorization\0".length()));
+    assertEquals("PGAdapter\0", readUntil(outputResult, "PGAdapter\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(25, outputResult.readInt());
+    assertEquals("integer_datetimes\0", readUntil(outputResult, "integer_datetimes\0".length()));
+    assertEquals("on\0", readUntil(outputResult, "on\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(25, outputResult.readInt());
+    assertEquals("server_encoding\0", readUntil(outputResult, "server_encoding\0".length()));
+    assertEquals("UTF8\0", readUntil(outputResult, "UTF8\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(25, outputResult.readInt());
+    assertEquals("client_encoding\0", readUntil(outputResult, "client_encoding\0".length()));
+    assertEquals("UTF8\0", readUntil(outputResult, "UTF8\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(22, outputResult.readInt());
+    assertEquals("DateStyle\0", readUntil(outputResult, "DateStyle\0".length()));
+    assertEquals("ISO,YMD\0", readUntil(outputResult, "ISO,YMD\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(27, outputResult.readInt());
+    assertEquals("IntervalStyle\0", readUntil(outputResult, "IntervalStyle\0".length()));
+    assertEquals("iso_8601\0", readUntil(outputResult, "iso_8601\0".length()));
+    assertEquals('S', outputResult.readByte());
+    assertEquals(35, outputResult.readInt());
+    assertEquals(
+        "standard_conforming_strings\0",
+        readUntil(outputResult, "standard_conforming_strings\0".length()));
+    assertEquals("on\0", readUntil(outputResult, "on\0".length()));
+    assertEquals('S', outputResult.readByte());
+
+    // Timezone will vary depending on the default location of the JVM that is running.
+    String timezoneIdentifier = ZoneId.systemDefault().getId();
+    int expectedLength = timezoneIdentifier.getBytes(StandardCharsets.UTF_8).length + 10 + 4;
+    assertEquals(expectedLength, outputResult.readInt());
+    assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
+    readUntilNullTerminator(outputResult);
+
+    // ReadyResponse
+    assertEquals('Z', outputResult.readByte());
+    assertEquals(5, outputResult.readInt());
+    assertEquals('I', outputResult.readByte());
+  }
+
+  @Test
+  public void testCancelMessageProtocolVersion30() throws Exception {
+    byte[] length = intToBytes(12 + PROTOCOL_3_0_KEY_LENGTH_BYTES);
+    byte[] protocol = intToBytes(CancelMessage.IDENTIFIER);
     byte[] connectionId = intToBytes(1);
-    byte[] secret = intToBytes(1);
+    byte[] secret = new byte[PROTOCOL_3_0_KEY_LENGTH_BYTES];
+    new SecureRandom().nextBytes(secret);
 
     byte[] value = Bytes.concat(length, protocol, connectionId, secret);
 
@@ -1731,11 +1877,44 @@ public class ProtocolTest {
     assertEquals(CancelMessage.class, message.getClass());
 
     assertEquals(1, ((CancelMessage) message).getConnectionId());
-    assertEquals(1, ((CancelMessage) message).getSecret());
+    assertArrayEquals(secret, ((CancelMessage) message).getSecret());
 
     message.send();
 
-    verify(connectionHandler).cancelActiveStatement(1, 1);
+    verify(connectionHandler).cancelActiveStatement(1, secret);
+    verify(connectionHandler).handleTerminate();
+  }
+
+  @Test
+  public void testCancelMessageProtocolVersion32() throws Exception {
+    byte[] length = intToBytes(12 + DEFAULT_KEY_LENGTH_BYTES);
+    byte[] protocol = intToBytes(CancelMessage.IDENTIFIER);
+    byte[] connectionId = intToBytes(1);
+    byte[] secret = new byte[DEFAULT_KEY_LENGTH_BYTES];
+    new SecureRandom().nextBytes(secret);
+
+    byte[] value = Bytes.concat(length, protocol, connectionId, secret);
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getServer()).thenReturn(server);
+
+    WireMessage message = BootstrapMessage.create(connectionHandler);
+    assertEquals(CancelMessage.class, message.getClass());
+
+    CancelMessage cancel = (CancelMessage) message;
+    assertEquals(1, cancel.getConnectionId());
+    assertArrayEquals(secret, cancel.getSecret());
+
+    message.send();
+
+    verify(connectionHandler).cancelActiveStatement(1, secret);
     verify(connectionHandler).handleTerminate();
   }
 
