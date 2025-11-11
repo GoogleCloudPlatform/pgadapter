@@ -746,19 +746,24 @@ public class ConnectionHandler implements Runnable {
       return false;
     }
 
-    if (StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER == connectionToCancel.getProtocolVersion()) {
-      if (secret.length != PROTOCOL_3_0_KEY_LENGTH_BYTES) {
+    switch (connectionToCancel.getProtocolVersion()) {
+      case StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER:
+        if (secret.length != PROTOCOL_3_0_KEY_LENGTH_BYTES) {
+          throw PGExceptionFactory.newPGException(
+              "protocol version 3.0 accepts only 4 bytes for the secret ",
+              SQLState.ProtocolViolation);
+        }
+        break;
+      case StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER:
+        if (secret.length != DEFAULT_KEY_LENGTH_BYTES) {
+          throw PGExceptionFactory.newPGException(
+              "protocol version 3.2 accepts 32 bytes for the secret ", SQLState.ProtocolViolation);
+        }
+        break;
+      default:
         throw PGExceptionFactory.newPGException(
-            "protocol version 3.0 accepts only 4 bytes for the secret ",
+            "unsupported protocol version: " + connectionToCancel.getProtocolVersion(),
             SQLState.ProtocolViolation);
-      }
-    }
-
-    if (StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER == connectionToCancel.getProtocolVersion()) {
-      if (secret.length != DEFAULT_KEY_LENGTH_BYTES) {
-        throw PGExceptionFactory.newPGException(
-            "protocol version 3.2 accepts 32 bytes for the secret ", SQLState.ProtocolViolation);
-      }
     }
 
     if (!Arrays.equals(secret, connectionToCancel.getSecret())) {
