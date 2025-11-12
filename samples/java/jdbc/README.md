@@ -14,7 +14,7 @@ The sample application adds the following dependencies:
 <dependency>
   <groupId>org.postgresql</groupId>
   <artifactId>postgresql</artifactId>
-  <version>0.52.0</version>
+  <version>42.7.8</version>
 </dependency>
 <dependency>
   <groupId>com.google.cloud</groupId>
