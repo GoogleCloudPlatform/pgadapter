@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.52.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.52.0...v0.52.1) (2025-11-12)
+
+
+### Dependencies
+
+* update dependency com.google.auto.value:auto-value-annotations to v1.11.1 ([#3924](https://github.com/GoogleCloudPlatform/pgadapter/issues/3924)) ([cb53adf](https://github.com/GoogleCloudPlatform/pgadapter/commit/cb53adf222e4f399309928dc9407896e92f222ac))
+* update dependency microsoft.net.test.sdk to 18.0.1 ([#3920](https://github.com/GoogleCloudPlatform/pgadapter/issues/3920)) ([ca20db5](https://github.com/GoogleCloudPlatform/pgadapter/commit/ca20db51a2e292849162a51caa08f51ce9059dca))
+* update dependency org.postgresql:r2dbc-postgresql to v1.1.1.release ([#3928](https://github.com/GoogleCloudPlatform/pgadapter/issues/3928)) ([5639e06](https://github.com/GoogleCloudPlatform/pgadapter/commit/5639e06764967a63cc73e92c17c5c13e5bc1c967))
+* update dependency sqlalchemy to v2.0.44 ([#3882](https://github.com/GoogleCloudPlatform/pgadapter/issues/3882)) ([2aca408](https://github.com/GoogleCloudPlatform/pgadapter/commit/2aca4086d2bf22effedd6ff7698b12147b51386c))
+
+
+### Documentation
+
+* fix PostgreSQL JDBC driver version reference in README ([#3923](https://github.com/GoogleCloudPlatform/pgadapter/issues/3923)) ([648624f](https://github.com/GoogleCloudPlatform/pgadapter/commit/648624fdc2d52472d17d7a978b8f76b0eaadc675))
+
 ## [0.52.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.51.1...v0.52.0) (2025-11-12)
 
 
