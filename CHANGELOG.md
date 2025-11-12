@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.52.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.51.1...v0.52.0) (2025-11-12)
+
+
+### Features
+
+* support for wire protocol 3.2 ([#3902](https://github.com/GoogleCloudPlatform/pgadapter/issues/3902)) ([bccd4bb](https://github.com/GoogleCloudPlatform/pgadapter/commit/bccd4bb94f046bf6f244f53b7a19c0dcdb7d518b))
+
+
+### Bug Fixes
+
+* named prepared statement could return cryptic error message ([#3921](https://github.com/GoogleCloudPlatform/pgadapter/issues/3921)) ([598ad2d](https://github.com/GoogleCloudPlatform/pgadapter/commit/598ad2d34c4cf35bfb60c998e1bb3b341bcc8b3e))
+
+
+### Dependencies
+
+* update dependency com.fasterxml.jackson.core:jackson-databind to v2.20.1 ([#3896](https://github.com/GoogleCloudPlatform/pgadapter/issues/3896)) ([c1d2bc2](https://github.com/GoogleCloudPlatform/pgadapter/commit/c1d2bc24909649f2a125fd3e94ca974371faf458))
+* update dependency django to v5.2.8 [security] ([#3906](https://github.com/GoogleCloudPlatform/pgadapter/issues/3906)) ([b73db32](https://github.com/GoogleCloudPlatform/pgadapter/commit/b73db32155ce3aa0f48c8853ed9467d5b58d52cc))
+* update dependency go to v1.25.4 ([#3919](https://github.com/GoogleCloudPlatform/pgadapter/issues/3919)) ([b0b241b](https://github.com/GoogleCloudPlatform/pgadapter/commit/b0b241b29fbe561fb39d94fd0778619122e7ecd7))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.55.0 ([#3876](https://github.com/GoogleCloudPlatform/pgadapter/issues/3876)) ([cf69e08](https://github.com/GoogleCloudPlatform/pgadapter/commit/cf69e08373191e09e5104c6900f5fb7bff546b35))
+* update dependency org.jetbrains.kotlin:kotlin-stdlib-jdk8 to v2.2.21 ([#3887](https://github.com/GoogleCloudPlatform/pgadapter/issues/3887)) ([7a0f53d](https://github.com/GoogleCloudPlatform/pgadapter/commit/7a0f53d232c2b5e29e494164ffec0b79ec483a1a))
+* update dependency org.testcontainers:testcontainers to v2 ([#3880](https://github.com/GoogleCloudPlatform/pgadapter/issues/3880)) ([706b8a2](https://github.com/GoogleCloudPlatform/pgadapter/commit/706b8a281afd61ef1f35a003ccf131427e906831))
+* update dependency psycopg to v3.2.11 ([#3870](https://github.com/GoogleCloudPlatform/pgadapter/issues/3870)) ([f992f5d](https://github.com/GoogleCloudPlatform/pgadapter/commit/f992f5dd55c4f5cc1cd413d91d8b25919bccabe0))
+* update dependency psycopg-binary to v3.2.11 ([#3871](https://github.com/GoogleCloudPlatform/pgadapter/issues/3871)) ([318cb1f](https://github.com/GoogleCloudPlatform/pgadapter/commit/318cb1fa7ff2847cb10153e0b93172326344fc8e))
+* update golang docker tag to v1.25.3 ([#3873](https://github.com/GoogleCloudPlatform/pgadapter/issues/3873)) ([f9a89fa](https://github.com/GoogleCloudPlatform/pgadapter/commit/f9a89fae07849bf6059556c20bbd089e3a77d3a9))
+
 ## [0.51.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.51.0...v0.51.1) (2025-10-20)
 
 
