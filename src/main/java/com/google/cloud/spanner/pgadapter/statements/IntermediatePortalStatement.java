@@ -19,6 +19,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
@@ -145,5 +146,15 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       return statementResultFuture;
     }
     return Futures.immediateFuture(getStatementResult());
+  }
+
+  @Override
+  protected boolean hasPreparedStatementException() {
+    return this.preparedStatement.hasException(ResultNotReadyBehavior.FAIL);
+  }
+
+  @Override
+  protected PGException getPreparedStatementException() {
+    return this.preparedStatement.exception;
   }
 }

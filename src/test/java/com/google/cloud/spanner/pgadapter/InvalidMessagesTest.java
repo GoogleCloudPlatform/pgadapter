@@ -17,11 +17,14 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import io.grpc.Status;
 import io.opentelemetry.api.OpenTelemetry;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -29,6 +32,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -508,6 +512,148 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
 
         // Verify that PGAdapter committed the implicit transaction.
         assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testCreateInvalidPreparedStatement() throws IOException {
+    // This test verifies that PGAdapter returns a valid error message if a client
+    // 1. Creates a named prepared statement that uses an invalid SQL string and that contains at
+    //    least one query parameter.
+    // 2. Then tries to execute the prepared statement, and includes only values and no types for
+    //    the query parameter values.
+    //
+    // This is a valid message flow, but one that is not really supported by any higher-level
+    // clients. It is however something that can be executed by applications that use pqlib
+    // directly. The above message flow would trigger a
+    // 'Statement result cannot be retrieved before flush/sync' error.
+
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        // Request startup.
+        outputStream.writeInt(17);
+        outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+        outputStream.writeBytes("user");
+        outputStream.writeByte(0);
+        outputStream.writeBytes("foo");
+        outputStream.writeByte(0);
+        outputStream.flush();
+
+        // Verify that the server responds with auth OK.
+        assertEquals('R', inputStream.readByte());
+        assertEquals(8, inputStream.readInt());
+        assertEquals(0, inputStream.readInt()); // 0 == success
+
+        // Receive key data.
+        assertEquals('K', inputStream.readByte());
+        assertEquals(12, inputStream.readInt());
+        inputStream.readInt();
+        inputStream.readInt();
+
+        // Just skip parameter data and wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        String invalidSql = "select * from non_existing_table where id=$1";
+        mockSpanner.putStatementResult(
+            StatementResult.exception(
+                Statement.of(invalidSql),
+                Status.NOT_FOUND
+                    .withDescription("Table non_existing_table not found")
+                    .asRuntimeException()));
+        String name = "my_statement";
+
+        // Create a named prepared statement.
+        // PARSE
+        outputStream.writeByte('P');
+        outputStream.writeInt(4 + 1 + invalidSql.getBytes(StandardCharsets.UTF_8).length + 1 + 2);
+        outputStream.write(name.getBytes(StandardCharsets.UTF_8));
+        outputStream.writeByte(0); // String terminator for the named statement
+        outputStream.write(invalidSql.getBytes(StandardCharsets.UTF_8));
+        outputStream.writeByte(0);
+        outputStream.writeShort(0);
+        // SYNC
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+
+        outputStream.flush();
+
+        // Wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        // Now try to use the prepared statement with a BIND-DESCRIBE-EXECUTE flow.
+
+        // BIND
+        byte[] value = "value".getBytes(StandardCharsets.UTF_8);
+        outputStream.writeByte('B');
+        outputStream.writeInt(4 + 1 + 1 + 2 + 2 + 2 + value.length + 1);
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        outputStream.write(name.getBytes(StandardCharsets.UTF_8));
+        outputStream.writeByte(0); // String terminator for the named statement.
+        outputStream.writeShort(0); // Zero parameter format codes
+        outputStream.writeShort(1); // One parameter value
+        outputStream.writeInt(value.length + 1);
+        outputStream.write(value);
+        outputStream.writeByte(0);
+        outputStream.writeShort(0); // Zero result format codes
+        // DESCRIBE
+        outputStream.writeByte('D');
+        outputStream.writeInt(4 + 1 + 1);
+        outputStream.writeByte('P');
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        // EXECUTE
+        outputStream.writeByte('E');
+        outputStream.writeInt(4 + 1 + 4);
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        outputStream.writeInt(0); // Return all rows
+        // FLUSH
+        outputStream.writeByte('H');
+        outputStream.writeInt(4);
+        // SYNC
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+
+        outputStream.flush();
+
+        // Verify that we get an error.
+        // Wait for 'Z' (ready for query)
+        String errorMessage = "";
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          byte[] contents = new byte[length - 4];
+          inputStream.readFully(contents);
+          if (message == 'Z') {
+            break;
+          } else if (message == 'E') {
+            byte[] errorMessageBytes = Arrays.copyOfRange(contents, 15, contents.length - 2);
+            errorMessage = new String(errorMessageBytes, StandardCharsets.UTF_8);
+          }
+        }
+
+        // Verify that we received the messages that we sent.
+        List<WireMessage> messages = getWireMessages();
+        // Startup-Parse-Sync-Bind-Describe-Execute-Flush-Sync.
+        assertEquals(8, messages.size());
+        // Verify that we received the expected error message.
+        assertEquals(
+            "Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            errorMessage);
       }
     }
   }
