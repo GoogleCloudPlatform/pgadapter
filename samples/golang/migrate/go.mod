@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.25.4
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20251008085954-a1da1d1b908c
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20251120093938-06934b6c1630
 	github.com/golang-migrate/migrate/v4 v4.19.0
 )
 
@@ -22,7 +22,7 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/docker v28.5.0+incompatible // indirect
+	github.com/docker/docker v28.5.1+incompatible // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
@@ -66,7 +66,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/oauth2 v0.31.0 // indirect
+	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

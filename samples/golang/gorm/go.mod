@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.25.4
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20251008085954-a1da1d1b908c
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20251120093938-06934b6c1630
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgtype v1.14.4
 	github.com/shopspring/decimal v1.4.0
@@ -75,7 +75,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/oauth2 v0.31.0 // indirect
+	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect

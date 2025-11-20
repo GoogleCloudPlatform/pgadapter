@@ -16,6 +16,8 @@ github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250901163000-d
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20250901163000-d50153d23cb3/go.mod h1:fUn303oOdtTxb5rXiSl4dqVNQBC4b+ujG/Ex6NGrCFk=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20251008085954-a1da1d1b908c h1:16YPXRx9vmQh+jck47OrCLfNoIgLix1UYctDhyH/Ruc=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20251008085954-a1da1d1b908c/go.mod h1:xUY4iSX5KcaYnfdEKehwTa2EVLhtnGZjOKCHnJEzj5Y=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20251120093938-06934b6c1630 h1:fsGtK20baeMT2K48Cw5rcs9+o3IfYg+CExhS/XH5734=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20251120093938-06934b6c1630/go.mod h1:xzmhkHudUWuU4jYmFnGgHiz6R1jDM5VV0spx5quJO5Q=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=
@@ -43,6 +45,8 @@ github.com/docker/docker v28.3.3+incompatible h1:Dypm25kh4rmk49v1eiVbsAtpAsYURjY
 github.com/docker/docker v28.3.3+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker v28.5.0+incompatible h1:ZdSQoRUE9XxhFI/B8YLvhnEFMmYN9Pp8Egd2qcaFk1E=
 github.com/docker/docker v28.5.0+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v28.5.1+incompatible h1:Bm8DchhSD2J6PsFzxC35TZo4TLGR2PdW/E69rU45NhM=
+github.com/docker/docker v28.5.1+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/go-connections v0.5.0 h1:USnMq7hx7gwdVZq1L49hLXaFtUdTADjXGp+uj1Br63c=
 github.com/docker/go-connections v0.5.0/go.mod h1:ov60Kzw0kKElRwhNs9UlUHAE/F9Fe6GLaXnqyDdmEXc=
 github.com/docker/go-connections v0.6.0 h1:LlMG9azAe1TqfR7sO+NJttz1gy6KO7VJBh+pMmjSD94=
@@ -198,6 +202,8 @@ golang.org/x/oauth2 v0.30.0 h1:dnDm7JmhM45NNpd8FDDeLhK6FwqbOf4MLCM9zb1BOHI=
 golang.org/x/oauth2 v0.30.0/go.mod h1:B++QgG3ZKulg6sRPGD/mqlHQs5rB3Ml9erfeDY7xKlU=
 golang.org/x/oauth2 v0.31.0 h1:8Fq0yVZLh4j4YA47vHKFTa9Ew5XIrCP8LC6UeNZnLxo=
 golang.org/x/oauth2 v0.31.0/go.mod h1:lzm5WQJQwKZ3nwavOZ3IS5Aulzxi68dUSgRHujetwEA=
+golang.org/x/oauth2 v0.32.0 h1:jsCblLleRMDrxMN29H3z/k1KliIvpLgCkE6R8FXXNgY=
+golang.org/x/oauth2 v0.32.0/go.mod h1:lzm5WQJQwKZ3nwavOZ3IS5Aulzxi68dUSgRHujetwEA=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
