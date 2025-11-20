@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.25.4
 
 require (
-	cloud.google.com/go/spanner v1.86.0
+	cloud.google.com/go/spanner v1.86.1
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.6
