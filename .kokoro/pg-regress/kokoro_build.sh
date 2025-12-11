@@ -3,6 +3,10 @@
 # Fail on any error.
 set -e
 
+GCP_PROJECT_ID="span-cloud-testing"
+INSTANCE_ID="pgadapter-testing"
+DATABASE_ID="pg_regress"
+
 # Display commands being run.
 # WARNING: please only enable 'set -x' if necessary for debugging, and be very
 #  careful if you handle credentials (e.g. from Keystore) with 'set -x':
@@ -15,10 +19,34 @@ set -e
 # Code under repo is checked out to ${KOKORO_ARTIFACTS_DIR}/github.
 # The final directory name in this path is determined by the scm name specified
 # in the job configuration.
-cd "${KOKORO_ARTIFACTS_DIR}/github/pgadapter/.kokoro/pg-regress"
+cd "${KOKORO_ARTIFACTS_DIR}/github/"
 
-gcloud spanner instances list --project=span-cloud-testing
+# Start pgadapter in a background process
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz \
+  && tar -xzvf pgadapter.tar.gz
+java -jar pgadapter.jar -p span-cloud-testing -i pgadapter-testing -d pg_regress &
 
+# Install psql
+sudo apt-get update
+sudo apt-get install --yes --no-install-recommends postgresql-client-17
+psql --version
+
+# Get postgresql source code
 git clone https://github.com/postgres/postgres.git
 
-echo 'Hello!'
+cp pgadapter/benchmarks/pg_regress/*.patch postgres/src/test/regress/
+cp pgadapter/benchmarks/pg_regress/*.py postgres/src/test/regress/
+
+cd postgres/src/test/regress/
+
+git apply expected.patch
+git apply sql.patch
+git apply code.patch
+
+# Run pg-regress test
+python start_test.py spanner_prod --skip-container \
+                --project $GCP_PROJECT_ID \
+                --instance $INSTANCE_ID \
+                --database $DATABASE_ID
+python compare_results.py expected/ results/
+
