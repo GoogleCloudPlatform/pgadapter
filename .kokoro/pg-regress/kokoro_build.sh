@@ -7,6 +7,8 @@ GCP_PROJECT_ID="span-cloud-testing"
 INSTANCE_ID="pgadapter-testing"
 DATABASE_ID="pg_regress"
 
+gcloud config set project $GCP_PROJECT_ID
+
 # Display commands being run.
 # WARNING: please only enable 'set -x' if necessary for debugging, and be very
 #  careful if you handle credentials (e.g. from Keystore) with 'set -x':
