@@ -41,6 +41,8 @@ cp pgadapter/benchmarks/pg_regress/*.py postgres/src/test/regress/
 
 cd postgres/src/test/regress/
 
+git checkout REL_16_0
+
 git apply expected.patch
 git apply sql.patch
 git apply code.patch
