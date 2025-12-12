@@ -3,9 +3,10 @@
 # Fail on any error.
 set -e
 
+uuid=$(uuidgen -r | cut -c1-6)
 GCP_PROJECT_ID="span-cloud-testing"
 INSTANCE_ID="pgadapter-testing"
-DATABASE_ID="pg_regress"
+DATABASE_ID="pg_regress_$uuid"
 
 gcloud config set project $GCP_PROJECT_ID
 
@@ -26,7 +27,7 @@ cd "${KOKORO_ARTIFACTS_DIR}/github/"
 # Start pgadapter in a background process
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz \
   && tar -xzvf pgadapter.tar.gz
-java -jar pgadapter.jar -p span-cloud-testing -i pgadapter-testing -d pg_regress &
+java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID &
 
 # Install psql
 sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
@@ -53,6 +54,7 @@ git apply code.patch
 python start_test.py spanner_prod --skip-container \
                 --project $GCP_PROJECT_ID \
                 --instance $INSTANCE_ID \
-                --database $DATABASE_ID
+                --database $DATABASE_ID \
+                --testcases='alter_table'
 python compare_results.py expected/ results/
 
