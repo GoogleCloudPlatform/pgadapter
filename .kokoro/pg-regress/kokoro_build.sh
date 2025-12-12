@@ -5,7 +5,7 @@ set -e
 
 uuid=$(uuidgen -r | cut -c1-6)
 GCP_PROJECT_ID="span-cloud-testing"
-INSTANCE_ID="pgadapter-testing"
+INSTANCE_ID="pgregress-testing"
 DATABASE_ID="pg_regress_$uuid"
 
 gcloud config set project $GCP_PROJECT_ID
