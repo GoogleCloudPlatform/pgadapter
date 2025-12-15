@@ -3,10 +3,14 @@
 # Fail on any error.
 set -e
 
+sudo apt update && sudo apt install uuid-runtime
+
 uuid=$(uuidgen -r | cut -c1-6)
 GCP_PROJECT_ID="span-cloud-testing"
 INSTANCE_ID="pgregress-testing"
 DATABASE_ID="pg_regress_$uuid"
+
+echo "DATABASE_ID: ${DATABASE_ID}"
 
 gcloud config set project $GCP_PROJECT_ID
 
