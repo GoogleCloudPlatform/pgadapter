@@ -54,6 +54,9 @@ git apply expected.patch
 git apply sql.patch
 git apply code.patch
 
+# Temporarily enable timing
+(echo '\timing on' | cat - sql/alter_table.sql) > sql/alter_table.sql
+
 # Run pg-regress test
 python start_test.py spanner_prod --skip-container \
                 --project $GCP_PROJECT_ID \
@@ -61,4 +64,6 @@ python start_test.py spanner_prod --skip-container \
                 --database $DATABASE_ID \
                 --testcases='alter_table'
 python compare_results.py expected/ results/
+
+cat results/alter_table.out
 
