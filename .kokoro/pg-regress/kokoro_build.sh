@@ -55,7 +55,8 @@ git apply sql.patch
 git apply code.patch
 
 # Temporarily enable timing
-(echo '\timing on' | cat - sql/alter_table.sql) > sql/alter_table.sql
+(echo '\timing on' | cat - sql/alter_table.sql) > temp.sql
+mv temp.sql sql/alter_table.sql
 
 # Run pg-regress test
 python start_test.py spanner_prod --skip-container \
