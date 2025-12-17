@@ -29,9 +29,16 @@ gcloud config set project $GCP_PROJECT_ID
 cd "${KOKORO_ARTIFACTS_DIR}/github/"
 
 # Start pgadapter in a background process
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz \
-  && tar -xzvf pgadapter.tar.gz
+#wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz \
+#  && tar -xzvf pgadapter.tar.gz
+
+# Build pgadapter from source
+cd pgadapter/
+mvn package -P assembly
+cd target/pgadapter
 java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID &
+
+cd "${KOKORO_ARTIFACTS_DIR}/github/"
 
 # Install psql
 sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'

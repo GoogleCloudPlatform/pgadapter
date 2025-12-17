@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.connection;
 
 import com.google.api.core.InternalApi;
+import com.google.api.gax.longrunning.OperationTimedPollAlgorithm;
+import com.google.api.gax.retrying.RetrySettings;
 import com.google.auth.Credentials;
 import com.google.cloud.spanner.connection.ConnectionOptions.Builder;
 import com.google.cloud.spanner.connection.StatementExecutor.StatementExecutorType;
@@ -53,5 +55,22 @@ public class PGAdapterConnectionOptionsHelper {
                   () -> ImmutableList.of(new GrpcLogInterceptor(Level.INFO))));
     }
     return connectionOptionsBuilder;
+  }
+
+  public static Builder configDdlOperationSettings(Builder connectionOptionsBuilder) {
+    return connectionOptionsBuilder.setConfigurator(
+      optionsConfigurator -> {
+        optionsConfigurator
+          .getDatabaseAdminStubSettingsBuilder()
+          .updateDatabaseDdlOperationSettings()
+          .setPollingAlgorithm(
+             OperationTimedPollAlgorithm.create(
+               RetrySettings.newBuilder()
+                 .setInitialRetryDelayDuration(java.time.Duration.ofMillis(500L))
+                 .setMaxRetryDelayDuration(java.time.Duration.ofMillis(1000L))
+                 .setRetryDelayMultiplier(1.0)
+                 .setTotalTimeoutDuration(java.time.Duration.ofMinutes(10L))
+                 .build()));
+      });
   }
 }
