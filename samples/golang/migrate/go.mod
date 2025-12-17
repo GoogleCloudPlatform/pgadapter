@@ -30,7 +30,6 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -64,9 +63,8 @@ require (
 	go.opentelemetry.io/otel v1.37.0 // indirect
 	go.opentelemetry.io/otel/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
-	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/oauth2 v0.31.0 // indirect
-	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
