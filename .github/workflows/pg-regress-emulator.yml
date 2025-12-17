@@ -19,11 +19,11 @@ jobs:
       TARGET_ENV: "emulator"
     steps:
       - name: Checkout PGAdapter repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: pgadapter
       - name: Checkout OSS PG repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: postgres/postgres
           path: postgres
