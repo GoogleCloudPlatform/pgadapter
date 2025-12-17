@@ -1,6 +1,6 @@
 psycopg-binary==3.2.12
 pytz==2025.2
-Django==5.2.8
+Django==5.2.9
 google==3.0.0
 google.auth==2.41.1
 testcontainers==4.13.2
