@@ -66,9 +66,9 @@ public class PGAdapterConnectionOptionsHelper {
           .setPollingAlgorithm(
              OperationTimedPollAlgorithm.create(
                RetrySettings.newBuilder()
-                 .setInitialRetryDelayDuration(java.time.Duration.ofMillis(500L))
-                 .setMaxRetryDelayDuration(java.time.Duration.ofMillis(1000L))
-                 .setRetryDelayMultiplier(1.0)
+                 .setInitialRetryDelayDuration(java.time.Duration.ofMillis(1000L))
+                 .setMaxRetryDelayDuration(java.time.Duration.ofSeconds(45L))
+                 .setRetryDelayMultiplier(1.3)
                  .setTotalTimeoutDuration(java.time.Duration.ofMinutes(10L))
                  .build()));
       });
