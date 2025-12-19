@@ -9,6 +9,9 @@ uuid=$(uuidgen -r | cut -c1-6)
 GCP_PROJECT_ID="span-cloud-testing"
 INSTANCE_ID="pgregress-testing"
 DATABASE_ID="pg_regress_$uuid"
+BQ_TABLE="spanner_pg_regress_results.cloud_prod_results"
+TARGET_ENV="cloud_prod_results"
+GCS_BUCKET_PATH="gs://pgadapter-pg-regress/cloud-prod-results"
 
 echo "DATABASE_ID: ${DATABASE_ID}"
 
@@ -39,6 +42,9 @@ cd target/pgadapter
 java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID &
 
 cd "${KOKORO_ARTIFACTS_DIR}/github/"
+
+# Install python deps
+pip install google-cloud-bigquery
 
 # Install psql
 sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
@@ -75,4 +81,9 @@ python compare_results.py expected/ results/
 
 #cat results/alter_table.out
 cat results.json
+
+ts=$(date +%s)
+python upload_bigquery.py results.json $BQ_TABLE $TARGET_ENV $ts
+gcloud storage cp results.json $GCS_BUCKET_PATH/results_$ts.json
+gcloud storage cp regression.diffs $GCS_BUCKET_PATH/regression_$ts.diffs
 
