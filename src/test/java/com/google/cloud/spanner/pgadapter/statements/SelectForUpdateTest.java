@@ -83,6 +83,21 @@ public class SelectForUpdateTest {
         internalReplaceForUpdate("select col1 from foo for update of foo, bar, \"baz\"", false));
   }
 
+  @Test
+  public void testReplaceForNoKeyUpdate() {
+    assertEquals(
+        Statement.of("select col1 from foo for update"),
+        internalReplaceForUpdate(
+            "select col1 from foo for no key update", /* replaceWithHint= */ false));
+
+    // FOR NO KEY UPDATE is not replaced with a hint. Replacing with a hint is no longer needed, as
+    // Spanner supports FOR UPDATE clauses.
+    assertEquals(
+        Statement.of("select col1 from foo for no key update"),
+        internalReplaceForUpdate(
+            "select col1 from foo for no key update", /* replaceWithHint= */ true));
+  }
+
   private void assertSameAfterRemoveForUpdate(String sql) {
     Statement statement = Statement.of(sql);
     assertSame(

@@ -252,6 +252,13 @@ public class SimpleParser {
       return statement;
     }
     int startPos = parser.pos;
+    if (!replaceWithHint
+        && parser.eatKeyword("for", "no", "key", "update")
+        && !parser.hasMoreTokens()) {
+      // Replace FOR NO KEY UPDATE with FOR UPDATE.
+      return statement.withReplacedSql(statement.getSql().substring(0, startPos) + " for update");
+    }
+    parser.pos = startPos;
     if (parser.eatKeyword("for") && parser.eatKeyword("update")) {
       if (!replaceWithHint) {
         startPos = parser.pos;
@@ -278,12 +285,12 @@ public class SimpleParser {
       // This is a simple 'for update' clause. Replace it with a 'LOCK_SCANNED_RANGES=exclusive'
       // hint and/or remove the 'of table' clause.
       if (replaceWithHint) {
-        return Statement.of(
+        return statement.withReplacedSql(
             "/*@ LOCK_SCANNED_RANGES=exclusive */"
                 + statement.getSql().substring(0, startPos)
                 + statement.getSql().substring(endPos));
       } else {
-        return Statement.of(
+        return statement.withReplacedSql(
             statement.getSql().substring(0, startPos) + statement.getSql().substring(endPos));
       }
     }
