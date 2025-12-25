@@ -898,7 +898,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
     String actualOutput =
         execute("orm_error_in_read_write_transaction.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "Insert failed: (psycopg.errors.RaiseException) com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with id 1 already exists";
+        "Insert failed: (psycopg.errors.RaiseException) Row with id 1 already exists";
     assertTrue(actualOutput, actualOutput.startsWith(expectedOutput));
     assertFalse(actualOutput, actualOutput.contains("Getting the row after an error succeeded"));
 
@@ -988,7 +988,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
     String expectedOutput =
         "Getting the row failed: This Session's transaction has been rolled back due to a previous exception during flush. "
             + "To begin a new transaction with this Session, first issue Session.rollback(). "
-            + "Original exception was: (psycopg.errors.RaiseException) com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with id 1 already exists";
+            + "Original exception was: (psycopg.errors.RaiseException) Row with id 1 already exists";
     assertTrue(actualOutput, actualOutput.startsWith(expectedOutput));
 
     assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));

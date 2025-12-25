@@ -69,7 +69,7 @@ public class RollbackToStatement extends IntermediatePortalStatement {
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("rollback")) {
       throw PGExceptionFactory.newPGException(
-          "not a valid ROLLBACK [WORK | TRANSACTION] TO statement: " + sql);
+          "not a valid ROLLBACK [WORK | TRANSACTION] TO statement: " + sql, SQLState.SyntaxError);
     }
     if (parser.peekKeyword("work")) {
       parser.eatKeyword("work");
@@ -78,7 +78,8 @@ public class RollbackToStatement extends IntermediatePortalStatement {
     }
     if (!parser.eatKeyword("to")) {
       throw PGExceptionFactory.newPGException(
-          "missing 'TO' keyword in ROLLBACK [WORK | TRANSACTION] TO statement: " + sql);
+          "missing 'TO' keyword in ROLLBACK [WORK | TRANSACTION] TO statement: " + sql,
+          SQLState.SyntaxError);
     }
     parser.eatKeyword("savepoint");
     TableOrIndexName name = parser.readTableOrIndexName();

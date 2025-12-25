@@ -498,7 +498,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       ParsedCopyStatement build() {
         if (freeze) {
           throw PGExceptionFactory.newPGException(
-              "PGAdapter does not support the freeze COPY option");
+              "PGAdapter does not support the freeze COPY option", SQLState.FeatureNotSupported);
         }
         if (direction == Direction.FROM) {
           if (query != null) {
@@ -540,20 +540,24 @@ public class CopyStatement extends IntermediatePortalStatement {
         }
         if (format != Format.CSV) {
           if (quote != null) {
-            throw PGExceptionFactory.newPGException("COPY quote available only in CSV mode");
+            throw PGExceptionFactory.newPGException(
+                "COPY quote available only in CSV mode", SQLState.SyntaxError);
           }
           if (escape != null) {
-            throw PGExceptionFactory.newPGException("COPY escape available only in CSV mode");
+            throw PGExceptionFactory.newPGException(
+                "COPY escape available only in CSV mode", SQLState.SyntaxError);
           }
           if (forceQuote != null) {
-            throw PGExceptionFactory.newPGException("COPY force quote available only in CSV mode");
+            throw PGExceptionFactory.newPGException(
+                "COPY force quote available only in CSV mode", SQLState.SyntaxError);
           }
           if (forceNotNull != null) {
             throw PGExceptionFactory.newPGException(
-                "COPY force not null available only in CSV mode");
+                "COPY force not null available only in CSV mode", SQLState.SyntaxError);
           }
           if (forceNull != null) {
-            throw PGExceptionFactory.newPGException("COPY force null available only in CSV mode");
+            throw PGExceptionFactory.newPGException(
+                "COPY force null available only in CSV mode", SQLState.SyntaxError);
           }
         }
         return new ParsedCopyStatement(this);
@@ -668,7 +672,8 @@ public class CopyStatement extends IntermediatePortalStatement {
               || optionParser.peekKeyword("binary")) {
             builder.format = Format.valueOf(optionParser.readKeyword().toString().toUpperCase());
           } else {
-            throw PGExceptionFactory.newPGException("Invalid format option: " + optionExpression);
+            throw PGExceptionFactory.newPGException(
+                "Invalid format option: " + optionExpression, SQLState.SyntaxError);
           }
         } else if (optionParser.eatKeyword("freeze")) {
           if (optionParser.hasMoreTokens()) {

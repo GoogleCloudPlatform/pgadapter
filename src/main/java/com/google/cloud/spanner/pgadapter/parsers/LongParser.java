@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
 import java.io.DataOutputStream;
@@ -52,7 +53,8 @@ public class LongParser extends Parser<Long> {
             this.item =
                 new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).longValueExact();
           } catch (Exception exception) {
-            throw PGExceptionFactory.newPGException("Invalid int8 value: " + stringValue);
+            throw PGExceptionFactory.newPGException(
+                "Invalid int8 value: " + stringValue, SQLState.SyntaxError);
           }
           break;
         case BINARY:

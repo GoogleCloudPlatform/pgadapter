@@ -326,7 +326,7 @@ public class KnexMockServerTest extends AbstractMockServerTest {
 
     assertEquals(
         "Transaction error: error: insert into \"users\" (\"id\", \"value\") values ($1, $2) - "
-            + "com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS\n"
+            + "io.grpc.StatusRuntimeException: ALREADY_EXISTS\n"
             + "{ id: '1', name: 'User 1' }\n",
         output);
 

@@ -23,6 +23,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -159,13 +160,14 @@ public class VacuumStatement extends IntermediatePortalStatement {
     SimpleParser parser = new SimpleParser(sql);
     ParsedVacuumStatement.Builder builder = new Builder();
     if (!parser.eatKeyword("vacuum")) {
-      throw PGExceptionFactory.newPGException("not a valid VACUUM statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid VACUUM statement: " + sql, SQLState.SyntaxError);
     }
     if (parser.eatToken("(")) {
       List<String> options = parser.parseExpressionList();
       if (!parser.eatToken(")")) {
         throw PGExceptionFactory.newPGException(
-            "missing closing parentheses for VACUUM options list");
+            "missing closing parentheses for VACUUM options list", SQLState.SyntaxError);
       }
       for (String option : options) {
         SimpleParser optionParser = new SimpleParser(option);
@@ -197,7 +199,8 @@ public class VacuumStatement extends IntermediatePortalStatement {
           String value = optionParser.parseExpression();
           builder.parallel = optionParser.parseInt(value);
         } else {
-          throw PGExceptionFactory.newPGException("Unknown option: " + option);
+          throw PGExceptionFactory.newPGException(
+              "Unknown option: " + option, SQLState.SyntaxError);
         }
       }
     } else {
@@ -210,7 +213,7 @@ public class VacuumStatement extends IntermediatePortalStatement {
     while (parser.getPos() < parser.getSql().length()) {
       TableOrIndexName table = parser.readTableOrIndexName();
       if (table == null) {
-        throw PGExceptionFactory.newPGException("Invalid table name");
+        throw PGExceptionFactory.newPGException("Invalid table name", SQLState.SyntaxError);
       }
       builder.tables.add(table);
       List<TableOrIndexName> columns = parser.readColumnListInParentheses(table.toString(), false);
@@ -233,7 +236,8 @@ public class VacuumStatement extends IntermediatePortalStatement {
     try {
       return BooleanParser.toBoolean(parser.getSql().substring(parser.getPos()));
     } catch (PGException ignore) {
-      throw PGExceptionFactory.newPGException(name + " requires a Boolean value");
+      throw PGExceptionFactory.newPGException(
+          name + " requires a Boolean value", SQLState.SyntaxError);
     }
   }
 }

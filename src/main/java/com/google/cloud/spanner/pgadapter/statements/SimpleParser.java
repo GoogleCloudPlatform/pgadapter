@@ -666,12 +666,14 @@ public class SimpleParser {
         scale = parseInt(scaleExpression);
       }
       if (!eatToken(")")) {
-        throw PGExceptionFactory.newPGException("missing ')' for type length");
+        throw PGExceptionFactory.newPGException(
+            "missing ')' for type length", SQLState.SyntaxError);
       }
     }
     if (eatToken("[")) {
       if (!eatToken("]")) {
-        throw PGExceptionFactory.newPGException("missing ']' for array definition");
+        throw PGExceptionFactory.newPGException(
+            "missing ']' for array definition", SQLState.SyntaxError);
       }
       array = true;
     }

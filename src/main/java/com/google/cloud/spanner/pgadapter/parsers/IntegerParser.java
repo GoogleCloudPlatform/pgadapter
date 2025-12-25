@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableMap;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -42,7 +43,8 @@ class IntegerParser extends Parser<Integer> {
             this.item =
                 new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).intValueExact();
           } catch (Exception exception) {
-            throw PGExceptionFactory.newPGException("Invalid int4 value: " + stringValue);
+            throw PGExceptionFactory.newPGException(
+                "Invalid int4 value: " + stringValue, SQLState.SyntaxError);
           }
           break;
         case BINARY:

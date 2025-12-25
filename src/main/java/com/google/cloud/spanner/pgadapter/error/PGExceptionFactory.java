@@ -19,6 +19,7 @@ import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TR
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.common.base.Strings;
 import io.grpc.StatusRuntimeException;
 import java.util.regex.Pattern;
 
@@ -109,19 +110,22 @@ public class PGExceptionFactory {
           .setSQLState(SQLState.SerializationFailure)
           .build();
     }
-    if ((spannerException.getErrorCode() == ErrorCode.NOT_FOUND
+    if (Strings.isNullOrEmpty(spannerException.getPostgreSQLErrorCode())
+        && (spannerException.getErrorCode() == ErrorCode.NOT_FOUND
             || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
         && COLUMN_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.UndefinedColumn)
           .build();
-    } else if ((spannerException.getErrorCode() == ErrorCode.NOT_FOUND
+    } else if (Strings.isNullOrEmpty(spannerException.getPostgreSQLErrorCode())
+        && (spannerException.getErrorCode() == ErrorCode.NOT_FOUND
             || spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT)
         && RELATION_NOT_FOUND_PATTERN.matcher(spannerException.getMessage()).find()) {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.UndefinedTable)
           .build();
-    } else if (spannerException.getErrorCode() == ErrorCode.ALREADY_EXISTS
+    } else if (Strings.isNullOrEmpty(spannerException.getPostgreSQLErrorCode())
+        && spannerException.getErrorCode() == ErrorCode.ALREADY_EXISTS
         && (PK_VIOLATION_PATTERN.matcher(spannerException.getMessage()).find()
             || PK_VIOLATION_PATTERN_EMULATOR.matcher(spannerException.getMessage()).find()
             || UNIQUE_INDEX_VIOLATION_PATTERN.matcher(spannerException.getMessage()).find()
@@ -131,7 +135,8 @@ public class PGExceptionFactory {
       return PGException.newBuilder(extractMessage(spannerException))
           .setSQLState(SQLState.UniqueViolation)
           .build();
-    } else if (spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+    } else if (Strings.isNullOrEmpty(spannerException.getPostgreSQLErrorCode())
+        && spannerException.getErrorCode() == ErrorCode.FAILED_PRECONDITION
         && (FOREIGN_KEY_VIOLATION_PATTERN_EMULATOR.matcher(spannerException.getMessage()).find()
             || FOREIGN_KEY_VIOLATION_PATTERN.matcher(spannerException.getMessage()).find())) {
       return PGException.newBuilder(extractMessage(spannerException))
@@ -156,7 +161,7 @@ public class PGExceptionFactory {
     } else if (spannerException.getErrorCode() == ErrorCode.DEADLINE_EXCEEDED) {
       return newQueryCancelledDueToTimeoutException(spannerException);
     }
-    return newPGException(extractMessage(spannerException));
+    return newPGException(extractMessage(spannerException), getSQLStateOrDefault(spannerException));
   }
 
   /** Converts the given {@link Exception} to a {@link PGException}. */
@@ -205,5 +210,10 @@ public class PGExceptionFactory {
       result = result.substring("[ERROR] ".length());
     }
     return result;
+  }
+
+  static SQLState getSQLStateOrDefault(SpannerException spannerException) {
+    SQLState state = SQLState.getSQLState(spannerException.getPostgreSQLErrorCode());
+    return state == null ? SQLState.RaiseException : state;
   }
 }

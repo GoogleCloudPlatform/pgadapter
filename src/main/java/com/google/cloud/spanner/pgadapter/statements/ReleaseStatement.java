@@ -68,7 +68,8 @@ public class ReleaseStatement extends IntermediatePortalStatement {
     // RELEASE [ SAVEPOINT ] savepoint_name
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("release")) {
-      throw PGExceptionFactory.newPGException("not a valid RELEASE statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid RELEASE statement: " + sql, SQLState.SyntaxError);
     }
     parser.eatKeyword("savepoint");
     TableOrIndexName name = parser.readTableOrIndexName();

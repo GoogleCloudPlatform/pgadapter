@@ -68,7 +68,8 @@ public class SavepointStatement extends IntermediatePortalStatement {
     // SAVEPOINT savepoint_name
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("savepoint")) {
-      throw PGExceptionFactory.newPGException("not a valid SAVEPOINT statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid SAVEPOINT statement: " + sql, SQLState.SyntaxError);
     }
     TableOrIndexName name = parser.readTableOrIndexName();
     if (name == null || name.schema != null) {

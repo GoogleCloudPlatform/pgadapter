@@ -23,6 +23,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -184,20 +185,23 @@ public class PrepareStatement extends IntermediatePortalStatement {
 
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("prepare")) {
-      throw PGExceptionFactory.newPGException("not a valid PREPARE statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid PREPARE statement: " + sql, SQLState.SyntaxError);
     }
     TableOrIndexName name = parser.readTableOrIndexName();
     if (name == null || name.schema != null) {
-      throw PGExceptionFactory.newPGException("invalid prepared statement name");
+      throw PGExceptionFactory.newPGException(
+          "invalid prepared statement name", SQLState.InvalidSqlStatementName);
     }
     ImmutableList.Builder<Integer> dataTypesBuilder = ImmutableList.builder();
     if (parser.eatToken("(")) {
       List<String> dataTypesNames = parser.parseExpressionList();
       if (dataTypesNames == null || dataTypesNames.isEmpty()) {
-        throw PGExceptionFactory.newPGException("invalid data type list");
+        throw PGExceptionFactory.newPGException("invalid data type list", SQLState.SyntaxError);
       }
       if (!parser.eatToken(")")) {
-        throw PGExceptionFactory.newPGException("missing closing parentheses in data type list");
+        throw PGExceptionFactory.newPGException(
+            "missing closing parentheses in data type list", SQLState.SyntaxError);
       }
       dataTypesBuilder.addAll(
           dataTypesNames.stream()
@@ -205,7 +209,8 @@ public class PrepareStatement extends IntermediatePortalStatement {
               .collect(Collectors.toList()));
     }
     if (!parser.eatKeyword("as")) {
-      throw PGExceptionFactory.newPGException("missing 'AS' keyword in PREPARE statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "missing 'AS' keyword in PREPARE statement: " + sql, SQLState.SyntaxError);
     }
     return new ParsedPreparedStatement(
         name.name,
@@ -221,6 +226,6 @@ public class PrepareStatement extends IntermediatePortalStatement {
     if (oid != null) {
       return oid;
     }
-    throw PGExceptionFactory.newPGException("unknown type name: " + type);
+    throw PGExceptionFactory.newPGException("unknown type name: " + type, SQLState.SyntaxError);
   }
 }

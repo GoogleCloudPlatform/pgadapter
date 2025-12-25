@@ -128,7 +128,8 @@ public class DiscardStatement extends IntermediatePortalStatement {
 
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("discard")) {
-      throw PGExceptionFactory.newPGException("not a valid DISCARD statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid DISCARD statement: " + sql, SQLState.SyntaxError);
     }
     DiscardType type;
     if (parser.eatKeyword("all")) {
@@ -140,7 +141,8 @@ public class DiscardStatement extends IntermediatePortalStatement {
     } else if (parser.eatKeyword("temp") || parser.eatKeyword("temporary")) {
       type = DiscardType.TEMPORARY;
     } else {
-      throw PGExceptionFactory.newPGException("Invalid DISCARD statement: " + parser.getSql());
+      throw PGExceptionFactory.newPGException(
+          "Invalid DISCARD statement: " + parser.getSql(), SQLState.SyntaxError);
     }
     parser.throwIfHasMoreTokens();
     return new ParsedDiscardStatement(type);

@@ -821,7 +821,8 @@ public class ConnectionHandler implements Runnable {
   public void closeStatement(String statementName) {
     if (!hasStatement(statementName)) {
       throw PGExceptionFactory.newPGException(
-          "prepared statement " + statementName + " does not exist");
+          "prepared statement " + statementName + " does not exist",
+          SQLState.InvalidSqlStatementName);
     }
     this.statementsMap.remove(statementName);
   }

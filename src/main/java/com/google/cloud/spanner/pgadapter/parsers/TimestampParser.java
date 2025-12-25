@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
@@ -154,9 +155,11 @@ public class TimestampParser extends Parser<Timestamp> {
               zonedDateTime.getLong(ChronoField.INSTANT_SECONDS),
               zonedDateTime.get(ChronoField.NANO_OF_SECOND));
         }
-        throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
+        throw PGExceptionFactory.newPGException(
+            "Invalid timestamp value: " + value, SQLState.SyntaxError);
       } catch (Exception exception) {
-        throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
+        throw PGExceptionFactory.newPGException(
+            "Invalid timestamp value: " + value, SQLState.SyntaxError);
       }
     }
   }

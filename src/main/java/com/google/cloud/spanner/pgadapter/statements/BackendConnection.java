@@ -750,10 +750,12 @@ public class BackendConnection {
       try {
         checkConnectionState();
         if (spannerConnection.isDdlBatchActive()) {
-          throw PGExceptionFactory.newPGException("Cannot execute TRUNCATE in a DDL batch");
+          throw PGExceptionFactory.newPGException(
+              "Cannot execute TRUNCATE in a DDL batch", SQLState.InvalidTransactionState);
         }
         if (spannerConnection.isDmlBatchActive()) {
-          throw PGExceptionFactory.newPGException("Cannot execute TRUNCATE in a DML batch");
+          throw PGExceptionFactory.newPGException(
+              "Cannot execute TRUNCATE in a DML batch", SQLState.InvalidTransactionState);
         }
         if (spannerConnection.isInTransaction()
             || spannerConnection.getAutocommitDmlMode() == AutocommitDmlMode.TRANSACTIONAL) {
