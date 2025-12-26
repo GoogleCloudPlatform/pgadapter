@@ -6,10 +6,11 @@
         <Nullable>enable</Nullable>
         <OutputType>Exe</OutputType>
         <LangVersion>10.0</LangVersion>
+        <RollForward>LatestMajor</RollForward>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Npgsql" Version="9.0.4" />
+      <PackageReference Include="Npgsql" Version="10.0.1" />
     </ItemGroup>
 
 </Project>
