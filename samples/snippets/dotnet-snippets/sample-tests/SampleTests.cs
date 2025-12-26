@@ -233,7 +233,7 @@ public class SampleTests
             // Bind port 5432 of the container to a random port on the host.
             .WithPortBinding(5432, true)
             // Wait until the PostgreSQL port is available.
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilExternalTcpPortIsAvailable(5432))
             // Build the container configuration.
             .Build();
         await container.StartAsync();
