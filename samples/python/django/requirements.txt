@@ -3,5 +3,5 @@ pytz==2025.2
 Django==5.2.9
 google==3.0.0
 google.auth==2.41.1
-testcontainers==4.13.2
+testcontainers==4.13.3
 requests==2.32.5
