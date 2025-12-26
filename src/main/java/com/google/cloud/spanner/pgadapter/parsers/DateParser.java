@@ -23,6 +23,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
 import java.io.DataOutputStream;
@@ -53,7 +54,8 @@ public class DateParser extends Parser<Date> {
           if (stringValue.length() >= 10) {
             this.item = Date.parseDate(stringValue.substring(0, 10));
           } else {
-            throw PGExceptionFactory.newPGException("Invalid date value: " + stringValue);
+            throw PGExceptionFactory.newPGException(
+                "Invalid date value: " + stringValue, SQLState.SyntaxError);
           }
           break;
         case BINARY:

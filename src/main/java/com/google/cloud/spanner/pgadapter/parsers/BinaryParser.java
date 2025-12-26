@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharSource;
@@ -57,7 +58,8 @@ public class BinaryParser extends Parser<ByteArray> {
             break;
           } catch (Exception exception) {
             throw PGExceptionFactory.newPGException(
-                "Invalid binary value: " + new String(item, StandardCharsets.UTF_8));
+                "Invalid binary value: " + new String(item, StandardCharsets.UTF_8),
+                SQLState.SyntaxError);
           }
         case BINARY:
           this.item = toByteArray(item);

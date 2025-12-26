@@ -375,13 +375,13 @@ public class ITNodePostgresTest implements IntegrationTest {
         runTest("testErrorInReadWriteTransaction", getHost(), testEnv.getServer().getLocalPort());
     if (IntegrationTest.isRunningOnEmulator()) {
       assertEquals(
-          "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Failed to insert row with primary key ({pk#name:\"foo\"}) due to previously existing row\n"
+          "Insert error: error: Failed to insert row with primary key ({pk#name:\"foo\"}) due to previously existing row\n"
               + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
               + "SELECT 1 returned: 1\n",
           output);
     } else {
       assertEquals(
-          "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row [foo] in table users already exists\n"
+          "Insert error: error: Row [foo] in table users already exists\n"
               + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
               + "SELECT 1 returned: 1\n",
           output);

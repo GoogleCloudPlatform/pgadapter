@@ -569,7 +569,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testErrorInReadWriteTransaction", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with \"name\" 'foo' already exists\n"
+        "Insert error: error: Row with \"name\" 'foo' already exists\n"
             + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
             + "SELECT 1 returned: 1\n",
         output);

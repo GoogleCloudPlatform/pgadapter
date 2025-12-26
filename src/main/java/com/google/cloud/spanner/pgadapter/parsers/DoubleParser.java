@@ -21,6 +21,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
@@ -46,7 +47,8 @@ public class DoubleParser extends Parser<Double> {
           try {
             this.item = Double.valueOf(stringValue);
           } catch (Exception exception) {
-            throw PGExceptionFactory.newPGException("Invalid float8 value: " + stringValue);
+            throw PGExceptionFactory.newPGException(
+                "Invalid float8 value: " + stringValue, SQLState.SyntaxError);
           }
           break;
         case BINARY:

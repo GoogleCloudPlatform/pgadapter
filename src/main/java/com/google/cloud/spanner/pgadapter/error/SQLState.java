@@ -14,7 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.error;
 
+import com.google.cloud.spanner.AbstractLazyInitializer;
+import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import javax.annotation.Nullable;
 
 public enum SQLState {
   Success("00000"),
@@ -220,6 +224,30 @@ public enum SQLState {
   InvalidSchemaDefinition("42P15"),
   InvalidTableDefinition("42P16"),
   InvalidObjectDefinition("42P17");
+
+  private static final AbstractLazyInitializer<Map<String, SQLState>> SQL_STATES =
+      new AbstractLazyInitializer<Map<String, SQLState>>() {
+        @Override
+        protected Map<String, SQLState> initialize() {
+          ImmutableMap.Builder<String, SQLState> builder = ImmutableMap.builder();
+          for (SQLState state : SQLState.values()) {
+            builder.put(state.code, state);
+          }
+          return builder.build();
+        }
+      };
+
+  /** Returns the SQLState object with the given code, or null if no such SQLState is found. */
+  public static @Nullable SQLState getSQLState(@Nullable String code) {
+    if (code == null) {
+      return null;
+    }
+    try {
+      return SQL_STATES.get().get(code);
+    } catch (Exception ignore) {
+      return null;
+    }
+  }
 
   private final String code;
 

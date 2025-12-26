@@ -21,6 +21,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
@@ -94,7 +95,8 @@ public class BooleanParser extends Parser<Boolean> {
     } else if (FALSE_VALUES.contains(value)) {
       return false;
     } else {
-      throw PGExceptionFactory.newPGException(value + " is not a valid boolean value");
+      throw PGExceptionFactory.newPGException(
+          value + " is not a valid boolean value", SQLState.SyntaxError);
     }
   }
 

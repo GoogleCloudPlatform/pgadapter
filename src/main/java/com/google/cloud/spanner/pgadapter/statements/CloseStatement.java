@@ -22,6 +22,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -106,13 +107,14 @@ public class CloseStatement extends IntermediatePortalStatement {
 
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("close")) {
-      throw PGExceptionFactory.newPGException("not a valid CLOSE statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid CLOSE statement: " + sql, SQLState.SyntaxError);
     }
     String statementName = null;
     if (!parser.eatKeyword("all")) {
       TableOrIndexName name = parser.readTableOrIndexName();
       if (name == null || name.schema != null) {
-        throw PGExceptionFactory.newPGException("invalid cursor name");
+        throw PGExceptionFactory.newPGException("invalid cursor name", SQLState.InvalidCursorName);
       }
       statementName = unquoteOrFoldIdentifier(name.name);
     }

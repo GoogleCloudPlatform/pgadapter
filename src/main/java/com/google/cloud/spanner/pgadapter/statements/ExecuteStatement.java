@@ -23,6 +23,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
@@ -128,11 +129,13 @@ public class ExecuteStatement extends IntermediatePortalStatement {
 
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("execute")) {
-      throw PGExceptionFactory.newPGException("not a valid EXECUTE statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid EXECUTE statement: " + sql, SQLState.SyntaxError);
     }
     TableOrIndexName name = parser.readTableOrIndexName();
     if (name == null || name.schema != null) {
-      throw PGExceptionFactory.newPGException("invalid prepared statement name");
+      throw PGExceptionFactory.newPGException(
+          "invalid prepared statement name", SQLState.InvalidSqlStatementName);
     }
     String statementName = unquoteOrFoldIdentifier(name.name);
 
@@ -140,10 +143,11 @@ public class ExecuteStatement extends IntermediatePortalStatement {
     if (parser.eatToken("(")) {
       List<String> parametersList = parser.parseExpressionList();
       if (parametersList == null || parametersList.isEmpty()) {
-        throw PGExceptionFactory.newPGException("invalid parameter list");
+        throw PGExceptionFactory.newPGException("invalid parameter list", SQLState.SyntaxError);
       }
       if (!parser.eatToken(")")) {
-        throw PGExceptionFactory.newPGException("missing closing parentheses in parameters list");
+        throw PGExceptionFactory.newPGException(
+            "missing closing parentheses in parameters list", SQLState.SyntaxError);
       }
       parameters =
           parametersList.stream().map(ExecuteStatement::unquoteString).collect(Collectors.toList());
@@ -153,7 +157,8 @@ public class ExecuteStatement extends IntermediatePortalStatement {
     parser.skipWhitespaces();
     if (parser.getPos() < parser.getSql().length()) {
       throw PGExceptionFactory.newPGException(
-          "Syntax error. Unexpected tokens: " + parser.getSql().substring(parser.getPos()));
+          "Syntax error. Unexpected tokens: " + parser.getSql().substring(parser.getPos()),
+          SQLState.SyntaxError);
     }
     return new ParsedExecuteStatement(
         statementName,

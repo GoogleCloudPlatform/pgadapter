@@ -22,6 +22,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -106,21 +107,24 @@ public class DeallocateStatement extends IntermediatePortalStatement {
 
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("deallocate")) {
-      throw PGExceptionFactory.newPGException("not a valid DEALLOCATE statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid DEALLOCATE statement: " + sql, SQLState.SyntaxError);
     }
     parser.eatKeyword("prepare");
     String statementName = null;
     if (!parser.eatKeyword("all")) {
       TableOrIndexName name = parser.readTableOrIndexName();
       if (name == null || name.schema != null) {
-        throw PGExceptionFactory.newPGException("invalid prepared statement name");
+        throw PGExceptionFactory.newPGException(
+            "invalid prepared statement name", SQLState.InvalidSqlStatementName);
       }
       statementName = unquoteOrFoldIdentifier(name.name);
     }
     parser.skipWhitespaces();
     if (parser.getPos() < parser.getSql().length()) {
       throw PGExceptionFactory.newPGException(
-          "Syntax error. Unexpected tokens: " + parser.getSql().substring(parser.getPos()));
+          "Syntax error. Unexpected tokens: " + parser.getSql().substring(parser.getPos()),
+          SQLState.SyntaxError);
     }
     return new ParsedDeallocateStatement(statementName);
   }

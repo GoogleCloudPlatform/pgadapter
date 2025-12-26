@@ -28,6 +28,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
 import com.google.common.base.Preconditions;
@@ -81,12 +82,14 @@ public class ShowDatabaseDdlStatement extends IntermediatePortalStatement {
     // SHOW DATABASE DDL [FOR POSTGRESQL]
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eatKeyword("show", "database", "ddl")) {
-      throw PGExceptionFactory.newPGException("not a valid SHOW DATABASE DDL statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid SHOW DATABASE DDL statement: " + sql, SQLState.SyntaxError);
     }
     boolean forPostgres = false;
     if (parser.eatKeyword("for")) {
       if (!parser.hasMoreTokens()) {
-        throw PGExceptionFactory.newPGException("missing 'POSTGRESQL' keyword: " + sql);
+        throw PGExceptionFactory.newPGException(
+            "missing 'POSTGRESQL' keyword: " + sql, SQLState.SyntaxError);
       }
       forPostgres = parser.eatKeyword("postgresql");
     }

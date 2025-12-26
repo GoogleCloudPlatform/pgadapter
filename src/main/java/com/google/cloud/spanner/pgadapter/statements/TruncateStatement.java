@@ -20,6 +20,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.TruncateStatement.ParsedTruncateStatement.Builder;
@@ -122,20 +123,23 @@ public class TruncateStatement extends IntermediatePortalStatement {
     SimpleParser parser = new SimpleParser(sql);
     ParsedTruncateStatement.Builder builder = new Builder();
     if (!parser.eatKeyword("truncate")) {
-      throw PGExceptionFactory.newPGException("not a valid TRUNCATE statement: " + sql);
+      throw PGExceptionFactory.newPGException(
+          "not a valid TRUNCATE statement: " + sql, SQLState.SyntaxError);
     }
     parser.eatKeyword("table");
     builder.only = parser.eatKeyword("only");
     TableOrIndexName table = parser.readTableOrIndexName();
     if (table == null) {
-      throw PGExceptionFactory.newPGException("invalid or missing table name");
+      throw PGExceptionFactory.newPGException(
+          "invalid or missing table name", SQLState.SyntaxError);
     }
     builder.tables.add(table);
     builder.star = parser.eatToken("*");
     while (parser.eatToken(",")) {
       TableOrIndexName name = parser.readTableOrIndexName();
       if (name == null) {
-        throw PGExceptionFactory.newPGException("invalid or missing table name");
+        throw PGExceptionFactory.newPGException(
+            "invalid or missing table name", SQLState.SyntaxError);
       }
       builder.tables.add(name);
     }
