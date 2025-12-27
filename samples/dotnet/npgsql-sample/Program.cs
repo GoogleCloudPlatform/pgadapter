@@ -52,6 +52,7 @@ internal static class Sample
             .WithPortBinding(5432, true)
             // Wait until the PostgreSQL port is available.
             .WithWaitStrategy(Wait.ForUnixContainer().UntilExternalTcpPortIsAvailable(5432))
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(5432))
             // Build the container configuration.
             .Build();
         await container.StartAsync();
