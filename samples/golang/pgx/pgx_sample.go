@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	pgadapter "github.com/GoogleCloudPlatform/pgadapter/wrappers/golang"
 	"github.com/jackc/pgx/v5"
@@ -70,6 +71,7 @@ func runSample(project, instance, database string, emulator bool) (string, error
 		fmt.Printf("failed to start PGAdapter: %v\n", err)
 		return "", err
 	}
+	time.Sleep(time.Second)
 	// Stop PGAdapter when this function returns.
 	// This is not required, as the PGAdapter sub-process shuts down automatically when your
 	// application shuts down. The PGAdapter sub-process is not guaranteed to shut down if
