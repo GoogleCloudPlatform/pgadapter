@@ -56,7 +56,7 @@ jobs:
           python-version: '3.9'
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4.8'
