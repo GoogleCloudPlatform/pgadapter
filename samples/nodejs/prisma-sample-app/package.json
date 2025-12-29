@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^25.0.0",
     "prisma": "^6.5.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.8.2"
