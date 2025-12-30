@@ -198,6 +198,7 @@ func runSample(project, instance, database string, emulator, isOpenSourcePG bool
 			fmt.Printf("Could not start PGAdapter: %v\n", err)
 			return err
 		}
+    time.Sleep(time.Second)
 		defer pgadapter.Stop(context.Background())
 		port, err := pgadapter.GetHostPort()
 		if err != nil {
