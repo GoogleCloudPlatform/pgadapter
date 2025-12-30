@@ -53,7 +53,7 @@ jobs:
       - run: go version
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.9'
+          python-version: '3.14'
       - uses: actions/setup-node@v6
         with:
           node-version: 22
