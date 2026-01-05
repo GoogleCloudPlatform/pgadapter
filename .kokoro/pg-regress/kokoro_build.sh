@@ -16,6 +16,7 @@ GCS_BUCKET_PATH="gs://pgadapter-pg-regress/cloud-prod-results"
 echo "DATABASE_ID: ${DATABASE_ID}"
 
 gcloud config set project $GCP_PROJECT_ID
+export GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 
 # Display commands being run.
 # WARNING: please only enable 'set -x' if necessary for debugging, and be very
