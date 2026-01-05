@@ -44,6 +44,11 @@ java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID &
 cd "${KOKORO_ARTIFACTS_DIR}/github/"
 
 # Install python deps
+sudo apt install software-properties-common
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install python3.12 -y
+python --version
 pip install google-cloud-bigquery
 
 # Install psql
