@@ -36,8 +36,12 @@ import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
+import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
+import com.google.spanner.v1.StructType;
+import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.util.Arrays;
@@ -598,7 +602,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
   public void testCreateRelationships() throws Exception {
     String insertUserSql =
         "INSERT INTO user_account (name, fullname) "
-            + "VALUES ($1::VARCHAR(30), $2::VARCHAR) "
+            + "VALUES ($1::VARCHAR, $2::VARCHAR) "
             + "RETURNING user_account.id";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -625,9 +629,10 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                 .build()));
     String insertAddressesSql =
         "INSERT INTO address (email_address, user_id) "
-            + "VALUES ($1::VARCHAR, $2::INTEGER), "
-            + "($3::VARCHAR, $4::INTEGER) "
-            + "RETURNING address.id";
+            + "SELECT p0::VARCHAR, p1::INTEGER "
+            + "FROM (VALUES ($1::VARCHAR, $2::INTEGER, 0), ($3::VARCHAR, $4::INTEGER, 1)) AS imp_sen(p0, p1, sen_counter) "
+            + "ORDER BY sen_counter "
+            + "RETURNING address.id, address.id AS id__1";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(insertAddressesSql),
@@ -657,10 +662,33 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                 .to(1L)
                 .build(),
             ResultSet.newBuilder()
-                .setMetadata(SELECT1_RESULTSET.getMetadata())
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("id")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("id__1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
                 .setStats(ResultSetStats.newBuilder().setRowCountExact(2L).build())
-                .addRows(SELECT1_RESULTSET.getRows(0))
-                .addRows(SELECT2_RESULTSET.getRows(0))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .build())
                 .build()));
 
     String actualOutput = execute("orm_create_relationships.py", host, pgServer.getLocalPort());
