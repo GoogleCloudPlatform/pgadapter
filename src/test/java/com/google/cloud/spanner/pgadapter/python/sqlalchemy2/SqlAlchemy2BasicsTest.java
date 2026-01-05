@@ -353,7 +353,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
   public void testCoreInsert() throws Exception {
     String sql =
         "INSERT INTO user_account (name, fullname) "
-            + "VALUES ($1::VARCHAR(30), $2::VARCHAR) RETURNING user_account.id";
+            + "VALUES ($1::VARCHAR, $2::VARCHAR) RETURNING user_account.id";
     ResultSet metadataResultSet =
         ResultSet.newBuilder()
             .setMetadata(
@@ -381,7 +381,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
 
     String sqlMultiple =
-        "INSERT INTO user_account (name, fullname) VALUES ($1::VARCHAR(30), $2::VARCHAR)";
+        "INSERT INTO user_account (name, fullname) VALUES ($1::VARCHAR, $2::VARCHAR)";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sqlMultiple),
@@ -460,7 +460,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
   public void testCoreInsertFromSelect() throws Exception {
     String sql =
         "INSERT INTO address (user_id, email_address) "
-            + "SELECT user_account.id, user_account.name || $1::VARCHAR(30) AS anon_1 \n"
+            + "SELECT user_account.id, user_account.name || $1::VARCHAR AS anon_1 \n"
             + "FROM user_account RETURNING address.id, address.email_address";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -506,7 +506,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
     String sql =
         "SELECT user_account.id, user_account.name, user_account.fullname \n"
             + "FROM user_account \n"
-            + "WHERE user_account.name = $1::VARCHAR(30)";
+            + "WHERE user_account.name = $1::VARCHAR";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -564,7 +564,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
     String sql =
         "SELECT user_account.id, user_account.name, user_account.fullname \n"
             + "FROM user_account \n"
-            + "WHERE user_account.name = $1::VARCHAR(30)";
+            + "WHERE user_account.name = $1::VARCHAR";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -599,7 +599,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
                 .build()));
     String insertSql =
         "INSERT INTO user_account (name, fullname) "
-            + "VALUES ($1::VARCHAR(30), $2::VARCHAR) RETURNING user_account.id";
+            + "VALUES ($1::VARCHAR, $2::VARCHAR) RETURNING user_account.id";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(insertSql),
