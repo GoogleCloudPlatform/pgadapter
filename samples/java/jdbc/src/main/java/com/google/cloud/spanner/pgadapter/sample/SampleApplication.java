@@ -93,7 +93,7 @@ public class SampleApplication {
         useEmulator ? startPGAdapterWithEmulator() : startPGAdapter(project, instance, credentials);
     try {
       String connectionUrl =
-          String.format("jdbc:postgresql://localhost:%d/%s?", server.getPort(), database);
+          String.format("jdbc:postgresql://localhost:%d/%s", server.getPort(), database);
       runSample(connectionUrl);
     } finally {
       server.shutdown();
