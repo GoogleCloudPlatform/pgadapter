@@ -10,7 +10,7 @@ GCP_PROJECT_ID="span-cloud-testing"
 INSTANCE_ID="pgregress-testing"
 DATABASE_ID="pg_regress_$uuid"
 BQ_TABLE="spanner_pg_regress_results.cloud_prod_results"
-TARGET_ENV="cloud_prod_results"
+TARGET_ENV="cloud_prod"
 GCS_BUCKET_PATH="gs://pgadapter-pg-regress/cloud-prod-results"
 
 echo "DATABASE_ID: ${DATABASE_ID}"
