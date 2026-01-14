@@ -19,7 +19,6 @@ import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeFalse;
 
 import com.google.api.gax.rpc.PermissionDeniedException;
 import com.google.api.gax.rpc.ResourceExhaustedException;
