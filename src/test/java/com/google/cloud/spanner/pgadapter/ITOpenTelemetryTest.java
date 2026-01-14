@@ -19,6 +19,7 @@ import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.DB
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.api.gax.rpc.PermissionDeniedException;
 import com.google.api.gax.rpc.ResourceExhaustedException;
@@ -56,6 +57,7 @@ public class ITOpenTelemetryTest implements IntegrationTest {
   @BeforeClass
   public static void setup() throws IOException {
     IntegrationTest.skipOnEmulator("This test requires credentials");
+    IntegrationTest.skipOnExperimentalHost("Cloud auth is not applicable for experimental host");
 
     OptionsMetadata.Builder openTelemetryOptionsBuilder =
         OptionsMetadata.newBuilder()
