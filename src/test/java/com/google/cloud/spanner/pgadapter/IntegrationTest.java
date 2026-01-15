@@ -22,7 +22,15 @@ public interface IntegrationTest {
     assumeFalse(reason, isRunningOnEmulator());
   }
 
+  static void skipOnExperimentalHost(String reason) {
+    assumeFalse(reason, isRunningOnExperimentalHost());
+  }
+
   static boolean isRunningOnEmulator() {
     return System.getenv("SPANNER_EMULATOR_HOST") != null;
+  }
+
+  static boolean isRunningOnExperimentalHost() {
+    return System.getProperty("SPANNER_EXPERIMENTAL_HOST") != null;
   }
 }

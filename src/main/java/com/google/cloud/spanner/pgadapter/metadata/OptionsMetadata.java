@@ -43,7 +43,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -65,12 +64,11 @@ public class OptionsMetadata {
   private static final String SPANNER_EMULATOR_HOST_ENV_VAR = "SPANNER_EMULATOR_HOST";
 
   static Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(30L);
-  private static final String CLOUD_SPANNER_HOST_FORMAT = ".*\\.googleapis\\.com.*";
-  private static final Pattern CLOUD_SPANNER_HOST_PATTERN =
-      Pattern.compile(CLOUD_SPANNER_HOST_FORMAT);
 
   private static final String EXTERNAL_HOST_PROJECT = "default";
   private static final String EXTERNAL_HOST_INSTANCE = "default";
+
+  private static final String IS_EXPERIMENTAL_HOST_PROPERTY_NAME = "isExperimentalHost";
 
   /**
    * Builder class for creating an instance of {@link OptionsMetadata}.
@@ -118,6 +116,7 @@ public class OptionsMetadata {
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
     private String clientCertificate;
     private String clientKey;
+    private boolean isExperimentalHost = false;
 
     Builder() {}
 
@@ -425,7 +424,7 @@ public class OptionsMetadata {
 
     /**
      * Configures mTLS authentication using the provided client certificate and key files. mTLS is
-     * only supported for external spanner hosts.
+     * only supported for experimental spanner hosts.
      *
      * @param clientCertificate Path to the client certificate file.
      * @param clientKey Path to the client private key file.
@@ -434,6 +433,18 @@ public class OptionsMetadata {
     Builder useClientCert(String clientCertificate, String clientKey) {
       this.clientCertificate = clientCertificate;
       this.clientKey = clientKey;
+      return this;
+    }
+
+    /*
+     * Configures connection to an experimental host endpoint
+     *
+     * @params experimentalHost url of the experimental host endpoint
+     */
+    @ExperimentalApi("https://github.com/googleapis/java-spanner/pull/3574")
+    Builder setExperimentalHost(String experimentalHost) {
+      setEndpoint(experimentalHost);
+      this.isExperimentalHost = true;
       return this;
     }
 
@@ -504,7 +515,8 @@ public class OptionsMetadata {
           || autoConfigEmulator
           || useVirtualGrpcTransportThreads
           || enableEndToEndTracing
-          || (clientKey != null && clientCertificate != null)) {
+          || (clientKey != null && clientCertificate != null)
+          || isExperimentalHost) {
         StringBuilder jdbcOptionBuilder = new StringBuilder();
         if (usePlainText) {
           jdbcOptionBuilder.append("usePlainText=true;");
@@ -529,6 +541,9 @@ public class OptionsMetadata {
         if (clientKey != null && clientCertificate != null) {
           jdbcOptionBuilder.append("clientCertificate=").append(clientCertificate).append(";");
           jdbcOptionBuilder.append("clientKey=").append(clientKey).append(";");
+        }
+        if (isExperimentalHost) {
+          jdbcOptionBuilder.append("isExperimentalHost=true;");
         }
         addOption(args, OPTION_JDBC_PROPERTIES, jdbcOptionBuilder.toString());
       }
@@ -733,8 +748,7 @@ public class OptionsMetadata {
     if (!propertyMap.containsKey("defaultSequenceKind")) {
       propertyMap.put("defaultSequenceKind", "bit_reversed_positive");
     }
-    boolean usesExternalHost =
-        isExternalHost(Preconditions.checkNotNull(environment), commandLine, propertyMap);
+    boolean usesExperimentalHost = isExperimentalHost(commandLine, propertyMap);
 
     this.environment = environment;
     this.osName = osName;
@@ -752,7 +766,7 @@ public class OptionsMetadata {
               + "OR use -c to set the credentials in PGAdapter and use these credentials for all connections.");
     }
     if (this.commandLine.hasOption(OPTION_DATABASE_NAME)
-        && !usesExternalHost
+        && !usesExperimentalHost
         && !(this.commandLine.hasOption(OPTION_PROJECT_ID)
             && this.commandLine.hasOption(OPTION_INSTANCE_ID))) {
       throw SpannerExceptionFactory.newSpannerException(
@@ -761,7 +775,7 @@ public class OptionsMetadata {
               + "Use the options -p <project-id> -i <instance-id> -d <database-id> to specify the "
               + "database that all connections to this instance of PGAdapter should use.");
     }
-    if ((usesExternalHost
+    if ((usesExperimentalHost
             || (this.commandLine.hasOption(OPTION_PROJECT_ID)
                 && this.commandLine.hasOption(OPTION_INSTANCE_ID)))
         && this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
@@ -1023,7 +1037,7 @@ public class OptionsMetadata {
    */
   public String buildCredentialsFile() {
     // Skip if a com.google.auth.Credentials instance has been set.
-    if (isExternalHost() || credentials != null) {
+    if (isExperimentalHost() || credentials != null) {
       return null;
     }
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
@@ -1113,17 +1127,23 @@ public class OptionsMetadata {
         || isAutoConfigEmulator(propertyMap);
   }
 
-  private boolean isExternalHost() {
-    return isExternalHost(this.environment, this.commandLine, this.propertyMap);
+  private boolean isExperimentalHost() {
+    if (this.propertyMap == null) {
+      return isExperimentalHost(
+          this.commandLine,
+          parseProperties(this.commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, "")));
+    }
+    return isExperimentalHost(this.commandLine, this.propertyMap);
   }
 
-  private static boolean isExternalHost(
-      Map<String, String> environment, CommandLine commandLine, Map<String, String> propertyMap) {
-    return !usesEmulator(environment, propertyMap)
-        && commandLine.hasOption(OPTION_SPANNER_ENDPOINT)
-        && !CLOUD_SPANNER_HOST_PATTERN
-            .matcher(commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT))
-            .matches();
+  private static boolean isExperimentalHost(
+      CommandLine commandLine, Map<String, String> propertyMap) {
+    if (propertyMap == null) {
+      return false;
+    }
+    return commandLine.hasOption(OPTION_SPANNER_ENDPOINT)
+        && commandLine.hasOption(OPTION_JDBC_PROPERTIES)
+        && propertyMap.containsKey(IS_EXPERIMENTAL_HOST_PROPERTY_NAME);
   }
 
   /** Returns the fully qualified database name based on the given database id or name. */
@@ -1135,7 +1155,7 @@ public class OptionsMetadata {
       String projectId;
       if (commandLine.hasOption(OPTION_PROJECT_ID)) {
         projectId = commandLine.getOptionValue(OPTION_PROJECT_ID);
-      } else if (isExternalHost()) {
+      } else if (isExperimentalHost()) {
         projectId = EXTERNAL_HOST_PROJECT;
       } else {
         projectId = getDefaultProjectId();
@@ -1150,7 +1170,7 @@ public class OptionsMetadata {
       String instanceId;
       if (commandLine.hasOption(OPTION_INSTANCE_ID)) {
         instanceId = commandLine.getOptionValue(OPTION_INSTANCE_ID);
-      } else if (isExternalHost()) {
+      } else if (isExperimentalHost()) {
         instanceId = EXTERNAL_HOST_INSTANCE;
       } else {
         throw SpannerExceptionFactory.newSpannerException(
@@ -1576,10 +1596,10 @@ public class OptionsMetadata {
   public DatabaseId getDefaultDatabaseId() {
     return this.hasDefaultConnectionUrl()
         ? DatabaseId.of(
-            !commandLine.hasOption(OPTION_PROJECT_ID) && isExternalHost()
+            !commandLine.hasOption(OPTION_PROJECT_ID) && isExperimentalHost()
                 ? EXTERNAL_HOST_PROJECT
                 : commandLine.getOptionValue(OPTION_PROJECT_ID),
-            !commandLine.hasOption(OPTION_INSTANCE_ID) && isExternalHost()
+            !commandLine.hasOption(OPTION_INSTANCE_ID) && isExperimentalHost()
                 ? EXTERNAL_HOST_INSTANCE
                 : commandLine.getOptionValue(OPTION_INSTANCE_ID),
             commandLine.getOptionValue(OPTION_DATABASE_NAME))
@@ -1588,7 +1608,7 @@ public class OptionsMetadata {
 
   /** Returns true if these options contain a default instance id. */
   public boolean hasDefaultInstanceId() {
-    return isExternalHost()
+    return isExperimentalHost()
         || (commandLine.hasOption(OPTION_PROJECT_ID) && commandLine.hasOption(OPTION_INSTANCE_ID));
   }
 
@@ -1596,10 +1616,10 @@ public class OptionsMetadata {
   public InstanceId getDefaultInstanceId() {
     if (hasDefaultInstanceId()) {
       return InstanceId.of(
-          !commandLine.hasOption(OPTION_PROJECT_ID) && isExternalHost()
+          !commandLine.hasOption(OPTION_PROJECT_ID) && isExperimentalHost()
               ? EXTERNAL_HOST_PROJECT
               : commandLine.getOptionValue(OPTION_PROJECT_ID),
-          !commandLine.hasOption(OPTION_INSTANCE_ID) && isExternalHost()
+          !commandLine.hasOption(OPTION_INSTANCE_ID) && isExperimentalHost()
               ? EXTERNAL_HOST_INSTANCE
               : commandLine.getOptionValue(OPTION_INSTANCE_ID));
     }

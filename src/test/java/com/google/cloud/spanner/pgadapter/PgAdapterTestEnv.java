@@ -43,6 +43,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Bytes;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
+import io.grpc.ManagedChannelBuilder;
 import io.opentelemetry.api.OpenTelemetry;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -112,6 +113,9 @@ public class PgAdapterTestEnv {
 
   // Default Spanner url. Null indicates that the default URL should be used.
   static final String DEFAULT_SPANNER_URL = null;
+
+  public static final String SPANNER_EXPERIMENTAL_HOST =
+      System.getProperty("SPANNER_EXPERIMENTAL_HOST", null);
 
   public static final ImmutableList<String> DEFAULT_DATA_MODEL =
       ImmutableList.of(
@@ -235,7 +239,7 @@ public class PgAdapterTestEnv {
 
   private void startPGAdapterServer(
       String databaseId, Iterable<String> additionalPGAdapterOptions, OpenTelemetry openTelemetry) {
-    if (PG_ADAPTER_ADDRESS == null) {
+    if (PG_ADAPTER_ADDRESS == null && SPANNER_EXPERIMENTAL_HOST == null) {
       additionalPGAdapterOptions = maybeAddAutoConfigEmulator(additionalPGAdapterOptions);
       String credentials = getCredentials();
       ImmutableList.Builder<String> argsListBuilder =
@@ -257,6 +261,21 @@ public class PgAdapterTestEnv {
       argsListBuilder.addAll(additionalPGAdapterOptions);
       String[] args = argsListBuilder.build().toArray(new String[0]);
       server = new ProxyServer(new OptionsMetadata(args), openTelemetry);
+      server.startServer();
+    } else if (SPANNER_EXPERIMENTAL_HOST != null) {
+      ImmutableList.Builder<String> argsListBuilder =
+          ImmutableList.<String>builder()
+              .add(
+                  "-e",
+                  SPANNER_EXPERIMENTAL_HOST,
+                  "-r",
+                  "isExperimentalHost=true;usePlainText=true");
+      if (databaseId != null) {
+        argsListBuilder.add("-d", databaseId);
+      }
+      argsListBuilder.add("-s", String.valueOf(0));
+      String[] args = argsListBuilder.build().toArray(new String[0]);
+      server = new ProxyServer(new OptionsMetadata(args));
       server.startServer();
     }
   }
@@ -350,6 +369,9 @@ public class PgAdapterTestEnv {
     if (hostUrl == null) {
       hostUrl = System.getProperty(TEST_SPANNER_URL_PROPERTY, DEFAULT_SPANNER_URL);
     }
+    if (SPANNER_EXPERIMENTAL_HOST != null) {
+      hostUrl = SPANNER_EXPERIMENTAL_HOST;
+    }
     return hostUrl;
   }
 
@@ -361,12 +383,18 @@ public class PgAdapterTestEnv {
     if (projectId == null) {
       projectId = System.getProperty(TEST_PROJECT_PROPERTY, DEFAULT_PROJECT_ID);
     }
+    if (SPANNER_EXPERIMENTAL_HOST != null) {
+      projectId = "default";
+    }
     return projectId;
   }
 
   public String getInstanceId() {
     if (instanceId == null) {
       instanceId = System.getProperty(TEST_INSTANCE_PROPERTY, DEFAULT_INSTANCE_ID);
+    }
+    if (SPANNER_EXPERIMENTAL_HOST != null) {
+      instanceId = "default";
     }
     return instanceId;
   }
@@ -517,7 +545,7 @@ public class PgAdapterTestEnv {
     Map<String, String> env = System.getenv();
     gcpCredentials = env.get(GCP_CREDENTIALS);
     GoogleCredentials credentials = null;
-    if (!Strings.isNullOrEmpty(gcpCredentials)) {
+    if (!Strings.isNullOrEmpty(gcpCredentials) && SPANNER_EXPERIMENTAL_HOST == null) {
       try {
         credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
       } catch (IOException e) {
@@ -550,6 +578,18 @@ public class PgAdapterTestEnv {
       }
     } else if (spannerHost != null) {
       builder.setHost(spannerHost);
+    }
+
+    if (SPANNER_EXPERIMENTAL_HOST != null) {
+      if (!SPANNER_EXPERIMENTAL_HOST.startsWith("http")) {
+        builder.setExperimentalHost("http://" + SPANNER_EXPERIMENTAL_HOST);
+      } else {
+        builder.setExperimentalHost(SPANNER_EXPERIMENTAL_HOST);
+      }
+      builder
+          .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+          .setCredentials(NoCredentials.getInstance());
+      credentials = null;
     }
 
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) == null && credentials != null) {
