@@ -25,7 +25,7 @@ export GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 #  the credentials being printed in build logs.
 #  Additionally, recursive invocation with credentials as command-line
 #  parameters, will print the full command, with credentials, in the build logs.
-# set -x
+set -x
 
 # Code under repo is checked out to ${KOKORO_ARTIFACTS_DIR}/github.
 # The final directory name in this path is determined by the scm name specified
@@ -45,10 +45,10 @@ java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID &
 cd "${KOKORO_ARTIFACTS_DIR}/github/"
 
 # Install python deps
-sudo apt install software-properties-common
-sudo add-apt-repository ppa:deadsnakes/ppa
-sudo apt update
-sudo apt install python3.12 -y
+#sudo apt install software-properties-common
+#sudo add-apt-repository ppa:deadsnakes/ppa
+#sudo apt update
+#sudo apt install python3.12 -y
 python --version
 pip install google-cloud-bigquery
 
