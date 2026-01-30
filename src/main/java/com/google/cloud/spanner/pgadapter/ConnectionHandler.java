@@ -74,6 +74,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -273,6 +274,13 @@ public class ConnectionHandler implements Runnable {
     } catch (SpannerException e) {
       spannerConnection.close();
       throw e;
+    }
+    // Override the 'unspecified' isolation level to prevent errors in drivers that query this
+    // setting at startup, and expect one of the supported PostgreSQL isolation levels.
+    // TODO: Once supported: Query the database for the default isolation level.
+    if (spannerConnection.getDefaultIsolationLevel()
+        == IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED) {
+      spannerConnection.setDefaultIsolationLevel(IsolationLevel.SERIALIZABLE);
     }
     spannerConnection.setSavepointSupport(SavepointSupport.ENABLED);
     this.spannerConnection = spannerConnection;

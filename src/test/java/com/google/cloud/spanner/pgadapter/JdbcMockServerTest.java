@@ -6179,9 +6179,33 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertTrue(request.hasTransaction());
         assertTrue(request.getTransaction().hasBegin());
         assertEquals(
-            IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
-            request.getTransaction().getBegin().getIsolationLevel());
+            IsolationLevel.SERIALIZABLE, request.getTransaction().getBegin().getIsolationLevel());
       }
+    }
+  }
+
+  @Test
+  public void testDefaultIsolationLevelInConnectionString() throws SQLException {
+    for (String isolation : new String[] {"repeatable read", "serializable"}) {
+      try (Connection connection =
+          DriverManager.getConnection(
+              createUrl()
+                  + String.format("?options=-c%%20default_transaction_isolation=%s", isolation))) {
+        connection.setAutoCommit(false);
+        try (java.sql.Statement statement = connection.createStatement()) {
+          assertEquals(UPDATE_COUNT, statement.executeUpdate(UPDATE_STATEMENT.getSql()));
+          connection.commit();
+
+          assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+          ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+          assertTrue(request.hasTransaction());
+          assertTrue(request.getTransaction().hasBegin());
+          assertEquals(
+              IsolationLevel.valueOf(isolation.replace(' ', '_').toUpperCase()),
+              request.getTransaction().getBegin().getIsolationLevel());
+        }
+      }
+      mockSpanner.clearRequests();
     }
   }
 
