@@ -90,5 +90,6 @@
  testdb_e2e_psql_v?? | spanner_sys        | txn_stats_total_hour             | VIEW       |                              |                      |                           |                          |                        |                    |          |               |                   |                  |               |                 |
  testdb_e2e_psql_v?? | spanner_sys        | txn_stats_total_minute           | VIEW       |                              |                      |                           |                          |                        |                    |          |               |                   |                  |               |                 |
  testdb_e2e_psql_v?? | spanner_sys        | user_split_points                | VIEW       |                              |                      |                           |                          |                        |                    |          |               |                   |                  |               |                 |
-(89 rows)
+ testdb_e2e_psql_v?? | spanner_sys        | vector_index_metrics_history     | VIEW       |                              |                      |                           |                          |                        |                    |          |               |                   |                  |               |                 |
+(90 rows)
 
