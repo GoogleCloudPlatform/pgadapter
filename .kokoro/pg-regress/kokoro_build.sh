@@ -9,14 +9,27 @@ uuid=$(uuidgen -r | cut -c1-6)
 GCP_PROJECT_ID="span-cloud-testing"
 INSTANCE_ID="pgregress-testing"
 DATABASE_ID="pg_regress_$uuid"
-BQ_TABLE="spanner_pg_regress_results.cloud_prod_results"
-TARGET_ENV="cloud_prod"
-GCS_BUCKET_PATH="gs://pgadapter-pg-regress/cloud-prod-results"
 
+GOOGLE_CLOUD_ENDPOINT="staging-wrenchworks.sandbox.googleapis.com"
+
+echo "SPANNER_ENV: ${SPANNER_ENV}"
 echo "DATABASE_ID: ${DATABASE_ID}"
 
 gcloud config set project $GCP_PROJECT_ID
 export GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
+
+if [[ "$SPANNER_ENV" == "cloud-devel" ]]; then
+  BQ_TABLE="spanner_pg_regress_results.cloud_devel_results"
+  TARGET_ENV="cloud_devel"
+  GCS_BUCKET_PATH="gs://pgadapter-pg-regress/cloud-devel-results"
+
+  # Use the cloud-devel endpoint
+  gcloud config set api_endpoint_overrides/spanner "https://${GOOGLE_CLOUD_ENDPOINT}/"
+else
+  BQ_TABLE="spanner_pg_regress_results.cloud_prod_results"
+  TARGET_ENV="cloud_prod"
+  GCS_BUCKET_PATH="gs://pgadapter-pg-regress/cloud-prod-results"
+fi
 
 # Display commands being run.
 # WARNING: please only enable 'set -x' if necessary for debugging, and be very
@@ -40,7 +53,12 @@ cd "${KOKORO_ARTIFACTS_DIR}/github/"
 cd pgadapter/
 mvn package -P assembly
 cd target/pgadapter
-java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID &
+
+if [[ "$SPANNER_ENV" == "cloud-devel" ]]; then
+  java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID -e "${GOOGLE_CLOUD_ENDPOINT}" &
+else
+  java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID &
+fi
 
 cd "${KOKORO_ARTIFACTS_DIR}/github/"
 
