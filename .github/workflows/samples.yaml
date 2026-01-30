@@ -35,9 +35,10 @@ jobs:
         with:
           go-version: '1.25.5'
       - run: go version
-      - name: Run gorm Sample tests
-        working-directory: ./samples/golang/gorm
-        run: go test
+      # Temporarily skipped due to a bug in the Emulator
+#      - name: Run gorm Sample tests
+#        working-directory: ./samples/golang/gorm
+#        run: go test
       - name: Run pgx Sample tests
         working-directory: ./samples/golang/pgx
         run: go test
