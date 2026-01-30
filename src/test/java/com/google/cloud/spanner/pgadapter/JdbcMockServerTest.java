@@ -92,7 +92,6 @@ import java.sql.Savepoint;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -3768,12 +3767,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   spannerResult.getDate(col).getYear(),
                   spannerResult.getDate(col).getMonth(),
                   spannerResult.getDate(col).getDayOfMonth());
-          if ((expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER)
-              || (expected.getYear() <= 1582
-                  && expected.getMonth() == Month.FEBRUARY
-                  && expected.getDayOfMonth() > 20)) {
-            // Just assert that we can get the value. Dates in the Julian/Gregorian cutover period
-            // are weird, as are potential intercalaris values.
+          if (expected.getYear() <= 1582) {
+            // Just assert that we can get the value. Dates before the Julian/Gregorian cutover
+            // date are weird, as are potential intercalaris values.
             assertNotNull(pgResult.getDate(col + 1));
           } else {
             assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());
