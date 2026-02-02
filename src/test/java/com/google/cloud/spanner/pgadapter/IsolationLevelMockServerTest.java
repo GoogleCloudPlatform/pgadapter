@@ -76,7 +76,7 @@ public class IsolationLevelMockServerTest extends AbstractMockServerTest {
       stmt.execute("commit");
     }
 
-    assertIsolationLevel(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+    assertIsolationLevel(IsolationLevel.SERIALIZABLE);
   }
 
   @Test
