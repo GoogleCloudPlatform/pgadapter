@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.53.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.53.0...v0.53.1) (2026-02-03)
+
+
+### Performance Improvements
+
+* remove session pool ([#4124](https://github.com/GoogleCloudPlatform/pgadapter/issues/4124)) ([a0a2cf0](https://github.com/GoogleCloudPlatform/pgadapter/commit/a0a2cf044311d1a791365eb9c46159d622c605d1))
+
+
+### Dependencies
+
+* update github.com/googlecloudplatform/pgadapter/wrappers/golang digest to 08429cd ([#3982](https://github.com/GoogleCloudPlatform/pgadapter/issues/3982)) ([5678c54](https://github.com/GoogleCloudPlatform/pgadapter/commit/5678c54f362711084ff1e0a83a2aafc2df13b6c0))
+
 ## [0.53.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.52.1...v0.53.0) (2026-01-05)
 
 
