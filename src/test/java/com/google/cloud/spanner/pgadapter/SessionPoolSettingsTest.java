@@ -20,6 +20,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.SessionPoolOptions;
 import com.google.spanner.v1.BatchCreateSessionsRequest;
+import com.google.spanner.v1.CreateSessionRequest;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -44,6 +45,7 @@ public class SessionPoolSettingsTest extends AbstractMockServerTest {
         null,
         builder ->
             builder
+                // The session pool has been removed and these settings are all deprecated.
                 .setSessionPoolOptions(
                     SessionPoolOptions.newBuilder()
                         .setMinSessions(20)
@@ -68,11 +70,8 @@ public class SessionPoolSettingsTest extends AbstractMockServerTest {
         assertFalse(resultSet.next());
       }
     }
-    // Check that the session pool options are honored.
-    assertEquals(5, mockSpanner.countRequestsOfType(BatchCreateSessionsRequest.class));
-    for (BatchCreateSessionsRequest createSessionsRequest :
-        mockSpanner.getRequestsOfType(BatchCreateSessionsRequest.class)) {
-      assertEquals(4, createSessionsRequest.getSessionCount());
-    }
+    // The Java client now always uses multiplexed sessions.
+    assertEquals(1, mockSpanner.countRequestsOfType(CreateSessionRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(BatchCreateSessionsRequest.class));
   }
 }

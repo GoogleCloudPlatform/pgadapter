@@ -33,12 +33,12 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
-import com.google.spanner.v1.BatchCreateSessionsRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.math.BigDecimal;
@@ -940,12 +940,23 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testStartupConnectionPropertiesInUrl() throws SQLException {
+    int numTransactions = 10;
     try (Connection connection =
         DriverManager.getConnection(
-            createUrl() + "&options=-c%20minSessions=10-c%20numChannels=1")) {}
-    assertEquals(1, mockSpanner.countRequestsOfType(BatchCreateSessionsRequest.class));
-    assertEquals(
-        10,
-        mockSpanner.getRequestsOfType(BatchCreateSessionsRequest.class).get(0).getSessionCount());
+            createUrl()
+                + "&options=-c%20default_isolation_level=REPEATABLE_READ-c%20numChannels=1")) {
+      connection.setAutoCommit(false);
+      for (int i = 0; i < numTransactions; i++) {
+        assertEquals(1, connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql()));
+        connection.commit();
+      }
+    }
+    assertEquals(numTransactions, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
+      assertTrue(request.hasTransaction());
+      assertTrue(request.getTransaction().hasBegin());
+      assertEquals(
+          IsolationLevel.REPEATABLE_READ, request.getTransaction().getBegin().getIsolationLevel());
+    }
   }
 }
