@@ -1,2 +1,2 @@
 psycopg~=3.3.2
-testcontainers~=4.13.0
+testcontainers~=4.14.1
