@@ -71,7 +71,7 @@ python --version
 pip install google-cloud-bigquery
 
 # Install psql
-sudo apt-get install --yes --no-install-recommends postgresql-client
+sudo apt-get install --yes --no-install-recommends postgresql-client-17
 psql --version
 
 # Get postgresql source code
