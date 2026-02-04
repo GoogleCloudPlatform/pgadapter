@@ -6,9 +6,10 @@ set -e
 sudo apt update && sudo apt install uuid-runtime
 
 uuid=$(uuidgen -r | cut -c1-6)
+uuid=${uuid:-"default"}
 GCP_PROJECT_ID="span-cloud-testing"
 INSTANCE_ID="pgregress-testing"
-DATABASE_ID="pg_regress_$uuid"
+DATABASE_ID="pg_regress_${uuid}"
 
 GOOGLE_CLOUD_ENDPOINT="staging-wrenchworks.sandbox.googleapis.com"
 
@@ -71,7 +72,10 @@ python --version
 pip install google-cloud-bigquery
 
 # Install psql
-sudo apt-get install --yes --no-install-recommends postgresql-client-17
+sudo apt install -y postgresql-common
+sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+sudo apt-get update
+sudo apt-get install --yes --no-install-recommends postgresql-client-16
 psql --version
 
 # Get postgresql source code
