@@ -82,8 +82,8 @@ sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail htt
 sudo sh -c "echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main' > /etc/apt/sources.list.d/pgdg.list"
 
 # Update the package lists:
-sudo apt-get update
-sudo apt-get install --yes --no-install-recommends postgresql-client-17
+sudo apt update
+sudo apt install -y postgresql-17
 psql --version
 
 # Get postgresql source code
