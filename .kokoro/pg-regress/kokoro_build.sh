@@ -71,20 +71,16 @@ cd "${KOKORO_ARTIFACTS_DIR}/github/"
 python --version
 pip install google-cloud-bigquery
 
+# Surgical update: Ignore external repos (Yarn/NodeSource) to avoid GPG errors.
+# We only care about the official Ubuntu repos for g++ and python
+sudo apt-get update -o Dir::Etc::sourcelist="sources.list" -o Dir::Etc::sourceparts="-" -y
+
 # Install psql
-apt-cache policy postgresql-client
-
-sudo apt-get install -y curl ca-certificates gnupg
-# Deal with the issue "the public key is not available"
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 62D54FD4003F6525 1655A0AB68576280
-
-curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-key.gpg
-
-sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/postgresql-key.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 sudo apt-get update
+sudo apt-get install --yes --no-install-recommends postgresql-client-17
 
-# Update the package lists:
-sudo apt-get install -y postgresql-client-16
 psql --version
 
 # Get postgresql source code
