@@ -72,18 +72,15 @@ python --version
 pip install google-cloud-bigquery
 
 # Install psql
-# Import the repository signing key:
-sudo apt install curl ca-certificates
-sudo install -d /usr/share/postgresql-common/pgdg
-sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+sudo apt-get update
+sudo apt-get install -y curl ca-certificates gnupg
+curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-key.gpg
 
-# Create the repository configuration file:
-. /etc/os-release
-sudo sh -c "echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main' > /etc/apt/sources.list.d/pgdg.list"
+sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/postgresql-key.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+sudo apt-get update
 
 # Update the package lists:
-sudo apt update
-sudo apt install -y postgresql-17
+sudo apt-get install -y postgresql-client-15
 psql --version
 
 # Get postgresql source code
