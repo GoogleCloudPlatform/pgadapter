@@ -75,6 +75,8 @@ pip install google-cloud-bigquery
 apt-cache policy postgresql-client
 
 sudo apt-get install -y curl ca-certificates gnupg
+
+curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
 curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-key.gpg
 
 sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/postgresql-key.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
