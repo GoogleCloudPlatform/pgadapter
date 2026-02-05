@@ -72,8 +72,9 @@ python --version
 pip install google-cloud-bigquery
 
 # Surgical update: Ignore external repos (Yarn/NodeSource) to avoid GPG errors.
-# We only care about the official Ubuntu repos for g++ and python
-sudo apt-get update -o Dir::Etc::sourcelist="sources.list" -o Dir::Etc::sourceparts="-" -y
+ls /etc/apt/sources.list.d/
+rm /etc/apt/sources.list.d/nodesource.list
+rm /etc/apt/sources.list.d/yarnpkg.list
 
 # Install psql
 sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
