@@ -25,11 +25,8 @@ COPY settings_moss.xml /root/.m2/settings.xml
 
 COPY extensions_moss.xml .mvn/extensions.xml
 
-# Download dependencies from airlock
-RUN mvn -B -s /root/.m2/settings.xml dependency:go-offline
-
 # Build from source.
-RUN mvn -B -s /root/.m2/settings.xml package -Passembly -DskipTests
+RUN mvn -B -s /root/.m2/settings.xml package -Passembly -Dmaven.test.skip=true
 
 ################################################################################
 #                                   RELEASE                                    #
