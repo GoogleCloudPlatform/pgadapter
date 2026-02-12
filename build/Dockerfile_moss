@@ -26,18 +26,15 @@ COPY settings_moss.xml /root/.m2/settings.xml
 
 COPY extensions_moss.xml .mvn/extensions.xml
 
-# Download dependencies from airlock
-RUN mvn -B -s /root/.m2/settings.xml dependency:go-offline
-
 # Build from source.
-RUN mvn -B -s /root/.m2/settings.xml package -Passembly -DskipTests
+RUN mvn -B -s /root/.m2/settings.xml package -Passembly -Dmaven.test.skip=true
 
 ################################################################################
 #                                   RELEASE                                    #
 ################################################################################
 
-#eclipse-temurin:21-jdk
-FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/eclipse-temurin@sha256:3d92c3222b9d376e420e7099054604dc0d7bafbebbcb4f79ffd77763cd6a1bcd
+#eclipse-temurin:25-jre
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/eclipse-temurin@sha256:ad53b918fedaefd44135a226c5ecaa4828a3d72db2f6d520da96a62979a63ac6
 
 COPY --from=build target/pgadapter /home/pgadapter
 COPY --from=build LICENSE /home/pgadapter/
