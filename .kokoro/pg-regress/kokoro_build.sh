@@ -79,7 +79,7 @@ rm /etc/apt/sources.list.d/nodesource.list
 sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
 wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 sudo apt-get update
-sudo apt-get install --yes --no-install-recommends postgresql-client-17
+sudo apt-get install --yes --no-install-recommends postgresql-client-17 jq
 
 psql --version
 
@@ -111,6 +111,8 @@ python compare_results.py expected/ results/
 
 #cat results/alter_table.out
 cat results.json
+
+jq 'if .overall.passed == 0 then "Error: overall.passed cannot be 0" | halt_error(1) else . end' results.json
 
 ts=$(date +%s)
 python upload_bigquery.py results.json $BQ_TABLE $TARGET_ENV $ts
