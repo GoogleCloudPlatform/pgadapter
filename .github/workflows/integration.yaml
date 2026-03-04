@@ -16,6 +16,9 @@ on:
           - staging-wrenchworks.sandbox.googleapis.com
           - preprod-spanner.sandbox.googleapis.com
 name: integration
+permissions:
+  contents: read
+  issues: write
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
   GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
@@ -158,4 +161,4 @@ jobs:
           ENDPOINT: ${{ env.GOOGLE_CLOUD_ENDPOINT }}
         with:
           filename: .github/integration-test-failed-template.md
-          assignees: pratickchokhani, olavloite
+          assignees: olavloite, rayudu3745
