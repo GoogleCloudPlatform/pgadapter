@@ -105,8 +105,7 @@ git apply code.patch
 python start_test.py spanner_prod --skip-container \
                 --project $GCP_PROJECT_ID \
                 --instance $INSTANCE_ID \
-                --database $DATABASE_ID
-                #--testcases='int8,float8'
+                --database $DATABASE_ID --testcases='int8,float8'
 python compare_results.py expected/ results/
 
 #cat results/alter_table.out
@@ -115,8 +114,8 @@ cat results.json
 jq 'if .overall.passed == 0 then "Error: overall.passed cannot be 0" | halt_error(1) else . end' results.json
 
 ts=$(date +%s)
-python upload_bigquery.py results.json $BQ_TABLE $TARGET_ENV $ts
-gcloud storage cp results.json $GCS_BUCKET_PATH/results_$ts.json
-gcloud storage cp regression.diffs $GCS_BUCKET_PATH/regression_$ts.diffs
-gcloud storage cp -r results/ "${GCS_BUCKET_PATH}/lastest-run-results/"
+#python upload_bigquery.py results.json $BQ_TABLE $TARGET_ENV $ts
+#gcloud storage cp results.json $GCS_BUCKET_PATH/results_$ts.json
+#gcloud storage cp regression.diffs $GCS_BUCKET_PATH/regression_$ts.diffs
+gcloud storage cp -r results/ $GCS_BUCKET_PATH/lastest-run-results
 
