@@ -11,6 +11,8 @@ github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161/go.mod h1:xomTg6
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20260202051005-08429cdb06e1 h1:zvuXM5d2zMv4cYgdIfraNhHxgwEnrv8XV4VJwz25bR8=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20260202051005-08429cdb06e1/go.mod h1:zEl5evshMEvjntGTZJPqnsmvVaILPZnR8k8L+genoV8=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20260305123401-167ec8da582e h1:kH1UsTpckuhCH3dnbgdZI9dJiVBrLKQ6mhiJulPpoGk=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20260305123401-167ec8da582e/go.mod h1:gzfeiC1y9jOzS5r9V6ntkjnGWVbjd5BdnRUyd2XGCBs=
 github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
