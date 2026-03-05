@@ -117,5 +117,5 @@ ts=$(date +%s)
 #python upload_bigquery.py results.json $BQ_TABLE $TARGET_ENV $ts
 #gcloud storage cp results.json $GCS_BUCKET_PATH/results_$ts.json
 #gcloud storage cp regression.diffs $GCS_BUCKET_PATH/regression_$ts.diffs
-gcloud storage cp cloud_prod_results/*.out $GCS_BUCKET_PATH/lastest-run-results
+gcloud storage cp results/*.out $GCS_BUCKET_PATH/lastest-run-results
 
