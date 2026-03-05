@@ -66,7 +66,7 @@
     <!-- Add Hypersistence Utils for access to additional data type mappings, for example for arrays. -->
     <dependency>
       <groupId>io.hypersistence</groupId>
-      <artifactId>hypersistence-utils-hibernate-63</artifactId>
+      <artifactId>hypersistence-utils-hibernate-71</artifactId>
       <version>3.15.1</version>
     </dependency>
     <dependency>
