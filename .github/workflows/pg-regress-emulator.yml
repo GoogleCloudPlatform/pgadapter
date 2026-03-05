@@ -84,6 +84,7 @@ jobs:
           ts=$(date +%s)
           python upload_bigquery.py results.json ${{env.BQ_TABLE}} ${{env.TARGET_ENV}} $ts
           gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_$ts.json
+          gcloud storage cp results/*.out ${{env.GCS_BUCKET_PATH}}/lastest-run-results/
           gcloud storage cp regression.diffs ${{env.GCS_BUCKET_PATH}}/regression_$ts.diffs
       - name: Compare json results
         working-directory: ./postgres/src/test/regress/
