@@ -26,6 +26,24 @@ if [[ "$SPANNER_ENV" == "cloud-devel" ]]; then
 
   # Use the cloud-devel endpoint
   gcloud config set api_endpoint_overrides/spanner "https://${GOOGLE_CLOUD_ENDPOINT}/"
+elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
+  BQ_TABLE="spanner_pg_regress_results.internal_emulator_results"
+  TARGET_ENV="internal_emulator"
+  GCS_BUCKET_PATH="gs://pgadapter-pg-regress/internal-emulator-results"
+  EMULATOR_GCP_PROJECT_ID="your-project-id"
+  INSTANCE_ID="test-instance"
+
+  # Run the emulator
+  ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main &
+
+  # Config gcloud to emulator
+  gcloud config configurations create emulator
+  gcloud config set auth/disable_credentials true
+  gcloud config set project your-project-id
+  gcloud config set api_endpoint_overrides/spanner http://localhost:9020/
+
+  gcloud spanner instances create test-instance \
+    --config=emulator-config --description="Test Instance" --nodes=1
 else
   BQ_TABLE="spanner_pg_regress_results.cloud_prod_results"
   TARGET_ENV="cloud_prod"
@@ -57,6 +75,8 @@ cd target/pgadapter
 
 if [[ "$SPANNER_ENV" == "cloud-devel" ]]; then
   java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID -e "${GOOGLE_CLOUD_ENDPOINT}" &
+elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
+  java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID -r autoConfigEmulator=true &
 else
   java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID &
 fi
@@ -112,6 +132,10 @@ python compare_results.py expected/ results/
 cat results.json
 
 jq 'if .overall.passed == 0 then "Error: overall.passed cannot be 0" | halt_error(1) else . end' results.json
+
+if [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
+  gcloud config configurations activate default
+fi
 
 ts=$(date +%s)
 python upload_bigquery.py results.json $BQ_TABLE $TARGET_ENV $ts
