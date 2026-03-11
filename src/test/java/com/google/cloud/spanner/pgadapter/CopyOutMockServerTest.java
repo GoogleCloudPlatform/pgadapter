@@ -227,7 +227,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t"
-              + "14 mons 3 days 04:05:6.789000\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t"
+              + "14 mons 3 days 04:05:6.789000\t2022-03-29\ttestÄ\t{\"key\": \"value\"}\t{1,NULL,2}\t"
               + "{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t"
               + "{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
               + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
@@ -267,7 +267,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t"
-              + "14 mons 3 days 04:05:6.789000\t2022-03-29\ttest\t{\"key\": \"value\"}\t{1,NULL,2}\t"
+              + "14 mons 3 days 04:05:6.789000\t2022-03-29\ttestÄ\t{\"key\": \"value\"}\t{1,NULL,2}\t"
               + "{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t{3.14,NULL,-99.99}\t"
               + "{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
               + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
@@ -307,7 +307,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-14 mons 3 days 04:05:6.789000-"
-              + "\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-"
+              + "\"2022-03-29\"-testÄ-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-"
               + "\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-"
               + "\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-"
               + "\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-"
@@ -337,8 +337,8 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint-col_bool-col_bytea-col_float4-col_float8-col_int-col_numeric-col_timestamptz-col_interval-col_date-col_varchar-col_jsonb-col_array_bigint-col_array_bool-col_array_bytea-col_array_float4-col_array_float8-col_array_int-col_array_numeric-col_array_timestamptz-col_array_interval-col_array_date-col_array_varchar-col_array_jsonb\n"
-              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-14 mons 3 days 04:05:6.789000-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{-100 mons 0 days 34:17:36.789000,NULL,12 mons 0 days 00:00:0.000000}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
-              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-14 mons 3 days 04:05:6.789000-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{-100 mons 0 days 34:17:36.789000,NULL,12 mons 0 days 00:00:0.000000}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-14 mons 3 days 04:05:6.789000-\"2022-03-29\"-testÄ-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{-100 mons 0 days 34:17:36.789000,NULL,12 mons 0 days 00:00:0.000000}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-14 mons 3 days 04:05:6.789000-\"2022-03-29\"-testÄ-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{-100 mons 0 days 34:17:36.789000,NULL,12 mons 0 days 00:00:0.000000}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n"
               + "-----------------------\n",
           writer.toString());
     }
@@ -360,7 +360,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint\n"
-              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-14 mons 3 days 04:05:6.789000-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{-100 mons 0 days 34:17:36.789000,NULL,12 mons 0 days 00:00:0.000000}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n",
+              + "1-t-\\x74657374-3.14-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-14 mons 3 days 04:05:6.789000-\"2022-03-29\"-testÄ-\"{~\"key~\": ~\"value~\"}\"-{1,NULL,2}-{t,NULL,f}-\"{~\"\\\\x627974657331~\",NULL,~\"\\\\x627974657332~\"}\"-\"{3.14,NULL,-99.99}\"-\"{3.14,NULL,-99.99}\"-\"{-100,NULL,-200}\"-\"{6.626,NULL,-3.14}\"-\"{~\"2022-02-16 16:18:02.123456+00~\",NULL,~\"2000-01-01 00:00:00+00~\"}\"-\"{-100 mons 0 days 34:17:36.789000,NULL,12 mons 0 days 00:00:0.000000}\"-\"{~\"2023-02-20~\",NULL,~\"2000-01-01~\"}\"-\"{~\"string1~\",NULL,~\"string2~\"}\"-\"{~\"{\\~\"key\\~\": \\~\"value1\\~\"}~\",NULL,~\"{\\~\"key\\~\": \\~\"value2\\~\"}~\"}\"\n",
           writer.toString());
     }
   }
@@ -382,7 +382,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       assertEquals(
           "col_bigint|col_bool|col_bytea|col_float4|col_float8|col_int|col_numeric|col_timestamptz|col_interval|col_date|col_varchar|col_jsonb|col_array_bigint|col_array_bool|col_array_bytea|col_array_float4|col_array_float8|col_array_int|col_array_numeric|col_array_timestamptz|col_array_interval|col_array_date|col_array_varchar|col_array_jsonb\n"
               + "1|t|\"\\\\x74657374\"|3.14|3.14|100|6.626|2022-02-16 13:18:02.123456+00|"
-              + "14 mons 3 days 04:05:6.789000|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
+              + "14 mons 3 days 04:05:6.789000|2022-03-29|testÄ|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "{1,NULL,2}|{t,NULL,f}|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
               + "{3.14,NULL,-99.99}|{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
@@ -407,7 +407,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "1|t|\"\\\\x74657374\"|3.14|3.14|100|6.626|2022-02-16 13:18:02.123456+00|"
-              + "14 mons 3 days 04:05:6.789000|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"|"
+              + "14 mons 3 days 04:05:6.789000|2022-03-29|testÄ|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "{1,NULL,2}|{t,NULL,f}|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
               + "{3.14,NULL,-99.99}|{3.14,NULL,-99.99}|{-100,NULL,-200}|{6.626,NULL,-3.14}|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
@@ -433,7 +433,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"3.14\"|\"100\"|\"6.626\"|\"2022-02-16 13:18:02.123456+00\"|"
-              + "\"14 mons 3 days 04:05:6.789000\"|\"2022-03-29\"|\"test\"|\"{\\\"key\\\": \\\"value\\\"}\"|"
+              + "\"14 mons 3 days 04:05:6.789000\"|\"2022-03-29\"|\"testÄ\"|\"{\\\"key\\\": \\\"value\\\"}\"|"
               + "\"{1,NULL,2}\"|\"{t,NULL,f}\"|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
               + "\"{3.14,NULL,-99.99}\"|\"{3.14,NULL,-99.99}\"|\"{-100,NULL,-200}\"|\"{6.626,NULL,-3.14}\"|"
               + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
@@ -550,7 +550,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         Value.interval(Interval.parseFromString("P1Y2M3DT4H5M6.789S")),
         record.getValue(Type.interval(), ++index));
     assertEquals(Value.date(Date.parseDate("2022-03-29")), record.getValue(Type.date(), ++index));
-    assertEquals(Value.string("test"), record.getValue(Type.string(), ++index));
+    assertEquals(Value.string("testÄ"), record.getValue(Type.string(), ++index));
   }
 
   @Test

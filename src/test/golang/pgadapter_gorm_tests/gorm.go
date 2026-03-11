@@ -263,7 +263,7 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	if g, w := *row.ColDate, parseDate("2022-03-29"); !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("ColDate mismatch\nGot:  %v\nWant: %v", g, w))
 	}
-	if g, w := *row.ColVarchar, "test"; g != w {
+	if g, w := *row.ColVarchar, "testÄ"; g != w {
 		return C.CString(fmt.Sprintf("ColVarchar mismatch\nGot:  %v\nWant: %v", g, w))
 	}
 

@@ -439,6 +439,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
+          <argLine>-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
           <forkedProcessExitTimeoutInSeconds>3</forkedProcessExitTimeoutInSeconds>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <!--suppress UnresolvedMavenProperty -->

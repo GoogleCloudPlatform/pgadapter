@@ -778,7 +778,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_timestamptz: 2022-02-16T13:18:02.123Z,\n"
             + "  col_interval: 'P1Y2M3DT4H5M6.789S',\n"
             + "  col_date: 2022-03-29T00:00:00.000Z,\n"
-            + "  col_varchar: 'test',\n"
+            + "  col_varchar: 'testÄ',\n"
             + "  col_jsonb: { key: 'value' },\n"
             + "  col_array_bigint: [ 1n, 1n, 2n ],\n"
             + "  col_array_bool: [ true, true, false ],\n"

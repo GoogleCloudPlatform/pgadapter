@@ -35,7 +35,7 @@ public class CopyDataResponse extends WireOutput {
 
   private final ResponseType responseType;
   private final DataFormat format;
-  private final String stringData;
+  private final byte[] stringData;
   private final char rowTerminator;
   private final Converter converter;
 
@@ -59,7 +59,11 @@ public class CopyDataResponse extends WireOutput {
   }
 
   public CopyDataResponse(DataOutputStream output, String data, char rowTerminator) {
-    super(output, data.length() + 5);
+    this(output, data.getBytes(StandardCharsets.UTF_8), rowTerminator);
+  }
+
+  private CopyDataResponse(DataOutputStream output, byte[] data, char rowTerminator) {
+    super(output, data.length + 5);
     this.responseType = ResponseType.ROW;
     this.format = DataFormat.POSTGRESQL_TEXT;
     this.stringData = data;
@@ -87,7 +91,7 @@ public class CopyDataResponse extends WireOutput {
   @Override
   protected void sendPayload() throws Exception {
     if (this.format == DataFormat.POSTGRESQL_TEXT) {
-      this.outputStream.write(this.stringData.getBytes(StandardCharsets.UTF_8));
+      this.outputStream.write(this.stringData);
       this.outputStream.write(this.rowTerminator);
     } else if (this.format == DataFormat.POSTGRESQL_BINARY) {
       if (this.responseType == ResponseType.TRAILER_WITH_HEADER) {

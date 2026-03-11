@@ -1633,7 +1633,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 new PGInterval("14 mons 3 days 4 hours 5 mins 6.789 secs"),
                 resultSet.getObject(++index, PGInterval.class));
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
-            assertEquals("test", resultSet.getString(++index));
+            assertEquals("testÄ", resultSet.getString(++index));
             assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
 
             for (int col = 1; col <= resultSet.getMetaData().getColumnCount(); col++) {

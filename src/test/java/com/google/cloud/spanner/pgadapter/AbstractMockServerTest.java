@@ -416,7 +416,7 @@ public abstract class AbstractMockServerTest {
                         .build())
                 .addValues(Value.newBuilder().setStringValue("P1Y2M3DT4H5M6.789S").build())
                 .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
-                .addValues(Value.newBuilder().setStringValue("test").build())
+                .addValues(Value.newBuilder().setStringValue("testÄ").build())
                 .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
                 .addValues(
                     Value.newBuilder()

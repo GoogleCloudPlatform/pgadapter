@@ -149,7 +149,7 @@ public class ITPgx5Test implements IntegrationTest {
                 .set("col_date")
                 .to(Date.parseDate("2022-03-29"))
                 .set("col_varchar")
-                .to("test")
+                .to("testÄ")
                 .set("col_jsonb")
                 .to("{\"key\": \"value\"}")
                 .build()));
