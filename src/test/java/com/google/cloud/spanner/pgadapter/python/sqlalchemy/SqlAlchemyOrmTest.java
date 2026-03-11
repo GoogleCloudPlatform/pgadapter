@@ -152,7 +152,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
 
     String actualOutput = execute("orm_select_first.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'testÄ'col_jsonb=      {'key': 'value'})\n";
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
@@ -175,7 +175,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
 
     String actualOutput = execute("orm_get.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'testÄ'col_jsonb=      {'key': 'value'})\n";
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
@@ -231,7 +231,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     String actualOutput =
         execute("orm_get_with_prepared_statement.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'testÄ'col_jsonb=      {'key': 'value'})\n";
     assertEquals(expectedOutput, actualOutput);
 
     // We receive 3 ExecuteSqlRequests:
@@ -266,7 +266,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
 
     String actualOutput = execute("orm_read_only_transaction.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'testÄ'col_jsonb=      {'key': 'value'})\n";
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
@@ -393,7 +393,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     String actualOutput = execute("orm_rollback.py", host, pgServer.getLocalPort());
     String expectedOutput =
         "Before rollback: AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'updated string'col_jsonb=      {'key': 'value'})\n"
-            + "After rollback: AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+            + "After rollback: AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'testÄ'col_jsonb=      {'key': 'value'})\n";
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));

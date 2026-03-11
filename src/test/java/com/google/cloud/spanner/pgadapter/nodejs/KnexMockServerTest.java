@@ -149,7 +149,7 @@ public class KnexMockServerTest extends AbstractMockServerTest {
             + "  col_timestamptz: 2022-02-16T13:18:02.123Z,\n"
             + "  col_interval: PostgresInterval { months: 14, days: 3 },\n"
             + "  col_date: '2022-03-29',\n"
-            + "  col_varchar: 'test',\n"
+            + "  col_varchar: 'testÄ',\n"
             + "  col_jsonb: { key: 'value' },\n"
             + "  col_array_bigint: [ '1', null, '2' ],\n"
             + "  col_array_bool: [ true, null, false ],\n"

@@ -102,7 +102,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
           + "col_timestamptz='2022-02-16T13:18:02.123456+00:00'\n"
           + "col_interval=   'P1Y2M3DT4H5M6.789S'\n"
           + "col_date=       datetime.date(2022, 3, 29)\n"
-          + "col_varchar=    'test'\n"
+          + "col_varchar=    'testÄ'\n"
           + "col_jsonb=      {'key': 'value'}\n"
           + "col_array_bigint=     [1, None, 2]\n"
           + "col_array_bool=       [True, None, False]\n"
@@ -482,7 +482,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
     String actualOutput = execute("orm_update.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        ALL_TYPES_ROW.replaceFirst("col_varchar=(\\s*)'test'", "col_varchar=$1'updated string'");
+        ALL_TYPES_ROW.replaceFirst("col_varchar=(\\s*)'testÄ'", "col_varchar=$1'updated string'");
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(5, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
@@ -565,7 +565,7 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
     String expectedOutput =
         "Before rollback: "
             + ALL_TYPES_ROW.replaceFirst(
-                "col_varchar=(\\s*)'test'", "col_varchar=$1'updated string'")
+                "col_varchar=(\\s*)'testÄ'", "col_varchar=$1'updated string'")
             + "After rollback: "
             + ALL_TYPES_ROW;
     assertEquals(expectedOutput, actualOutput);

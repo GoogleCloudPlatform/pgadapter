@@ -577,7 +577,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "  col_numeric: '6.626',\n"
             + "  col_timestamptz: 2022-02-16T13:18:02.123Z,\n"
             + "  col_date: '2022-03-29',\n"
-            + "  col_varchar: 'test',\n"
+            + "  col_varchar: 'testÄ',\n"
             + "  col_jsonb: { key: 'value' }\n"
             + "}\n",
         output);

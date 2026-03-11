@@ -483,7 +483,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_timestamptz\":\"2022-02-16T13:18:02.123Z\","
             + "\"col_interval\":{\"months\":14,\"days\":3},"
             + "\"col_date\":\"2022-03-29\","
-            + "\"col_varchar\":\"test\","
+            + "\"col_varchar\":\"testÄ\","
             + "\"col_jsonb\":{\"key\":\"value\"},"
             + "\"col_array_bigint\":[\"1\",null,\"2\"],"
             + "\"col_array_bool\":[true,null,false],"
@@ -622,7 +622,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t14 mons 3 days 04:05:6.789000\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
+        "1\tt\t\\\\x74657374\t3.14\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t14 mons 3 days 04:05:6.789000\t2022-03-29\ttestÄ\t{\"key\": \"value\"}\t"
             + "{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t"
             + "{3.14,NULL,-99.99}\t{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
             + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"

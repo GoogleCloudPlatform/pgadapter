@@ -241,7 +241,7 @@ public class NpgsqlTest
                     Console.WriteLine($"Value mismatch: Got '{reader.GetDateTime(index)}', Want: '2022-03-29'");
                     return;
                 }
-                if (reader.GetString(++index) != "test")
+                if (reader.GetString(++index) != "testÄ")
                 {
                     Console.WriteLine($"Value mismatch: Got '{reader.GetString(index)}', Want: 'test'");
                     return;
@@ -452,7 +452,7 @@ public class NpgsqlTest
                     Console.WriteLine($"Date value mismatch: Got '{reader.GetDateTime(index)}', Want: '2022-03-29'");
                     return;
                 }
-                if (reader.GetString(++index) != "test")
+                if (reader.GetString(++index) != "testÄ")
                 {
                     Console.WriteLine($"Value mismatch: Got '{reader.GetString(index)}', Want: 'test'");
                     return;
