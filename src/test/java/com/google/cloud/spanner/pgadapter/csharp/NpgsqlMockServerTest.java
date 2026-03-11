@@ -261,7 +261,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p10")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .bind("p11")
-                .to("test")
+                .to("testÄ")
                 .build(),
             1L));
 
@@ -406,7 +406,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p10")
                 .to(Date.parseDate("2022-03-29"))
                 .bind("p11")
-                .to("test")
+                .to("testÄ")
                 .bind("p12")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .build(),

@@ -278,7 +278,7 @@ public class NpgsqlTest
                 new () {Value = DateTime.Parse("2022-04-02"), DbType = DbType.Date},
                 new () {Value = "test_string"},
                 new () {Value = JsonDocument.Parse("{\"key\": \"value\"}")},
-                new () {Value = "test"},
+                new () {Value = "testÄ"},
             }
         };
         var updateCount = cmd.ExecuteNonQuery();
@@ -384,7 +384,7 @@ public class NpgsqlTest
                 new () {Value = DateTime.Parse("2022-02-16T13:18:02.123456789Z").ToUniversalTime(), DbType = DbType.DateTimeOffset},
                 new () {Value = new NpgsqlInterval(14, 3, 14400000000L + 300000000L + 6789000L)},
                 new () {Value = DateTime.Parse("2022-03-29"), DbType = DbType.Date},
-                new () {Value = "test"},
+                new () {Value = "testÄ"},
                 new () {Value = JsonDocument.Parse("{\"key\":\"value\"}")},
             }
         };
@@ -871,6 +871,7 @@ public class NpgsqlTest
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
         
+        Console.OutputEncoding = Encoding.UTF8;
         using (var reader =
                connection.BeginBinaryExport("COPY (select col_bigint, col_bool, col_bytea, col_float4, col_float8, col_int, col_numeric, col_timestamptz, col_interval::interval, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float4, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_interval, col_array_date, col_array_varchar, col_array_jsonb from all_types order by col_bigint) " +
                                             "TO STDOUT (FORMAT BINARY)"))
@@ -1136,6 +1137,7 @@ public class NpgsqlTest
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
         
+        Console.OutputEncoding = Encoding.UTF8;
         using (var reader =
                connection.BeginTextExport("COPY (select * from all_types order by col_bigint) " +
                                             "TO STDOUT"))
