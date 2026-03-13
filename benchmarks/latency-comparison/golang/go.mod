@@ -9,7 +9,7 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.8.0
-	github.com/montanaflynn/stats v0.7.0
+	github.com/montanaflynn/stats v0.8.2
 	github.com/testcontainers/testcontainers-go v0.40.0
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.271.0
