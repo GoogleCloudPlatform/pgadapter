@@ -125,9 +125,8 @@ public class LongParser extends Parser<Long> {
         StringParser.writeToPG(sessionState, outputStream, getLongAsString(resultSet, position));
         break;
       case POSTGRESQL_BINARY:
-        byte[] value = convertToPG(resultSet.getLong(position));
-        outputStream.writeInt(value.length);
-        outputStream.write(value);
+        outputStream.writeInt(8);
+        outputStream.writeLong(resultSet.getLong(position));
         break;
       default:
         throw new IllegalArgumentException("unknown data format: " + format);

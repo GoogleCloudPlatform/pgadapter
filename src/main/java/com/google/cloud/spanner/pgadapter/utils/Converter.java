@@ -169,9 +169,9 @@ public class Converter implements AutoCloseable {
       case DATE:
         return DateParser.convertToPG(sessionState, outputStream, result, position, format);
       case FLOAT32:
-        return FloatParser.convertToPG(result, position, format);
+        return FloatParser.convertToPG(outputStream, result, position, format);
       case FLOAT64:
-        return DoubleParser.convertToPG(result, position, format);
+        return DoubleParser.convertToPG(outputStream, result, position, format);
       case INT64:
       case PG_OID:
         return LongParser.convertToPG(sessionState, outputStream, result, position, format);
