@@ -22,8 +22,10 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.utils.AsciiPrinter;
 import com.google.common.collect.ImmutableMap;
-import java.nio.charset.StandardCharsets;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
@@ -88,11 +90,14 @@ public class DoubleParser extends Parser<Double> {
     return result;
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+  public static byte[] convertToPG(
+      DataOutputStream outputStream, ResultSet resultSet, int position, DataFormat format)
+      throws IOException {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        return Double.toString(resultSet.getDouble(position)).getBytes(StandardCharsets.UTF_8);
+        AsciiPrinter.writeAsciiToPG(outputStream, Double.toString(resultSet.getDouble(position)));
+        return null;
       case POSTGRESQL_BINARY:
         return convertToPG(resultSet.getDouble(position));
       default:

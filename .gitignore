@@ -2,6 +2,7 @@ target/
 /target
 .DS_STORE
 .idea/
+.vscode/
 *.iml
 *.class
 *.lst

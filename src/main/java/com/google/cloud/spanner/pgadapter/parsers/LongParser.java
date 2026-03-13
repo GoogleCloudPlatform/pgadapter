@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.utils.AsciiPrinter;
 import com.google.common.collect.ImmutableMap;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -122,7 +123,7 @@ public class LongParser extends Parser<Long> {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        StringParser.writeToPG(sessionState, outputStream, getLongAsString(resultSet, position));
+        AsciiPrinter.writeAsciiToPG(outputStream, getLongAsString(resultSet, position));
         break;
       case POSTGRESQL_BINARY:
         byte[] value = convertToPG(resultSet.getLong(position));

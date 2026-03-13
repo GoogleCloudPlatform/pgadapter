@@ -20,9 +20,11 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.utils.AsciiPrinter;
 import com.google.common.collect.ImmutableMap;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
@@ -96,11 +98,14 @@ public class NumericParser extends Parser<String> {
     }
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+  public static byte[] convertToPG(
+      DataOutputStream outputStream, ResultSet resultSet, int position, DataFormat format)
+      throws IOException {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        return resultSet.getString(position).getBytes(StandardCharsets.UTF_8);
+        AsciiPrinter.writeAsciiToPG(outputStream, resultSet.getString(position));
+        return null;
       case POSTGRESQL_BINARY:
         return convertToPG(resultSet.getString(position));
       default:
