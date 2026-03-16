@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.53.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.53.2...v0.53.3) (2026-03-16)
+
+
+### Bug Fixes
+
+* copy multi-byte characters using text format failed ([#4216](https://github.com/GoogleCloudPlatform/pgadapter/issues/4216)) ([a183089](https://github.com/GoogleCloudPlatform/pgadapter/commit/a183089f58abdaa671c9706da578c6b76c7042da))
+
+
+### Performance Improvements
+
+* write numbers directly to the stream ([#4229](https://github.com/GoogleCloudPlatform/pgadapter/issues/4229)) ([55387d1](https://github.com/GoogleCloudPlatform/pgadapter/commit/55387d12e09ae5d6026bb6de3e88865d23dca7dc))
+
+
+### Dependencies
+
+* update dependency go to v1.26.1 ([#4223](https://github.com/GoogleCloudPlatform/pgadapter/issues/4223)) ([fa09f62](https://github.com/GoogleCloudPlatform/pgadapter/commit/fa09f6200cbe791bb1200187e6561af97b585b63))
+* update dependency google.auth to v2.49.1 ([#4230](https://github.com/GoogleCloudPlatform/pgadapter/issues/4230)) ([76ecd47](https://github.com/GoogleCloudPlatform/pgadapter/commit/76ecd477e05283fda98bc40c3e3c41b210088d16))
+* update dependency io.opentelemetry:opentelemetry-bom to v1.60.1 ([#4231](https://github.com/GoogleCloudPlatform/pgadapter/issues/4231)) ([fa0490e](https://github.com/GoogleCloudPlatform/pgadapter/commit/fa0490e07190714a599cfcb82e30b2ffabd70cd8))
+* update dependency npgsql to 10.0.2 ([#4225](https://github.com/GoogleCloudPlatform/pgadapter/issues/4225)) ([dc45b0e](https://github.com/GoogleCloudPlatform/pgadapter/commit/dc45b0e07bdac90f0651cc50b2cfb320297249f2))
+* update dependency nunit to 4.5.1 ([#4187](https://github.com/GoogleCloudPlatform/pgadapter/issues/4187)) ([658e351](https://github.com/GoogleCloudPlatform/pgadapter/commit/658e3510c504b86cc91c2b88b3841c2350710514))
+* update dependency nunit.analyzers to 4.12.0 ([#4234](https://github.com/GoogleCloudPlatform/pgadapter/issues/4234)) ([141524f](https://github.com/GoogleCloudPlatform/pgadapter/commit/141524f46a8d9395e7adfe33310c606a30f06d09))
+* update dependency nunit3testadapter to 6.1.0 ([#4188](https://github.com/GoogleCloudPlatform/pgadapter/issues/4188)) ([27bca72](https://github.com/GoogleCloudPlatform/pgadapter/commit/27bca7259dd9d3b5f5a2be9585a4ab221d065d5f))
+* update dependency org.hibernate.orm:hibernate-core to v7.2.7.final ([#4238](https://github.com/GoogleCloudPlatform/pgadapter/issues/4238)) ([38561bc](https://github.com/GoogleCloudPlatform/pgadapter/commit/38561bc3092a5c83d47cc1f5e661f7b92dd75b7f))
+* update dependency org.springframework.boot:spring-boot-dependencies to v3.5.11 ([#4178](https://github.com/GoogleCloudPlatform/pgadapter/issues/4178)) ([aac71b9](https://github.com/GoogleCloudPlatform/pgadapter/commit/aac71b94e3f0859afed51d76d32eb8578e77aec2))
+* update dependency org.springframework.boot:spring-boot-starter-parent to v3.5.11 ([#4179](https://github.com/GoogleCloudPlatform/pgadapter/issues/4179)) ([c9da5e8](https://github.com/GoogleCloudPlatform/pgadapter/commit/c9da5e84d6906a1106215d57b81aaeae7ee04a65))
+* update dependency pytz to v2026 ([#4197](https://github.com/GoogleCloudPlatform/pgadapter/issues/4197)) ([96d3967](https://github.com/GoogleCloudPlatform/pgadapter/commit/96d39670235228a5869c4724ca672f0a3b8f55b0))
+* update dependency testcontainers to 4.11.0 ([#4235](https://github.com/GoogleCloudPlatform/pgadapter/issues/4235)) ([56ea4f9](https://github.com/GoogleCloudPlatform/pgadapter/commit/56ea4f929650aa3adbb525d8d7cc063f04ef00f4))
+* update golang docker tag to v1.26.1 ([#4226](https://github.com/GoogleCloudPlatform/pgadapter/issues/4226)) ([d48867f](https://github.com/GoogleCloudPlatform/pgadapter/commit/d48867f06891504f931889127803ccb892b23b09))
+* update maven docker tag to v3.9.14 ([#4227](https://github.com/GoogleCloudPlatform/pgadapter/issues/4227)) ([258257b](https://github.com/GoogleCloudPlatform/pgadapter/commit/258257bafcd29cb43839a518aa6029b609381871))
+* update module github.com/montanaflynn/stats to v0.8.2 ([#4236](https://github.com/GoogleCloudPlatform/pgadapter/issues/4236)) ([d3357c3](https://github.com/GoogleCloudPlatform/pgadapter/commit/d3357c31960c4a8022ac189cdfb85971e9b27a19))
+* update module github.com/testcontainers/testcontainers-go to v0.41.0 ([#4237](https://github.com/GoogleCloudPlatform/pgadapter/issues/4237)) ([4e79caf](https://github.com/GoogleCloudPlatform/pgadapter/commit/4e79caf61d4a0f2bac1af99ceabdd691334b2190))
+* update module golang.org/x/oauth2 to v0.36.0 ([#4191](https://github.com/GoogleCloudPlatform/pgadapter/issues/4191)) ([0f73cc8](https://github.com/GoogleCloudPlatform/pgadapter/commit/0f73cc8892dfa813b288cdaac54c245603963b60))
+* update module google.golang.org/api to v0.271.0 ([#4192](https://github.com/GoogleCloudPlatform/pgadapter/issues/4192)) ([e3a33f6](https://github.com/GoogleCloudPlatform/pgadapter/commit/e3a33f6c6b9b47c61ee317f64e74c2e0274254f8))
+
 ## [0.53.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.53.1...v0.53.2) (2026-03-05)
 
 
