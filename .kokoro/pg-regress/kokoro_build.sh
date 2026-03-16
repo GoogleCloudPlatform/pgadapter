@@ -30,8 +30,7 @@ elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
   BQ_TABLE="spanner_pg_regress_results.internal_emulator_results"
   TARGET_ENV="internal_emulator"
   GCS_BUCKET_PATH="gs://pgadapter-pg-regress/internal-emulator-results"
-  EMULATOR_GCP_PROJECT_ID="your-project-id"
-  INSTANCE_ID="test-instance"
+  GCP_PROJECT_ID="your-project-id"
 
   # Run the emulator
   ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main &
@@ -39,10 +38,10 @@ elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
   # Config gcloud to emulator
   gcloud config configurations create emulator
   gcloud config set auth/disable_credentials true
-  gcloud config set project your-project-id
+  gcloud config set project $GCP_PROJECT_ID
   gcloud config set api_endpoint_overrides/spanner http://localhost:9020/
 
-  gcloud spanner instances create test-instance \
+  gcloud spanner instances create $INSTANCE_ID \
     --config=emulator-config --description="Test Instance" --nodes=1
 else
   BQ_TABLE="spanner_pg_regress_results.cloud_prod_results"
@@ -135,6 +134,8 @@ jq 'if .overall.passed == 0 then "Error: overall.passed cannot be 0" | halt_erro
 
 if [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
   gcloud config configurations activate default
+  GCP_PROJECT_ID="span-cloud-testing"
+  export GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 fi
 
 ts=$(date +%s)
