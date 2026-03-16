@@ -31,6 +31,9 @@ elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
   TARGET_ENV="internal_emulator"
   GCS_BUCKET_PATH="gs://pgadapter-pg-regress/internal-emulator-results"
   GCP_PROJECT_ID="your-project-id"
+  INSTANCE_ID="test-instance"
+  DATABASE_ID="test-database"
+  export GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 
   # Run the emulator
   ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main &
