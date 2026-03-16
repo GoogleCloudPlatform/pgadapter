@@ -38,7 +38,7 @@ elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
 
   # Run the emulator
   ls -l ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/
-  ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main &
+  ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main 2>&1 &
 
   # Config gcloud to emulator
   gcloud config configurations create emulator
