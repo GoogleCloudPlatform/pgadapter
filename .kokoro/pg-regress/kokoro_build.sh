@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 # Fail on any error.
 set -e
 
@@ -36,6 +37,7 @@ elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
   export GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 
   # Run the emulator
+  ls -l ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/
   ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main &
 
   # Config gcloud to emulator
