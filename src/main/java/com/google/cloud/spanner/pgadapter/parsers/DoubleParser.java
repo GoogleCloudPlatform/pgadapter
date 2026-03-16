@@ -23,6 +23,8 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableMap;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
@@ -88,13 +90,17 @@ public class DoubleParser extends Parser<Double> {
     return result;
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+  public static byte[] convertToPG(
+      DataOutputStream outputStream, ResultSet resultSet, int position, DataFormat format)
+      throws IOException {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
         return Double.toString(resultSet.getDouble(position)).getBytes(StandardCharsets.UTF_8);
       case POSTGRESQL_BINARY:
-        return convertToPG(resultSet.getDouble(position));
+        outputStream.writeInt(8);
+        outputStream.writeDouble(resultSet.getDouble(position));
+        return null;
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
