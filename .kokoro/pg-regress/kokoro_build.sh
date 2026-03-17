@@ -37,9 +37,11 @@ elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
   export GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 
   # Run the emulator
+  export UIDE_="--uid="
+  export GIDE_="--gid="
   ls -l ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/
   ls -lR "${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main.runfiles"
-  ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main --uid= --gid= 2>&1 &
+  ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main 2>&1 &
 
   # Config gcloud to emulator
   gcloud config configurations create emulator
