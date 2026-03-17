@@ -36,9 +36,17 @@ elif [[ "$SPANNER_ENV" == "internal-emulator" ]]; then
   DATABASE_ID="test-database"
   export GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 
+  # Ensure the "nobody" group exists
+  if ! getent group nobody > /dev/null; then
+    echo "Creating 'nobody' group..."
+    sudo groupadd nobody
+  fi
+  # Optional: Ensure a 'nobody' user exists and is in the 'nobody' group
+  if ! getent passwd nobody > /dev/null; then
+    echo "Creating 'nobody' user..."
+    sudo useradd -g nobody -s /sbin/nologin nobody
+  fi
   # Run the emulator
-  export UIDE_="--uid="
-  export GIDE_="--gid="
   ls -l ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/
   ls -lR "${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main.runfiles"
   ${KOKORO_BLAZE_DIR}/internal_emulator/blaze-bin/third_party/cloud_spanner_emulator/binaries/gateway_main 2>&1 &
