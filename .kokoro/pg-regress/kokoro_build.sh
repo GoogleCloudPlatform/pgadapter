@@ -70,13 +70,13 @@ set -x
 cd "${KOKORO_ARTIFACTS_DIR}/github/"
 
 # Start pgadapter in a background process
-#wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz \
-#  && tar -xzvf pgadapter.tar.gz
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz \
+  && tar -xzvf pgadapter.tar.gz
 
 # Build pgadapter from source
-cd pgadapter/
-mvn package -P assembly
-cd target/pgadapter
+#cd pgadapter/
+#mvn package -P assembly
+#cd target/pgadapter
 
 if [[ "$SPANNER_ENV" == "cloud-devel" ]]; then
   java -jar pgadapter.jar -p $GCP_PROJECT_ID -i $INSTANCE_ID -d $DATABASE_ID -e "${GOOGLE_CLOUD_ENDPOINT}" &
