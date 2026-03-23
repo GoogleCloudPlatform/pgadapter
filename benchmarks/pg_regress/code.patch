@@ -1,3 +1,48 @@
+diff --git a/src/include/c.h b/src/include/c.h
+index f69d739be57..3aacbbc405e 100644
+--- a/src/include/c.h
++++ b/src/include/c.h
+@@ -430,26 +430,26 @@ typedef void (*pg_funcptr_t) (void);
+  * See also the version of this code in src/interfaces/ecpg/include/ecpglib.h.
+  */
+ 
+-#ifndef __cplusplus
++//#ifndef __cplusplus
+ 
+-#ifdef PG_USE_STDBOOL
++//#ifdef PG_USE_STDBOOL
+ #include <stdbool.h>
+-#else
++//#else
+ 
+-#ifndef bool
+-typedef unsigned char bool;
+-#endif
++//#ifndef bool
++//typedef unsigned char bool;
++//#endif
+ 
+-#ifndef true
+-#define true	((bool) 1)
+-#endif
++//#ifndef true
++//#define true	((bool) 1)
++//#endif
+ 
+-#ifndef false
+-#define false	((bool) 0)
+-#endif
++//#ifndef false
++//#define false	((bool) 0)
++//#endif
+ 
+-#endif							/* not PG_USE_STDBOOL */
+-#endif							/* not C++ */
++//#endif							/* not PG_USE_STDBOOL */
++//#endif							/* not C++ */
+ 
+ 
+ /* ----------------------------------------------------------------
 diff --git a/src/test/regress/pg_regress.c b/src/test/regress/pg_regress.c
 index 60d34a40b20..6a1eea9c266 100644
 --- a/src/test/regress/pg_regress.c
