@@ -30,6 +30,7 @@ import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
@@ -117,11 +118,25 @@ public class SimpleQueryStatement {
   /** Replaces any known unsupported query (e.g. JDBC metadata queries). */
   static Tuple<Boolean, String> replaceKnownUnsupportedQueries(
       WellKnownClient client, OptionsMetadata options, String sql) {
+    boolean replaced = false;
     if ((options.isReplaceJdbcMetadataQueries() || client == WellKnownClient.JDBC)
         && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
-      return Tuple.of(Boolean.TRUE, JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql));
+      sql = JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql);
+      replaced = true;
     }
-    return Tuple.of(Boolean.FALSE, sql);
+    if (client != null) {
+      for (QueryPartReplacer replacer : client.getQueryPartReplacements()) {
+        Tuple<String, QueryPartReplacer.ReplacementStatus> result = replacer.replace(sql);
+        if (!result.x().equals(sql)) {
+          sql = result.x();
+          replaced = true;
+        }
+        if (result.y() == QueryPartReplacer.ReplacementStatus.STOP) {
+          break;
+        }
+      }
+    }
+    return Tuple.of(replaced, sql);
   }
 
   /**

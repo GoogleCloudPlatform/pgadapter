@@ -120,7 +120,7 @@ public class OptionsMetadata {
 
     Builder() {}
 
-    Builder setEnvironment(Map<String, String> environment) {
+    public Builder setEnvironment(Map<String, String> environment) {
       this.environment = Preconditions.checkNotNull(environment);
       return this;
     }

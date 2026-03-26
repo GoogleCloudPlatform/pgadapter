@@ -132,12 +132,19 @@ public class OptionsMetadataTest {
 
     assertEquals(
         "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;credentials=credentials.json",
-        new OptionsMetadata(new String[] {"-c", "credentials.json"})
+        new OptionsMetadata(
+                ImmutableMap.of(),
+                System.getProperty("os.name"),
+                DEFAULT_STARTUP_TIMEOUT,
+                new String[] {"-c", "credentials.json"})
             .buildConnectionURL(
                 "projects/test-project/instances/test-instance/databases/test-database"));
     assertEquals(
         "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;credentials=credentials.json",
         new OptionsMetadata(
+                ImmutableMap.of(),
+                System.getProperty("os.name"),
+                DEFAULT_STARTUP_TIMEOUT,
                 new String[] {
                   "-p", "test-project", "-i", "test-instance", "-c", "credentials.json"
                 })
@@ -171,7 +178,11 @@ public class OptionsMetadataTest {
             == null);
 
     OptionsMetadata useDefaultProjectIdOptions =
-        new OptionsMetadata(new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name"),
+            DEFAULT_STARTUP_TIMEOUT,
+            new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
           @Override
           String getDefaultProjectId() {
             return "custom-test-project";
@@ -181,7 +192,11 @@ public class OptionsMetadataTest {
         "cloudspanner:/projects/custom-test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;credentials=credentials.json",
         useDefaultProjectIdOptions.buildConnectionURL("test-database"));
     OptionsMetadata noProjectIdOptions =
-        new OptionsMetadata(new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name"),
+            DEFAULT_STARTUP_TIMEOUT,
+            new String[] {"-i", "test-instance", "-c", "credentials.json"}) {
           @Override
           String getDefaultProjectId() {
             return null;
@@ -202,7 +217,11 @@ public class OptionsMetadataTest {
             == null);
 
     OptionsMetadata useDefaultCredentials =
-        new OptionsMetadata(new String[] {"-p", "test-project", "-i", "test-instance"}) {
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name"),
+            DEFAULT_STARTUP_TIMEOUT,
+            new String[] {"-p", "test-project", "-i", "test-instance"}) {
           @Override
           void tryGetDefaultCredentials() {}
         };
@@ -210,7 +229,11 @@ public class OptionsMetadataTest {
         "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter",
         useDefaultCredentials.buildConnectionURL("test-database"));
     OptionsMetadata noDefaultCredentialsOptions =
-        new OptionsMetadata(new String[] {"-p", "test-project", "-i", "test-instance"}) {
+        new OptionsMetadata(
+            ImmutableMap.of(),
+            System.getProperty("os.name"),
+            DEFAULT_STARTUP_TIMEOUT,
+            new String[] {"-p", "test-project", "-i", "test-instance"}) {
           @Override
           void tryGetDefaultCredentials() throws IOException {
             throw new IOException("test exception");

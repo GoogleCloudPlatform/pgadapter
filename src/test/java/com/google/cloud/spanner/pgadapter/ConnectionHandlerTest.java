@@ -652,7 +652,7 @@ public class ConnectionHandlerTest {
     // UNSPECIFIED.
     connectionHandler.maybeDetermineWellKnownClient(parseMessage);
 
-    assertTrue(connectionHandler.isHasDeterminedClientUsingQuery());
+    assertFalse(connectionHandler.isHasDeterminedClientUsingQuery());
     assertTrue(connectionHandler.getSkippedAutoDetectParseMessages().isEmpty());
   }
 
@@ -665,7 +665,10 @@ public class ConnectionHandlerTest {
             == null);
 
     OptionsMetadata options =
-        OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .setEnvironment(ImmutableMap.of())
+            .build();
     // Check that the dialect is included in the connection URL. This is required to support the
     // 'autoConfigEmulator' property.
     assertEquals(
@@ -694,11 +697,16 @@ public class ConnectionHandlerTest {
                 .setProject("test-project")
                 .setInstance("test-instance")
                 .setDatabase("test-database")
+                .setEnvironment(ImmutableMap.of())
                 .build(),
             buildProperties(ImmutableMap.of()),
             ImmutableMap.of()));
     // Enable the autoConfigEmulator flag through the options builder.
-    OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
+    OptionsMetadata emulatorOptions =
+        OptionsMetadata.newBuilder()
+            .autoConfigureEmulator()
+            .setEnvironment(ImmutableMap.of())
+            .build();
     assertEquals(
         "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;autoConfigEmulator=true;defaultSequenceKind=bit_reversed_positive;dialect=postgresql",
         buildConnectionURL(
@@ -770,7 +778,10 @@ public class ConnectionHandlerTest {
         "true",
         () -> {
           OptionsMetadata optionsWithSystemProperty =
-              OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
+              OptionsMetadata.newBuilder()
+                  .setCredentials(NoCredentials.getInstance())
+                  .setEnvironment(ImmutableMap.of())
+                  .build();
           assertEquals(
               "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualThreads=true;dialect=postgresql",
               buildConnectionURL(
@@ -784,7 +795,10 @@ public class ConnectionHandlerTest {
         "true",
         () -> {
           OptionsMetadata optionsWithSystemProperty =
-              OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
+              OptionsMetadata.newBuilder()
+                  .setCredentials(NoCredentials.getInstance())
+                  .setEnvironment(ImmutableMap.of())
+                  .build();
           assertEquals(
               "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualGrpcTransportThreads=true;dialect=postgresql",
               buildConnectionURL(

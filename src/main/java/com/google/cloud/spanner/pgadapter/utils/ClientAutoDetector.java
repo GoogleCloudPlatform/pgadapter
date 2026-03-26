@@ -394,6 +394,34 @@ public class ClientAutoDetector {
                     + ")"));
       }
     },
+    ADBC {
+      private final Pattern adbcTypeQuery =
+          Pattern.compile("(?s).*pg_type.*WHERE.*typreceive.*typsend.*", Pattern.CASE_INSENSITIVE);
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
+        return parseMessage.getSql() != null && adbcTypeQuery.matcher(parseMessage.getSql()).find();
+      }
+
+      @Override
+      boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
+        return !statements.isEmpty() && adbcTypeQuery.matcher(statements.get(0).getSql()).find();
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        return ImmutableList.of(
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("typreceive\\s*!=\\s*0"), "typreceive != '0'::varchar"),
+            RegexQueryPartReplacer.replace(
+                Pattern.compile("typsend\\s*!=\\s*0"), "typsend != '0'::varchar"));
+      }
+    },
     PGX {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {

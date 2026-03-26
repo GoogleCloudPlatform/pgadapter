@@ -672,7 +672,7 @@ public class PgCatalog {
 
     public static final String PG_ATTRIBUTE_CTE =
         "pg_attribute as (\n"
-            + "select  '''\"' || table_schema || '\".\"' || table_name || '\"''' as attrelid,\n"
+            + "select  (ABS(spanner.farm_fingerprint(table_schema || '.' || table_name)) % 2147483647) as attrelid,\n"
             + "        column_name as attname,\n"
             + "        case regexp_replace(c.spanner_type, '\\(.*\\)', '')\n"
             + "            when 'boolean' then 16\n"
@@ -712,7 +712,7 @@ public class PgCatalog {
             + "        c.spanner_type\n"
             + "from information_schema.columns c\n"
             + "union all\n"
-            + "select  '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as attrelid,\n"
+            + "select  (ABS(spanner.farm_fingerprint(i.table_schema || '.' || i.table_name || '.' || i.index_name)) % 2147483647) as attrelid,\n"
             + "        i.column_name as attname,\n"
             + "        case regexp_replace(c.spanner_type, '\\(.*\\)', '')\n"
             + "            when 'boolean' then 16\n"
@@ -770,8 +770,8 @@ public class PgCatalog {
 
     public static final String PG_ATTRDEF_CTE =
         "pg_attrdef as (\n"
-            + "select  '''\"' || table_schema || '\".\"' || table_name || '\".\"' || column_name || '\"''' as oid,\n"
-            + "        '''\"' || table_schema || '\".\"' || table_name || '\"''' as adrelid,\n"
+            + "select  (ABS(spanner.farm_fingerprint(table_schema || '.' || table_name || '.' || column_name)) % 2147483647) as oid,\n"
+            + "        (ABS(spanner.farm_fingerprint(table_schema || '.' || table_name)) % 2147483647) as adrelid,\n"
             + "        ordinal_position as adnum,\n"
             + "        coalesce(column_default, generation_expression) as adbin\n"
             + "from information_schema.columns c\n"
@@ -788,7 +788,7 @@ public class PgCatalog {
     public static final String PG_CONSTRAINT_CTE =
         "pg_constraint as (\n"
             + "select\n"
-            + "    '''\"' || tc.constraint_schema || '\".\"' || tc.constraint_name || '\"''' as oid,\n"
+            + "    (ABS(spanner.farm_fingerprint(tc.constraint_schema || '.' || tc.constraint_name)) % 2147483647) as oid,\n"
             + "    tc.constraint_name as conname, 2200 as connamespace,\n"
             + "    case tc.constraint_type\n"
             + "        when 'PRIMARY KEY' then 'p'\n"
@@ -796,9 +796,9 @@ public class PgCatalog {
             + "        when 'FOREIGN KEY' then 'f'\n"
             + "        else ''\n"
             + "    end as contype, false as condeferrable, false as condeferred, true as convalidated,\n"
-            + "    '''\"' || tc.table_schema || '\".\"' || tc.table_name || '\"''' as conrelid,\n"
+            + "    (ABS(spanner.farm_fingerprint(tc.table_schema || '.' || tc.table_name)) % 2147483647) as conrelid,\n"
             + "    0::bigint as contypid, '0'::varchar as conindid, '0'::varchar as conparentid,\n"
-            + "    '''\"' || uc.table_schema || '\".\"' || uc.table_name || '\"''' as confrelid,\n"
+            + "    (ABS(spanner.farm_fingerprint(uc.table_schema || '.' || uc.table_name)) % 2147483647) as confrelid,\n"
             + "    case rc.update_rule\n"
             + "        when 'CASCADE' then 'c'\n"
             + "        when 'NO ACTION' then 'a'\n"

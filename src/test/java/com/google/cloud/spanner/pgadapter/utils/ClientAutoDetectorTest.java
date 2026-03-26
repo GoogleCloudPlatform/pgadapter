@@ -484,4 +484,27 @@ public class ClientAutoDetectorTest {
       WellKnownClient.DEFAULT_UNSPECIFIED.set(true);
     }
   }
+
+  @Test
+  public void testAdbc() {
+    // Test detection by query
+    assertEquals(
+        WellKnownClient.ADBC,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of(),
+            ImmutableList.of(
+                Statement.of(
+                    "WITH pg_type AS (SELECT 1) SELECT oid, typname, typreceive, typbasetype, typrelid, typarray FROM pg_type  WHERE (typreceive != 0 OR typsend != 0) AND typtype != 'r' AND typreceive::TEXT != 'array_recv'"))));
+
+    // Test replacement
+    String sql =
+        "WITH pg_type AS (SELECT 1) SELECT oid, typname, typreceive, typbasetype, typrelid, typarray FROM pg_type  WHERE (typreceive != 0 OR typsend != 0) AND typtype != 'r' AND typreceive::TEXT != 'array_recv'";
+    String replaced = sql;
+    for (QueryPartReplacer replacer : WellKnownClient.ADBC.getQueryPartReplacements()) {
+      replaced = replacer.replace(replaced).x();
+    }
+    assertEquals(
+        "WITH pg_type AS (SELECT 1) SELECT oid, typname, typreceive, typbasetype, typrelid, typarray FROM pg_type  WHERE (typreceive != '0'::varchar OR typsend != '0'::varchar) AND typtype != 'r' AND typreceive::TEXT != 'array_recv'",
+        replaced);
+  }
 }

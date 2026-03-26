@@ -148,7 +148,7 @@ public class ConnectionHandler implements Runnable {
   private Connection spannerConnection;
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
-  private boolean hasDeterminedClientUsingQuery;
+  private int autoDetectCount;
 
   /**
    * List of PARSE messages that we received before auto-detecting the client. This list can be used
@@ -967,9 +967,8 @@ public class ConnectionHandler implements Runnable {
    * executed.
    */
   public void maybeDetermineWellKnownClient(Statement statement) {
-    if (!this.hasDeterminedClientUsingQuery) {
-      if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
-          && getServer().getOptions().shouldAutoDetectClient()) {
+    if (this.wellKnownClient == WellKnownClient.UNSPECIFIED && this.autoDetectCount < 100) {
+      if (getServer().getOptions().shouldAutoDetectClient()) {
         setWellKnownClient(
             ClientAutoDetector.detectClient(
                 skippedAutoDetectParseMessages, ImmutableList.of(statement)));
@@ -985,8 +984,7 @@ public class ConnectionHandler implements Runnable {
       }
       maybeSetApplicationName();
       skippedAutoDetectParseMessages.clear();
-      // Make sure that we only try to detect the client once.
-      this.hasDeterminedClientUsingQuery = true;
+      this.autoDetectCount++;
     }
   }
 
@@ -997,7 +995,7 @@ public class ConnectionHandler implements Runnable {
    * messages.
    */
   public void maybeDetermineWellKnownClient(ParseMessage parseMessage) {
-    if (!this.hasDeterminedClientUsingQuery) {
+    if (this.wellKnownClient == WellKnownClient.UNSPECIFIED && this.autoDetectCount < 100) {
       // We skip up to 10 Parse messages before forcing the connection to detect a client (or not).
       // This is a safety measure against clients that might send a very large number of Parse
       // messages with client-side statements directly after connecting. This could in worst case
@@ -1009,15 +1007,13 @@ public class ConnectionHandler implements Runnable {
           && skippedAutoDetectParseMessages.size() < 10) {
         skippedAutoDetectParseMessages.add(parseMessage);
       } else {
-        if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
-            && getServer().getOptions().shouldAutoDetectClient()) {
+        if (getServer().getOptions().shouldAutoDetectClient()) {
           setWellKnownClient(
               ClientAutoDetector.detectClient(skippedAutoDetectParseMessages, parseMessage));
         }
         maybeSetApplicationName();
         skippedAutoDetectParseMessages.clear();
-        // Make sure that we only try to detect the client once.
-        this.hasDeterminedClientUsingQuery = true;
+        this.autoDetectCount++;
       }
     }
   }
@@ -1052,7 +1048,7 @@ public class ConnectionHandler implements Runnable {
 
   @VisibleForTesting
   boolean isHasDeterminedClientUsingQuery() {
-    return this.hasDeterminedClientUsingQuery;
+    return this.wellKnownClient != WellKnownClient.UNSPECIFIED || this.autoDetectCount >= 10;
   }
 
   /** Status of a {@link ConnectionHandler} */
