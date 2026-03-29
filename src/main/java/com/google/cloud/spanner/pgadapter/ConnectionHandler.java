@@ -214,8 +214,6 @@ public class ConnectionHandler implements Runnable {
             connectionOptionsBuilder, options.isLogGrpcMessages());
     connectionOptionsBuilder =
         PGAdapterConnectionOptionsHelper.useDirectExecutor(connectionOptionsBuilder);
-    connectionOptionsBuilder =
-        PGAdapterConnectionOptionsHelper.configDdlOperationSettings(connectionOptionsBuilder);
     if (credentials != null) {
       connectionOptionsBuilder =
           PGAdapterConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
