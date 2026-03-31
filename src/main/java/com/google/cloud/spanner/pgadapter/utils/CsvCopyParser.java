@@ -132,6 +132,22 @@ class CsvCopyParser implements CopyInParser {
       return getSpannerValue(sessionState, type, recordValue);
     }
 
+    private static Value getNonFiniteValue(String recordValue) {
+      if ("NaN".equalsIgnoreCase(recordValue)) {
+        return Value.string("NaN");
+      }
+      if ("Infinity".equalsIgnoreCase(recordValue)
+          || "+Infinity".equalsIgnoreCase(recordValue)
+          || "inf".equalsIgnoreCase(recordValue)
+          || "+inf".equalsIgnoreCase(recordValue)) {
+        return Value.string("Infinity");
+      }
+      if ("-Infinity".equalsIgnoreCase(recordValue) || "-inf".equalsIgnoreCase(recordValue)) {
+        return Value.string("-Infinity");
+      }
+      return null;
+    }
+
     static Value getSpannerValue(SessionState sessionState, Type type, String recordValue)
         throws SpannerException {
       try {
@@ -145,9 +161,23 @@ class CsvCopyParser implements CopyInParser {
           case INT64:
             return Value.int64(recordValue == null ? null : Long.parseLong(recordValue));
           case FLOAT32:
-            return Value.float32(recordValue == null ? null : Float.parseFloat(recordValue));
+            if (recordValue == null) {
+              return Value.float32(null);
+            }
+            Value nonFiniteValue32 = getNonFiniteValue(recordValue);
+            if (nonFiniteValue32 != null) {
+              return nonFiniteValue32;
+            }
+            return Value.float32(Float.parseFloat(recordValue));
           case FLOAT64:
-            return Value.float64(recordValue == null ? null : Double.parseDouble(recordValue));
+            if (recordValue == null) {
+              return Value.float64(null);
+            }
+            Value nonFiniteValue64 = getNonFiniteValue(recordValue);
+            if (nonFiniteValue64 != null) {
+              return nonFiniteValue64;
+            }
+            return Value.float64(Double.parseDouble(recordValue));
           case PG_NUMERIC:
             return Value.pgNumeric(recordValue);
           case BYTES:
