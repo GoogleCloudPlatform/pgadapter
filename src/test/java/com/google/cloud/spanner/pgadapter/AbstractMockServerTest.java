@@ -14,8 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PG_TYPE_CTE_EMULATED;
 import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgType.PG_TYPE_CTE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -113,13 +113,13 @@ import org.postgresql.util.PGobject;
 public abstract class AbstractMockServerTest {
   private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
 
-  public static final String PG_TYPE_PREFIX = PG_NAMESPACE_CTE + ",\n" + PG_TYPE_CTE_EMULATED;
+  public static final String PG_TYPE_PREFIX = PG_NAMESPACE_CTE + ",\n" + PG_TYPE_CTE;
   public static final String PG_CLASS_PREFIX = String.format(PgClass.PG_CLASS_CTE, "-1", "-1");
   public static final String EMULATED_PG_CLASS_PREFIX =
       String.format(
           PgClass.PG_CLASS_CTE,
-          "'''\"' || t.table_schema || '\".\"' || t.table_name || '\"'''",
-          "'''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"'''");
+          "mod(abs(spanner.farm_fingerprint(t.table_schema || '.' || t.table_name)), 2147483648)",
+          "mod(abs(spanner.farm_fingerprint(i.table_schema || '.' || i.table_name || '.' || i.index_name)), 2147483648)");
   public static final String EMULATED_PG_ATTRIBUTE_PREFIX = PgAttribute.PG_ATTRIBUTE_CTE;
   public static final String EMULATED_PG_ATTRDEF_PREFIX = PgAttrdef.PG_ATTRDEF_CTE;
 

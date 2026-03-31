@@ -849,6 +849,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
     builder.command(command);
     builder.directory(directory);
     builder.environment().putAll(environment);
+    builder.redirectErrorStream(true);
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
     Scanner errorScanner = new Scanner(process.getErrorStream());
@@ -941,7 +942,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                     + "  LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum\n"
                     + "  LEFT JOIN pg_type t ON a.atttypid = t.oid\n"
                     + "  LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation\n"
-                    + " WHERE a.attrelid = '''\"public\".\"%s\"'''\n"
+                    + " WHERE a.attrelid = mod(abs(spanner.farm_fingerprint('public.%s')), 2147483648)\n"
                     + "   AND a.attnum > 0 AND NOT a.attisdropped\n"
                     + " ORDER BY a.attnum\n",
                 table));
