@@ -20,8 +20,10 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -45,13 +47,8 @@ public class DoubleParser extends Parser<Double> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          String stringValue = new String(item);
-          try {
-            this.item = Double.valueOf(stringValue);
-          } catch (Exception exception) {
-            throw PGExceptionFactory.newPGException(
-                "Invalid float8 value: " + stringValue, SQLState.SyntaxError);
-          }
+          String stringValue = new String(item, StandardCharsets.UTF_8);
+          this.item = parseDouble(stringValue);
           break;
         case BINARY:
           this.item = toDouble(item);
@@ -108,6 +105,55 @@ public class DoubleParser extends Parser<Double> {
 
   @Override
   public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
-    parametersBuilder.put(name, Value.float64(this.item));
+    parametersBuilder.put(name, toValue(this.item));
+  }
+
+  /**
+   * Converts a string to a double. This method correctly recognizes valid PostgreSQL formats for
+   * the special Inf, -Inf, and NaN.
+   */
+  public static double parseDouble(@Nonnull String s) throws PGException {
+    if (Strings.isNullOrEmpty(s)) {
+      throw PGExceptionFactory.newPGException("Invalid float8 value: " + s, SQLState.SyntaxError);
+    }
+    // Quick check for Inf, -Inf, and NaN.
+    s = s.trim();
+    if (s.isEmpty()) {
+      throw PGExceptionFactory.newPGException("Invalid float8 value: " + s, SQLState.SyntaxError);
+    }
+    if (s.equalsIgnoreCase("inf")
+        || s.equalsIgnoreCase("infinity")
+        || s.equalsIgnoreCase("+inf")
+        || s.equalsIgnoreCase("+infinity")) {
+      return Double.POSITIVE_INFINITY;
+    }
+    if (s.equalsIgnoreCase("-inf") || s.equalsIgnoreCase("-infinity")) {
+      return Double.NEGATIVE_INFINITY;
+    }
+    if (s.equalsIgnoreCase("NaN")) {
+      return Double.NaN;
+    }
+    try {
+      return Double.parseDouble(s);
+    } catch (NumberFormatException exception) {
+      throw PGExceptionFactory.newPGException("Invalid float8 value: " + s, SQLState.SyntaxError);
+    }
+  }
+
+  /**
+   * Converts a double to a Spanner {@link Value}. This method correctly encodes the special values
+   * Inf, -Inf, and NaN into a string value.
+   */
+  public static Value toValue(Double value) {
+    if (value != null) {
+      if (value == Double.POSITIVE_INFINITY) {
+        return Value.string("Infinity");
+      } else if (value == Double.NEGATIVE_INFINITY) {
+        return Value.string("-Infinity");
+      } else if (Double.isNaN(value)) {
+        return Value.string("NaN");
+      }
+    }
+    return Value.float64(value);
   }
 }

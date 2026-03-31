@@ -20,8 +20,10 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import org.junit.Test;
@@ -31,6 +33,34 @@ import org.postgresql.util.ByteConverter;
 
 @RunWith(JUnit4.class)
 public class FloatParserTest {
+
+  @Test
+  public void testParseFloat() {
+    assertEquals(Float.POSITIVE_INFINITY, FloatParser.parseFloat("inf"), 0.0f);
+    assertEquals(Float.POSITIVE_INFINITY, FloatParser.parseFloat("+inf"), 0.0f);
+    assertEquals(Float.POSITIVE_INFINITY, FloatParser.parseFloat("infinity"), 0.0f);
+    assertEquals(Float.POSITIVE_INFINITY, FloatParser.parseFloat("+infinity"), 0.0f);
+    assertEquals(Float.POSITIVE_INFINITY, FloatParser.parseFloat("INF"), 0.0f);
+    assertEquals(Float.POSITIVE_INFINITY, FloatParser.parseFloat("Infinity"), 0.0f);
+    assertEquals(Float.POSITIVE_INFINITY, FloatParser.parseFloat("+INF"), 0.0f);
+
+    assertEquals(Float.NEGATIVE_INFINITY, FloatParser.parseFloat("-inf"), 0.0f);
+    assertEquals(Float.NEGATIVE_INFINITY, FloatParser.parseFloat("-infinity"), 0.0f);
+    assertEquals(Float.NEGATIVE_INFINITY, FloatParser.parseFloat("-INF"), 0.0f);
+
+    assertEquals(Float.NaN, FloatParser.parseFloat("NaN"), 0.0f);
+    assertEquals(Float.NaN, FloatParser.parseFloat("nan"), 0.0f);
+    assertEquals(Float.NaN, FloatParser.parseFloat("NAN"), 0.0f);
+
+    assertEquals(3.14f, FloatParser.parseFloat("3.14"), 0.0f);
+    assertEquals(-3.14f, FloatParser.parseFloat("-3.14"), 0.0f);
+    assertEquals(0.0f, FloatParser.parseFloat("0.0"), 0.0f);
+
+    assertThrows(PGException.class, () -> FloatParser.parseFloat(""));
+    assertThrows(PGException.class, () -> FloatParser.parseFloat("  "));
+    assertThrows(PGException.class, () -> FloatParser.parseFloat("foo"));
+    assertThrows(PGException.class, () -> FloatParser.parseFloat(null));
+  }
 
   @Test
   public void testToFloat() {
@@ -54,5 +84,34 @@ public class FloatParserTest {
     assertThrows(
         PGException.class,
         () -> new FloatParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+
+    assertEquals("NaN", new FloatParser(Float.NaN).stringParse());
+    assertEquals("Infinity", new FloatParser(Float.POSITIVE_INFINITY).stringParse());
+    assertEquals("-Infinity", new FloatParser(Float.NEGATIVE_INFINITY).stringParse());
+  }
+
+  @Test
+  public void testToValue() {
+    assertEquals(Value.float32(3.14f), FloatParser.toValue(3.14f));
+
+    assertEquals(Value.string("NaN"), FloatParser.toValue(Float.NaN));
+    assertEquals(Value.string("Infinity"), FloatParser.toValue(Float.POSITIVE_INFINITY));
+    assertEquals(Value.string("-Infinity"), FloatParser.toValue(Float.NEGATIVE_INFINITY));
+
+    assertEquals(Value.string("NaN"), FloatParser.toValue(FloatParser.parseFloat("NaN")));
+    assertEquals(Value.string("Infinity"), FloatParser.toValue(FloatParser.parseFloat("Inf")));
+  }
+
+  @Test
+  public void testBind() {
+    ImmutableMap.Builder<String, Value> builder = ImmutableMap.builder();
+    new FloatParser(Float.NaN).bind(builder, "nan");
+    new FloatParser(Float.POSITIVE_INFINITY).bind(builder, "inf");
+    new FloatParser(Float.NEGATIVE_INFINITY).bind(builder, "-inf");
+
+    ImmutableMap<String, Value> parameters = builder.build();
+    assertEquals(Value.string("NaN"), parameters.get("nan"));
+    assertEquals(Value.string("Infinity"), parameters.get("inf"));
+    assertEquals(Value.string("-Infinity"), parameters.get("-inf"));
   }
 }
