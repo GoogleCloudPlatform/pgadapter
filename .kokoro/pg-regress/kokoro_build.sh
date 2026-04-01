@@ -94,7 +94,8 @@ cd "${KOKORO_ARTIFACTS_DIR}/github/"
 #sudo apt update
 #sudo apt install python3.12 -y
 python --version
-pip install google-cloud-bigquery
+# This can fail with "Read timed out" error so we increase the timeout.
+pip install google-cloud-bigquery --timeout=120
 
 # Surgical update: Ignore external repos (Yarn/NodeSource) to avoid GPG errors.
 ls /etc/apt/sources.list.d/
