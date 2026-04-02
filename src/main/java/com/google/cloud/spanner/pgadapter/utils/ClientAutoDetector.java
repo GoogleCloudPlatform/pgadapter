@@ -595,6 +595,49 @@ public class ClientAutoDetector {
         return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
       }
     },
+    ADBC {
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("(?i)typreceive\\s*!=\\s*0"), "typreceive != '0'::varchar"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("(?i)typsend\\s*!=\\s*0"), "typsend != '0'::varchar"));
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
+        boolean hasVersionQuery =
+            skippedParseMessages.stream()
+                .anyMatch(
+                    p -> {
+                      String sql = p.getSql().toLowerCase(Locale.ENGLISH).trim();
+                      return sql.equals("select version()") || sql.equals("select version();");
+                    });
+        return hasVersionQuery
+            && statements.stream()
+                .anyMatch(
+                    s -> {
+                      String sql = s.getSql().replaceAll("\\s+", " ");
+                      return (sql.contains(
+                                  "SELECT oid, typname, typreceive, typbasetype, typrelid, typarray FROM pg_cat")
+                              && sql.contains("type")
+                              && sql.contains("typreceive != 0 OR typsend != 0"))
+                          || (sql.contains(
+                                  "SELECT attrelid, attname, atttypid FROM pg_catalog.pg_attribute ORDER BY attrelid, attnum")
+                              || sql.contains(
+                                  "SELECT attrelid, attname, atttypid FROM pg_attribute ORDER BY attrelid, attnum"));
+                    });
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getQueryPartReplacements() {
+        return functionReplacements;
+      }
+    },
     UNSPECIFIED {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {

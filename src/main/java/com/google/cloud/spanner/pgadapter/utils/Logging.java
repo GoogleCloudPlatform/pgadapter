@@ -26,7 +26,7 @@ public class Logging {
   /** Format a log message by prepending the current thread name and method to the message. */
   public static Supplier<String> format(String method, Supplier<String> message) {
     return () ->
-        String.format("[%s]: [%s] " + message.get(), Thread.currentThread().getName(), method);
+        String.format("[%s]: [%s] %s", Thread.currentThread().getName(), method, message.get());
   }
 
   /** Create a log message with the current thread name, method and action. */
@@ -40,6 +40,6 @@ public class Logging {
   public static Supplier<String> format(String method, Action action, Supplier<String> message) {
     return () ->
         String.format(
-            "[%s]: [%s] [%s] " + message.get(), Thread.currentThread().getName(), method, action);
+            "[%s]: [%s] [%s] %s", Thread.currentThread().getName(), method, action, message.get());
   }
 }
