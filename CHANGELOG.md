@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.54.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.53.3...v0.54.0) (2026-04-02)
+
+
+### Features
+
+* support Python ADBC driver ([#4279](https://github.com/GoogleCloudPlatform/pgadapter/issues/4279)) ([2f1fd3c](https://github.com/GoogleCloudPlatform/pgadapter/commit/2f1fd3c8d38b3bf6772efbf65e347d6f86eb5064)), closes [#4276](https://github.com/GoogleCloudPlatform/pgadapter/issues/4276)
+
+
+### Bug Fixes
+
+* support COPY for FLOAT8/FLOAT4 NaN/Infinity ([#4275](https://github.com/GoogleCloudPlatform/pgadapter/issues/4275)) ([7be5ad3](https://github.com/GoogleCloudPlatform/pgadapter/commit/7be5ad39b204c9e1d4885faaa96ca296fa5c3f3b))
+
+
+### Dependencies
+
+* update dependency requests to v2.33.0 [security] ([#4265](https://github.com/GoogleCloudPlatform/pgadapter/issues/4265)) ([7d9fb36](https://github.com/GoogleCloudPlatform/pgadapter/commit/7d9fb36587be4e4bbb8de6553acb6d1ec46ff54f))
+
 ## [0.53.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.53.2...v0.53.3) (2026-03-16)
 
 
