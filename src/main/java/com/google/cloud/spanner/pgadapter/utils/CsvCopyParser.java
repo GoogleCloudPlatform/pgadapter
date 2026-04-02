@@ -24,6 +24,8 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.parsers.ArrayParser;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
+import com.google.cloud.spanner.pgadapter.parsers.FloatParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.Iterators;
@@ -145,9 +147,13 @@ class CsvCopyParser implements CopyInParser {
           case INT64:
             return Value.int64(recordValue == null ? null : Long.parseLong(recordValue));
           case FLOAT32:
-            return Value.float32(recordValue == null ? null : Float.parseFloat(recordValue));
+            return recordValue == null
+                ? Value.float32(null)
+                : FloatParser.toValue(FloatParser.parseFloat(recordValue));
           case FLOAT64:
-            return Value.float64(recordValue == null ? null : Double.parseDouble(recordValue));
+            return recordValue == null
+                ? Value.float64(null)
+                : DoubleParser.toValue(DoubleParser.parseDouble(recordValue));
           case PG_NUMERIC:
             return Value.pgNumeric(recordValue);
           case BYTES:

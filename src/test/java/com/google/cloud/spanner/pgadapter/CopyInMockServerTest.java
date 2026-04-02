@@ -39,6 +39,7 @@ import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.protobuf.Value.KindCase;
+import com.google.protobuf.util.JsonFormat;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.Mutation;
@@ -578,6 +579,150 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     for (int col = 1; col < mutation.getInsert().getColumnsCount(); col++) {
       assertEquals(nullValue, mutation.getInsert().getValues(0).getValues(col));
     }
+  }
+
+  @Test
+  public void testCopyInFloat8NonFinite() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new StringReader(
+                  "1\ttrue\t\\x01\t1.0\tNaN\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "2\ttrue\t\\x01\t1.0\tInfinity\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "3\ttrue\t\\x01\t1.0\t-Infinity\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "4\ttrue\t\\x01\t1.0\tnan\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "5\ttrue\t\\x01\t1.0\tinfinity\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "6\ttrue\t\\x01\t1.0\t+Infinity\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "7\ttrue\t\\x01\t1.0\tinf\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "8\ttrue\t\\x01\t1.0\t+inf\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "9\ttrue\t\\x01\t1.0\t-inf\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"));
+      assertEquals(9L, copyCount);
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(9, mutation.getInsert().getValuesCount());
+
+    // Row 1: NaN
+    ListValue row1 = mutation.getInsert().getValues(0);
+    assertEquals("NaN", row1.getValues(4).getStringValue());
+
+    // Row 2: Infinity
+    ListValue row2 = mutation.getInsert().getValues(1);
+    assertEquals("Infinity", row2.getValues(4).getStringValue());
+
+    // Row 3: -Infinity
+    ListValue row3 = mutation.getInsert().getValues(2);
+    assertEquals("-Infinity", row3.getValues(4).getStringValue());
+
+    // Row 4: nan
+    ListValue row4 = mutation.getInsert().getValues(3);
+    assertEquals("NaN", row4.getValues(4).getStringValue());
+
+    // Row 5: infinity
+    ListValue row5 = mutation.getInsert().getValues(4);
+    assertEquals("Infinity", row5.getValues(4).getStringValue());
+
+    // Row 6: +Infinity
+    ListValue row6 = mutation.getInsert().getValues(5);
+    assertEquals("Infinity", row6.getValues(4).getStringValue());
+
+    // Row 7: inf
+    ListValue row7 = mutation.getInsert().getValues(6);
+    assertEquals("Infinity", row7.getValues(4).getStringValue());
+
+    // Row 8: +inf
+    ListValue row8 = mutation.getInsert().getValues(7);
+    assertEquals("Infinity", row8.getValues(4).getStringValue());
+
+    // Row 9: -inf
+    ListValue row9 = mutation.getInsert().getValues(8);
+    assertEquals("-Infinity", row9.getValues(4).getStringValue());
+
+    // Verify that JsonFormat now succeeds on the whole request
+    String json = JsonFormat.printer().print(commitRequest);
+    assertTrue(json.contains("\"NaN\""));
+    assertTrue(json.contains("\"Infinity\""));
+    assertTrue(json.contains("\"-Infinity\""));
+  }
+
+  @Test
+  public void testCopyInFloat4NonFinite() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new StringReader(
+                  "1\ttrue\t\\x01\tNaN\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "2\ttrue\t\\x01\tInfinity\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "3\ttrue\t\\x01\t-Infinity\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "4\ttrue\t\\x01\tnan\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "5\ttrue\t\\x01\tinfinity\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "6\ttrue\t\\x01\t+Infinity\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "7\ttrue\t\\x01\tinf\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "8\ttrue\t\\x01\t+inf\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"
+                      + "9\ttrue\t\\x01\t-inf\t1.0\t1\t1.0\t2026-03-30T23:40:58Z\t2026-03-30\ttest\t{}\n"));
+      assertEquals(9L, copyCount);
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(9, mutation.getInsert().getValuesCount());
+
+    // Row 1: NaN
+    ListValue row1 = mutation.getInsert().getValues(0);
+    assertEquals("NaN", row1.getValues(3).getStringValue());
+
+    // Row 2: Infinity
+    ListValue row2 = mutation.getInsert().getValues(1);
+    assertEquals("Infinity", row2.getValues(3).getStringValue());
+
+    // Row 3: -Infinity
+    ListValue row3 = mutation.getInsert().getValues(2);
+    assertEquals("-Infinity", row3.getValues(3).getStringValue());
+
+    // Row 4: nan
+    ListValue row4 = mutation.getInsert().getValues(3);
+    assertEquals("NaN", row4.getValues(3).getStringValue());
+
+    // Row 5: infinity
+    ListValue row5 = mutation.getInsert().getValues(4);
+    assertEquals("Infinity", row5.getValues(3).getStringValue());
+
+    // Row 6: +Infinity
+    ListValue row6 = mutation.getInsert().getValues(5);
+    assertEquals("Infinity", row6.getValues(3).getStringValue());
+
+    // Row 7: inf
+    ListValue row7 = mutation.getInsert().getValues(6);
+    assertEquals("Infinity", row7.getValues(3).getStringValue());
+
+    // Row 8: +inf
+    ListValue row8 = mutation.getInsert().getValues(7);
+    assertEquals("Infinity", row8.getValues(3).getStringValue());
+
+    // Row 9: -inf
+    ListValue row9 = mutation.getInsert().getValues(8);
+    assertEquals("-Infinity", row9.getValues(3).getStringValue());
   }
 
   @Test
