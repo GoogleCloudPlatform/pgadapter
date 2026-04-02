@@ -1823,7 +1823,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     String tableSql =
         "with pg_class as (\n"
             + "  select\n"
-            + "  '''\"' || t.table_schema || '\".\"' || t.table_name || '\"''' as oid,\n"
+            + "  mod(abs(spanner.farm_fingerprint(t.table_schema || '.' || t.table_name)), 2147483648) as oid,\n"
             + "  table_name as relname,\n"
             + "  case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
             + "  0 as reltype,\n"
@@ -1861,7 +1861,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "group by t.table_name, t.table_schema, t.table_type\n"
             + "union all\n"
             + "select\n"
-            + "    '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as oid,\n"
+            + "    mod(abs(spanner.farm_fingerprint(i.table_schema || '.' || i.table_name || '.' || i.index_name)), 2147483648) as oid,\n"
             + "    i.index_name as relname,\n"
             + "    case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
             + "    0 as reltype,\n"

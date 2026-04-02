@@ -239,14 +239,14 @@ public class ClientAutoDetector {
               RegexQueryPartReplacer.replace(
                   Pattern.compile("pg_get_constraintdef\\s*\\(.+\\)\\s*AS\\s+"), "conbin AS "),
               RegexQueryPartReplacer.replace(
-                  Pattern.compile("'\"(.+?)\"'::regclass"), "'''\"public\".\"$1\"'''"),
+                  Pattern.compile("'\"(.+?)\"'::regclass"),
+                  "mod(abs(spanner.farm_fingerprint('public.$1')), 2147483648)"),
               RegexQueryPartReplacer.replace(
                   Pattern.compile(
                       "string_agg\\(enum\\.enumlabel, ',' ORDER BY enum\\.enumsortorder\\)"),
                   "''::varchar"),
               RegexQueryPartReplacer.replace(
-                  Pattern.compile("(\\s+.+?)\\.oid::regclass::text"),
-                  " substr($1.oid, 12, length($1.oid) - 13)"),
+                  Pattern.compile("(\\s+.+?)\\.oid::regclass::text"), " $1.relname"),
               RegexQueryPartReplacer.replace(
                   Pattern.compile(
                       "t\\.typinput\\s*=\\s*'array_in\\(\\s*cstring\\s*,\\s*oid,\\s*integer\\)'::regprocedure"),

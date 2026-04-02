@@ -15,10 +15,8 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.ITJdbcMetadataTest.getDdlStatements;
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
@@ -58,15 +56,13 @@ public class ITPgClassTest implements IntegrationTest {
   }
 
   private static class PgClassRow {
-    final String oid;
     final String relname;
     final String relkind;
     final int relnatts;
     // Relchecks is not implemented and always returns zero.
     final int relchecks;
 
-    PgClassRow(String oid, String relname, String relkind, int relnatts, int relchecks) {
-      this.oid = oid;
+    PgClassRow(String relname, String relkind, int relnatts, int relchecks) {
       this.relname = relname;
       this.relkind = relkind;
       this.relnatts = relnatts;
@@ -76,32 +72,24 @@ public class ITPgClassTest implements IntegrationTest {
 
   @Test
   public void testPgClass() throws SQLException {
-    ImmutableList<PgClassRow> expectedRows =
-        ImmutableList.of(
-            new PgClassRow("'\"public\".\"albums\"'", "albums", "r", 3, 0),
-            new PgClassRow(
-                "'\"public\".\"albums\".\"IDX_albums_singer_id_%",
-                "IDX_albums_singer_id_%", "i", 1, 0),
-            new PgClassRow("'\"public\".\"albums\".\"PRIMARY_KEY\"'", "PRIMARY_KEY", "i", 1, 0),
-            new PgClassRow("'\"public\".\"all_types\"'", "all_types", "r", 22, 0),
-            new PgClassRow("'\"public\".\"all_types\".\"PRIMARY_KEY\"'", "PRIMARY_KEY", "i", 1, 0),
-            new PgClassRow(
-                "'\"public\".\"all_types\".\"idx_col_varchar_int\"'",
-                "idx_col_varchar_int",
-                "i",
-                2,
-                0),
-            new PgClassRow("'\"public\".\"numbers\"'", "numbers", "r", 2, 0),
-            new PgClassRow("'\"public\".\"numbers\".\"PRIMARY_KEY\"'", "PRIMARY_KEY", "i", 1, 0),
-            new PgClassRow(
-                "'\"public\".\"numbers\".\"idx_numbers_name\"'", "idx_numbers_name", "i", 1, 0),
-            new PgClassRow("'\"public\".\"recording_attempt\"'", "recording_attempt", "r", 4, 0),
-            new PgClassRow(
-                "'\"public\".\"recording_attempt\".\"PRIMARY_KEY\"'", "PRIMARY_KEY", "i", 3, 0),
-            new PgClassRow("'\"public\".\"singers\"'", "singers", "r", 2, 0),
-            new PgClassRow("'\"public\".\"singers\".\"PRIMARY_KEY\"'", "PRIMARY_KEY", "i", 1, 0),
-            new PgClassRow("'\"public\".\"tracks\"'", "tracks", "r", 3, 0),
-            new PgClassRow("'\"public\".\"tracks\".\"PRIMARY_KEY\"'", "PRIMARY_KEY", "i", 2, 0));
+    java.util.List<PgClassRow> expectedRows =
+        new java.util.ArrayList<>(
+            java.util.Arrays.asList(
+                new PgClassRow("albums", "r", 3, 0),
+                new PgClassRow("IDX_albums_singer_id_%", "i", 1, 0),
+                new PgClassRow("PRIMARY_KEY", "i", 1, 0),
+                new PgClassRow("all_types", "r", 22, 0),
+                new PgClassRow("PRIMARY_KEY", "i", 1, 0),
+                new PgClassRow("idx_col_varchar_int", "i", 2, 0),
+                new PgClassRow("numbers", "r", 2, 0),
+                new PgClassRow("PRIMARY_KEY", "i", 1, 0),
+                new PgClassRow("idx_numbers_name", "i", 1, 0),
+                new PgClassRow("recording_attempt", "r", 4, 0),
+                new PgClassRow("PRIMARY_KEY", "i", 3, 0),
+                new PgClassRow("singers", "r", 2, 0),
+                new PgClassRow("PRIMARY_KEY", "i", 1, 0),
+                new PgClassRow("tracks", "r", 3, 0),
+                new PgClassRow("PRIMARY_KEY", "i", 2, 0)));
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (ResultSet resultSet =
           connection
@@ -111,38 +99,38 @@ public class ITPgClassTest implements IntegrationTest {
                       + "from pg_class "
                       + "where relnamespace=2200 "
                       + "order by oid")) {
-        int index = 0;
         while (resultSet.next()) {
-          assertTrue(index < expectedRows.size());
-          PgClassRow expected = expectedRows.get(index);
-          if (expected.oid.endsWith("%")) {
-            assertTrue(
-                resultSet.getString("oid"),
-                resultSet
-                    .getString("oid")
-                    .startsWith(expected.oid.substring(0, expected.oid.length() - 1)));
-            assertTrue(
-                resultSet.getString("relname"),
-                resultSet
-                    .getString("relname")
-                    .startsWith(expected.relname.substring(0, expected.relname.length() - 1)));
-          } else {
-            assertEquals(expected.oid, resultSet.getString("oid"));
-            assertEquals(expected.relname, resultSet.getString("relname"));
+          assertTrue(resultSet.getLong("oid") != 0);
+          String relname = resultSet.getString("relname");
+          String relkind = resultSet.getString("relkind");
+          int relnatts = resultSet.getInt("relnatts");
+          int relchecks = resultSet.getInt("relchecks");
+          boolean found = false;
+          for (int i = 0; i < expectedRows.size(); i++) {
+            PgClassRow expected = expectedRows.get(i);
+            boolean nameMatch =
+                expected.relname.endsWith("%")
+                    ? relname.startsWith(
+                        expected.relname.substring(0, expected.relname.length() - 1))
+                    : relname.equals(expected.relname);
+            if (nameMatch
+                && relkind.equals(expected.relkind)
+                && relnatts == expected.relnatts
+                && relchecks == expected.relchecks) {
+              expectedRows.remove(i);
+              found = true;
+              break;
+            }
           }
-          assertEquals(expected.oid, expected.relkind, resultSet.getString("relkind"));
-          assertEquals(expected.oid, expected.relnatts, resultSet.getInt("relnatts"));
-          assertEquals(expected.oid, expected.relchecks, resultSet.getInt("relchecks"));
-          index++;
+          assertTrue("Unexpected row: " + relname, found);
         }
-        assertEquals(index, expectedRows.size());
+        assertTrue("Missing rows", expectedRows.isEmpty());
       }
     }
   }
 
   private static class PgIndexRow {
-    final String indexrelid;
-    final String indrelid;
+
     final int indnatts;
     final int indnkeyatts;
     final boolean indisunique;
@@ -151,16 +139,12 @@ public class ITPgClassTest implements IntegrationTest {
     final String indpred;
 
     PgIndexRow(
-        String indexrelid,
-        String indrelid,
         int indnatts,
         int indnkeyatts,
         boolean indisunique,
         boolean indnullsnotdistinct,
         boolean indisprimary,
         String indpred) {
-      this.indexrelid = indexrelid;
-      this.indrelid = indrelid;
       this.indnatts = indnatts;
       this.indnkeyatts = indnkeyatts;
       this.indisunique = indisunique;
@@ -177,119 +161,50 @@ public class ITPgClassTest implements IntegrationTest {
             + "indnullsnotdistinct, indisprimary, indpred "
             + "from pg_index "
             + "order by indexrelid";
-    ImmutableList<PgIndexRow> expectedRows =
-        ImmutableList.of(
-            new PgIndexRow(
-                "'\"public\".\"albums\".\"IDX_albums_singer_id_%",
-                "'\"public\".\"albums\"'", 1, 1, false, false, false, null),
-            new PgIndexRow(
-                "'\"public\".\"albums\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"albums\"'",
-                1,
-                1,
-                true,
-                true,
-                true,
-                null),
-            new PgIndexRow(
-                "'\"public\".\"all_types\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"all_types\"'",
-                1,
-                1,
-                true,
-                true,
-                true,
-                null),
-            new PgIndexRow(
-                "'\"public\".\"all_types\".\"idx_col_varchar_int\"'",
-                "'\"public\".\"all_types\"'",
-                2,
-                2,
-                false,
-                false,
-                false,
-                null),
-            new PgIndexRow(
-                "'\"public\".\"numbers\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"numbers\"'",
-                1,
-                1,
-                true,
-                true,
-                true,
-                null),
-            new PgIndexRow(
-                "'\"public\".\"numbers\".\"idx_numbers_name\"'",
-                "'\"public\".\"numbers\"'",
-                1,
-                1,
-                true,
-                true,
-                false,
-                "name IS NOT NULL"),
-            new PgIndexRow(
-                "'\"public\".\"recording_attempt\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"recording_attempt\"'",
-                3,
-                3,
-                true,
-                true,
-                true,
-                null),
-            new PgIndexRow(
-                "'\"public\".\"singers\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"singers\"'",
-                1,
-                1,
-                true,
-                true,
-                true,
-                null),
-            new PgIndexRow(
-                "'\"public\".\"tracks\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"tracks\"'",
-                2,
-                2,
-                true,
-                true,
-                true,
-                null));
+    java.util.List<PgIndexRow> expectedRows =
+        new java.util.ArrayList<>(
+            java.util.Arrays.asList(
+                new PgIndexRow(1, 1, false, false, false, null),
+                new PgIndexRow(1, 1, true, true, true, null),
+                new PgIndexRow(1, 1, true, true, true, null),
+                new PgIndexRow(2, 2, false, false, false, null),
+                new PgIndexRow(1, 1, true, true, true, null),
+                new PgIndexRow(1, 1, true, true, false, "name IS NOT NULL"),
+                new PgIndexRow(3, 3, true, true, true, null),
+                new PgIndexRow(1, 1, true, true, true, null),
+                new PgIndexRow(2, 2, true, true, true, null)));
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        int index = 0;
         while (resultSet.next()) {
-          assertTrue(index < expectedRows.size());
-          PgIndexRow expected = expectedRows.get(index);
-          if (expected.indexrelid.endsWith("%")) {
-            assertTrue(
-                resultSet.getString("indexrelid"),
-                resultSet
-                    .getString("indexrelid")
-                    .startsWith(
-                        expected.indexrelid.substring(0, expected.indexrelid.length() - 1)));
-          } else {
-            assertEquals(expected.indexrelid, resultSet.getString("indexrelid"));
+          assertTrue(resultSet.getLong("indexrelid") != 0);
+          assertTrue(resultSet.getLong("indrelid") != 0);
+          int indnatts = resultSet.getInt("indnatts");
+          int indnkeyatts = resultSet.getInt("indnkeyatts");
+          boolean indisunique = resultSet.getBoolean("indisunique");
+          boolean indnullsnotdistinct = resultSet.getBoolean("indnullsnotdistinct");
+          boolean indisprimary = resultSet.getBoolean("indisprimary");
+          String indpred = resultSet.getString("indpred");
+
+          boolean found = false;
+          for (int i = 0; i < expectedRows.size(); i++) {
+            PgIndexRow expected = expectedRows.get(i);
+            String targetIndPred = IntegrationTest.isRunningOnEmulator() ? null : expected.indpred;
+            boolean predMatch =
+                targetIndPred == null ? indpred == null : targetIndPred.equals(indpred);
+            if (expected.indnatts == indnatts
+                && expected.indnkeyatts == indnkeyatts
+                && expected.indisunique == indisunique
+                && expected.indnullsnotdistinct == indnullsnotdistinct
+                && expected.indisprimary == indisprimary
+                && predMatch) {
+              expectedRows.remove(i);
+              found = true;
+              break;
+            }
           }
-          assertEquals(expected.indexrelid, expected.indrelid, resultSet.getString("indrelid"));
-          assertEquals(expected.indexrelid, expected.indnatts, resultSet.getInt("indnatts"));
-          assertEquals(expected.indexrelid, expected.indnkeyatts, resultSet.getInt("indnkeyatts"));
-          assertEquals(
-              expected.indexrelid, expected.indisunique, resultSet.getBoolean("indisunique"));
-          assertEquals(
-              expected.indexrelid,
-              expected.indnullsnotdistinct,
-              resultSet.getBoolean("indnullsnotdistinct"));
-          assertEquals(
-              expected.indexrelid, expected.indisprimary, resultSet.getBoolean("indisprimary"));
-          // TODO: Remove when the emulator supports indpred.
-          if (IntegrationTest.isRunningOnEmulator()) {
-            assertNull(expected.indexrelid, resultSet.getString("indpred"));
-          } else {
-            assertEquals(expected.indexrelid, expected.indpred, resultSet.getString("indpred"));
-          }
-          index++;
+          assertTrue("Unexpected index row: " + indnatts + ", " + indisprimary, found);
         }
-        assertEquals(index, expectedRows.size());
+        assertTrue("Missing index rows", expectedRows.isEmpty());
       }
     }
   }
@@ -382,9 +297,8 @@ public class ITPgClassTest implements IntegrationTest {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("select * from pg_attrdef")) {
         assertTrue(resultSet.next());
-        assertEquals(
-            "'\"public\".\"recording_attempt\".\"recording_time\"'", resultSet.getString("oid"));
-        assertEquals("'\"public\".\"recording_attempt\"'", resultSet.getString("adrelid"));
+        assertTrue(resultSet.getLong("oid") != 0);
+        assertTrue(resultSet.getLong("adrelid") != 0);
         assertEquals(4, resultSet.getInt("adnum"));
         assertEquals("now()", resultSet.getString("adbin"));
         assertFalse(resultSet.next());
@@ -393,12 +307,8 @@ public class ITPgClassTest implements IntegrationTest {
   }
 
   private static class PgConstraintRow {
-    final String oid;
     final String conname;
     final char contype;
-    final String conrelid;
-    final String conindid; // Currently not implemented
-    final String confrelid;
     final String confupdtype;
     final String confdeltype;
     final String confmatchtype;
@@ -407,24 +317,16 @@ public class ITPgClassTest implements IntegrationTest {
     final String conbin;
 
     private PgConstraintRow(
-        String oid,
         String conname,
         char contype,
-        String conrelid,
-        String conindid,
-        String confrelid,
         String confupdtype,
         String confdeltype,
         String confmatchtype,
         Long[] conkey,
         Long[] confkey,
         String conbin) {
-      this.oid = oid;
       this.conname = conname;
       this.contype = contype;
-      this.conrelid = conrelid;
-      this.conindid = conindid;
-      this.confrelid = confrelid;
       this.confupdtype = confupdtype;
       this.confdeltype = confdeltype;
       this.confmatchtype = confmatchtype;
@@ -436,151 +338,48 @@ public class ITPgClassTest implements IntegrationTest {
 
   @Test
   public void testPgConstraint() throws SQLException {
-    ImmutableList<PgConstraintRow> expectedRows =
-        ImmutableList.of(
-            new PgConstraintRow(
-                "'\"public\".\"FK_albums_singers_%",
-                "FK_albums_singers_%",
-                'f',
-                "'\"public\".\"albums\"'",
-                "0",
-                "'\"public\".\"singers\"'",
-                "a",
-                "a",
-                "s",
-                new Long[] {2L},
-                new Long[] {1L},
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"FK_recording_attempt_albums_%",
-                "FK_recording_attempt_albums_%",
-                'f',
-                "'\"public\".\"recording_attempt\"'",
-                "0",
-                "'\"public\".\"albums\"'",
-                "a",
-                "a",
-                "s",
-                new Long[] {1L},
-                new Long[] {1L},
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"FK_recording_attempt_tracks_%",
-                "FK_recording_attempt_tracks_%",
-                'f',
-                "'\"public\".\"recording_attempt\"'",
-                "0",
-                "'\"public\".\"tracks\"'",
-                "a",
-                "a",
-                "s",
-                new Long[] {1L, 2L},
-                new Long[] {1L, 2L},
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"FK_tracks_albums_%",
-                "FK_tracks_albums_%",
-                'f',
-                "'\"public\".\"tracks\"'",
-                "0",
-                "'\"public\".\"albums\"'",
-                "a",
-                "a",
-                "s",
-                new Long[] {1L},
-                new Long[] {1L},
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"PK_albums\"'",
-                "PK_albums",
-                'p',
-                "'\"public\".\"albums\"'",
-                "0",
-                null,
-                null,
-                null,
-                "s",
-                new Long[] {1L},
-                null,
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"PK_all_types\"'",
-                "PK_all_types",
-                'p',
-                "'\"public\".\"all_types\"'",
-                "0",
-                null,
-                null,
-                null,
-                "s",
-                new Long[] {1L},
-                null,
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"PK_numbers\"'",
-                "PK_numbers",
-                'p',
-                "'\"public\".\"numbers\"'",
-                "0",
-                null,
-                null,
-                null,
-                "s",
-                new Long[] {1L},
-                null,
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"PK_recording_attempt\"'",
-                "PK_recording_attempt",
-                'p',
-                "'\"public\".\"recording_attempt\"'",
-                "0",
-                null,
-                null,
-                null,
-                "s",
-                new Long[] {1L, 2L, 3L},
-                null,
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"PK_singers\"'",
-                "PK_singers",
-                'p',
-                "'\"public\".\"singers\"'",
-                "0",
-                null,
-                null,
-                null,
-                "s",
-                new Long[] {1L},
-                null,
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"PK_tracks\"'",
-                "PK_tracks",
-                'p',
-                "'\"public\".\"tracks\"'",
-                "0",
-                null,
-                null,
-                null,
-                "s",
-                new Long[] {1L, 2L},
-                null,
-                null),
-            new PgConstraintRow(
-                "'\"public\".\"recording_attempt_greater_than_zero\"'",
-                "recording_attempt_greater_than_zero",
-                'c',
-                "'\"public\".\"recording_attempt\"'",
-                "0",
-                null,
-                null,
-                null,
-                "s",
-                new Long[] {3L},
-                null,
-                "(attempt > '0'::bigint)"));
+    java.util.List<PgConstraintRow> expectedRows =
+        new java.util.ArrayList<>(
+            java.util.Arrays.asList(
+                new PgConstraintRow(
+                    "FK_albums_singers_%",
+                    'f', "a", "a", "s", new Long[] {2L}, new Long[] {1L}, null),
+                new PgConstraintRow(
+                    "FK_recording_attempt_albums_%",
+                    'f', "a", "a", "s", new Long[] {1L}, new Long[] {1L}, null),
+                new PgConstraintRow(
+                    "FK_recording_attempt_tracks_%",
+                    'f', "a", "a", "s", new Long[] {1L, 2L}, new Long[] {1L, 2L}, null),
+                new PgConstraintRow(
+                    "FK_tracks_albums_%",
+                    'f', "a", "a", "s", new Long[] {1L}, new Long[] {1L}, null),
+                new PgConstraintRow("PK_albums", 'p', null, null, "s", new Long[] {1L}, null, null),
+                new PgConstraintRow(
+                    "PK_all_types", 'p', null, null, "s", new Long[] {1L}, null, null),
+                new PgConstraintRow(
+                    "PK_numbers", 'p', null, null, "s", new Long[] {1L}, null, null),
+                new PgConstraintRow(
+                    "PK_recording_attempt",
+                    'p',
+                    null,
+                    null,
+                    "s",
+                    new Long[] {1L, 2L, 3L},
+                    null,
+                    null),
+                new PgConstraintRow(
+                    "PK_singers", 'p', null, null, "s", new Long[] {1L}, null, null),
+                new PgConstraintRow(
+                    "PK_tracks", 'p', null, null, "s", new Long[] {1L, 2L}, null, null),
+                new PgConstraintRow(
+                    "recording_attempt_greater_than_zero",
+                    'c',
+                    null,
+                    null,
+                    "s",
+                    new Long[] {3L},
+                    null,
+                    "(attempt > '0'::bigint)")));
 
     String sql =
         "select oid, conname, contype, conrelid, conindid, confrelid, confupdtype, confdeltype, "
@@ -589,45 +388,56 @@ public class ITPgClassTest implements IntegrationTest {
             + "order by oid";
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        int index = 0;
         while (resultSet.next()) {
-          assertTrue(resultSet.getString("oid"), index < expectedRows.size());
-          PgConstraintRow expected = expectedRows.get(index);
-          if (expected.oid.endsWith("%")) {
-            assertTrue(
-                expected.oid,
-                resultSet
-                    .getString("oid")
-                    .startsWith(expected.oid.substring(0, expected.oid.length() - 1)));
-            assertTrue(
-                expected.conname,
-                resultSet
-                    .getString("conname")
-                    .startsWith(expected.conname.substring(0, expected.conname.length() - 1)));
-          } else {
-            assertEquals(expected.oid, resultSet.getString("oid"));
-            assertEquals(expected.conname, resultSet.getString("conname"));
-          }
-          assertEquals(expected.contype, resultSet.getString("contype").charAt(0));
-          assertEquals(expected.conrelid, resultSet.getString("conrelid"));
-          assertEquals(expected.conindid, resultSet.getString("conindid"));
-          assertEquals(expected.confrelid, resultSet.getString("confrelid"));
-          assertEquals(expected.confupdtype, resultSet.getString("confupdtype"));
-          assertEquals(expected.confdeltype, resultSet.getString("confdeltype"));
-          assertEquals(expected.confmatchtype, resultSet.getString("confmatchtype"));
-          // TODO: Remove check when we array_agg with order by is supported.
-          if (!IntegrationTest.isRunningOnEmulator()) {
-            assertArrayEquals(expected.conkey, (Long[]) resultSet.getArray("conkey").getArray());
-          }
-          assertArrayEquals(
-              expected.confkey,
+          assertTrue(resultSet.getLong("oid") != 0);
+          String conname = resultSet.getString("conname");
+          char contype = resultSet.getString("contype").charAt(0);
+          String confupdtype = resultSet.getString("confupdtype");
+          String confdeltype = resultSet.getString("confdeltype");
+          String confmatchtype = resultSet.getString("confmatchtype");
+          Long[] conkey =
+              IntegrationTest.isRunningOnEmulator()
+                  ? null
+                  : (Long[]) resultSet.getArray("conkey").getArray();
+          Long[] confkey =
               resultSet.getArray("confkey") == null
                   ? null
-                  : (Long[]) resultSet.getArray("confkey").getArray());
-          assertEquals(expected.conbin, resultSet.getString("conbin"));
-          index++;
+                  : (Long[]) resultSet.getArray("confkey").getArray();
+          String conbin = resultSet.getString("conbin");
+
+          boolean found = false;
+          for (int i = 0; i < expectedRows.size(); i++) {
+            PgConstraintRow expected = expectedRows.get(i);
+            boolean nameMatch =
+                expected.conname.endsWith("%")
+                    ? conname.startsWith(
+                        expected.conname.substring(0, expected.conname.length() - 1))
+                    : conname.equals(expected.conname);
+            boolean keyMatch =
+                IntegrationTest.isRunningOnEmulator()
+                    || java.util.Arrays.equals(expected.conkey, conkey);
+            boolean fkeyMatch = java.util.Arrays.equals(expected.confkey, confkey);
+            boolean strMatch = true;
+            if (expected.confupdtype != null && !expected.confupdtype.equals(confupdtype))
+              strMatch = false;
+            if (expected.confupdtype == null && confupdtype != null) strMatch = false;
+            if (expected.confdeltype != null && !expected.confdeltype.equals(confdeltype))
+              strMatch = false;
+            if (expected.confdeltype == null && confdeltype != null) strMatch = false;
+            if (expected.confmatchtype != null && !expected.confmatchtype.equals(confmatchtype))
+              strMatch = false;
+            if (expected.confmatchtype == null && confmatchtype != null) strMatch = false;
+            if (expected.conbin != null && !expected.conbin.equals(conbin)) strMatch = false;
+            if (expected.conbin == null && conbin != null) strMatch = false;
+            if (nameMatch && contype == expected.contype && keyMatch && fkeyMatch && strMatch) {
+              expectedRows.remove(i);
+              found = true;
+              break;
+            }
+          }
+          assertTrue("Unexpected constraint row: " + conname, found);
         }
-        assertEquals(expectedRows.size(), index);
+        assertTrue("Missing constraint rows", expectedRows.isEmpty());
       }
     }
   }

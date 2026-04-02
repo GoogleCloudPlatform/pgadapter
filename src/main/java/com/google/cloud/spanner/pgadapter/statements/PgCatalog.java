@@ -397,8 +397,6 @@ public class PgCatalog {
   // initialization inside inner classes.
   public static final String PG_DESCRIPTION_CTE =
       String.format(PgDescription.PG_DESCRIPTION_CTE_FORMAT, "0::bigint", "0::bigint");
-  public static final String PG_DESCRIPTION_CTE_EMULATED =
-      String.format(PgDescription.PG_DESCRIPTION_CTE_FORMAT, "''::varchar", "''::varchar");
 
   public class PgDescription implements PgCatalogTable {
     static final String PG_DESCRIPTION_CTE_FORMAT =
@@ -416,17 +414,9 @@ public class PgCatalog {
 
     @Override
     public String getTableExpression() {
-      return sessionState.isEmulatePgClassTables()
-          ? PG_DESCRIPTION_CTE_EMULATED
-          : PG_DESCRIPTION_CTE;
+      return PG_DESCRIPTION_CTE;
     }
   }
-
-  // This is defined outside the PgType class, because Java 8 does not allow static initialization
-  // inside inner classes.
-  @InternalApi
-  public static final String PG_TYPE_CTE_EMULATED =
-      PgType.PG_TYPE_CTE.replace("0 as typrelid", "'0'::varchar as typrelid");
 
   @InternalApi
   public class PgType implements PgCatalogTable {
@@ -512,7 +502,7 @@ public class PgCatalog {
 
     @Override
     public String getTableExpression() {
-      return sessionState.isEmulatePgClassTables() ? PG_TYPE_CTE_EMULATED : PG_TYPE_CTE;
+      return PG_TYPE_CTE;
     }
 
     @Override
@@ -615,8 +605,8 @@ public class PgCatalog {
       if (sessionState.isEmulatePgClassTables()) {
         return String.format(
             PG_CLASS_CTE,
-            "'''\"' || t.table_schema || '\".\"' || t.table_name || '\"'''",
-            "'''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"'''");
+            "mod(abs(spanner.farm_fingerprint(t.table_schema || '.' || t.table_name)), 2147483648)",
+            "mod(abs(spanner.farm_fingerprint(i.table_schema || '.' || i.table_name || '.' || i.index_name)), 2147483648)");
       }
       return String.format(PG_CLASS_CTE, "-1", "-1");
     }
@@ -672,7 +662,7 @@ public class PgCatalog {
 
     public static final String PG_ATTRIBUTE_CTE =
         "pg_attribute as (\n"
-            + "select  '''\"' || table_schema || '\".\"' || table_name || '\"''' as attrelid,\n"
+            + "select  mod(abs(spanner.farm_fingerprint(table_schema || '.' || table_name)), 2147483648) as attrelid,\n"
             + "        column_name as attname,\n"
             + "        case regexp_replace(c.spanner_type, '\\(.*\\)', '')\n"
             + "            when 'boolean' then 16\n"
@@ -712,7 +702,7 @@ public class PgCatalog {
             + "        c.spanner_type\n"
             + "from information_schema.columns c\n"
             + "union all\n"
-            + "select  '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as attrelid,\n"
+            + "select  mod(abs(spanner.farm_fingerprint(i.table_schema || '.' || i.table_name || '.' || i.index_name)), 2147483648) as attrelid,\n"
             + "        i.column_name as attname,\n"
             + "        case regexp_replace(c.spanner_type, '\\(.*\\)', '')\n"
             + "            when 'boolean' then 16\n"
@@ -770,8 +760,8 @@ public class PgCatalog {
 
     public static final String PG_ATTRDEF_CTE =
         "pg_attrdef as (\n"
-            + "select  '''\"' || table_schema || '\".\"' || table_name || '\".\"' || column_name || '\"''' as oid,\n"
-            + "        '''\"' || table_schema || '\".\"' || table_name || '\"''' as adrelid,\n"
+            + "select  mod(abs(spanner.farm_fingerprint(table_schema || '.' || table_name || '.' || column_name)), 2147483648) as oid,\n"
+            + "        mod(abs(spanner.farm_fingerprint(table_schema || '.' || table_name)), 2147483648) as adrelid,\n"
             + "        ordinal_position as adnum,\n"
             + "        coalesce(column_default, generation_expression) as adbin\n"
             + "from information_schema.columns c\n"
@@ -788,7 +778,7 @@ public class PgCatalog {
     public static final String PG_CONSTRAINT_CTE =
         "pg_constraint as (\n"
             + "select\n"
-            + "    '''\"' || tc.constraint_schema || '\".\"' || tc.constraint_name || '\"''' as oid,\n"
+            + "    mod(abs(spanner.farm_fingerprint(tc.constraint_schema || '.' || tc.constraint_name)), 2147483648) as oid,\n"
             + "    tc.constraint_name as conname, 2200 as connamespace,\n"
             + "    case tc.constraint_type\n"
             + "        when 'PRIMARY KEY' then 'p'\n"
@@ -796,9 +786,9 @@ public class PgCatalog {
             + "        when 'FOREIGN KEY' then 'f'\n"
             + "        else ''\n"
             + "    end as contype, false as condeferrable, false as condeferred, true as convalidated,\n"
-            + "    '''\"' || tc.table_schema || '\".\"' || tc.table_name || '\"''' as conrelid,\n"
+            + "    mod(abs(spanner.farm_fingerprint(tc.table_schema || '.' || tc.table_name)), 2147483648) as conrelid,\n"
             + "    0::bigint as contypid, '0'::varchar as conindid, '0'::varchar as conparentid,\n"
-            + "    '''\"' || uc.table_schema || '\".\"' || uc.table_name || '\"''' as confrelid,\n"
+            + "    mod(abs(spanner.farm_fingerprint(uc.table_schema || '.' || uc.table_name)), 2147483648) as confrelid,\n"
             + "    case rc.update_rule\n"
             + "        when 'CASCADE' then 'c'\n"
             + "        when 'NO ACTION' then 'a'\n"
@@ -887,8 +877,8 @@ public class PgCatalog {
   public class PgIndex implements PgCatalogTable {
     public static final String PG_INDEX_CTE =
         "pg_index as (\n"
-            + "select '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as indexrelid,\n"
-            + "       '''\"' || i.table_schema || '\".\"' || i.table_name || '\"''' as indrelid,\n"
+            + "select mod(abs(spanner.farm_fingerprint(i.table_schema || '.' || i.table_name || '.' || i.index_name)), 2147483648) as indexrelid,\n"
+            + "       mod(abs(spanner.farm_fingerprint(i.table_schema || '.' || i.table_name)), 2147483648) as indrelid,\n"
             + "       count(1) as indnatts, sum(case ic.ordinal_position is null when true then 0 else 1 end) as indnkeyatts,\n"
             + "       i.is_unique='YES' as indisunique, i.is_unique='YES' and i.is_null_filtered='NO' as indnullsnotdistinct,\n"
             + "       i.index_type='PRIMARY_KEY' as indisprimary, false as indisexclusion, true as indimmediate,\n"
