@@ -39,7 +39,6 @@ import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.invoke.CallSite;
@@ -56,9 +55,12 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
-import org.apache.maven.model.Model;
-import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 /** Effectively this is the main class */
 public class Server {
@@ -373,15 +375,23 @@ public class Server {
     }
 
     try {
-      MavenXpp3Reader reader = new MavenXpp3Reader();
-      Model model = reader.read(new FileReader("pom.xml"));
-      if (model.getVersion() != null) {
-        return model.getVersion();
+      File pomFile = new File("pom.xml");
+      if (pomFile.exists()) {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(pomFile);
+        NodeList list = doc.getElementsByTagName("version");
+        for (int i = 0; i < list.getLength(); i++) {
+          Node node = list.item(i);
+          if (node.getParentNode().getNodeName().equals("project")) {
+            return node.getTextContent();
+          }
+        }
       }
     } catch (Exception e) {
       // ignore
     }
 
-    return "(unknown)";
+    return null;
   }
 }
