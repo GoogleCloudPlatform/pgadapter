@@ -1,7 +1,0 @@
-{
-  "noImplicitAny": false,
-  "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs"
-  },
-}
