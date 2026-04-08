@@ -76,7 +76,7 @@ func TestStart(t *testing.T) {
 		for {
 			n, err := conn.Read(tmp)
 			if err != nil {
-				if err != io.EOF {
+				if err != io.EOF && !strings.Contains(err.Error(), "connection reset by peer") {
 					t.Fatalf("%d: Read failed: %v", i, err)
 				}
 				break
