@@ -4,4 +4,4 @@ Django==5.2.13
 google==3.0.0
 google.auth==2.49.2
 testcontainers==4.14.1
-requests==2.33.0
+requests==2.33.1
