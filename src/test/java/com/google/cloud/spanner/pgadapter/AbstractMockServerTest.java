@@ -1465,6 +1465,7 @@ public abstract class AbstractMockServerTest {
     mockInstanceAdmin.reset();
     if (pgServer != null) {
       pgServer.clearDebugMessages();
+      pgServer.autoDescribedStatementsCache.invalidateAll();
     }
   }
 

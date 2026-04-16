@@ -69,8 +69,6 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
@@ -82,7 +80,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -120,12 +117,6 @@ public class ConnectionHandler implements Runnable {
   private final ProxyServer server;
   private Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
-  private final Cache<String, Future<DescribeResult>> autoDescribedStatementsCache =
-      CacheBuilder.newBuilder()
-          .expireAfterWrite(Duration.ofMinutes(30L))
-          .maximumSize(5000L)
-          .concurrencyLevel(1)
-          .build();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
   private Thread thread;
@@ -147,6 +138,7 @@ public class ConnectionHandler implements Runnable {
   private int invalidMessagesCount;
   private Connection spannerConnection;
   private DatabaseId databaseId;
+  private String databaseName;
   private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
   private boolean hasDeterminedClientUsingQuery;
 
@@ -285,6 +277,7 @@ public class ConnectionHandler implements Runnable {
     spannerConnection.setSavepointSupport(SavepointSupport.ENABLED);
     this.spannerConnection = spannerConnection;
     this.databaseId = connectionOptions.getDatabaseId();
+    this.databaseName = databaseId.getName();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
   }
 
@@ -818,12 +811,18 @@ public class ConnectionHandler implements Runnable {
    * in the cache.
    */
   public Future<DescribeResult> getAutoDescribedStatement(String sql) {
-    return this.autoDescribedStatementsCache.getIfPresent(sql);
+    if (this.databaseName == null) {
+      return null;
+    }
+    return this.server.autoDescribedStatementsCache.getIfPresent(this.databaseName + sql);
   }
 
   /** Stores the parameter types of an auto-described statement in the cache. */
   public void registerAutoDescribedStatement(String sql, Future<DescribeResult> describeResult) {
-    this.autoDescribedStatementsCache.put(sql, describeResult);
+    if (this.databaseName == null) {
+      return;
+    }
+    this.server.autoDescribedStatementsCache.put(this.databaseName + sql, describeResult);
   }
 
   private boolean shouldSkipForClientDetection(

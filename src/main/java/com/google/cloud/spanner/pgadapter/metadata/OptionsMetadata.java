@@ -117,6 +117,8 @@ public class OptionsMetadata {
     private String clientCertificate;
     private String clientKey;
     private boolean isExperimentalHost = false;
+    private Long describeCacheExpireMinutes;
+    private Long describeCacheMaxSize;
 
     Builder() {}
 
@@ -448,6 +450,22 @@ public class OptionsMetadata {
       return this;
     }
 
+    /**
+     * (Optional) The number of minutes that described statements are cached. Described statements
+     * are queries executed in PLAN mode to determine parameter types and metadata. Caching these
+     * results can improve performance by avoiding repeated PLAN executions. Defaults to 30 minutes.
+     */
+    public Builder setDescribeCacheExpireMinutes(long minutes) {
+      this.describeCacheExpireMinutes = minutes;
+      return this;
+    }
+
+    /** (Optional) The maximum number of described statements that are cached. Defaults to 5000. */
+    public Builder setDescribeCacheMaxSize(long maxSize) {
+      this.describeCacheMaxSize = maxSize;
+      return this;
+    }
+
     public OptionsMetadata build() {
       if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
         throw SpannerExceptionFactory.newSpannerException(
@@ -468,6 +486,13 @@ public class OptionsMetadata {
       ImmutableList.Builder<String> args = ImmutableList.builder();
       if (!Strings.isNullOrEmpty(project)) {
         addOption(args, OPTION_PROJECT_ID, project);
+      }
+      if (describeCacheExpireMinutes != null) {
+        addLongOption(
+            args, OPTION_DESCRIBE_CACHE_EXPIRE_MINUTES, String.valueOf(describeCacheExpireMinutes));
+      }
+      if (describeCacheMaxSize != null) {
+        addLongOption(args, OPTION_DESCRIBE_CACHE_MAX_SIZE, String.valueOf(describeCacheMaxSize));
       }
       if (!Strings.isNullOrEmpty(instance)) {
         addOption(args, OPTION_INSTANCE_ID, instance);
@@ -674,6 +699,11 @@ public class OptionsMetadata {
   private static final String OPTION_LOG_GRPC_MESSAGES = "log_grpc_messages";
   private static final String OPTION_ALLOW_SHUTDOWN_STATEMENT = "allow_shutdown_statement";
   private static final String OPTION_COMMAND = "cmd";
+  private static final String OPTION_DESCRIBE_CACHE_EXPIRE_MINUTES =
+      "describe_cache_expire_minutes";
+  private static final String OPTION_DESCRIBE_CACHE_MAX_SIZE = "describe_cache_max_size";
+  private static final long DEFAULT_DESCRIBE_CACHE_EXPIRE_MINUTES = 30L;
+  private static final long DEFAULT_DESCRIBE_CACHE_MAX_SIZE = 5000L;
 
   private final Map<String, String> environment;
   private final String osName;
@@ -708,6 +738,8 @@ public class OptionsMetadata {
   private final boolean logGrpcMessages;
   private final boolean allowShutdownStatement;
   private final String command;
+  private final long describeCacheExpireMinutes;
+  private final long describeCacheMaxSize;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -787,6 +819,8 @@ public class OptionsMetadata {
     this.proxyPort = buildProxyPort(commandLine);
     this.socketFile = buildSocketFile(commandLine);
     this.maxBacklog = buildMaxBacklog(commandLine);
+    this.describeCacheExpireMinutes = buildDescribeCacheExpireMinutes(commandLine);
+    this.describeCacheMaxSize = buildDescribeCacheMaxSize(commandLine);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
@@ -870,6 +904,8 @@ public class OptionsMetadata {
     this.proxyPort = proxyPort;
     this.socketFile = isWindows() ? "" : DEFAULT_SOCKET_DIR + File.separatorChar + SOCKET_FILE_NAME;
     this.maxBacklog = DEFAULT_MAX_BACKLOG;
+    this.describeCacheExpireMinutes = DEFAULT_DESCRIBE_CACHE_EXPIRE_MINUTES;
+    this.describeCacheMaxSize = DEFAULT_DESCRIBE_CACHE_MAX_SIZE;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
@@ -1011,6 +1047,33 @@ public class OptionsMetadata {
       throw new IllegalArgumentException("Max backlog must be greater than 0");
     }
     return backlog;
+  }
+
+  private long buildDescribeCacheExpireMinutes(CommandLine commandLine) {
+    long expireMinutes =
+        Long.parseLong(
+            commandLine
+                .getOptionValue(
+                    OPTION_DESCRIBE_CACHE_EXPIRE_MINUTES,
+                    String.valueOf(DEFAULT_DESCRIBE_CACHE_EXPIRE_MINUTES))
+                .trim());
+    if (expireMinutes <= 0) {
+      throw new IllegalArgumentException("Describe cache expire minutes must be greater than 0");
+    }
+    return expireMinutes;
+  }
+
+  private long buildDescribeCacheMaxSize(CommandLine commandLine) {
+    long maxSize =
+        Long.parseLong(
+            commandLine
+                .getOptionValue(
+                    OPTION_DESCRIBE_CACHE_MAX_SIZE, String.valueOf(DEFAULT_DESCRIBE_CACHE_MAX_SIZE))
+                .trim());
+    if (maxSize <= 0) {
+      throw new IllegalArgumentException("Describe cache max size must be greater than 0");
+    }
+    return maxSize;
   }
 
   /**
@@ -1292,6 +1355,20 @@ public class OptionsMetadata {
         "authenticate",
         false,
         "Whether you wish the proxy to perform an authentication step.");
+    options.addOption(
+        null,
+        OPTION_DESCRIBE_CACHE_EXPIRE_MINUTES,
+        true,
+        String.format(
+            "The number of minutes that described statements are cached. Defaults to %d.",
+            DEFAULT_DESCRIBE_CACHE_EXPIRE_MINUTES));
+    options.addOption(
+        null,
+        OPTION_DESCRIBE_CACHE_MAX_SIZE,
+        true,
+        String.format(
+            "The maximum number of described statements that are cached. Defaults to %d.",
+            DEFAULT_DESCRIBE_CACHE_MAX_SIZE));
     options.addOption(null, OPTION_ENABLE_OPEN_TELEMETRY, false, "Enable OpenTelemetry tracing.");
     options.addOption(
         null, OPTION_ENABLE_OPEN_TELEMETRY_METRICS, false, "Enable OpenTelemetry metrics.");
@@ -1671,6 +1748,14 @@ public class OptionsMetadata {
 
   public int getMaxBacklog() {
     return this.maxBacklog;
+  }
+
+  public long getDescribeCacheExpireMinutes() {
+    return this.describeCacheExpireMinutes;
+  }
+
+  public long getDescribeCacheMaxSize() {
+    return this.describeCacheMaxSize;
   }
 
   public TextFormat getTextFormat() {
