@@ -64,7 +64,7 @@ public class DeallocateStatement extends IntermediatePortalStatement {
 
   @Override
   public String getCommandTag() {
-    return "DEALLOCATE";
+    return deallocateStatement.name == null ? "DEALLOCATE ALL" : "DEALLOCATE";
   }
 
   @Override

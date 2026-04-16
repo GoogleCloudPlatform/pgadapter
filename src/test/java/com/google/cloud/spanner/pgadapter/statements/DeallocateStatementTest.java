@@ -18,8 +18,16 @@ import static com.google.cloud.spanner.pgadapter.statements.DeallocateStatement.
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -46,5 +54,23 @@ public class DeallocateStatementTest {
     assertThrows(PGException.class, () -> parse("deallocate prepare"));
     assertThrows(PGException.class, () -> parse("deallocate foo bar"));
     assertThrows(PGException.class, () -> parse("deallocate foo.bar"));
+  }
+
+  @Test
+  public void testGetCommandTag() {
+    assertEquals("DEALLOCATE", createStatement("deallocate foo").getCommandTag());
+    assertEquals("DEALLOCATE", createStatement("deallocate prepare foo").getCommandTag());
+    assertEquals("DEALLOCATE ALL", createStatement("deallocate all").getCommandTag());
+  }
+
+  private static DeallocateStatement createStatement(String sql) {
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(mock(ConnectionMetadata.class));
+    return new DeallocateStatement(
+        connectionHandler,
+        mock(OptionsMetadata.class),
+        "",
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(Statement.of(sql)),
+        Statement.of(sql));
   }
 }

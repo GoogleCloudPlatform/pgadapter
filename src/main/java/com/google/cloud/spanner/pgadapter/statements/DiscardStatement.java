@@ -70,7 +70,18 @@ public class DiscardStatement extends IntermediatePortalStatement {
 
   @Override
   public String getCommandTag() {
-    return "DISCARD";
+    switch (discardStatement.type) {
+      case ALL:
+        return "DISCARD ALL";
+      case PLANS:
+        return "DISCARD PLANS";
+      case SEQUENCES:
+        return "DISCARD SEQUENCES";
+      case TEMPORARY:
+        return "DISCARD TEMP";
+      default:
+        return "DISCARD";
+    }
   }
 
   @Override
