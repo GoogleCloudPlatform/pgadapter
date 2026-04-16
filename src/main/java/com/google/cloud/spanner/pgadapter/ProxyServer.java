@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.ThreadFactoryUtil;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
@@ -29,6 +30,8 @@ import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.wireprotocol.MessageReader;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Tracer;
@@ -39,6 +42,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -49,6 +53,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -70,6 +75,8 @@ public class ProxyServer extends AbstractApiService {
 
   @VisibleForTesting
   static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS = new ConcurrentHashMap<>();
+
+  final Cache<String, Future<DescribeResult>> autoDescribedStatementsCache;
 
   private final OptionsMetadata options;
   private final OpenTelemetry openTelemetry;
@@ -171,6 +178,13 @@ public class ProxyServer extends AbstractApiService {
       OptionsMetadata optionsMetadata, OpenTelemetry openTelemetry, Properties properties) {
     this.options = optionsMetadata;
     this.messageReader = new MessageReader(optionsMetadata);
+    this.autoDescribedStatementsCache =
+        CacheBuilder.newBuilder()
+            .expireAfterWrite(Duration.ofMinutes(optionsMetadata.getDescribeCacheExpireMinutes()))
+            .maximumSize(optionsMetadata.getDescribeCacheMaxSize())
+            .concurrencyLevel(1)
+            .build();
+
     this.openTelemetry = openTelemetry;
     this.metrics =
         optionsMetadata.isEnableOpenTelemetryMetrics()

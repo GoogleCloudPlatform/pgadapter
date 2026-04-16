@@ -1757,6 +1757,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
         mockSpanner.clearRequests();
       }
+      // Invalidate the described statement cache to get predictable results
+      // across multiple tests.
+      pgServer.autoDescribedStatementsCache.invalidateAll();
     }
   }
 

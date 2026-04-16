@@ -98,6 +98,34 @@ public class OptionsMetadataTest {
   }
 
   @Test
+  public void testDefaultDescribeCacheOptions() {
+    OptionsMetadata options =
+        new OptionsMetadata(new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
+    assertEquals(30L, options.getDescribeCacheExpireMinutes());
+    assertEquals(5000L, options.getDescribeCacheMaxSize());
+  }
+
+  @Test
+  public void testCustomDescribeCacheOptions() {
+    OptionsMetadata options =
+        new OptionsMetadata(
+            new String[] {
+              "-p",
+              "p",
+              "-i",
+              "i",
+              "-describe_cache_expire_minutes",
+              "10",
+              "-describe_cache_max_size",
+              "1000",
+              "-c",
+              "credentials.json"
+            });
+    assertEquals(10L, options.getDescribeCacheExpireMinutes());
+    assertEquals(1000L, options.getDescribeCacheMaxSize());
+  }
+
+  @Test
   public void testDatabaseName() {
     assertFalse(
         new OptionsMetadata(new String[] {"-c", "credentials.json"}).hasDefaultConnectionUrl());
