@@ -117,16 +117,16 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     for (int index = 0; index < this.parameters.length; index++) {
       short formatCode = getParameterFormatCode(index);
       int type = preparedStatement.getParameterDataType(index);
-      Parser<?> parser =
-          Parser.create(
-              connectionHandler
-                  .getExtendedQueryProtocolHandler()
-                  .getBackendConnection()
-                  .getSessionState(),
-              this.parameters[index],
-              type,
-              FormatCode.of(formatCode));
-      parser.bind(parametersBuilder, "p" + (index + 1));
+      Parser.bind(
+          parametersBuilder,
+          "p" + (index + 1),
+          this.parameters[index],
+          type,
+          FormatCode.of(formatCode),
+          connectionHandler
+              .getExtendedQueryProtocolHandler()
+              .getBackendConnection()
+              .getSessionState());
     }
     return Statement.of(statement.getSql(), parametersBuilder.build());
   }
