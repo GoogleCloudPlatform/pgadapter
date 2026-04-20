@@ -259,6 +259,25 @@ public abstract class Parser<T> {
     }
   }
 
+  /** Binds a parameter value to a statement builder without necessarily instantiating a parser. */
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      int oidType,
+      FormatCode formatCode,
+      SessionState sessionState) {
+    switch (oidType) {
+      case Oid.BOOL:
+      case Oid.BIT:
+        BooleanParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      default:
+        // Fallback to instance creation until all types are optimized with static bind methods.
+        create(sessionState, item, oidType, formatCode).bind(parametersBuilder, name);
+    }
+  }
+
   /**
    * Translates the given Cloud Spanner {@link Type} to a PostgreSQL OID constant.
    *

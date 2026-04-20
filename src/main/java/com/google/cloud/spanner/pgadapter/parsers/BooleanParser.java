@@ -63,18 +63,22 @@ public class BooleanParser extends Parser<Boolean> {
   }
 
   BooleanParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          String stringValue = new String(item, UTF8).toLowerCase(Locale.ENGLISH);
-          this.item = toBoolean(stringValue);
-          break;
-        case BINARY:
-          this.item = toBoolean(item);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toBoolean(item, formatCode);
+  }
+
+  /** Converts the given data to a boolean value based on the format code. */
+  public static Boolean toBoolean(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item, UTF8).toLowerCase(Locale.ENGLISH);
+        return toBoolean(stringValue);
+      case BINARY:
+        return toBoolean(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -138,6 +142,14 @@ public class BooleanParser extends Parser<Boolean> {
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, Value.bool(toBoolean(item, formatCode)));
   }
 
   @Override
