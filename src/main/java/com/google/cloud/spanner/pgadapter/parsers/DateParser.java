@@ -45,25 +45,27 @@ public class DateParser extends Parser<Date> {
   }
 
   DateParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          String stringValue = new String(item, UTF8);
-          // Use the first 10 characters of the date string, as the string might contain a timezone
-          // identifier, which is not supported by parseDate(String).
-          if (stringValue.length() >= 10) {
-            this.item = Date.parseDate(stringValue.substring(0, 10));
-          } else {
-            throw PGExceptionFactory.newPGException(
-                "Invalid date value: " + stringValue, SQLState.SyntaxError);
-          }
-          break;
-        case BINARY:
-          this.item = toDate(item);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toDate(item, formatCode);
+  }
+
+  /** Converts the given data to a {@link Date} based on the format code. */
+  public static Date toDate(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item, UTF8);
+        if (stringValue.length() >= 10) {
+          return Date.parseDate(stringValue.substring(0, 10));
+        } else {
+          throw PGExceptionFactory.newPGException(
+              "Invalid date value: " + stringValue, SQLState.SyntaxError);
+        }
+      case BINARY:
+        return toDate(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -176,6 +178,14 @@ public class DateParser extends Parser<Date> {
       throw new IllegalArgumentException("Date is out of range, epoch day=" + days);
     }
     return (int) days;
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, Value.date(toDate(item, formatCode)));
   }
 
   @Override

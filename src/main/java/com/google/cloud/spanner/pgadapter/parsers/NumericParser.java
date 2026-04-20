@@ -44,17 +44,21 @@ public class NumericParser extends Parser<String> {
   }
 
   NumericParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          this.item = new String(item);
-          break;
-        case BINARY:
-          this.item = toNumericString(item);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toNumericString(item, formatCode);
+  }
+
+  /** Converts the given data to a string representation of the numeric value. */
+  public static String toNumericString(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        return new String(item);
+      case BINARY:
+        return toNumericString(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -106,6 +110,14 @@ public class NumericParser extends Parser<String> {
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, Value.pgNumeric(toNumericString(item, formatCode)));
   }
 
   @Override

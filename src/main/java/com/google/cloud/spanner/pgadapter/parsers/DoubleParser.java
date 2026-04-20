@@ -44,18 +44,22 @@ public class DoubleParser extends Parser<Double> {
   }
 
   DoubleParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          String stringValue = new String(item, StandardCharsets.UTF_8);
-          this.item = parseDouble(stringValue);
-          break;
-        case BINARY:
-          this.item = toDouble(item);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toDouble(item, formatCode);
+  }
+
+  /** Converts the given data to a double based on the format code. */
+  public static Double toDouble(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item, StandardCharsets.UTF_8);
+        return parseDouble(stringValue);
+      case BINARY:
+        return toDouble(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -101,6 +105,14 @@ public class DoubleParser extends Parser<Double> {
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, toValue(toDouble(item, formatCode)));
   }
 
   @Override

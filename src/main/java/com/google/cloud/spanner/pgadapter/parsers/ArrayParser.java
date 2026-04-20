@@ -345,76 +345,112 @@ public class ArrayParser extends Parser<List<?>> {
     }
   }
 
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      int oidType,
+      FormatCode formatCode,
+      SessionState sessionState) {
+    int elementOid = Parser.getArrayElementOid(oidType);
+    List<?> list;
+    if (item == null) {
+      list = null;
+    } else {
+      switch (formatCode) {
+        case TEXT:
+          list =
+              stringArrayToList(
+                  new String(item, StandardCharsets.UTF_8), elementOid, sessionState, false);
+          break;
+        case BINARY:
+          list = binaryArrayToList(item, false);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
+    }
+    bind(parametersBuilder, name, list, elementOid);
+  }
+
   @SuppressWarnings("unchecked")
-  @Override
-  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      List<?> list,
+      int elementOid) {
     switch (elementOid) {
       case Oid.BIT:
       case Oid.BOOL:
-        parametersBuilder.put(name, Value.boolArray((List<Boolean>) this.item));
+        parametersBuilder.put(name, Value.boolArray((List<Boolean>) list));
         break;
       case Oid.INT2:
-        if (this.item == null) {
+        if (list == null) {
           parametersBuilder.put(name, Value.int64Array((long[]) null));
         } else {
           parametersBuilder.put(
               name,
               Value.int64Array(
-                  ((List<Short>) this.item)
+                  ((List<Short>) list)
                       .stream()
                           .map(s -> s == null ? null : s.longValue())
                           .collect(Collectors.toList())));
         }
         break;
       case Oid.INT4:
-        if (this.item == null) {
+        if (list == null) {
           parametersBuilder.put(name, Value.int64Array((long[]) null));
         } else {
           parametersBuilder.put(
               name,
               Value.int64Array(
-                  ((List<Integer>) this.item)
+                  ((List<Integer>) list)
                       .stream()
                           .map(i -> i == null ? null : i.longValue())
                           .collect(Collectors.toList())));
         }
         break;
       case Oid.INT8:
-        parametersBuilder.put(name, Value.int64Array((List<Long>) this.item));
+        parametersBuilder.put(name, Value.int64Array((List<Long>) list));
         break;
       case Oid.OID:
-        parametersBuilder.put(name, Value.pgOidArray((List<Long>) this.item));
+        parametersBuilder.put(name, Value.pgOidArray((List<Long>) list));
         break;
       case Oid.NUMERIC:
-        parametersBuilder.put(name, Value.pgNumericArray((List<String>) this.item));
+        parametersBuilder.put(name, Value.pgNumericArray((List<String>) list));
         break;
       case Oid.FLOAT4:
-        parametersBuilder.put(name, Value.float32Array((List<Float>) this.item));
+        parametersBuilder.put(name, Value.float32Array((List<Float>) list));
         break;
       case Oid.FLOAT8:
-        parametersBuilder.put(name, Value.float64Array((List<Double>) this.item));
+        parametersBuilder.put(name, Value.float64Array((List<Double>) list));
         break;
       case Oid.UUID:
       case Oid.VARCHAR:
       case Oid.TEXT:
-        parametersBuilder.put(name, Value.stringArray((List<String>) this.item));
+        parametersBuilder.put(name, Value.stringArray((List<String>) list));
         break;
       case Oid.JSONB:
-        parametersBuilder.put(name, Value.pgJsonbArray((List<String>) this.item));
+        parametersBuilder.put(name, Value.pgJsonbArray((List<String>) list));
         break;
       case Oid.BYTEA:
-        parametersBuilder.put(name, Value.bytesArray((List<ByteArray>) this.item));
+        parametersBuilder.put(name, Value.bytesArray((List<ByteArray>) list));
         break;
       case Oid.TIMESTAMPTZ:
       case Oid.TIMESTAMP:
-        parametersBuilder.put(name, Value.timestampArray((List<Timestamp>) this.item));
+        parametersBuilder.put(name, Value.timestampArray((List<Timestamp>) list));
         break;
       case Oid.DATE:
-        parametersBuilder.put(name, Value.dateArray((List<Date>) this.item));
+        parametersBuilder.put(name, Value.dateArray((List<Date>) list));
         break;
       default:
         throw PGExceptionFactory.newPGException(
-            "Unsupported array element type: " + arrayElementType, SQLState.InvalidParameterValue);
+            "Unsupported array element type: " + elementOid, SQLState.InvalidParameterValue);
     }
+  }
+
+  @Override
+  public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
+    bind(parametersBuilder, name, this.item, this.elementOid);
   }
 }

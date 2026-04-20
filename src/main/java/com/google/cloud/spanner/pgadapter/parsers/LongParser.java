@@ -45,24 +45,27 @@ public class LongParser extends Parser<Long> {
   }
 
   LongParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          String stringValue = new String(item);
-          try {
-            this.item =
-                new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).longValueExact();
-          } catch (Exception exception) {
-            throw PGExceptionFactory.newPGException(
-                "Invalid int8 value: " + stringValue, SQLState.SyntaxError);
-          }
-          break;
-        case BINARY:
-          this.item = toLong(item);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toLong(item, formatCode);
+  }
+
+  /** Converts the given data to a long based on the format code. */
+  public static Long toLong(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item);
+        try {
+          return new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).longValueExact();
+        } catch (Exception exception) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid int8 value: " + stringValue, SQLState.SyntaxError);
+        }
+      case BINARY:
+        return toLong(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -139,6 +142,14 @@ public class LongParser extends Parser<Long> {
       return ((ProtobufResultSet) resultSet).getProtobufValue(column).getStringValue();
     }
     return Long.toString(resultSet.getLong(column));
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, Value.int64(toLong(item, formatCode)));
   }
 
   @Override

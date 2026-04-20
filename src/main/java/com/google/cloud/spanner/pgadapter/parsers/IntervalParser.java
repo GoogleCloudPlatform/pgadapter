@@ -65,17 +65,21 @@ public class IntervalParser extends Parser<Interval> {
   }
 
   IntervalParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          this.item = toInterval(new String(item, StandardCharsets.UTF_8));
-          break;
-        case BINARY:
-          this.item = toInterval(item);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toInterval(item, formatCode);
+  }
+
+  /** Converts the given data to an {@link Interval} based on the format code. */
+  public static Interval toInterval(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        return toInterval(new String(item, StandardCharsets.UTF_8));
+      case BINARY:
+        return toInterval(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -174,6 +178,14 @@ public class IntervalParser extends Parser<Interval> {
         minutes[0],
         seconds[0],
         micros);
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, Value.interval(toInterval(item, formatCode)));
   }
 
   @Override

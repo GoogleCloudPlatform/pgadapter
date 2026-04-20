@@ -115,6 +115,14 @@ public class StringParser extends Parser<String> {
     }
   }
 
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, Value.string(item == null ? null : toString(item)));
+  }
+
   @Override
   public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
     parametersBuilder.put(name, Value.string(this.item));
