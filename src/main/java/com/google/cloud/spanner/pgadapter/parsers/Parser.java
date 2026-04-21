@@ -272,6 +272,68 @@ public abstract class Parser<T> {
       case Oid.BIT:
         BooleanParser.bind(parametersBuilder, name, item, formatCode);
         break;
+      case Oid.BYTEA:
+      case Oid.BIT_ARRAY:
+        BinaryParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.DATE:
+        DateParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.FLOAT4:
+        FloatParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.FLOAT8:
+        DoubleParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.INT8:
+      case Oid.OID:
+        LongParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.INT2:
+        ShortParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.INT4:
+        IntegerParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.NUMERIC:
+        NumericParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.TEXT:
+      case Oid.VARCHAR:
+        StringParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.UUID:
+        UuidParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.TIMESTAMP:
+      case Oid.TIMESTAMPTZ:
+        TimestampParser.bind(parametersBuilder, name, item, formatCode, sessionState);
+        break;
+      case Oid.INTERVAL:
+        IntervalParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.JSONB:
+        JsonbParser.bind(parametersBuilder, name, item, formatCode);
+        break;
+      case Oid.BOOL_ARRAY:
+      case Oid.BYTEA_ARRAY:
+      case Oid.DATE_ARRAY:
+      case Oid.FLOAT4_ARRAY:
+      case Oid.FLOAT8_ARRAY:
+      case Oid.INT2_ARRAY:
+      case Oid.INT4_ARRAY:
+      case Oid.INT8_ARRAY:
+      case Oid.OID_ARRAY:
+      case Oid.NUMERIC_ARRAY:
+      case Oid.TEXT_ARRAY:
+      case Oid.VARCHAR_ARRAY:
+      case Oid.UUID_ARRAY:
+      case Oid.TIMESTAMP_ARRAY:
+      case Oid.TIMESTAMPTZ_ARRAY:
+      case Oid.INTERVAL_ARRAY:
+      case Oid.JSONB_ARRAY:
+        ArrayParser.bind(parametersBuilder, name, item, oidType, formatCode, sessionState);
+        break;
       default:
         // Fallback to instance creation until all types are optimized with static bind methods.
         create(sessionState, item, oidType, formatCode).bind(parametersBuilder, name);

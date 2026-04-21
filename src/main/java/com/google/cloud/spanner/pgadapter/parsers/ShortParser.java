@@ -30,24 +30,27 @@ class ShortParser extends Parser<Short> {
   }
 
   ShortParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          String stringValue = new String(item);
-          try {
-            this.item =
-                new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).shortValueExact();
-          } catch (Exception exception) {
-            throw PGExceptionFactory.newPGException(
-                "Invalid int2 value: " + stringValue, SQLState.SyntaxError);
-          }
-          break;
-        case BINARY:
-          this.item = ByteConverter.int2(item, 0);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toShort(item, formatCode);
+  }
+
+  /** Converts the given data to a short based on the format code. */
+  public static Short toShort(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item);
+        try {
+          return new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).shortValueExact();
+        } catch (Exception exception) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid int2 value: " + stringValue, SQLState.SyntaxError);
+        }
+      case BINARY:
+        return ByteConverter.int2(item, 0);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -65,6 +68,15 @@ class ShortParser extends Parser<Short> {
     byte[] result = new byte[2];
     ByteConverter.int2(result, 0, value);
     return result;
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    Short value = toShort(item, formatCode);
+    parametersBuilder.put(name, Value.int64(value == null ? null : value.longValue()));
   }
 
   @Override

@@ -40,16 +40,19 @@ public class UuidParser extends Parser<UUID> {
   }
 
   UuidParser(byte[] item, FormatCode formatCode) {
+    this.item = toUuid(item, formatCode);
+  }
+
+  /** Converts the given data to a UUID based on the format code. */
+  public static UUID toUuid(byte[] item, FormatCode formatCode) {
     switch (formatCode) {
       case TEXT:
-        this.item =
-            item == null ? null : verifyStringValue(new String(item, StandardCharsets.UTF_8));
-        break;
+        return item == null ? null : verifyStringValue(new String(item, StandardCharsets.UTF_8));
       case BINARY:
-        this.item = verifyBinaryValue(item);
-        break;
+        return verifyBinaryValue(item);
       default:
         handleInvalidFormat(formatCode);
+        return null;
     }
   }
 
@@ -131,6 +134,20 @@ public class UuidParser extends Parser<UUID> {
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    UUID uuid = toUuid(item, formatCode);
+    parametersBuilder.put(
+        name,
+        uuid == null
+            ? NULL_VALUE
+            : Value.untyped(
+                com.google.protobuf.Value.newBuilder().setStringValue(uuid.toString()).build()));
   }
 
   @Override

@@ -50,23 +50,27 @@ public class BinaryParser extends Parser<ByteArray> {
   }
 
   BinaryParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          try {
-            this.item = ByteArray.copyFrom(PGbytea.toBytes(item));
-            break;
-          } catch (Exception exception) {
-            throw PGExceptionFactory.newPGException(
-                "Invalid binary value: " + new String(item, StandardCharsets.UTF_8),
-                SQLState.SyntaxError);
-          }
-        case BINARY:
-          this.item = toByteArray(item);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toByteArray(item, formatCode);
+  }
+
+  /** Converts the given data to a {@link ByteArray} based on the format code. */
+  public static ByteArray toByteArray(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        try {
+          return ByteArray.copyFrom(PGbytea.toBytes(item));
+        } catch (Exception exception) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid binary value: " + new String(item, StandardCharsets.UTF_8),
+              SQLState.SyntaxError);
+        }
+      case BINARY:
+        return toByteArray(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -180,6 +184,14 @@ public class BinaryParser extends Parser<ByteArray> {
       length += 2;
     }
     return length;
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, Value.bytes(toByteArray(item, formatCode)));
   }
 
   @Override

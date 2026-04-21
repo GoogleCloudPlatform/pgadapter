@@ -56,6 +56,21 @@ class UnspecifiedParser extends Parser<Value> {
         : this.item.getString().getBytes(StandardCharsets.UTF_8);
   }
 
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(
+        name,
+        item == null
+            ? NULL_VALUE
+            : Value.untyped(
+                com.google.protobuf.Value.newBuilder()
+                    .setStringValue(new String(item, StandardCharsets.UTF_8))
+                    .build()));
+  }
+
   @Override
   public void bind(ImmutableMap.Builder<String, Value> parametersBuilder, String name) {
     parametersBuilder.put(name, this.item == null ? NULL_VALUE : this.item);

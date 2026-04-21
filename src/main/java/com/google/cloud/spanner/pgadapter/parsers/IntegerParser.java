@@ -35,24 +35,27 @@ class IntegerParser extends Parser<Integer> {
   }
 
   IntegerParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          String stringValue = new String(item);
-          try {
-            this.item =
-                new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).intValueExact();
-          } catch (Exception exception) {
-            throw PGExceptionFactory.newPGException(
-                "Invalid int4 value: " + stringValue, SQLState.SyntaxError);
-          }
-          break;
-        case BINARY:
-          this.item = ByteConverter.int4(item, 0);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toInteger(item, formatCode);
+  }
+
+  /** Converts the given data to an integer based on the format code. */
+  public static Integer toInteger(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item);
+        try {
+          return new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).intValueExact();
+        } catch (Exception exception) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid int4 value: " + stringValue, SQLState.SyntaxError);
+        }
+      case BINARY:
+        return ByteConverter.int4(item, 0);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -70,6 +73,15 @@ class IntegerParser extends Parser<Integer> {
     byte[] result = new byte[4];
     ByteConverter.int4(result, 0, value);
     return result;
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    Integer value = toInteger(item, formatCode);
+    parametersBuilder.put(name, Value.int64(value == null ? null : value.longValue()));
   }
 
   @Override

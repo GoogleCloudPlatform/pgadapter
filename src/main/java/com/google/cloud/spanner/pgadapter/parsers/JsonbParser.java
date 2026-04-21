@@ -43,16 +43,21 @@ public class JsonbParser extends Parser<String> {
   }
 
   JsonbParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          this.item = new String(item, UTF8);
-          break;
-        case BINARY:
-          this.item = toString(item);
-          break;
-        default:
-      }
+    this.item = toJsonbString(item, formatCode);
+  }
+
+  /** Converts the given data to a jsonb string based on the format code. */
+  public static String toJsonbString(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        return new String(item, UTF8);
+      case BINARY:
+        return toString(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -124,6 +129,14 @@ public class JsonbParser extends Parser<String> {
       return ((ProtobufResultSet) resultSet).getProtobufValue(column).getStringValue();
     }
     return resultSet.getPgJsonb(column);
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, Value.pgJsonb(toJsonbString(item, formatCode)));
   }
 
   @Override

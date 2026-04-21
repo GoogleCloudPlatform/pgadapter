@@ -95,18 +95,22 @@ public class TimestampParser extends Parser<Timestamp> {
 
   TimestampParser(byte[] item, FormatCode formatCode, SessionState sessionState) {
     this.sessionState = sessionState;
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          this.item =
-              toTimestamp(new String(item, StandardCharsets.UTF_8), sessionState.getTimezone());
-          break;
-        case BINARY:
-          this.item = toTimestamp(item);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toTimestamp(item, formatCode, sessionState);
+  }
+
+  /** Converts the given data to a {@link Timestamp} based on the format code. */
+  public static Timestamp toTimestamp(
+      byte[] item, FormatCode formatCode, SessionState sessionState) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        return toTimestamp(new String(item, StandardCharsets.UTF_8), sessionState.getTimezone());
+      case BINARY:
+        return toTimestamp(item);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -243,6 +247,15 @@ public class TimestampParser extends Parser<Timestamp> {
         OffsetDateTime.ofInstant(
             Instant.ofEpochSecond(value.getSeconds(), value.getNanos()), zoneId);
     return TIMESTAMP_OUTPUT_FORMATTER.format(offsetDateTime);
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode,
+      SessionState sessionState) {
+    parametersBuilder.put(name, Value.timestamp(toTimestamp(item, formatCode, sessionState)));
   }
 
   @Override

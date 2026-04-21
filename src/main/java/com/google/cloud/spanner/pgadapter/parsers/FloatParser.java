@@ -42,18 +42,26 @@ public class FloatParser extends Parser<Float> {
   }
 
   FloatParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      switch (formatCode) {
-        case TEXT:
-          String stringValue = new String(item);
-          this.item = parseFloat(stringValue);
-          break;
-        case BINARY:
-          this.item = ByteConverter.float4(item, 0);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported format: " + formatCode);
-      }
+    this.item = toFloat(item, formatCode);
+  }
+
+  /** Converts the given data to a float based on the format code. */
+  public static Float toFloat(byte[] item, FormatCode formatCode) {
+    if (item == null) {
+      return null;
+    }
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item);
+        return parseFloat(stringValue);
+      case BINARY:
+        if (item.length < 4) {
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT, "Invalid length for float4: " + item.length);
+        }
+        return ByteConverter.float4(item, 0);
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
   }
 
@@ -98,6 +106,14 @@ public class FloatParser extends Parser<Float> {
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
+  }
+
+  public static void bind(
+      ImmutableMap.Builder<String, Value> parametersBuilder,
+      String name,
+      byte[] item,
+      FormatCode formatCode) {
+    parametersBuilder.put(name, toValue(toFloat(item, formatCode)));
   }
 
   @Override
