@@ -788,7 +788,7 @@ func TestDdlBatchInTransaction(connString string) *C.char {
 		return C.CString("missing expected error for DDL batch in transaction")
 	}
 	// The batch execution should return an error indicating that DDL batches are not supported in transactions.
-	if g, w := err.Error(), "ERROR: DDL statements are not allowed in mixed batches or transactions. (SQLSTATE 25000)"; g != w {
+	if g, w := err.Error(), "error preprocessing batch (prepare): ERROR: DDL statements are not allowed in mixed batches or transactions. (SQLSTATE 25000)"; g != w {
 		return C.CString(fmt.Sprintf("error mismatch\n Got: %v\nWant: %v", g, w))
 	}
 
