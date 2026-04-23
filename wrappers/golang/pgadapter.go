@@ -29,7 +29,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/oauth2/google"
@@ -668,7 +668,7 @@ func startDocker(ctx context.Context, config Config) (pgadapter *PGAdapter, err 
 	if err != nil {
 		return pgadapter, err
 	}
-	pgadapter.port = mappedPort.Int()
+	pgadapter.port = int(mappedPort.Num())
 	// Wait for PGAdapter to start.
 	if err := waitForPort(pgadapter.port, 50*time.Millisecond, 50*time.Millisecond, 100); err != nil {
 		return nil, err

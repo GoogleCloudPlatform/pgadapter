@@ -16,7 +16,7 @@ package pgadapter
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"os"
 	"time"
 
@@ -98,7 +98,7 @@ func StartPGAdapterWithCredentials(ctx context.Context, project, instance string
 		return 0, stopPGAdapter, err
 	}
 	time.Sleep(time.Second)
-	return mappedPort.Int(), stopPGAdapter, nil
+	return int(mappedPort.Num()), stopPGAdapter, nil
 }
 
 // stopPGAdapter stops the PGAdapter Docker container.
