@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
@@ -41,7 +41,7 @@ func TestSamples(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get mapped port: %v", err)
 	}
-	port := mappedPort.Int()
+	port := int(mappedPort.Num())
 
 	db := "example-db"
 	if err := samples.CreateTables(host, port, db); err != nil {
