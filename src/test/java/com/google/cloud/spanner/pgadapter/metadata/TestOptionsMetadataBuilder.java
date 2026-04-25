@@ -24,6 +24,11 @@ public class TestOptionsMetadataBuilder extends OptionsMetadata.Builder {
     return this;
   }
 
+  public TestOptionsMetadataBuilder disableDebugMode() {
+    setDebugMode(false);
+    return this;
+  }
+
   @Override
   public TestOptionsMetadataBuilder setEndpoint(String endpoint) {
     super.setEndpoint(endpoint);

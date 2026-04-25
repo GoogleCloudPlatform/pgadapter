@@ -409,6 +409,11 @@ public class OptionsMetadata {
       return this;
     }
 
+    Builder setDebugMode(boolean debugMode) {
+      this.debugMode = debugMode;
+      return this;
+    }
+
     Builder setEndpoint(String endpoint) {
       this.endpoint = endpoint;
       return this;
