@@ -42,19 +42,18 @@ import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 
 /** Utility class for converting between generic PostgreSQL conversions. */
 @InternalApi
 public class Converter implements AutoCloseable {
   private final ByteArrayOutputStream buffer = new ByteArrayOutputStream(256);
   private final DataOutputStream outputStream = new DataOutputStream(buffer);
-  private final IntermediateStatement statement;
-  private final QueryMode mode;
-  private final OptionsMetadata options;
   private final ResultSet resultSet;
   private final SessionState sessionState;
   private boolean includeBinaryCopyHeaderInFirstRow;
   private boolean firstRow = true;
+  private final DataFormat[] columnFormats;
 
   public Converter(
       IntermediateStatement statement,
@@ -62,9 +61,6 @@ public class Converter implements AutoCloseable {
       OptionsMetadata options,
       ResultSet resultSet,
       boolean includeBinaryCopyHeaderInFirstRow) {
-    this.statement = statement;
-    this.mode = mode;
-    this.options = options;
     this.resultSet = resultSet;
     this.sessionState =
         statement
@@ -73,6 +69,18 @@ public class Converter implements AutoCloseable {
             .getBackendConnection()
             .getSessionState();
     this.includeBinaryCopyHeaderInFirstRow = includeBinaryCopyHeaderInFirstRow;
+    this.columnFormats = new DataFormat[resultSet.getColumnCount()];
+    if (statement instanceof CopyToStatement) {
+      DataFormat fixedFormat =
+          ((CopyToStatement) statement).isBinary()
+              ? DataFormat.POSTGRESQL_BINARY
+              : DataFormat.POSTGRESQL_TEXT;
+      Arrays.fill(this.columnFormats, fixedFormat);
+    } else {
+      for (int i = 0; i < resultSet.getColumnCount(); i++) {
+        this.columnFormats[i] = DataFormat.getDataFormat(i, statement, mode, options);
+      }
+    }
   }
 
   public Converter includeBinaryCopyHeader() {
@@ -95,13 +103,6 @@ public class Converter implements AutoCloseable {
   }
 
   public int convertResultSetRowToDataRowResponse() throws IOException {
-    DataFormat fixedFormat = null;
-    if (statement instanceof CopyToStatement) {
-      fixedFormat =
-          ((CopyToStatement) statement).isBinary()
-              ? DataFormat.POSTGRESQL_BINARY
-              : DataFormat.POSTGRESQL_TEXT;
-    }
     buffer.reset();
     if (includeBinaryCopyHeaderInFirstRow && firstRow) {
       outputStream.write(COPY_BINARY_HEADER);
@@ -116,10 +117,7 @@ public class Converter implements AutoCloseable {
       if (resultSet.isNull(column_index)) {
         outputStream.writeInt(-1);
       } else {
-        DataFormat format =
-            fixedFormat == null
-                ? DataFormat.getDataFormat(column_index, statement, mode, options)
-                : fixedFormat;
+        DataFormat format = this.columnFormats[column_index];
         byte[] column =
             Converter.convertToPG(outputStream, this.resultSet, column_index, format, sessionState);
         // TODO: Remove this if statement and write statements once all data types are written
