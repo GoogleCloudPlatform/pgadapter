@@ -5,10 +5,11 @@ go 1.25.0
 toolchain go1.26.2
 
 require (
-	cloud.google.com/go/spanner v1.90.0
+	cloud.google.com/go/spanner v1.91.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/moby/moby/api v1.54.1
 	github.com/montanaflynn/stats v0.9.0
 	github.com/testcontainers/testcontainers-go v0.42.0
 	golang.org/x/oauth2 v0.36.0
@@ -65,7 +66,6 @@ require (
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
-	github.com/moby/moby/api v1.54.1 // indirect
 	github.com/moby/moby/client v0.4.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
