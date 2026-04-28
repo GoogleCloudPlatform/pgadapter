@@ -30,6 +30,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
@@ -38,12 +39,20 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 /**
  * Benchmarks for PGAdapter using the in-process mock Spanner server. This class is named without
  * the 'Test' suffix to prevent it from running automatically during standard unit test execution.
+ *
+ * <p>This benchmark is intentionally single-threaded. Its intended use is to measure CPU and memory
+ * usage of PGAdapter in a controlled single-threaded environment. It is not intended to measure
+ * throughput or scalability.
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
-public class MockServerBenchmark extends AbstractMockServerTest {
+public class SingleThreadedMockServerBenchmark extends AbstractMockServerTest {
 
+  /**
+   * The single connection that is used for all benchmarks. Note that this makes this benchmark
+   * single-threaded by design.
+   */
   private Connection connection;
 
   private static com.google.cloud.spanner.MockSpannerServiceImpl
@@ -294,53 +303,54 @@ public class MockServerBenchmark extends AbstractMockServerTest {
   }
 
   @Benchmark
-  public void testSelectOneRowWithParam(ParameterState state) throws SQLException {
+  public void testSelectOneRowWithParam(ParameterState state, Blackhole blackhole)
+      throws SQLException {
     try (java.sql.PreparedStatement statement =
         connection.prepareStatement("SELECT * FROM all_types WHERE col_bigint = ?")) {
       statement.setLong(1, state.nextValue());
       try (ResultSet resultSet = statement.executeQuery()) {
         while (resultSet.next()) {
           // Consume result set
-          resultSet.getLong(1);
+          blackhole.consume(resultSet.getLong(1));
         }
       }
     }
   }
 
   @Benchmark
-  public void testSelect1() throws SQLException {
+  public void testSelect1(Blackhole blackhole) throws SQLException {
     try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
       while (resultSet.next()) {
         // Consume result set
-        resultSet.getLong(1);
+        blackhole.consume(resultSet.getLong(1));
       }
     }
   }
 
   @Benchmark
-  public void testSelectFiveRows() throws SQLException {
+  public void testSelectFiveRows(Blackhole blackhole) throws SQLException {
     try (ResultSet resultSet =
         connection.createStatement().executeQuery("SELECT * FROM TableWithFiveRows")) {
       while (resultSet.next()) {
         // Consume result set
-        resultSet.getString(1);
+        blackhole.consume(resultSet.getString(1));
       }
     }
   }
 
   @Benchmark
-  public void testSelectLargeResultSet() throws SQLException {
+  public void testSelectLargeResultSet(Blackhole blackhole) throws SQLException {
     try (ResultSet resultSet =
         connection.createStatement().executeQuery("SELECT * FROM large_table")) {
       while (resultSet.next()) {
         // Consume result set
-        resultSet.getString(1);
+        blackhole.consume(resultSet.getString(1));
       }
     }
   }
 
   @Benchmark
-  public void testReadWriteTransaction() throws SQLException {
+  public void testReadWriteTransaction(Blackhole blackhole) throws SQLException {
     connection.setAutoCommit(false);
     try {
       try (java.sql.PreparedStatement statement =
@@ -348,7 +358,7 @@ public class MockServerBenchmark extends AbstractMockServerTest {
         statement.setLong(1, 1L);
         try (ResultSet resultSet = statement.executeQuery()) {
           while (resultSet.next()) {
-            /* consume */
+            blackhole.consume(resultSet.getLong(1));
           }
         }
       }
@@ -363,7 +373,7 @@ public class MockServerBenchmark extends AbstractMockServerTest {
         statement.setLong(1, 2L);
         try (ResultSet resultSet = statement.executeQuery()) {
           while (resultSet.next()) {
-            /* consume */
+            blackhole.consume(resultSet.getLong(1));
           }
         }
       }
@@ -391,7 +401,7 @@ public class MockServerBenchmark extends AbstractMockServerTest {
     // Touch file to force recompilation and JMH generation
     Options opt =
         new OptionsBuilder()
-            .include(MockServerBenchmark.class.getName())
+            .include(SingleThreadedMockServerBenchmark.class.getName())
             .addProfiler(GCProfiler.class)
             .forks(1)
             .warmupIterations(2)
