@@ -19,6 +19,8 @@ cloud.google.com/go/monitoring v1.25.0 h1:HnsTIOxTN6BCSkt1P/Im23r1m7MHTTpmSYCzPk
 cloud.google.com/go/monitoring v1.25.0/go.mod h1:wlj6rX+JGyusw/8+2duW4cJ6kmDHGmde3zMTJuG3Jpc=
 cloud.google.com/go/spanner v1.90.0 h1:tVUzYI9IZJY1SDvCmCzyuLoaAyotZgiyQq6go+lNH5A=
 cloud.google.com/go/spanner v1.90.0/go.mod h1:8NB5a7qgwIhGD19Ly+vkpKffPL78vIG9RcrgsuREha0=
+cloud.google.com/go/spanner v1.91.0 h1:XwXfcZ0kc1NT9Uu2IsThFiWtYptB+WgLn/KZEZcyzRg=
+cloud.google.com/go/spanner v1.91.0/go.mod h1:8NB5a7qgwIhGD19Ly+vkpKffPL78vIG9RcrgsuREha0=
 dario.cat/mergo v1.0.2 h1:85+piFYR1tMbRrLcDwR18y4UKJ3aH1Tbzi24VRW1TK8=
 dario.cat/mergo v1.0.2/go.mod h1:E/hbnu0NxMFBjpMIE34DRGLWqDy0g5FuKDhCb31ngxA=
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 h1:He8afgbRMd7mFxO99hRNu+6tazq8nFF9lIwo9JFroBk=
