@@ -452,13 +452,8 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     }
 
     // The statement is sent only once to the mock server in simple query mode.
-    // But as the statement uses a JSONB parameter, the JDBC driver will execute a query to verify
-    // that the type is available.
-    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    ExecuteSqlRequest jsonbRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
-    assertEquals(SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL.getSql(), jsonbRequest.getSql());
-
-    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
     assertEquals(QueryMode.NORMAL, request.getQueryMode());
     assertEquals(pgSql, request.getSql());
     assertTrue(request.getTransaction().hasSingleUse());
