@@ -707,7 +707,11 @@ public class OptionsMetadata {
   private static final String OPTION_DESCRIBE_CACHE_EXPIRE_MINUTES =
       "describe_cache_expire_minutes";
   private static final String OPTION_DESCRIBE_CACHE_MAX_SIZE = "describe_cache_max_size";
-  private static final long DEFAULT_DESCRIBE_CACHE_EXPIRE_MINUTES = 30L;
+  // The default for this cache is not to expire elements. The reason is that the values in this
+  // cache would only be invalidated if the datatype of an existing column would change, which is
+  // highly unlikely to occur for a production system.
+  private static final long DEFAULT_DESCRIBE_CACHE_EXPIRE_MINUTES =
+      Duration.ofSeconds(Long.MAX_VALUE).toMinutes();
   private static final long DEFAULT_DESCRIBE_CACHE_MAX_SIZE = 5000L;
 
   private final Map<String, String> environment;
