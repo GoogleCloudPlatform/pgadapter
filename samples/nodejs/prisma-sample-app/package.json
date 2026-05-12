@@ -16,7 +16,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@prisma/client": "^6.5.0",
+    "@prisma/client": "^7.0.0",
     "yargs": "^17.5.1",
     "testcontainers": "^11.0.0"
   }
