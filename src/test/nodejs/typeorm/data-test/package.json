@@ -9,7 +9,7 @@
       "typescript": "6.0.3"
    },
    "dependencies": {
-      "typeorm": "0.3.28",
+      "typeorm": "0.3.30",
       "reflect-metadata": "^0.2.1",
       "pg": "^8.9.0",
       "yargs": "^17.5.1"
