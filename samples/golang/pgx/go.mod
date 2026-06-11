@@ -6,7 +6,7 @@ toolchain go1.26.2
 
 require (
 	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.0.0-20260202051005-08429cdb06e1
-	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jackc/pgx/v5 v5.10.0
 )
 
 require (
