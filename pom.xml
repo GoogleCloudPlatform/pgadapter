@@ -459,12 +459,9 @@
           <excludedGroups>${excludedTests}</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
           <skipTests>${skipUnits}</skipTests>
-          <systemProperties>
-            <property>
-              <name>java.util.logging.config.file</name>
-              <value>src/test/resources/logging.properties</value>
-            </property>
-          </systemProperties>
+          <systemPropertyVariables>
+            <java.util.logging.config.file>src/test/resources/logging.properties</java.util.logging.config.file>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>
@@ -564,12 +561,9 @@
           <!--suppress UnresolvedMavenProperty -->
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
-          <systemProperties>
-            <property>
-              <name>java.util.logging.config.file</name>
-              <value>src/test/resources/integration-test-logging.properties</value>
-            </property>
-          </systemProperties>
+          <systemPropertyVariables>
+            <java.util.logging.config.file>src/test/resources/integration-test-logging.properties</java.util.logging.config.file>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>
