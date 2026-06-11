@@ -104,11 +104,7 @@
       <artifactId>commons-codec</artifactId>
       <version>1.22.0</version>
     </dependency>
-    <dependency>
-      <groupId>org.checkerframework</groupId>
-      <artifactId>checker-qual</artifactId>
-      <version>4.2.0</version>
-    </dependency>
+
 
     <dependency>
       <groupId>junit</groupId>
