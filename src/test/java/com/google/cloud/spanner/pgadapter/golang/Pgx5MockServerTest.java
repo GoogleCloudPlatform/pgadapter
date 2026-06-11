@@ -60,6 +60,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -450,6 +451,65 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+  }
+
+  @Test
+  public void testInsertUUIDArray() {
+    String sql = "INSERT INTO my_test_table (id, uuid_arr) VALUES ($1, $2)";
+    UUID id = UUID.fromString("fe99a057-814d-4634-8f4f-e5807d89a34c");
+    UUID uuid1 = UUID.fromString("f6a94ced-78da-4142-9fe2-17afec5ad252");
+    UUID uuid2 = UUID.fromString("9e1e8554-1e2a-46b1-9778-f9167dabb4c7");
+
+    // Put PLAN result to tell pgx and PGAdapter the parameter types (uuid and uuid[])
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    com.google.spanner.v1.ResultSetMetadata.newBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.UUID).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p2")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.UUID)
+                                                        .build())
+                                                .build())
+                                        .build())
+                                .build()))
+                .setStats(com.google.spanner.v1.ResultSetStats.newBuilder().build())
+                .build()));
+
+    // Put actual update result using partial matching
+    mockSpanner.putPartialStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    String res = pgxTest.TestInsertUUIDArray(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeParamsRequest = requests.get(0);
+    assertEquals(sql, describeParamsRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+
+    // Explicitly verify the type codes received by Spanner for p2
+    assertTrue(executeRequest.getParamTypesMap().containsKey("p2"));
+    assertEquals(TypeCode.ARRAY, executeRequest.getParamTypesMap().get("p2").getCode());
+    assertEquals(
+        TypeCode.UUID, executeRequest.getParamTypesMap().get("p2").getArrayElementType().getCode());
   }
 
   @Test
