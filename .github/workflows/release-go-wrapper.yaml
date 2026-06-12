@@ -1,0 +1,36 @@
+name: Release Go Wrapper
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  tag-go-wrapper:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get version tag
+        id: get_version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "version=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push Go Wrapper tag
+        run: |
+          GO_TAG="wrappers/golang/${{ steps.get_version.outputs.version }}"
+          
+          # Check if the tag already exists to prevent build failures on re-runs
+          if git rev-parse "$GO_TAG" >/dev/null 2>&1; then
+            echo "Tag $GO_TAG already exists."
+          else
+            echo "Creating and pushing tag: $GO_TAG"
+            git tag "$GO_TAG"
+            git push origin "$GO_TAG"
+          fi
