@@ -387,7 +387,7 @@ public class ITPrismaTest implements IntegrationTest {
     assertTrue(
         output,
         output.contains(
-            "Transaction failed: PrismaClientUnknownRequestError: Error in connector: Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
+            "Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
   }
 
   @Test

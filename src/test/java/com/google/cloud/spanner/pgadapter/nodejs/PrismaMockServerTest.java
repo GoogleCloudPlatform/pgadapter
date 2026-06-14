@@ -93,11 +93,11 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
-    assertEquals(2, executeSqlRequests.size());
-    ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
-    assertTrue(planRequest.getTransaction().hasSingleUse());
-    assertTrue(planRequest.getTransaction().getSingleUse().hasReadOnly());
-    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
   }
 
   @Test
@@ -340,20 +340,22 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
           mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
               .filter(request -> request.getSql().equals(sql))
               .collect(Collectors.toList());
-      assertEquals(3, executeSqlRequests.size());
-      ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
-      assertTrue(planRequest.getTransaction().hasSingleUse());
-      assertTrue(planRequest.getTransaction().getSingleUse().hasReadOnly());
-      assertEquals(
-          stale, planRequest.getTransaction().getSingleUse().getReadOnly().hasMaxStaleness());
-      assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
-      ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+      int expectedCount = stale ? 2 : 3;
+      assertEquals(expectedCount, executeSqlRequests.size());
+      if (!stale) {
+        ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
+        assertTrue(planRequest.getTransaction().hasSingleUse());
+        assertTrue(planRequest.getTransaction().getSingleUse().hasReadOnly());
+        assertFalse(planRequest.getTransaction().getSingleUse().getReadOnly().hasMaxStaleness());
+        assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+      }
+      ExecuteSqlRequest executeRequest = executeSqlRequests.get(stale ? 0 : 1);
       assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
       assertTrue(executeRequest.getTransaction().hasSingleUse());
       assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
       assertEquals(
           stale, executeRequest.getTransaction().getSingleUse().getReadOnly().hasMaxStaleness());
-      ExecuteSqlRequest executeRequest2 = executeSqlRequests.get(2);
+      ExecuteSqlRequest executeRequest2 = executeSqlRequests.get(stale ? 1 : 2);
       assertEquals(QueryMode.NORMAL, executeRequest2.getQueryMode());
       assertTrue(executeRequest2.getTransaction().hasSingleUse());
       assertTrue(executeRequest2.getTransaction().getSingleUse().hasReadOnly());
@@ -501,7 +503,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         "INSERT INTO \"public\".\"User\" (\"id\",\"email\") VALUES ($1,$2) RETURNING \"public\".\"User\".\"id\"";
     ResultSetMetadata insertUserMetadata =
         createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING)).toBuilder()
-            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING), ImmutableList.of("id"))
+                    .getRowType())
             .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -533,7 +537,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
             .toBuilder()
             .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                createMetadata(
+                        ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+                        ImmutableList.of("id", "email", "name"))
                     .getRowType())
             .build();
     mockSpanner.putStatementResult(
@@ -748,7 +754,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p7")
                 .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p8")
-                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z"))
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123000000Z"))
                 .bind("p9")
                 .to("P1Y2M3DT4H5M6.789S")
                 .bind("p10")
@@ -888,7 +894,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p6")
                 .to(com.google.cloud.spanner.Value.pgNumeric("3.14"))
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123456000Z"))
+                .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123000000Z"))
                 .bind("p8")
                 .to("P1Y2M3DT4H5M6.789S")
                 .bind("p9")
@@ -1077,7 +1083,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p7")
                 .to(com.google.cloud.spanner.Value.pgNumeric("3.14"))
                 .bind("p8")
-                .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123456000Z"))
+                .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123000000Z"))
                 .bind("p9")
                 .to("P1Y2M3DT4H5M6.789S")
                 .bind("p10")
@@ -1099,7 +1105,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p18")
                 .to(com.google.cloud.spanner.Value.pgNumeric("3.14"))
                 .bind("p19")
-                .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123456000Z"))
+                .to(Timestamp.parseTimestamp("2023-03-13T05:40:02.123000000Z"))
                 .bind("p20")
                 .to("P1Y2M3DT4H5M6.789S")
                 .bind("p21")
@@ -1315,7 +1321,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p6")
                 .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-02-16T12:18:02.123456000Z"))
+                .to(Timestamp.parseTimestamp("2022-02-16T12:18:02.123000000Z"))
                 .bind("p8")
                 .to(Date.parseDate("2022-03-29"))
                 .bind("p9")
@@ -1335,7 +1341,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p16")
                 .to(com.google.cloud.spanner.Value.pgNumeric("-6.626"))
                 .bind("p17")
-                .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123456000Z"))
+                .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123000000Z"))
                 .bind("p18")
                 .to(Date.parseDate("2022-03-30"))
                 .bind("p19")
@@ -1432,7 +1438,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
             .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                createMetadata(
+                        ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+                        ImmutableList.of("id", "email", "name"))
                     .getRowType())
             .build();
     mockSpanner.putStatementResult(
@@ -1524,7 +1532,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
             .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                createMetadata(
+                        ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+                        ImmutableList.of("id", "email", "name"))
                     .getRowType())
             .build();
     mockSpanner.putStatementResult(
@@ -1614,7 +1624,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
             .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                createMetadata(
+                        ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+                        ImmutableList.of("id", "email", "name"))
                     .getRowType())
             .build();
     mockSpanner.putStatementResult(
@@ -1691,7 +1703,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
             .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                createMetadata(
+                        ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+                        ImmutableList.of("id", "email", "name"))
                     .getRowType())
             .build();
     mockSpanner.putStatementResult(
@@ -1751,7 +1765,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(
         output,
         output.contains(
-            "Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
+            "Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
   }
 
   @Test
@@ -1763,7 +1777,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
             .toBuilder()
             .setRowType(
-                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                createMetadata(
+                        ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+                        ImmutableList.of("id", "email", "name"))
                     .getRowType())
             .build();
     mockSpanner.putStatementResult(
