@@ -59,7 +59,7 @@ jobs:
           node-version: 24
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '4.0.3'
+          ruby-version: '4.0.5'
           bundler-cache: true
       - name: Setup psql
         run: |
@@ -78,3 +78,4 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
           SPANNER_EMULATOR_HOST: localhost:9010
+          SPANNER_DISABLE_BUILTIN_METRICS: true

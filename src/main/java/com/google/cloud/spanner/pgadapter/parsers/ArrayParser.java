@@ -38,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -426,6 +427,8 @@ public class ArrayParser extends Parser<List<?>> {
         parametersBuilder.put(name, Value.float64Array((List<Double>) list));
         break;
       case Oid.UUID:
+        parametersBuilder.put(name, Value.uuidArray((List<UUID>) list));
+        break;
       case Oid.VARCHAR:
       case Oid.TEXT:
         parametersBuilder.put(name, Value.stringArray((List<String>) list));

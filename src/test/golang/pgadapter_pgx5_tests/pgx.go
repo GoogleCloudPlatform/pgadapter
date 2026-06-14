@@ -288,6 +288,35 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	return nil
 }
 
+//export TestInsertUUIDArray
+func TestInsertUUIDArray(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	insertSql := "INSERT INTO my_test_table (id, uuid_arr) VALUES ($1, $2)"
+	id := "fe99a057-814d-4634-8f4f-e5807d89a34c"
+	uuid1 := "f6a94ced-78da-4142-9fe2-17afec5ad252"
+	uuid2 := "9e1e8554-1e2a-46b1-9778-f9167dabb4c7"
+	uuidArr := []string{uuid1, uuid2}
+
+	tag, err := conn.Exec(ctx, insertSql, id, uuidArr)
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
+	}
+	if !tag.Insert() {
+		return C.CString("statement was not recognized as an insert")
+	}
+	if tag.RowsAffected() != 1 {
+		return C.CString(fmt.Sprintf("rows affected mismatch:\n Got: %v\nWant: 1", tag.RowsAffected()))
+	}
+
+	return nil
+}
+
 //export TestInsertNullsAllDataTypes
 func TestInsertNullsAllDataTypes(connString string) *C.char {
 	ctx := context.Background()

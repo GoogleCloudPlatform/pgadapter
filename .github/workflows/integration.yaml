@@ -104,7 +104,7 @@ jobs:
           node-version: 24
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '4.0.3'
+          ruby-version: '4.0.5'
           bundler-cache: true
       - name: Setup psql
         run: |
@@ -145,7 +145,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           directory: ./target/site/jacoco-merged-test-coverage-report
           fail_ci_if_error: false
