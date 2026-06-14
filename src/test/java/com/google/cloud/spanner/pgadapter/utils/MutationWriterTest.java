@@ -170,7 +170,9 @@ public class MutationWriterTest {
                 .set("name")
                 .to("Two")
                 .build());
-    verify(databaseClient).writeWithOptions(eq(expectedMutations), any());
+    verify(databaseClient)
+        .writeWithOptions(
+            eq(expectedMutations), any(com.google.cloud.spanner.Options.TransactionOption[].class));
   }
 
   @Test
@@ -270,7 +272,9 @@ public class MutationWriterTest {
       StatementResult updateCount = mutationWriter.call();
 
       assertEquals(5L, updateCount.getUpdateCount().longValue());
-      verify(databaseClient, times(3)).writeWithOptions(anyIterable(), any());
+      verify(databaseClient, times(3))
+          .writeWithOptions(
+              anyIterable(), any(com.google.cloud.spanner.Options.TransactionOption[].class));
     } finally {
       System.getProperties().remove("copy_in_mutation_limit");
     }
@@ -372,7 +376,9 @@ public class MutationWriterTest {
       // 4. The second batch contains 28 bytes. (3 - 'Three')
       // 5. The third batch contains 24 bytes. (4 - 'Four')
       // 6. the fourth batch contains 24 bytes. (5 - 'Five')
-      verify(databaseClient, times(4)).writeWithOptions(anyIterable(), any());
+      verify(databaseClient, times(4))
+          .writeWithOptions(
+              anyIterable(), any(com.google.cloud.spanner.Options.TransactionOption[].class));
     } finally {
       System.getProperties().remove("copy_in_commit_limit");
     }
@@ -441,7 +447,9 @@ public class MutationWriterTest {
                 .set("name")
                 .to("Five")
                 .build());
-    verify(databaseClient).writeWithOptions(eq(expectedMutations), any());
+    verify(databaseClient)
+        .writeWithOptions(
+            eq(expectedMutations), any(com.google.cloud.spanner.Options.TransactionOption[].class));
 
     executor.shutdown();
   }

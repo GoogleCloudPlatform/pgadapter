@@ -132,7 +132,8 @@ async function testUpdateAllTypes(dataSource: DataSource) {
     row.col_varchar = 'some updated string';
     row.col_jsonb = {key: 'updated-value'};
 
-    await repository.update(row.col_bigint, row);
+    const { col_bigint, ...updateValues } = row;
+    await repository.update(row.col_bigint, updateValues);
     console.log('Updated one record')
 }
 

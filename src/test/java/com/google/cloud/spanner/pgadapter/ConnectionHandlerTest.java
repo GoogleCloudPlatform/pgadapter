@@ -27,8 +27,6 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -908,7 +906,7 @@ public class ConnectionHandlerTest {
     Spanner spanner = mock(Spanner.class);
     DatabaseAdminClient adminClient = mock(DatabaseAdminClient.class);
     when(spanner.getDatabaseAdminClient()).thenReturn(adminClient);
-    when(adminClient.listDatabases(eq("my-instance"), any())).thenReturn(Pages.empty());
+    when(adminClient.listDatabases("my-instance")).thenReturn(Pages.empty());
     StatusRuntimeException exception =
         newStatusResourceNotFoundException(
             "test-database",
