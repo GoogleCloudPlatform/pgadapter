@@ -13,7 +13,7 @@
     "@types/pg": "^8.11.6",
     "dotenv": "^17.0.0",
     "pg": "^8.11.3",
-    "testcontainers": "^11.0.0",
+    "testcontainers": "^12.0.0",
     "ts-node": "^10.9.2",
     "yargs": "^17.7.2"
   },
