@@ -4,4 +4,4 @@ sqlalchemy==2.0.44
 google~=3.0.0
 google.auth~=2.54.0
 testcontainers~=4.14.1
-requests==2.33.1
+requests==2.34.2
