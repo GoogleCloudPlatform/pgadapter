@@ -78,14 +78,14 @@
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.61.0</version>
+        <version>1.63.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.80.0</version>
+        <version>26.83.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -112,11 +112,7 @@
       <groupId>com.google.auto.value</groupId>
       <artifactId>auto-value-annotations</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.checkerframework</groupId>
-      <artifactId>checker-qual</artifactId>
-      <version>4.0.0</version>
-    </dependency>
+
     <dependency>
       <groupId>io.opentelemetry</groupId>
       <artifactId>opentelemetry-api</artifactId>
@@ -211,7 +207,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.9.15</version>
+      <version>3.9.16</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -459,12 +455,9 @@
           <excludedGroups>${excludedTests}</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
           <skipTests>${skipUnits}</skipTests>
-          <systemProperties>
-            <property>
-              <name>java.util.logging.config.file</name>
-              <value>src/test/resources/logging.properties</value>
-            </property>
-          </systemProperties>
+          <systemPropertyVariables>
+            <java.util.logging.config.file>src/test/resources/logging.properties</java.util.logging.config.file>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>
@@ -564,12 +557,9 @@
           <!--suppress UnresolvedMavenProperty -->
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
-          <systemProperties>
-            <property>
-              <name>java.util.logging.config.file</name>
-              <value>src/test/resources/integration-test-logging.properties</value>
-            </property>
-          </systemProperties>
+          <systemPropertyVariables>
+            <java.util.logging.config.file>src/test/resources/integration-test-logging.properties</java.util.logging.config.file>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>

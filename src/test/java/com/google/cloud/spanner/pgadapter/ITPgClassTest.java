@@ -188,9 +188,8 @@ public class ITPgClassTest implements IntegrationTest {
           boolean found = false;
           for (int i = 0; i < expectedRows.size(); i++) {
             PgIndexRow expected = expectedRows.get(i);
-            String targetIndPred = IntegrationTest.isRunningOnEmulator() ? null : expected.indpred;
             boolean predMatch =
-                targetIndPred == null ? indpred == null : targetIndPred.equals(indpred);
+                expected.indpred == null ? indpred == null : expected.indpred.equals(indpred);
             if (expected.indnatts == indnatts
                 && expected.indnkeyatts == indnkeyatts
                 && expected.indisunique == indisunique

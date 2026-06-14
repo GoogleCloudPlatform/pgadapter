@@ -5067,6 +5067,62 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testUUIDArrayParameter() throws SQLException {
+    String jdbcSql = "INSERT INTO my_test_table (id, uuid_arr) VALUES (?, ?)";
+    String pgSql = "INSERT INTO my_test_table (id, uuid_arr) VALUES ($1, $2)";
+    UUID id = UUID.randomUUID();
+    UUID uuid1 = UUID.randomUUID();
+    UUID uuid2 = UUID.randomUUID();
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    com.google.spanner.v1.ResultSetMetadata.newBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.UUID).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p2")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.UUID)
+                                                        .build())
+                                                .build())
+                                        .build())
+                                .build()))
+                .build()));
+
+    mockSpanner.putPartialStatementResult(StatementResult.update(Statement.of(pgSql), 1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement statement = connection.prepareStatement(jdbcSql)) {
+        statement.setObject(1, id);
+        statement.setArray(2, connection.createArrayOf("uuid", new UUID[] {uuid1, uuid2}));
+        assertEquals(1, statement.executeUpdate());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.getParamTypesMap().containsKey("p2"));
+    assertEquals(TypeCode.ARRAY, executeRequest.getParamTypesMap().get("p2").getCode());
+    assertEquals(
+        TypeCode.UUID, executeRequest.getParamTypesMap().get("p2").getArrayElementType().getCode());
+  }
+
+  @Test
   public void testVacuumStatement_noTables() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("vacuum");
