@@ -141,7 +141,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String existsSql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
-            + "FROM \"user\" \"User\" WHERE \"User\".\"id\" IN ($1)";
+            + "FROM \"user\" \"User\" WHERE \"User\".\"id\" = $1";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(existsSql),
@@ -311,7 +311,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String existsSql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
-            + "FROM \"user\" \"User\" WHERE \"User\".\"id\" IN ($1)";
+            + "FROM \"user\" \"User\" WHERE \"User\".\"id\" = $1";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(existsSql),
@@ -343,7 +343,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                 .build()));
 
     String updateSql =
-        "UPDATE \"user\" SET \"firstName\" = $1, \"lastName\" = $2, \"age\" = $3 WHERE \"id\" IN ($4)";
+        "UPDATE \"user\" SET \"firstName\" = $1, \"lastName\" = $2, \"age\" = $3 WHERE \"id\" = $4";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(updateSql),
@@ -449,7 +449,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String existsSql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
-            + "FROM \"user\" \"User\" WHERE \"User\".\"id\" IN ($1)";
+            + "FROM \"user\" \"User\" WHERE \"User\".\"id\" = $1";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(existsSql),
@@ -603,7 +603,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "\"AllTypes\".\"col_timestamptz\" AS \"AllTypes_col_timestamptz\", \"AllTypes\".\"col_date\" AS \"AllTypes_col_date\", "
             + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\", \"AllTypes\".\"col_jsonb\" AS \"AllTypes_col_jsonb\" "
             + "FROM \"all_types\" \"AllTypes\" "
-            + "WHERE \"AllTypes\".\"col_bigint\" IN ($1)";
+            + "WHERE \"AllTypes\".\"col_bigint\" = $1";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(existsSql),
@@ -736,7 +736,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("AllTypes_")));
     String updateSql =
-        "UPDATE \"all_types\" SET \"col_bigint\" = $1, \"col_bool\" = $2, \"col_bytea\" = $3, \"col_float8\" = $4, \"col_int\" = $5, \"col_numeric\" = $6, \"col_timestamptz\" = $7, \"col_date\" = $8, \"col_varchar\" = $9, \"col_jsonb\" = $10 WHERE \"col_bigint\" IN ($11)";
+        "UPDATE \"all_types\" SET \"col_bool\" = $1, \"col_bytea\" = $2, \"col_float8\" = $3, \"col_int\" = $4, \"col_numeric\" = $5, \"col_timestamptz\" = $6, \"col_date\" = $7, \"col_varchar\" = $8, \"col_jsonb\" = $9 WHERE \"col_bigint\" = $10";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(updateSql),
@@ -744,7 +744,6 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                 .setMetadata(
                     createParameterTypesMetadata(
                         ImmutableList.of(
-                            TypeCode.INT64,
                             TypeCode.BOOL,
                             TypeCode.BYTES,
                             TypeCode.FLOAT64,
@@ -753,33 +752,34 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.JSON)))
+                            TypeCode.JSON,
+                            TypeCode.INT64)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(updateSql)
                 .bind("p1")
-                .to(1L)
-                .bind("p2")
                 .to(false)
-                .bind("p3")
+                .bind("p2")
                 .to(ByteArray.copyFrom("updated string"))
-                .bind("p4")
+                .bind("p3")
                 .to(1.23456789)
-                .bind("p5")
+                .bind("p4")
                 .to(987654321L)
-                .bind("p6")
+                .bind("p5")
                 .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
-                .bind("p7")
+                .bind("p6")
                 .to(Timestamp.parseTimestamp("2022-11-16T10:03:42.999Z"))
-                .bind("p8")
+                .bind("p7")
                 .to(Date.parseDate("2022-11-16"))
-                .bind("p9")
+                .bind("p8")
                 .to("some updated string")
                 // TODO: Change to JSONB
-                .bind("p10")
+                .bind("p9")
                 .to("{\"key\":\"updated-value\"}")
+                .bind("p10")
+                .to(1L)
                 .build(),
             1L));
 
