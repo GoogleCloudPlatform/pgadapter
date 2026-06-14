@@ -39,12 +39,24 @@ public interface NodeJSTest {
     builder.directory(testDirectory);
 
     Process process = builder.start();
-    InputStream errorStream = process.getErrorStream();
+    InputStream errStream = process.getErrorStream();
     process.waitFor();
 
-    String errors = readAll(errorStream);
+    String errors = readAll(errStream);
     assertEquals("", errors);
     assertEquals(errors, 0, process.exitValue());
+
+    File prismaSchema = new File(testDirectory, "prisma/schema.prisma");
+    if (prismaSchema.exists()) {
+      ProcessBuilder generateBuilder = new ProcessBuilder();
+      generateBuilder.command("npx", "prisma", "generate");
+      generateBuilder.directory(testDirectory);
+      Process generateProcess = generateBuilder.start();
+      InputStream generateErrorStream = generateProcess.getErrorStream();
+      generateProcess.waitFor();
+      String generateErrors = readAll(generateErrorStream);
+      assertEquals(generateErrors, 0, generateProcess.exitValue());
+    }
   }
 
   static String runTest(String directory, String testName, String host, int port, String database)

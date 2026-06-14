@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import {Prisma, PrismaClient} from "@prisma/client";
+import pg from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import {
   randomAlbumTitle,
   randomFirstName,
@@ -25,23 +27,18 @@ import {randomBytes, randomInt} from "crypto";
 import {promisify} from "util";
 import {exec} from "child_process";
 
-let prisma: PrismaClient;
-let staleReadClient: PrismaClient;
+export let prisma: PrismaClient;
+export let staleReadClient: PrismaClient;
 
 export function createPrismaClient() {
-  // This is the 'normal' Prisma client that can be used for strong reads and read/write transactions.
-  prisma = new PrismaClient();
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const adapter = new PrismaPg(pool);
+  prisma = new PrismaClient({ adapter });
 
-  // This client is read-only and will use a staleness of up to 10 seconds when reading data.
-  // These reads can have a slightly lower latency, but could return data that is up to 10 seconds
-  // stale.
-  staleReadClient = new PrismaClient({
-    datasources: {
-      db: {
-        url: `${process.env.DATABASE_URL}%20-c%20spanner.read_only_staleness='MAX_STALENESS 10s'`,
-      },
-    },
-  });
+  const staleReadUrl = `${process.env.DATABASE_URL}%20-c%20spanner.read_only_staleness='MAX_STALENESS 10s'`;
+  const staleReadPool = new pg.Pool({ connectionString: staleReadUrl });
+  const staleReadAdapter = new PrismaPg(staleReadPool);
+  staleReadClient = new PrismaClient({ adapter: staleReadAdapter });
 }
 
 const execAsync = promisify(exec);

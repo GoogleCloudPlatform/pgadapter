@@ -385,9 +385,7 @@ public class ITPrismaTest implements IntegrationTest {
             testEnv.getPGAdapterPort());
 
     assertTrue(
-        output,
-        output.contains(
-            "Transaction failed: PrismaClientUnknownRequestError: Error in connector: Error querying the database: ERROR: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
+        output, output.contains("Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
   }
 
   @Test

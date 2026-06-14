@@ -103,6 +103,7 @@ jobs:
         working-directory: ./samples/nodejs/prisma-sample-app
         run: |
           npm install
+          npx prisma generate
           npm start
         env:
           TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1

@@ -1,3 +1,6 @@
 {
-  "noImplicitAny": false
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "esModuleInterop": true
+  }
 }

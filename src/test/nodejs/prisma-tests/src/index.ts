@@ -13,22 +13,24 @@
 // limitations under the License.
 
 import {Prisma, PrismaClient, User} from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 import {exec} from "child_process";
 import {promisify} from "util";
 
-function runTest(host: string, port: number, database: string, test: (client) => Promise<void>, options?: string) {
+async function runTest(host: string, port: number, database: string, test: (client) => Promise<void>, options?: string) {
   if (host.charAt(0) == '/') {
-    process.env.DATABASE_URL = `postgresql://localhost:${port}/${database}?host=${host}&options=-c%20spanner.well_known_client=prisma`;
+    process.env.DATABASE_URL = `postgresql://localhost:${port}/${database}?host=${host}&options=-c%20spanner.well_known_client=prisma%20-c%20timezone=UTC`;
     if (options) {
       process.env.DATABASE_URL += `&${options}`;
     }
   } else {
-    process.env.DATABASE_URL = `postgresql://${host}:${port}/${database}?options=-c%20spanner.well_known_client=prisma`;
+    process.env.DATABASE_URL = `postgresql://${host}:${port}/${database}?options=-c%20spanner.well_known_client=prisma%20-c%20timezone=UTC`;
     if (options) {
       process.env.DATABASE_URL += `&${options}`;
     }
   }
-  const prisma = new PrismaClient();
+  const adapter = new PrismaPg(process.env.DATABASE_URL);
+  const prisma = new PrismaClient({ adapter });
   runTestWithClient(prisma, test)
   .then(async () => {
     await prisma.$disconnect();

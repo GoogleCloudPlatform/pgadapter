@@ -3,8 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
+  provider = "postgresql"
 }
 
 model Singer {
@@ -18,6 +17,7 @@ model Singer {
   active    Boolean
   albums    Album[]
   Concert   Concert[]
+
   @@index(lastName)
 }
 
@@ -32,6 +32,7 @@ model Album {
   singer          Singer    @relation(fields: [singerId], references: [id])
   singerId        String
   tracks          Track[]
+
   @@unique([singerId, title])
 }
 
@@ -43,6 +44,7 @@ model Track {
   title       String
   sampleRate  Float?
   album       Album    @relation(fields: [id], references: [id])
+
   @@id([id, trackNumber])
   @@unique([id, title])
 }
@@ -57,25 +59,26 @@ model Venue {
 }
 
 model Concert {
-  id          String   @id
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String       @id
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   name        String
-  venue       Venue    @relation(fields: [venueId], references: [id])
+  venue       Venue        @relation(fields: [venueId], references: [id])
   venueId     String
-  singer      Singer   @relation(fields: [singerId], references: [id])
+  singer      Singer       @relation(fields: [singerId], references: [id])
   singerId    String
-  startTime   DateTime @db.Timestamptz
-  endTime     DateTime @db.Timestamptz
+  startTime   DateTime     @db.Timestamptz
+  endTime     DateTime     @db.Timestamptz
   ticketSales TicketSale[]
+
   @@index([startTime(sort: Desc)])
 }
 
 model TicketSale {
-  id           Int @id @default(autoincrement())
+  id           BigInt   @id @default(autoincrement())
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  concert      Concert @relation(fields: [concertId], references: [id])
+  concert      Concert  @relation(fields: [concertId], references: [id])
   concertId    String
   customerName String
   price        Decimal

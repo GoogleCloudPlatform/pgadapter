@@ -20,6 +20,38 @@ import {
   printSingersAndAlbums, staleRead, updateVenueDescription
 } from "./sample";
 import {GenericContainer, PullPolicy, StartedTestContainer, TestContainer} from "testcontainers";
+import fs from "fs";
+import path from "path";
+
+// Load environment variables from .env file.
+// Prior to Prisma 7, Prisma Client automatically loaded .env files,
+// but with driver adapters, we must load them manually.
+function loadEnv() {
+  try {
+    const envPath = path.resolve(__dirname, "../.env");
+    if (fs.existsSync(envPath)) {
+      const envFile = fs.readFileSync(envPath, "utf-8");
+      for (const line of envFile.split("\n")) {
+        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+        if (match) {
+          const key = match[1].trim();
+          let value = (match[2] || "").trim();
+          if (value.startsWith('"') && value.endsWith('"')) {
+            value = value.slice(1, -1);
+          } else if (value.startsWith("'") && value.endsWith("'")) {
+            value = value.slice(1, -1);
+          }
+          if (!process.env[key]) {
+            process.env[key] = value.trim();
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+loadEnv();
 
 console.log("Running sample application...");
 
@@ -46,7 +78,7 @@ async function runSample() {
 
     // Dynamically set the DATABASE_URL environment variable to point to the PGAdapter instance
     // that was started.
-    process.env.DATABASE_URL = `postgresql://127.0.0.1:${port}/prisma-sample?options=-c%20spanner.well_known_client=prisma`;
+    process.env.DATABASE_URL = `postgresql://127.0.0.1:${port}/prisma-sample?options=-c%20spanner.well_known_client=prisma%20-c%20timezone=UTC`;
   }
   
   // Create the Prisma client.
