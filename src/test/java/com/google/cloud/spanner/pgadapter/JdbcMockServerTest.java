@@ -4552,7 +4552,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       // Java considers 'EST' to always be '-05:00'. That is; it is never DST.
       connection.createStatement().execute("set time zone 'EST'");
-      verifySettingValue(connection, "timezone", "-05:00");
+      verifySettingValue(
+          connection, "timezone", java.time.ZoneId.SHORT_IDS.getOrDefault("EST", "-05:00"));
       // 'EST5EDT' is the ID for the timezone that will change with DST.
       connection.createStatement().execute("set time zone 'EST5EDT'");
       verifySettingValue(connection, "timezone", "EST5EDT");
