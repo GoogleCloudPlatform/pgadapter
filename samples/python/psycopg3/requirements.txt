@@ -2,4 +2,4 @@ psycopg[binary]~=3.3.4
 testcontainers~=4.14.2
 requests==2.34.2
 google~=3.0.0
-google.auth~=2.53.0
+google.auth~=2.54.0
