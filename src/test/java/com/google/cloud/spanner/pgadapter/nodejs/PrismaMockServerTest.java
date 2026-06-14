@@ -1763,9 +1763,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
         runTest("testUnsupportedTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
 
     assertTrue(
-        output,
-        output.contains(
-            "Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
+        output, output.contains("Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED"));
   }
 
   @Test
