@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.FlushMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.TerminateMessage;
@@ -87,11 +88,12 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
 
     List<WireMessage> messages = getWireMessages();
-    assertEquals(4, messages.size());
-    assertEquals(StartupMessage.class, messages.get(0).getClass());
-    assertEquals(QueryMessage.class, messages.get(1).getClass());
+    assertEquals(5, messages.size());
+    assertEquals(SSLMessage.class, messages.get(0).getClass());
+    assertEquals(StartupMessage.class, messages.get(1).getClass());
     assertEquals(QueryMessage.class, messages.get(2).getClass());
-    assertEquals(TerminateMessage.class, messages.get(3).getClass());
+    assertEquals(QueryMessage.class, messages.get(3).getClass());
+    assertEquals(TerminateMessage.class, messages.get(4).getClass());
   }
 
   @Test
@@ -117,13 +119,15 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
     assertEquals(expectedOutput, actualOutput);
 
     List<WireMessage> messages = getWireMessages();
-    assertEquals(25, messages.size());
-    // Yes, you read that right. 25 messages to execute the same query twice.
-    // 3 of these messages are not related to executing the queries:
-    // 1. Startup
-    // 2. Execute `set time zone 'utc'`
-    // 3. Terminate
+    assertEquals(26, messages.size());
+    // Yes, you read that right. 26 messages to execute the same query twice.
+    // 4 of these messages are not related to executing the queries:
+    // 1. SSL Negotiation
+    // 2. Startup
+    // 3. Execute `set time zone 'utc'`
+    // 4. Terminate
     int index = 0;
+    assertEquals(SSLMessage.class, messages.get(index++).getClass());
     assertEquals(StartupMessage.class, messages.get(index++).getClass());
     assertEquals(QueryMessage.class, messages.get(index++).getClass());
 
