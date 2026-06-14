@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
@@ -60,6 +61,8 @@ public class ITLiquibaseTest {
 
   @BeforeClass
   public static void setup() throws ClassNotFoundException, IOException, SQLException {
+    assumeTrue("Liquibase 5.x requires at least Java 17", getJavaMajorVersion() >= 17);
+
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
 
@@ -239,5 +242,22 @@ public class ITLiquibaseTest {
 
     int res = process.waitFor();
     assertEquals(errors, 0, res);
+  }
+
+  private static int getJavaMajorVersion() {
+    String version = System.getProperty("java.version");
+    if (version.startsWith("1.")) {
+      return Integer.parseInt(version.substring(2, 3));
+    } else {
+      int dot = version.indexOf(".");
+      if (dot != -1) {
+        return Integer.parseInt(version.substring(0, dot));
+      }
+      int dash = version.indexOf("-");
+      if (dash != -1) {
+        return Integer.parseInt(version.substring(0, dash));
+      }
+      return Integer.parseInt(version);
+    }
   }
 }
