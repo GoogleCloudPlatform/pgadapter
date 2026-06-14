@@ -78,3 +78,4 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
           SPANNER_EMULATOR_HOST: localhost:9010
+          SPANNER_DISABLE_BUILTIN_METRICS: true
