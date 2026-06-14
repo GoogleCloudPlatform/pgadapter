@@ -39,7 +39,7 @@ jobs:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.9'
+          python-version: '3.14'
       - name: 'Install python dependencies'
         run: |
           pip install google-cloud-bigquery

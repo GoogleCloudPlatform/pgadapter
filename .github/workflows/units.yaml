@@ -23,7 +23,7 @@ jobs:
       - run: go version
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       - run: python --version
       - uses: shivammathur/setup-php@v2
         with:
@@ -81,7 +81,7 @@ jobs:
       - run: go version
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       - run: python --version
       - uses: shivammathur/setup-php@v2
         with:
