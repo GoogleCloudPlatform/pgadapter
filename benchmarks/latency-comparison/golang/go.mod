@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/spanner v1.91.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/moby/moby/api v1.54.2
 	github.com/montanaflynn/stats v0.9.0
 	github.com/testcontainers/testcontainers-go v0.42.0
