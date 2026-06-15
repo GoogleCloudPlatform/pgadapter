@@ -63,6 +63,14 @@
       "matchPackageNames": [
         "/^com.google.cloud:google-cloud-/"
       ]
+    },
+    {
+      "matchPaths": [
+        "samples/python/sqlalchemy-sample/**",
+        "src/test/python/sqlalchemy/**"
+      ],
+      "matchPackageNames": ["sqlalchemy"],
+      "allowedVersions": "<2.0.0"
     }
   ],
   "semanticCommits": "enabled",
