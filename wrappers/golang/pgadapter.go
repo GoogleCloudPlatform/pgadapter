@@ -431,6 +431,18 @@ func waitForPort(port int, initialWait, waitInterval time.Duration, maxAttempts 
 			time.Sleep(waitInterval)
 			continue
 		} else {
+			_ = conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
+			var singleByte [1]byte
+			_, err := conn.Read(singleByte[:])
+			if err != nil {
+				if networkError, ok := err.(net.Error); ok && networkError.Timeout() {
+					_ = conn.Close()
+					return nil
+				}
+				_ = conn.Close()
+				time.Sleep(waitInterval)
+				continue
+			}
 			_ = conn.Close()
 			return nil
 		}
