@@ -105,6 +105,11 @@ jobs:
           npm install
           npx prisma generate
           npm start
+      - name: Run Drizzle Sample tests
+        working-directory: ./samples/nodejs/drizzle
+        run: |
+          npm install
+          npm start
         env:
           TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
           TESTCONTAINERS_RYUK_DISABLED: true

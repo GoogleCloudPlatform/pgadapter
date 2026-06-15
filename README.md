@@ -49,6 +49,8 @@ PGAdapter can be used with the following frameworks and tools:
    for a sample application.
 1. `Prisma` ORM can be used with PGAdapter. See [Prisma sample application](samples/nodejs/prisma-sample-app)
    for a sample application.
+1. `Drizzle` ORM can be used with PGAdapter. See [Drizzle ORM support](docs/drizzle.md)
+   for more details. See also [this directory](samples/nodejs/drizzle) for a sample application using `Drizzle`.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
