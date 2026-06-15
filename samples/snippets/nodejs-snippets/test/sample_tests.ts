@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { describe, before, after, test, beforeEach } from 'node:test';
+import assert from 'node:assert';
 import {
     TestContainer,
     StartedTestContainer,
@@ -19,12 +21,12 @@ import {
     PullPolicy
 } from "testcontainers";
 import createTables from "../src/create_tables";
-import createConnection from "../src/create_connection"
-import writeDataWithDml from "../src/write_data_with_dml"
-import writeDataWithDmlBatch from "../src/write_data_with_dml_batch"
-import writeDataWithCopy from "../src/write_data_with_copy"
-import queryData from "../src/query_data"
-import queryWithParameter from "../src/query_data_with_parameter"
+import createConnection from "../src/create_connection";
+import writeDataWithDml from "../src/write_data_with_dml";
+import writeDataWithDmlBatch from "../src/write_data_with_dml_batch";
+import writeDataWithCopy from "../src/write_data_with_copy";
+import queryData from "../src/query_data";
+import queryWithParameter from "../src/query_data_with_parameter";
 import addColumn from "../src/add_column";
 import ddlBatch from "../src/ddl_batch";
 import updateDataWithCopy from "../src/update_data_with_copy";
@@ -42,105 +44,112 @@ const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-a
 describe('running samples', () => {
     let startedTestContainer: StartedTestContainer;
     const log = console.log;
+    const loggedLines: string[] = [];
 
-    beforeAll(async () => {
+    before(async () => {
         startedTestContainer = await container.start();
-        console.log = jest.fn();
-    }, 30000);
+        console.log = (...args: any[]) => {
+            loggedLines.push(args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' '));
+        };
+    });
 
-    afterAll(async () => {
+    after(async () => {
         console.log = log;
         if (startedTestContainer) {
             await startedTestContainer.stop({remove: true});
         }
-    }, 30000);
+    });
 
-    test('create tables', async () => {
+    beforeEach(() => {
+        loggedLines.length = 0;
+    });
+
+    test('create tables', { timeout: 30000 }, async () => {
         await createTables(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Created Singers & Albums tables in database: [example-db]");
-    }, 30000);
-    test('create connection', async () => {
+        assert(loggedLines.includes("Created Singers & Albums tables in database: [example-db]"));
+    });
+    test('create connection', { timeout: 30000 }, async () => {
         await createConnection(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Greeting from Cloud Spanner PostgreSQL: Hello world!");
-    }, 30000);
-    test('write data with DML', async () => {
+        assert(loggedLines.includes("Greeting from Cloud Spanner PostgreSQL: Hello world!"));
+    });
+    test('write data with DML', { timeout: 30000 }, async () => {
         await writeDataWithDml(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("4 records inserted");
-    }, 30000);
-    test('execute DML batch', async () => {
+        assert(loggedLines.includes("4 records inserted"));
+    });
+    test('execute DML batch', { timeout: 30000 }, async () => {
         await writeDataWithDmlBatch(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("3 records inserted");
-    }, 30000);
-    test('copy from stdin', async () => {
+        assert(loggedLines.includes("3 records inserted"));
+    });
+    test('copy from stdin', { timeout: 30000 }, async () => {
         await writeDataWithCopy(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Copied 5 singers");
-        expect(console.log).toHaveBeenCalledWith("Copied 5 albums");
-    }, 30000);
-    test('query data', async () => {
+        assert(loggedLines.includes("Copied 5 singers"));
+        assert(loggedLines.includes("Copied 5 albums"));
+    });
+    test('query data', { timeout: 30000 }, async () => {
         await queryData(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("1 2 Go, Go, Go");
-        expect(console.log).toHaveBeenCalledWith("2 2 Forever Hold Your Peace");
-        expect(console.log).toHaveBeenCalledWith("1 1 Total Junk");
-        expect(console.log).toHaveBeenCalledWith("2 1 Green");
-        expect(console.log).toHaveBeenCalledWith("2 3 Terrified");
-    }, 30000);
-    test('query with parameter', async () => {
+        assert(loggedLines.includes("1 2 Go, Go, Go"));
+        assert(loggedLines.includes("2 2 Forever Hold Your Peace"));
+        assert(loggedLines.includes("1 1 Total Junk"));
+        assert(loggedLines.includes("2 1 Green"));
+        assert(loggedLines.includes("2 3 Terrified"));
+    });
+    test('query with parameter', { timeout: 30000 }, async () => {
         await queryWithParameter(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("12 Melissa Garcia");
-    }, 30000);
-    test('add column', async () => {
+        assert(loggedLines.includes("12 Melissa Garcia"));
+    });
+    test('add column', { timeout: 30000 }, async () => {
         await addColumn(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Added marketing_budget column");
-    }, 30000);
-    test('ddl batch', async () => {
+        assert(loggedLines.includes("Added marketing_budget column"));
+    });
+    test('ddl batch', { timeout: 30000 }, async () => {
         await ddlBatch(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Added venues and concerts tables");
-    }, 30000);
-    test('update data', async () => {
+        assert(loggedLines.includes("Added venues and concerts tables"));
+    });
+    test('update data', { timeout: 30000 }, async () => {
         await updateDataWithCopy(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Updated 2 albums");
-    }, 30000);
-    test('query data with new column', async () => {
+        assert(loggedLines.includes("Updated 2 albums"));
+    });
+    test('query data with new column', { timeout: 30000 }, async () => {
         await queryDataWithNewColumn(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("1 1 100000");
-        expect(console.log).toHaveBeenCalledWith("1 2 null");
-        expect(console.log).toHaveBeenCalledWith("2 1 null");
-        expect(console.log).toHaveBeenCalledWith("2 2 500000");
-        expect(console.log).toHaveBeenCalledWith("2 3 null");
-    }, 30000);
-    test('update data with transaction', async () => {
+        assert(loggedLines.includes("1 1 100000"));
+        assert(loggedLines.includes("1 2 null"));
+        assert(loggedLines.includes("2 1 null"));
+        assert(loggedLines.includes("2 2 500000"));
+        assert(loggedLines.includes("2 3 null"));
+    });
+    test('update data with transaction', { timeout: 30000 }, async () => {
         await writeWithTransactionUsingDml(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Transferred marketing budget from Album 2 to Album 1");
-    }, 30000);
-    test('transaction and statement tags', async () => {
+        assert(loggedLines.includes("Transferred marketing budget from Album 2 to Album 1"));
+    });
+    test('transaction and statement tags', { timeout: 30000 }, async () => {
         await tags(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Reduced marketing budget");
-    }, 30000);
-    test('read-only transaction', async () => {
+        assert(loggedLines.includes("Reduced marketing budget"));
+    });
+    test('read-only transaction', { timeout: 30000 }, async () => {
         await readOnlyTransaction(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("1 1 Total Junk");
-        expect(console.log).toHaveBeenCalledWith("1 2 Go, Go, Go");
-        expect(console.log).toHaveBeenCalledWith("2 1 Green");
-        expect(console.log).toHaveBeenCalledWith("2 2 Forever Hold Your Peace");
-        expect(console.log).toHaveBeenCalledWith("2 3 Terrified");
-    }, 30000);
-    test('data boost', async () => {
+        assert(loggedLines.includes("1 1 Total Junk"));
+        assert(loggedLines.includes("1 2 Go, Go, Go"));
+        assert(loggedLines.includes("2 1 Green"));
+        assert(loggedLines.includes("2 2 Forever Hold Your Peace"));
+        assert(loggedLines.includes("2 3 Terrified"));
+    });
+    test('data boost', { timeout: 30000 }, async () => {
         await dataBoost(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("2 Catalina Smith");
-        expect(console.log).toHaveBeenCalledWith("4 Lea Martin");
-        expect(console.log).toHaveBeenCalledWith("12 Melissa Garcia");
-        expect(console.log).toHaveBeenCalledWith("14 Jacqueline Long");
-        expect(console.log).toHaveBeenCalledWith("16 Sarah Wilson");
-        expect(console.log).toHaveBeenCalledWith("18 Maya Patel");
-        expect(console.log).toHaveBeenCalledWith("1 Marc Richards");
-        expect(console.log).toHaveBeenCalledWith("3 Alice Trentor");
-        expect(console.log).toHaveBeenCalledWith("5 David Lomond");
-        expect(console.log).toHaveBeenCalledWith("13 Russel Morales");
-        expect(console.log).toHaveBeenCalledWith("15 Dylan Shaw");
-        expect(console.log).toHaveBeenCalledWith("17 Ethan Miller");
-    }, 30000);
-    test('partitioned DML', async () => {
+        assert(loggedLines.includes("2 Catalina Smith"));
+        assert(loggedLines.includes("4 Lea Martin"));
+        assert(loggedLines.includes("12 Melissa Garcia"));
+        assert(loggedLines.includes("14 Jacqueline Long"));
+        assert(loggedLines.includes("16 Sarah Wilson"));
+        assert(loggedLines.includes("18 Maya Patel"));
+        assert(loggedLines.includes("1 Marc Richards"));
+        assert(loggedLines.includes("3 Alice Trentor"));
+        assert(loggedLines.includes("5 David Lomond"));
+        assert(loggedLines.includes("13 Russel Morales"));
+        assert(loggedLines.includes("15 Dylan Shaw"));
+        assert(loggedLines.includes("17 Ethan Miller"));
+    });
+    test('partitioned DML', { timeout: 30000 }, async () => {
         await partitionedDml(startedTestContainer.getHost(), startedTestContainer.getMappedPort(5432), "example-db");
-        expect(console.log).toHaveBeenCalledWith("Updated at least 3 albums");
-    }, 30000);
+        assert(loggedLines.includes("Updated at least 3 albums"));
+    });
 });
