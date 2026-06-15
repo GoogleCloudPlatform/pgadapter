@@ -65,7 +65,7 @@ runSample()
   });
 
 async function runSample() {
-  let pgAdapter: StartedTestContainer = null;
+  let pgAdapter: StartedTestContainer | null = null;
   if (process.env.AUTO_START_PGADAPTER && process.env.AUTO_START_PGADAPTER.toLowerCase() == 'true') {
     // Start PGAdapter and the Spanner emulator in a Docker container.
     // Using a TestContainer to run PGAdapter is OK in development and test, but for production, it is
