@@ -25,12 +25,13 @@ export async function createDataModel(db: any) {
     console.log("Sample data model already exists, not creating any new tables.");
     return;
   }
-  console.log("Creating tables...");
-  
-  // Set default sequence kind for bit-reversed sequences before sequence/serial is created.
-  await db.execute(`alter database db set spanner.default_sequence_kind='bit_reversed_positive'`);
+  console.log("Creating tables as a single DDL batch...");
 
   await db.execute(`
+    START BATCH DDL;
+
+    alter database db set spanner.default_sequence_kind='bit_reversed_positive';
+
     create table if not exists singers (
        id         varchar not null primary key,
        first_name varchar,
@@ -44,9 +45,7 @@ export async function createDataModel(db: any) {
        created_at timestamptz,
        updated_at timestamptz
     );
-  `);
 
-  await db.execute(`
     create table if not exists albums (
       id               varchar not null primary key,
       title            varchar not null,
@@ -58,9 +57,7 @@ export async function createDataModel(db: any) {
       updated_at       timestamptz,
       constraint fk_albums_singers foreign key (singer_id) references singers (id)
     );
-  `);
 
-  await db.execute(`
     create table if not exists tracks (
       id           varchar not null,
       track_number bigint not null,
@@ -70,9 +67,7 @@ export async function createDataModel(db: any) {
       updated_at   timestamptz,
       primary key (id, track_number)
     ) interleave in parent albums on delete cascade;
-  `);
 
-  await db.execute(`
     create table if not exists venues (
       id          varchar not null primary key,
       name        varchar not null,
@@ -80,9 +75,7 @@ export async function createDataModel(db: any) {
       created_at  timestamptz,
       updated_at  timestamptz
     );
-  `);
 
-  await db.execute(`
     create table if not exists concerts (
       id          varchar not null primary key,
       venue_id    varchar not null,
@@ -96,9 +89,7 @@ export async function createDataModel(db: any) {
       constraint fk_concerts_singers foreign key (singer_id) references singers (id),
       constraint chk_end_time_after_start_time check (end_time > start_time)
     );
-  `);
 
-  await db.execute(`
     create table if not exists ticket_sales (
       id               serial primary key,
       concert_id       varchar not null,
@@ -109,6 +100,8 @@ export async function createDataModel(db: any) {
       updated_at       timestamptz,
       constraint fk_ticket_sales_concerts foreign key (concert_id) references concerts (id)
     );
+
+    RUN BATCH;
   `);
 
   console.log("Finished creating tables.");

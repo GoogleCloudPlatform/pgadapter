@@ -178,6 +178,20 @@ async function testDelete(db: any) {
   }
 }
 
+async function testBatchDml(db: any) {
+  try {
+    await db.transaction(async (tx: any) => {
+      await tx.execute(sql`START BATCH DML`);
+      await tx.insert(users).values({ name: 'batch-foo' });
+      await tx.insert(users).values({ name: 'batch-bar' });
+      await tx.execute(sql`RUN BATCH`);
+    });
+    console.log("Executed Batch DML");
+  } catch (e) {
+    console.error("Batch DML error:", e);
+  }
+}
+
 async function testSelectRelationalQueries(db: any) {
   try {
     const results = await db.query.users.findMany({
@@ -258,6 +272,12 @@ require('yargs')
     'Deletes a row',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testDelete)
+  )
+  .command(
+    'testBatchDml <host> <port> <database>',
+    'Executes batch DML statements',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testBatchDml)
   )
   .command(
     'testReadOnlyTransaction <host> <port> <database>',

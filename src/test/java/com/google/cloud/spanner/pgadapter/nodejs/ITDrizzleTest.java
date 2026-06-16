@@ -240,6 +240,22 @@ public class ITDrizzleTest implements IntegrationTest {
   }
 
   @Test
+  public void testBatchDml() throws Exception {
+    String output = runTest("testBatchDml", getHost(), testEnv.getServer().getLocalPort());
+    assertEquals("Executed Batch DML\n", output);
+
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT * FROM users ORDER BY name"))) {
+      assertTrue(resultSet.next());
+      assertEquals("batch-bar", resultSet.getString("name"));
+      assertTrue(resultSet.next());
+      assertEquals("batch-foo", resultSet.getString("name"));
+      assertFalse(resultSet.next());
+    }
+  }
+
+  @Test
   public void testInsertExecutedTwice() throws Exception {
     String output = runTest("testInsertTwice", getHost(), testEnv.getServer().getLocalPort());
     assertEquals("Inserted 1 row(s)\nInserted 1 row(s)\n", output);

@@ -28,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
@@ -409,6 +410,40 @@ public class DrizzleMockServerTest extends AbstractMockServerTest {
       }
       throw t;
     }
+  }
+
+  @Test
+  public void testBatchDml() throws Exception {
+    String sql = "insert into \"users\" (\"name\") values ($1)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("batch-foo").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("batch-bar").build(), 1L));
+
+    String output = runTest("testBatchDml", getHost(), pgServer.getLocalPort());
+
+    assertEquals("Executed Batch DML\n", output);
+
+    List<ExecuteBatchDmlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
+    assertEquals(1, requests.size());
+    ExecuteBatchDmlRequest request = requests.get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+    assertEquals(
+        "batch-foo", request.getStatements(0).getParams().getFieldsOrThrow("p1").getStringValue());
+    assertEquals(sql, request.getStatements(1).getSql());
+    assertEquals(
+        "batch-bar", request.getStatements(1).getParams().getFieldsOrThrow("p1").getStringValue());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test

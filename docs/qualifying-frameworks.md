@@ -85,4 +85,44 @@ Documentation helps users understand how to configure and run the qualified fram
   - **Detail Known Limitations**: Document all missing SQL features, unsupported ORM APIs, or migration tool restrictions (e.g. if the ORM uses `LATERAL` joins under the hood, or if schema migrations require manual DDL statements).
   - Include code snippets demonstrating how to initialize the connection.
   - Link directly to the sample application in `samples/`.
-  - Include a section confirming alignment with the framework's official Quickstart tutorial and any workarounds needed.
+
+---
+
+## 5. Spanner Optimizations
+
+When qualifying a framework, you must identify, implement, and document optimizations specific to Cloud Spanner. This ensures the integration runs efficiently and does not suffer from excessive round-trips or transaction overhead.
+
+### A. DDL Batching
+Creating or updating a database schema using separate, individual DDL statements causes high latency in Cloud Spanner.
+- **Requirement**: Always group schema setup or table creation statements in your samples or test suites into a single DDL batch.
+- **Implementation**: Wrap the DDL execution blocks with PGAdapter's batch boundaries:
+  ```sql
+  START BATCH DDL;
+  ALTER DATABASE db SET spanner.default_sequence_kind='bit_reversed_positive';
+  CREATE TABLE singers (...);
+  CREATE TABLE albums (...);
+  RUN BATCH;
+  ```
+  Or use driver-level native batch operations if supported.
+
+### B. Batch DML
+Executing multiple DML write/update operations individually inside a transaction incurs network round-trip overhead.
+- **Requirement**: Always include a sample demonstrating how to execute multiple DML statements as a Spanner DML Batch, and verify this functionality in your integration tests.
+- **Implementation**: Wrap Drizzle or other client-side DML operations inside a transaction block using session-level batch queries:
+  ```typescript
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`START BATCH DML`);
+    await tx.insert(users).values({ name: 'batch-foo' });
+    await tx.insert(users).values({ name: 'batch-bar' });
+    await tx.execute(sql`RUN BATCH`);
+  });
+  ```
+  Ensure integration tests assert that the mock Spanner server received exactly one `ExecuteBatchDmlRequest` containing the expected statements.
+
+### C. ORM and Driver Native Batching Integration Points
+Many client libraries, drivers, or ORMs have native batching capabilities:
+- **Requirement**: Investigate if the framework has idiomatic batching patterns (such as JDBC `addBatch()` / `executeBatch()` for `Statement` and `PreparedStatement` APIs, or ORM-specific bulk managers).
+- **Implementation**:
+  - Prefer using these framework-native integration points in your samples.
+  - PGAdapter often translates these driver-native batch calls automatically to Spanner DDL/DML batches. If supported, verify this translation behavior in your test suites.
+

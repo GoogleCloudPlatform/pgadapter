@@ -61,7 +61,7 @@ public class ITDrizzleSampleTest implements IntegrationTest {
             new File(SAMPLE_DIR), testEnv.getServer().getLocalPort(), testEnv.getDatabaseId());
 
     assertTrue(output, output.contains("Checking whether tables already exists..."));
-    assertTrue(output, output.contains("Creating tables..."));
+    assertTrue(output, output.contains("Creating tables as a single DDL batch..."));
     assertTrue(output, output.contains("Finished creating tables."));
     assertTrue(
         output,

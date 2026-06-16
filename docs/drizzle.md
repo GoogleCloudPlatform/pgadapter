@@ -113,6 +113,32 @@ await db.execute(sql`RESET spanner.read_only_staleness`);
 
 ---
 
+## ⚡ Spanner Optimizations
+
+### 1. DDL Batching
+When executing schema generation or alterations, wrap your queries inside a single `START BATCH DDL` and `RUN BATCH` statement block to execute them in one Spanner DDL transaction:
+```typescript
+await db.execute(sql`
+  START BATCH DDL;
+  CREATE TABLE singers (...);
+  CREATE TABLE albums (...);
+  RUN BATCH;
+`);
+```
+
+### 2. Batch DML
+Execute multiple insert or update statements in a single batch transaction to reduce round-trips:
+```typescript
+await db.transaction(async (tx) => {
+  await tx.execute(sql`START BATCH DML`);
+  await tx.insert(users).values({ name: 'batch-foo' });
+  await tx.insert(users).values({ name: 'batch-bar' });
+  await tx.execute(sql`RUN BATCH`);
+});
+```
+
+---
+
 ## ⚠️ Limitations & Best Practices
 
 1. **Auto-increment columns**: Cloud Spanner recommends using **bit-reversed sequences** rather than standard monotonic auto-increment sequences to prevent write hotspots.
