@@ -84,7 +84,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           echo "EXCLUDED_INTEGRATION_TESTS=SlowTest" >> $GITHUB_ENV
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
