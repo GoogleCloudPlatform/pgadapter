@@ -1,0 +1,244 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use super::google;
+use async_trait::async_trait;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+
+#[mockall::automock]
+#[async_trait]
+pub trait Spanner {
+    async fn create_session(
+        &self,
+        request: tonic::Request<google::spanner::v1::CreateSessionRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::Session>>;
+    async fn batch_create_sessions(
+        &self,
+        request: tonic::Request<google::spanner::v1::BatchCreateSessionsRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::BatchCreateSessionsResponse>>;
+    async fn get_session(
+        &self,
+        request: tonic::Request<google::spanner::v1::GetSessionRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::Session>>;
+    async fn list_sessions(
+        &self,
+        request: tonic::Request<google::spanner::v1::ListSessionsRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::ListSessionsResponse>>;
+    async fn delete_session(
+        &self,
+        request: tonic::Request<google::spanner::v1::DeleteSessionRequest>,
+    ) -> tonic::Result<tonic::Response<()>>;
+    async fn execute_sql(
+        &self,
+        request: tonic::Request<google::spanner::v1::ExecuteSqlRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::ResultSet>>;
+    async fn execute_streaming_sql(
+        &self,
+        request: tonic::Request<google::spanner::v1::ExecuteSqlRequest>,
+    ) -> tonic::Result<
+        tonic::Response<mpsc::Receiver<tonic::Result<google::spanner::v1::PartialResultSet>>>,
+    >;
+    async fn execute_batch_dml(
+        &self,
+        request: tonic::Request<google::spanner::v1::ExecuteBatchDmlRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::ExecuteBatchDmlResponse>>;
+    async fn read(
+        &self,
+        request: tonic::Request<google::spanner::v1::ReadRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::ResultSet>>;
+    async fn streaming_read(
+        &self,
+        request: tonic::Request<google::spanner::v1::ReadRequest>,
+    ) -> tonic::Result<
+        tonic::Response<mpsc::Receiver<tonic::Result<google::spanner::v1::PartialResultSet>>>,
+    >;
+    async fn begin_transaction(
+        &self,
+        request: tonic::Request<google::spanner::v1::BeginTransactionRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::Transaction>>;
+    async fn commit(
+        &self,
+        request: tonic::Request<google::spanner::v1::CommitRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::CommitResponse>>;
+    async fn rollback(
+        &self,
+        request: tonic::Request<google::spanner::v1::RollbackRequest>,
+    ) -> tonic::Result<tonic::Response<()>>;
+    async fn partition_query(
+        &self,
+        request: tonic::Request<google::spanner::v1::PartitionQueryRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::PartitionResponse>>;
+    async fn partition_read(
+        &self,
+        request: tonic::Request<google::spanner::v1::PartitionReadRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::PartitionResponse>>;
+    async fn batch_write(
+        &self,
+        request: tonic::Request<google::spanner::v1::BatchWriteRequest>,
+    ) -> tonic::Result<
+        tonic::Response<mpsc::Receiver<tonic::Result<google::spanner::v1::BatchWriteResponse>>>,
+    >;
+    async fn fetch_cache_update(
+        &self,
+        request: tonic::Request<google::spanner::v1::FetchCacheUpdateRequest>,
+    ) -> tonic::Result<
+        tonic::Response<mpsc::Receiver<tonic::Result<google::spanner::v1::CacheUpdate>>>,
+    >;
+}
+
+#[async_trait]
+impl google::spanner::v1::spanner_server::Spanner for MockSpanner {
+    async fn create_session(
+        &self,
+        request: tonic::Request<google::spanner::v1::CreateSessionRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::Session>> {
+        self::Spanner::create_session(self, request).await
+    }
+    async fn batch_create_sessions(
+        &self,
+        request: tonic::Request<google::spanner::v1::BatchCreateSessionsRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::BatchCreateSessionsResponse>> {
+        self::Spanner::batch_create_sessions(self, request).await
+    }
+    async fn get_session(
+        &self,
+        request: tonic::Request<google::spanner::v1::GetSessionRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::Session>> {
+        self::Spanner::get_session(self, request).await
+    }
+    async fn list_sessions(
+        &self,
+        request: tonic::Request<google::spanner::v1::ListSessionsRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::ListSessionsResponse>> {
+        self::Spanner::list_sessions(self, request).await
+    }
+    async fn delete_session(
+        &self,
+        request: tonic::Request<google::spanner::v1::DeleteSessionRequest>,
+    ) -> tonic::Result<tonic::Response<()>> {
+        self::Spanner::delete_session(self, request).await
+    }
+    async fn execute_sql(
+        &self,
+        request: tonic::Request<google::spanner::v1::ExecuteSqlRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::ResultSet>> {
+        eprintln!(
+            "MockSpanner Server received execute_sql: {}",
+            request.get_ref().sql
+        );
+        self::Spanner::execute_sql(self, request).await
+    }
+    type ExecuteStreamingSqlStream =
+        ReceiverStream<tonic::Result<google::spanner::v1::PartialResultSet>>;
+    async fn execute_streaming_sql(
+        &self,
+        request: tonic::Request<google::spanner::v1::ExecuteSqlRequest>,
+    ) -> tonic::Result<tonic::Response<Self::ExecuteStreamingSqlStream>> {
+        eprintln!(
+            "MockSpanner Server received execute_streaming_sql: {}",
+            request.get_ref().sql
+        );
+        let response = self::Spanner::execute_streaming_sql(self, request).await?;
+        let (metadata, receiver, extensions) = response.into_parts();
+        Ok(tonic::Response::from_parts(
+            metadata,
+            ReceiverStream::new(receiver),
+            extensions,
+        ))
+    }
+    async fn execute_batch_dml(
+        &self,
+        request: tonic::Request<google::spanner::v1::ExecuteBatchDmlRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::ExecuteBatchDmlResponse>> {
+        self::Spanner::execute_batch_dml(self, request).await
+    }
+    async fn read(
+        &self,
+        request: tonic::Request<google::spanner::v1::ReadRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::ResultSet>> {
+        self::Spanner::read(self, request).await
+    }
+    type StreamingReadStream = ReceiverStream<tonic::Result<google::spanner::v1::PartialResultSet>>;
+    async fn streaming_read(
+        &self,
+        request: tonic::Request<google::spanner::v1::ReadRequest>,
+    ) -> tonic::Result<tonic::Response<Self::StreamingReadStream>> {
+        let response = self::Spanner::streaming_read(self, request).await?;
+        let (metadata, receiver, extensions) = response.into_parts();
+        Ok(tonic::Response::from_parts(
+            metadata,
+            ReceiverStream::new(receiver),
+            extensions,
+        ))
+    }
+    async fn begin_transaction(
+        &self,
+        request: tonic::Request<google::spanner::v1::BeginTransactionRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::Transaction>> {
+        eprintln!("MockSpanner Server received begin_transaction");
+        self::Spanner::begin_transaction(self, request).await
+    }
+    async fn commit(
+        &self,
+        request: tonic::Request<google::spanner::v1::CommitRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::CommitResponse>> {
+        eprintln!("MockSpanner Server received commit");
+        self::Spanner::commit(self, request).await
+    }
+    async fn rollback(
+        &self,
+        request: tonic::Request<google::spanner::v1::RollbackRequest>,
+    ) -> tonic::Result<tonic::Response<()>> {
+        self::Spanner::rollback(self, request).await
+    }
+    async fn partition_query(
+        &self,
+        request: tonic::Request<google::spanner::v1::PartitionQueryRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::PartitionResponse>> {
+        self::Spanner::partition_query(self, request).await
+    }
+    async fn partition_read(
+        &self,
+        request: tonic::Request<google::spanner::v1::PartitionReadRequest>,
+    ) -> tonic::Result<tonic::Response<google::spanner::v1::PartitionResponse>> {
+        self::Spanner::partition_read(self, request).await
+    }
+    type BatchWriteStream = ReceiverStream<tonic::Result<google::spanner::v1::BatchWriteResponse>>;
+    async fn batch_write(
+        &self,
+        request: tonic::Request<google::spanner::v1::BatchWriteRequest>,
+    ) -> tonic::Result<tonic::Response<Self::BatchWriteStream>> {
+        let response = self::Spanner::batch_write(self, request).await?;
+        let (metadata, receiver, extensions) = response.into_parts();
+        Ok(tonic::Response::from_parts(
+            metadata,
+            ReceiverStream::new(receiver),
+            extensions,
+        ))
+    }
+    type FetchCacheUpdateStream = ReceiverStream<tonic::Result<google::spanner::v1::CacheUpdate>>;
+    async fn fetch_cache_update(
+        &self,
+        request: tonic::Request<google::spanner::v1::FetchCacheUpdateRequest>,
+    ) -> tonic::Result<tonic::Response<Self::FetchCacheUpdateStream>> {
+        let response = self::Spanner::fetch_cache_update(self, request).await?;
+        let (metadata, receiver, extensions) = response.into_parts();
+        Ok(tonic::Response::from_parts(
+            metadata,
+            ReceiverStream::new(receiver),
+            extensions,
+        ))
+    }
+}

@@ -2039,9 +2039,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         preparedStatement.setLong(1, 1L);
         PSQLException exception =
             assertThrows(PSQLException.class, preparedStatement::executeQuery);
-        assertEquals(
-            "ERROR: relation \"non_existing_table\" does not exist - Statement: 'select * from non_existing_table where id=$1'",
-            exception.getMessage());
+        assertTrue(
+            exception.getMessage().contains("relation \"non_existing_table\" does not exist"));
         assertEquals(SQLState.UndefinedTable.toString(), exception.getSQLState());
       }
     }

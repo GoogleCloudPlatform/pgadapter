@@ -76,6 +76,8 @@ import io.grpc.stub.StreamObserver;
 import io.opentelemetry.api.OpenTelemetry;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -326,6 +328,29 @@ public abstract class AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("2").build())
                   .build())
           .setMetadata(SELECT1_METADATA)
+          .build();
+
+  protected static final com.google.spanner.v1.ResultSet DIALECT_RESULTSET =
+      com.google.spanner.v1.ResultSet.newBuilder()
+          .addRows(
+              com.google.protobuf.ListValue.newBuilder()
+                  .addValues(
+                      com.google.protobuf.Value.newBuilder().setStringValue("POSTGRESQL").build())
+                  .build())
+          .setMetadata(
+              com.google.spanner.v1.ResultSetMetadata.newBuilder()
+                  .setRowType(
+                      com.google.spanner.v1.StructType.newBuilder()
+                          .addFields(
+                              com.google.spanner.v1.StructType.Field.newBuilder()
+                                  .setName("option_value")
+                                  .setType(
+                                      com.google.spanner.v1.Type.newBuilder()
+                                          .setCode(com.google.spanner.v1.TypeCode.STRING)
+                                          .build())
+                                  .build())
+                          .build())
+                  .build())
           .build();
 
   private static final com.google.spanner.v1.ResultSet SELECT_FIVE_ROWS_RESULTSET =
@@ -1269,6 +1294,15 @@ public abstract class AbstractMockServerTest {
         OpenTelemetry.noop());
   }
 
+  protected static void putExceptionResult(
+      Statement statement, String pgSql, io.grpc.StatusRuntimeException exception) {
+    mockSpanner.putStatementResult(StatementResult.exception(statement, exception));
+    if ("true".equals(System.getProperty("pgadapter.test.rust", "false"))) {
+      mockSpanner.putPartialStatementResult(
+          StatementResult.exception(Statement.of(pgSql), exception));
+    }
+  }
+
   public static PGobject createJdbcPgJsonbObject(String value) throws SQLException {
     PGobject result = new PGobject();
     result.setValue(value);
@@ -1313,6 +1347,16 @@ public abstract class AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
     mockSpanner.putStatementResult(
         MockSpannerServiceImpl.StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT option_value FROM information_schema.database_options WHERE option_name = 'database_dialect'"),
+            DIALECT_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "select option_value from information_schema.database_options where option_name = 'database_dialect'"),
+            DIALECT_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.exception(INVALID_SELECT, EXCEPTION));
     mockSpanner.putStatementResult(StatementResult.exception(INVALID_DML, EXCEPTION));
     mockSpanner.putStatementResult(StatementResult.exception(INVALID_DDL, EXCEPTION));
@@ -1334,24 +1378,26 @@ public abstract class AbstractMockServerTest {
                       Metadata metadata,
                       ServerCallHandler<ReqT, RespT> serverCallHandler) {
 
-                    if (SpannerGrpc.getExecuteStreamingSqlMethod()
-                        .getFullMethodName()
-                        .equals(serverCall.getMethodDescriptor().getFullMethodName())) {
-                      String userAgent =
-                          metadata.get(
-                              Metadata.Key.of(
-                                  "x-goog-api-client", Metadata.ASCII_STRING_MARSHALLER));
-                      assertNotNull(userAgent);
-                      assertTrue(userAgent.contains("pg-adapter"));
-                      assertTrue(
-                          userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
+                    if (!"true".equals(System.getProperty("pgadapter.test.rust", "false"))) {
+                      if (SpannerGrpc.getExecuteStreamingSqlMethod()
+                          .getFullMethodName()
+                          .equals(serverCall.getMethodDescriptor().getFullMethodName())) {
+                        String userAgent =
+                            metadata.get(
+                                Metadata.Key.of(
+                                    "x-goog-api-client", Metadata.ASCII_STRING_MARSHALLER));
+                        assertNotNull(userAgent);
+                        assertTrue(userAgent.contains("pg-adapter"));
+                        assertTrue(
+                            userAgent.contains(ServiceOptions.getGoogApiClientLibName() + "/"));
 
-                      String endToEndTracing =
-                          metadata.get(
-                              Metadata.Key.of(
-                                  "x-goog-spanner-end-to-end-tracing",
-                                  Metadata.ASCII_STRING_MARSHALLER));
-                      assertEquals("true", endToEndTracing);
+                        String endToEndTracing =
+                            metadata.get(
+                                Metadata.Key.of(
+                                    "x-goog-spanner-end-to-end-tracing",
+                                    Metadata.ASCII_STRING_MARSHALLER));
+                        assertEquals("true", endToEndTracing);
+                      }
                     }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
@@ -1372,8 +1418,23 @@ public abstract class AbstractMockServerTest {
         .setCredentials(NoCredentials.getInstance())
         .setEnableEndToEndTracing(true);
     optionsConfigurator.accept(builder);
-    pgServer = new ProxyServer(builder.build(), openTelemetry);
+    if ("true".equals(System.getProperty("pgadapter.test.rust", "false"))) {
+      pgServer = new RustProxyServer(builder.build(), spannerServer.getPort());
+    } else {
+      pgServer = new ProxyServer(builder.build(), openTelemetry);
+    }
     pgServer.startServer();
+    if ("true".equals(System.getProperty("pgadapter.test.rust", "false"))) {
+      try (Connection connection =
+          DriverManager.getConnection(
+              String.format(
+                  "jdbc:postgresql://localhost:%d/%s?protocolVersion=3.0",
+                  pgServer.getLocalPort(), defaultDatabase != null ? defaultDatabase : "d"))) {
+        // Open and close connection to warm up dialect detection cache in Rust
+      } catch (SQLException e) {
+        throw new RuntimeException("Failed to warm up Rust dialect detection cache", e);
+      }
+    }
   }
 
   @AfterClass
