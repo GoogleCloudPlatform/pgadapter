@@ -6,7 +6,7 @@ toolchain go1.26.4
 
 require (
 	github.com/docker/docker v28.5.2+incompatible
-	github.com/moby/moby/api v1.54.2
+	github.com/moby/moby/api v1.55.0
 	github.com/testcontainers/testcontainers-go v0.42.0
 	golang.org/x/oauth2 v0.36.0
 )
