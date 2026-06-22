@@ -95,3 +95,12 @@ PGAdapter is designed to be a transparent, drop-in proxy for PostgreSQL. When in
 2. **Fix on Proxy Side**: If a client encounters wire protocol failures, unsupported SQL commands, or missing metadata/system catalog queries, **always resolve the issue by modifying PGAdapter** (e.g., implementing missing messages, extending the translation engine, or providing simulated catalog tables/views). Do not work around proxy deficiencies by changing the client application.
 3. **Ensure Drop-in Swap**: The ultimate goal is for users to be able to point their PostgreSQL applications to Spanner PGAdapter by simply modifying the connection string, with zero changes to their code.
 
+---
+
+## 🏁 7. Qualifying New Drivers and ORMs
+When qualifying a new PostgreSQL driver, ORM, schema migration tool, or other client database library, you **must** follow the step-by-step instructions detailed in:
+👉 [Qualifying a Driver, ORM, or Framework with PGAdapter](file:///Users/loite/IdeaProjects/pgadapter/docs/qualifying-frameworks.md)
+
+This guidelines details how to construct the Mock Server Tests, Integration Tests, Sample Application, and User Documentation.
+
+
