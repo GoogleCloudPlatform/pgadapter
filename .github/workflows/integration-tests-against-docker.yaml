@@ -11,7 +11,6 @@ jobs:
       GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
       GOOGLE_CLOUD_DATABASE: "e2e_docker"
       GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
-      DOCKERFILE: "build/Dockerfile.ci"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
