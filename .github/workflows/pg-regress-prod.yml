@@ -17,11 +17,11 @@ jobs:
       GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
     steps:
       - name: Checkout PGAdapter repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: pgadapter
       - name: Checkout OSS PG repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: postgres/postgres
           path: postgres
