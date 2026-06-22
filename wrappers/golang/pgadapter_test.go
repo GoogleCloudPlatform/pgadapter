@@ -84,23 +84,23 @@ func TestStart(t *testing.T) {
 			buf = append(buf, tmp[:n]...)
 		}
 		if g, w := len(buf), 42; g != w {
-			t.Fatalf("Received unexpected buffer length\nGot:  %v\nWant: %v", g, w)
+			t.Fatalf("%d: Received unexpected buffer length\nGot:  %v\nWant: %v", i, g, w)
 		}
 		if g, w := string(buf[0]), "E"; g != w {
-			t.Fatalf("Received unexpected server response type\nGot:  %v\nWant: %v", g, w)
+			t.Fatalf("%d: Received unexpected server response type\nGot:  %v\nWant: %v", i, g, w)
 		}
 		// The encoded message length does not include the message type, which is 1 byte long.
 		if g, w := binary.BigEndian.Uint32(buf[1:5]), uint32(36); g != w {
-			t.Fatalf("Received unexpected server response length\nGot:  %v\nWant: %v", g, w)
+			t.Fatalf("%d: Received unexpected server response length\nGot:  %v\nWant: %v", i, g, w)
 		}
 		if g, w := string(buf[20:35]), "Unknown message"; g != w {
-			t.Fatalf("Received unexpected error message\nGot:  %v\nWant: %v", g, w)
+			t.Fatalf("%d: Received unexpected error message\nGot:  %v\nWant: %v", i, g, w)
 		}
 		if g, w := string(buf[37]), "X"; g != w {
-			t.Fatalf("Missing terminate message\nGot:  %v\nWant: %v", g, w)
+			t.Fatalf("%d: Missing terminate message\nGot:  %v\nWant: %v", i, g, w)
 		}
 		if g, w := binary.BigEndian.Uint32(buf[38:]), uint32(4); g != w {
-			t.Fatalf("Received unexpected server response length\nGot:  %v\nWant: %v", g, w)
+			t.Fatalf("%d: Received unexpected server response length\nGot:  %v\nWant: %v", i, g, w)
 		}
 		err = pgadapter.Stop(context.Background())
 		if err != nil {
