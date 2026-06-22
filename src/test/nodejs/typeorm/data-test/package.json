@@ -5,7 +5,7 @@
    "type": "commonjs",
    "devDependencies": {
       "ts-node": "10.9.2",
-      "@types/node": "^25.0.2",
+      "@types/node": "^26.0.0",
       "typescript": "6.0.3"
    },
    "dependencies": {
