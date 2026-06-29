@@ -4,7 +4,7 @@
   "description": "Drizzle ORM Sample App",
   "type": "commonjs",
   "devDependencies": {
-    "@types/node": "^25.0.0",
+    "@types/node": "^26.0.0",
     "@types/pg": "^8.11.0",
     "@types/yargs": "^17.0.33",
     "ts-node": "10.9.2",

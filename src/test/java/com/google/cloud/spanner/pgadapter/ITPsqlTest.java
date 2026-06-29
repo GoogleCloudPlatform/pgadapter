@@ -964,6 +964,8 @@ public class ITPsqlTest implements IntegrationTest {
           // Nuuk stopped using DST in 2023. This is unknown to older JDKs.
           ZoneId.of("America/Nuuk"),
           ZoneId.of("America/Godthab"),
+          // Vancouver DST rules differ for future timestamps in some timezone databases.
+          ZoneId.of("America/Vancouver"),
           // Antarctica has multiple differences between databases.
           ZoneId.of("Antarctica/Vostok"),
           ZoneId.of("Antarctica/Casey"),
