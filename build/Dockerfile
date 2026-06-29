@@ -25,6 +25,9 @@ RUN mvn package -Passembly -DskipTests
 ################################################################################
 
 FROM eclipse-temurin:25-jre
+# Update the base image to include any patches that might have been published
+# since the base image was built.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build target/pgadapter /home/pgadapter
 COPY --from=build LICENSE /home/pgadapter/
