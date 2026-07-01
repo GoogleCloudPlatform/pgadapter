@@ -24,7 +24,7 @@ RUN mvn package -Passembly -DskipTests
 #                                   RELEASE                                    #
 ################################################################################
 
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM gcr.io/distroless/java25-debian13:nonroot
 
 COPY --from=build --chown=nonroot target/pgadapter /home/pgadapter
 COPY --from=build --chown=nonroot LICENSE /home/pgadapter/
