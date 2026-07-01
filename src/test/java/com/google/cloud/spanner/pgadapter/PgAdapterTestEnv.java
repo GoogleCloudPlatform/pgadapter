@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 
 import com.google.api.gax.longrunning.OperationFuture;
+import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.Database;
@@ -554,7 +555,7 @@ public class PgAdapterTestEnv {
 
     Map<String, String> env = System.getenv();
     gcpCredentials = env.get(GCP_CREDENTIALS);
-    GoogleCredentials credentials = null;
+    Credentials credentials = null;
     if (!Strings.isNullOrEmpty(gcpCredentials) && SPANNER_OMNI_HOST == null) {
       try {
         credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
@@ -591,18 +592,16 @@ public class PgAdapterTestEnv {
     }
 
     if (SPANNER_OMNI_HOST != null) {
-      if (!SPANNER_OMNI_HOST.startsWith("http")) {
-        builder.setHost("http://" + SPANNER_OMNI_HOST).setType(SpannerOptions.InstanceType.OMNI);
-      } else {
-        builder.setHost(SPANNER_OMNI_HOST).setType(SpannerOptions.InstanceType.OMNI);
-      }
+      builder
+          .setHost((USE_PLAIN_TEXT ? "http://" : "https://") + SPANNER_OMNI_HOST)
+          .setType(SpannerOptions.InstanceType.OMNI);
       if (USE_PLAIN_TEXT) {
         builder.usePlainText();
       }
       if (SPANNER_OMNI_CLIENT_CERT != null && SPANNER_OMNI_CLIENT_KEY != null) {
         builder.useClientCert(SPANNER_OMNI_CLIENT_CERT, SPANNER_OMNI_CLIENT_KEY);
       }
-      credentials = null;
+      credentials = NoCredentials.getInstance();
     }
 
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) == null && credentials != null) {
