@@ -3,10 +3,6 @@ name: Build and Push Docker Image to Google Artifact Registry
 on:
   # This allows manual activation of this action for testing.
   workflow_dispatch:
-  push:
-    tags:
-      # Automatically build and push Docker image when a release (version) tag is pushed.
-      - v*
 
 env:
   GITHUB_SHA: ${{ github.sha }}
