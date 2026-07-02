@@ -33,14 +33,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.DatabaseName;
-import io.grpc.ExperimentalApi;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -445,20 +444,6 @@ public class OptionsMetadata {
     Builder useClientCert(String clientCertificate, String clientKey) {
       this.clientCertificate = clientCertificate;
       this.clientKey = clientKey;
-      return this;
-    }
-
-    /**
-     * Configures connection to an experimental host endpoint
-     *
-     * @param experimentalHost url of the experimental host endpoint
-     * @deprecated Use {@link #setType(String)} and {@link #setEndpoint(String)} instead.
-     */
-    @ExperimentalApi("https://github.com/googleapis/java-spanner/pull/3574")
-    @Deprecated
-    Builder setExperimentalHost(String experimentalHost) {
-      setEndpoint(experimentalHost);
-      setType(SPANNER_OMNI_TYPE);
       return this;
     }
 
@@ -947,7 +932,7 @@ public class OptionsMetadata {
     this.ddlTransactionMode = DdlTransactionMode.AutocommitImplicitTransaction;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
     this.commandMetadataJSON = commandMetadata;
-    this.propertyMap = new HashMap<>();
+    this.propertyMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
     this.debugMode = false;
@@ -958,7 +943,7 @@ public class OptionsMetadata {
   }
 
   private Map<String, String> parseProperties(String propertyOptions) {
-    Map<String, String> properties = new HashMap<>();
+    Map<String, String> properties = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     if (!propertyOptions.isEmpty()) {
       String[] propertyList = propertyOptions.split(";");
       for (int i = 0; i < propertyList.length; ++i) {

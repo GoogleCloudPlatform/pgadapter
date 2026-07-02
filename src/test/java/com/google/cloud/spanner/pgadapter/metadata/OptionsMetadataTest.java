@@ -689,7 +689,8 @@ public class OptionsMetadataTest {
     assertEquals(
         DatabaseId.of("default", "default", "test_db"),
         OptionsMetadata.newBuilder()
-            .setExperimentalHost("localhost:8000")
+            .setEndpoint("localhost:8000")
+            .setType("omni")
             .setDatabase("test_db")
             .build()
             .getDefaultDatabaseId());
@@ -716,7 +717,8 @@ public class OptionsMetadataTest {
         DatabaseId.of("default", "default", "test_db"),
         OptionsMetadata.newBuilder()
             .setEnvironment(ImmutableMap.of("SPANNER_EMULATOR_HOST", "localhost:9010"))
-            .setExperimentalHost("localhost:8000")
+            .setEndpoint("localhost:8000")
+            .setType("omni")
             .setDatabase("test_db")
             .build()
             .getDefaultDatabaseId());
@@ -728,6 +730,18 @@ public class OptionsMetadataTest {
         DatabaseId.of("default", "default", "test_db"),
         (new OptionsMetadata(
                 new String[] {"-d", "test_db", "-e", "localhost:8000", "-r", "type=omni"}))
+            .getDefaultDatabaseId());
+    assertEquals(
+        DatabaseId.of("default", "default", "test_db"),
+        (new OptionsMetadata(
+                new String[] {"-d", "test_db", "-e", "localhost:8000", "-r", "Type=OMNI"}))
+            .getDefaultDatabaseId());
+    assertEquals(
+        DatabaseId.of("default", "default", "test_db"),
+        (new OptionsMetadata(
+                new String[] {
+                  "-d", "test_db", "-e", "localhost:8000", "-r", "IsExperimentalHost=true"
+                }))
             .getDefaultDatabaseId());
     SpannerException spannerException =
         assertThrows(
