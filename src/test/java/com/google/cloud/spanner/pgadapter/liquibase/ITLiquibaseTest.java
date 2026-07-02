@@ -224,24 +224,20 @@ public class ITLiquibaseTest {
         ImmutableList.<String>builder().add("mvn", "-B").add(commands).build();
     builder.command(liquibaseCommand);
     builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
+    builder.redirectErrorStream(true);
     Process process = builder.start();
 
-    String errors;
     String output;
 
     try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()));
-        BufferedReader errorReader =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-      errors = errorReader.lines().collect(Collectors.joining("\n"));
+        new BufferedReader(new InputStreamReader(process.getInputStream()))) {
       output = reader.lines().collect(Collectors.joining("\n"));
     }
 
-    LOGGER.warning(errors);
     LOGGER.info(output);
 
     int res = process.waitFor();
-    assertEquals(errors, 0, res);
+    assertEquals(output, 0, res);
   }
 
   private static int getJavaMajorVersion() {
