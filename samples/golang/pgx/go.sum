@@ -8,6 +8,8 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEK
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.0 h1:iitl6nmUV75SpXESYquwDMwFZKuxeBbg1uaBJz59L8g=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.0/go.mod h1:IFp8IssDst00AkljM2tzlhR8qt2cse44j4g1KN6++zQ=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.1 h1:wcolNxQmb9ubIUtxq9R2UhetWPeKQWYBynkglKBPdVQ=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.1/go.mod h1:IFp8IssDst00AkljM2tzlhR8qt2cse44j4g1KN6++zQ=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
