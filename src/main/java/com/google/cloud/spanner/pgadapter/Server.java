@@ -109,7 +109,7 @@ public class Server {
   }
 
   @VisibleForTesting
-  public static void runCommand(
+  public static int runCommand(
       ProxyServer proxyServer, @Nullable String database, String... command)
       throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
@@ -121,7 +121,7 @@ public class Server {
     }
     builder.inheritIO();
     Process process = builder.start();
-    process.waitFor();
+    return process.waitFor();
   }
 
   /**

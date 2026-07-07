@@ -398,6 +398,7 @@
         </plugins>
       </build>
     </profile>
+
     <profile>
       <id>format</id>
       <activation>
