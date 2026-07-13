@@ -3,4 +3,4 @@ pandas==2.3.3
 testcontainers~=4.14.1
 requests==2.34.2
 google~=3.0.0
-google.auth~=2.55.0
+google.auth~=2.56.0
