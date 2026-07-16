@@ -281,6 +281,8 @@ github.com/montanaflynn/stats v0.10.0 h1:8GQhct8Qup299/6gFmW3K3xRvPrdpmdjVCWRsZ5
 github.com/montanaflynn/stats v0.10.0/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/montanaflynn/stats v0.11.0 h1:zDghK0ZIhSGNLdZaZYob15c5fjgVnuTzv/MRZ9UJifY=
 github.com/montanaflynn/stats v0.11.0/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
+github.com/montanaflynn/stats v0.12.1 h1:3nN/em/MZXYFTw4qSLoLpollJ35nrETH8t/hVsxKbiU=
+github.com/montanaflynn/stats v0.12.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/morikuni/aec v1.0.0 h1:nP9CBfwrvYnBRgY6qfDQkygYDmYwOilePFkwzv4dU8A=
 github.com/morikuni/aec v1.0.0/go.mod h1:BbKIizmSmc5MMPqRYbxO4ZU0S0+P200+tUnFx7PXmsc=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=

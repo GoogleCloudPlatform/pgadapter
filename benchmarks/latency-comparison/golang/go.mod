@@ -10,7 +10,7 @@ require (
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/moby/moby/api v1.55.0
-	github.com/montanaflynn/stats v0.11.0
+	github.com/montanaflynn/stats v0.12.1
 	github.com/testcontainers/testcontainers-go v0.43.0
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.288.0
