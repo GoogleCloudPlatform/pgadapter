@@ -104,7 +104,7 @@ jobs:
           node-version: 24
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '4.0.5'
+          ruby-version: '4.0.6'
           bundler-cache: true
       - name: Setup psql
         run: |
