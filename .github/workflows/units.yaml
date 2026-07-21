@@ -35,7 +35,7 @@ jobs:
           node-version: 24
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '4.0.5'
+          ruby-version: '4.0.6'
           bundler-cache: true
       - run: mvn -Dpgadapter.use_virtual_threads=true -Dpgadapter.use_virtual_grpc_transport_threads=true -B test -Ptest-all -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
   windows:
@@ -96,6 +96,6 @@ jobs:
           node-version: 24
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '4.0.5'
+          ruby-version: '4.0.6'
           bundler-cache: true
       - run: mvn -B test -Ptest-all -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
