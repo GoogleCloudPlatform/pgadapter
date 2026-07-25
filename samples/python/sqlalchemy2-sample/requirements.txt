@@ -3,5 +3,5 @@ pytz==2026.2
 sqlalchemy==2.0.51
 google~=3.0.0
 google.auth~=2.56.0
-testcontainers~=4.14.1
+testcontainers~=4.15.0
 requests==2.34.2
