@@ -15,7 +15,7 @@ OSS_PG_VERSION=16
 current_script_cwd = os.getcwd()
 print(f"Current working directory of Python script: {current_script_cwd}")
 
-def execute_cmd(command, subprocess_dir="./"):
+def execute_cmd(command, subprocess_dir="./", exit_on_error=False):
     print(f"Executing command: {command}")
     try:
         # Execute the command and capture output
@@ -45,6 +45,8 @@ def execute_cmd(command, subprocess_dir="./"):
 
         # Access the exit code
         print(f"\nExit Code: {proc.returncode}")
+        if exit_on_error and proc.returncode > 0:
+          sys.exit(proc.returncode)
         return "".join(stdout)
 
     except subprocess.CalledProcessError as e:
@@ -94,7 +96,7 @@ def main():
     execute_cmd("make")
     # 3. start pgadapter + emulator container
     if args.target == "spanner_prod":
-        execute_cmd(f"gcloud spanner databases create {database_name} --instance={args.instance} --database-dialect=POSTGRESQL")
+        execute_cmd(f"gcloud spanner databases create {database_name} --instance={args.instance} --database-dialect=POSTGRESQL", exit_on_error=True)
 
     container_id = ""
     if not args.skip_container:
