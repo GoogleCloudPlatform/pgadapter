@@ -262,11 +262,32 @@ public class ListDatabasesStatementTest {
     return connectionHandler;
   }
 
-  @SuppressWarnings("unchecked")
   private Page<Database> createMockPage(Iterable<Database> databases) {
-    Page<Database> result = mock(Page.class);
-    when(result.iterateAll()).thenReturn(databases);
+    return new Page<Database>() {
+      @Override
+      public boolean hasNextPage() {
+        return false;
+      }
 
-    return result;
+      @Override
+      public String getNextPageToken() {
+        return "";
+      }
+
+      @Override
+      public Page<Database> getNextPage() {
+        return null;
+      }
+
+      @Override
+      public Iterable<Database> getValues() {
+        return databases;
+      }
+
+      @Override
+      public Iterable<Database> iterateAll() {
+        return databases;
+      }
+    };
   }
 }

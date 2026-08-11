@@ -4,13 +4,6 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-    groups:
-      google-cloud:
-        patterns:
-          - "com.google.cloud:*"
-          - "com.google.cloud.opentelemetry:*"
-          - "io.opentelemetry:*"
-          - "org.bouncycastle:*"
 
   - package-ecosystem: "github-actions"
     # Workflow files stored in the
@@ -104,9 +97,3 @@ updates:
     directory: "/benchmarks/latency-comparison/java"
     schedule:
       interval: "daily"
-    groups:
-      google-cloud:
-        patterns:
-          - "com.google.cloud:*"
-          - "io.opentelemetry:*"
-          - "org.bouncycastle:*"
