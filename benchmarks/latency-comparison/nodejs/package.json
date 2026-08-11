@@ -6,7 +6,8 @@
   "devDependencies": {
     "@types/node": "^26.0.0",
     "@types/yargs": "^17.0.33",
-    "typescript": "^6.0.0"
+    "tsx": "^4.22.4",
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "@google-cloud/spanner": "^8.0.0",
@@ -14,11 +15,10 @@
     "dotenv": "^17.0.0",
     "pg": "^8.11.3",
     "testcontainers": "^12.0.0",
-    "ts-node": "^10.9.2",
     "yargs": "^18.1.0"
   },
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "start": "tsx src/index.ts",
     "build": "tsc --build",
     "clean": "tsc --build --clean"
   }

@@ -4,9 +4,8 @@
    "description": "TypeORM Data operations tests",
    "type": "commonjs",
    "devDependencies": {
-      "ts-node": "10.9.2",
       "@types/node": "^26.0.0",
-      "typescript": "6.0.3"
+      "typescript": "7.0.2"
    },
    "dependencies": {
       "typeorm": "1.1.0",
@@ -15,7 +14,7 @@
       "yargs": "^18.1.0"
    },
    "scripts": {
-      "start": "ts-node src/index.ts",
+      "start": "tsc && node build/index.js",
       "typeorm": "typeorm-ts-node-commonjs"
    }
 }
