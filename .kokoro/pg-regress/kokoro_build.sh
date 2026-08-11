@@ -6,11 +6,10 @@ set -e
 
 sudo apt update && sudo apt install uuid-runtime
 
-uuid=$(uuidgen -r | cut -c1-6)
-uuid=${uuid:-"default"}
+timestamp=$(date +%s)
 GCP_PROJECT_ID="span-cloud-testing"
 INSTANCE_ID="pgregress-testing"
-DATABASE_ID="pg_regress_${uuid}"
+DATABASE_ID="pg_regress_${timestamp}"
 
 GOOGLE_CLOUD_ENDPOINT="staging-wrenchworks.sandbox.googleapis.com"
 
