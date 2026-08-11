@@ -17,6 +17,8 @@ import {
   printSingersAndAlbums,
   prisma
 } from "./sample";
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 
 function runTest(host: string, port: number, database: string, test: () => Promise<void>) {
   runTestWithClient(test)
@@ -34,8 +36,8 @@ async function runTestWithClient(test: () => Promise<void>) {
   await test();
 }
 
-require('yargs')
-.demand(4)
+yargs(hideBin(process.argv))
+.demandCommand(1)
 .command(
     'testCreateRandomSingersAndAlbums <host> <port> <database>',
     'Creates a random set of singers and albums',

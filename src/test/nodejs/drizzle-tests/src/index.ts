@@ -3,6 +3,8 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql, eq } from 'drizzle-orm';
 import * as schema from './schema';
 import { users, allTypes, posts } from './schema';
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 
 async function runTest(host: string, port: number, database: string, test: (db: any) => Promise<void>) {
   const client = new Client({
@@ -205,8 +207,8 @@ async function testSelectRelationalQueries(db: any) {
   }
 }
 
-require('yargs')
-  .demand(4)
+yargs(hideBin(process.argv))
+  .demandCommand(1)
   .command(
     'testSelectRelationalQueries <host> <port> <database>',
     'Executes relational queries',
