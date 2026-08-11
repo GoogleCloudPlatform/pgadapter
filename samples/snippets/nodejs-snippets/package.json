@@ -8,9 +8,8 @@
     "@types/pg": "^8.11.4",
     "@types/yargs": "^17.0.33",
     "testcontainers": "^12.0.2",
-    "ts-node": "^10.9.2",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.0"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "@types/pg-copy-streams": "^1.2.5",
@@ -19,7 +18,7 @@
     "yargs": "^18.1.0"
   },
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "start": "tsx src/index.ts",
     "test": "tsx --test test/sample_tests.ts"
   }
 }
