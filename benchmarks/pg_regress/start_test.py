@@ -96,7 +96,7 @@ def main():
     execute_cmd("make")
     # 3. start pgadapter + emulator container
     if args.target == "spanner_prod":
-        execute_cmd(f"gcloud spanner databases create {database_name} --instance={args.instance} --database-dialect=POSTGRESQL", exit_on_error=True)
+        execute_cmd(f"gcloud spanner databases create {database_name} --instance={args.instance} --database-dialect=POSTGRESQL")
 
     container_id = ""
     if not args.skip_container:
