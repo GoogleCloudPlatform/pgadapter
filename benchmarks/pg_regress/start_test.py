@@ -2,6 +2,7 @@
 """
 
 import argparse
+import functools
 import os
 import sys
 import subprocess
@@ -11,22 +12,25 @@ import uuid
 
 OSS_PG_VERSION=16
 
+print = functools.partial(print, flush=True)
 
 current_script_cwd = os.getcwd()
 print(f"Current working directory of Python script: {current_script_cwd}")
 
 def execute_cmd(command, subprocess_dir="./", exit_on_error=False):
     print(f"Executing command: {command}")
+    buffered_cmd = f"stdbuf -oL -eL {command}" if not command.startswith("stdbuf") else command
     try:
         # Execute the command and capture output
         # capture_output=True captures stdout and stderr
         # text=True decodes output as text using default encoding
-        proc = subprocess.Popen(command,
+        proc = subprocess.Popen(buffered_cmd,
                                 cwd=subprocess_dir,
                                 shell=True,
                                 text=True,
                                 stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+                                stderr=subprocess.STDOUT,
+                                bufsize=1)
 
         print("Command Output:")
         stdout = []

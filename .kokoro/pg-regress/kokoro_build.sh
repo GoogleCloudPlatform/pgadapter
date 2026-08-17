@@ -4,6 +4,9 @@ set -x
 # Fail on any error.
 set -e
 
+export PYTHONUNBUFFERED=1
+export PGOPTIONS="-c statement_timeout=60000"
+
 sudo apt update && sudo apt install uuid-runtime
 
 timestamp=$(date +%s)
@@ -126,10 +129,10 @@ git apply code.patch
 #mv temp.sql sql/alter_table.sql
 
 # Run pg-regress test
-python start_test.py spanner_prod --skip-container \
+python -u start_test.py spanner_prod --skip-container \
                 --project $GCP_PROJECT_ID \
                 --instance $INSTANCE_ID \
-                --database $DATABASE_ID #--testcases='int8,float8'
+                --database $DATABASE_ID --testcases='int8,float8'
 
 python compare_results.py expected/ results/
 
