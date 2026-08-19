@@ -132,7 +132,7 @@ git apply code.patch
 python -u start_test.py spanner_prod --skip-container \
                 --project $GCP_PROJECT_ID \
                 --instance $INSTANCE_ID \
-                --database $DATABASE_ID --testcases='int8,float8'
+                --database $DATABASE_ID #--testcases='int8,float8'
 
 python compare_results.py expected/ results/
 
