@@ -25,6 +25,7 @@
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
+  <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter-latency-comparison</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <name>Google Cloud Spanner PGAdapter Latency Comparison</name>
@@ -32,11 +33,6 @@
   <description>
     Benchmark test for comparing the latency of the PostgreSQL JDBC driver with the Cloud Spanner JDBC driver.
   </description>
-  <parent>
-    <groupId>com.google.cloud</groupId>
-    <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.19.0</version>
-  </parent>
 
   <dependencyManagement>
     <dependencies>
@@ -50,7 +46,7 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-spanner-bom</artifactId>
-        <version>6.120.0</version>
+        <version>6.121.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
