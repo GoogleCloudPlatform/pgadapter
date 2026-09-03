@@ -40,7 +40,7 @@
     <junixsocket.version>2.11.0</junixsocket.version>
     <opentelemetry.exporter.version>0.37.0</opentelemetry.exporter.version>
     <mockito.artifactId>mockito-core</mockito.artifactId>
-    <mockito.version>4.11.0</mockito.version>
+    <mockito.version>5.23.0</mockito.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
