@@ -17,7 +17,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "pg": "^8.11.0",
     "yargs": "^18.1.0",
