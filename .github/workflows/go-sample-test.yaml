@@ -4,6 +4,8 @@ on:
       - postgresql-dialect
   pull_request:
 name: go-sample-test
+permissions:
+  contents: read
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
   GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"

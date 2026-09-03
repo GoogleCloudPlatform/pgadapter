@@ -1,6 +1,8 @@
 on:
   pull_request:
 name: units
+permissions:
+  contents: read
 jobs:
   ubuntu:
     runs-on: ubuntu-latest

@@ -4,6 +4,8 @@ on:
     - main
   pull_request:
 name: ci
+permissions:
+  contents: read
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
   GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"

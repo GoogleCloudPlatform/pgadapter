@@ -4,6 +4,8 @@ on:
   # pull_request:
   #  branches: [ postgresql-dialect ]
 name: integration-tests-against-docker
+permissions:
+  contents: read
 jobs:
   integration_tests:
     runs-on: ubuntu-latest

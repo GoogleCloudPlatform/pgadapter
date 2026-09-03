@@ -5,6 +5,8 @@ on:
   pull_request:
   workflow_dispatch:
 name: integration-emulator
+permissions:
+  contents: read
 env:
   GOOGLE_CLOUD_PROJECT: "test-project"
   GOOGLE_CLOUD_INSTANCE: "test-instance"

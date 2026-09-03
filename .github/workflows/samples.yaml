@@ -5,6 +5,8 @@ on:
   pull_request:
   workflow_dispatch:
 name: samples
+permissions:
+  contents: read
 jobs:
   java-samples:
     runs-on: ubuntu-latest

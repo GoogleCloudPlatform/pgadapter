@@ -5,6 +5,8 @@ on:
   pull_request:
   workflow_dispatch:
 name: snippets
+permissions:
+  contents: read
 jobs:
   psql-snippets:
     runs-on: ubuntu-latest
