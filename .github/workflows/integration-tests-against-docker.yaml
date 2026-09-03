@@ -13,13 +13,13 @@ jobs:
       GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
       DOCKERFILE: "build/Dockerfile.ci"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           java-version: 8
           distribution: 'zulu'
       - id: 'auth'
-        uses: 'google-github-actions/auth@v3'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
           export_environment_variables: true
@@ -31,10 +31,10 @@ jobs:
         run: |
           docker run \
                 -d -p 5432:5432 \
-                -v ${{env.GOOGLE_APPLICATION_CREDENTIALS}}:/credentials.json:ro \
+                -v "$GOOGLE_APPLICATION_CREDENTIALS":/credentials.json:ro \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/credentials.json \
                 pgadapter \
-                -p ${{env.GOOGLE_CLOUD_PROJECT}} -i ${{env.GOOGLE_CLOUD_INSTANCE}} -d ${{env.GOOGLE_CLOUD_DATABASE}} \
+                -p "$GOOGLE_CLOUD_PROJECT" -i "$GOOGLE_CLOUD_INSTANCE" -d "$GOOGLE_CLOUD_DATABASE" \
                 -x
       - name: Run integration tests
         run: |
@@ -43,4 +43,4 @@ jobs:
                 -DskipITs=false \
                 -DPG_ADAPTER_ADDRESS="localhost" \
                 -DPG_ADAPTER_LOCAL_PORT="5432" \
-                -DPG_ADAPTER_DATABASE="${{env.GOOGLE_CLOUD_DATABASE}}"
+                -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"

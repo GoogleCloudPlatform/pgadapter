@@ -18,7 +18,6 @@ on:
 name: integration
 permissions:
   contents: read
-  issues: write
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
   GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
@@ -39,6 +38,9 @@ jobs:
   integration-test:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
+    permissions:
+      contents: read
+      issues: write
     timeout-minutes: 60
     runs-on: ubuntu-latest
     # Add a PostgreSQL Docker container
@@ -62,8 +64,10 @@ jobs:
     steps:
       - id: set-manual-endpoint
         if: "${{ inputs.endpoint }}"
+        env:
+          ENDPOINT: ${{ inputs.endpoint }}
         run: |
-          echo "GOOGLE_CLOUD_ENDPOINT=${{ inputs.endpoint }}" >> $GITHUB_ENV
+          echo "GOOGLE_CLOUD_ENDPOINT=$ENDPOINT" >> $GITHUB_ENV
       - id: set-preprod-scheduled-endpoint
         if: github.event.schedule=='52 4 * * *'
         run: |
@@ -84,25 +88,25 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           echo "EXCLUDED_INTEGRATION_TESTS=SlowTest" >> $GITHUB_ENV
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Java
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: zulu
           java-version: 21
       - run: java -version
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '^1.17.7'
       - run: go version
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.14'
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
         with:
           ruby-version: '4.0.6'
           bundler-cache: true
@@ -130,11 +134,11 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
       - name: Auth
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
       - name: Setup GCloud
-        uses: google-github-actions/setup-gcloud@v3
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
       - name: Run integration tests
@@ -145,7 +149,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_DATABASE: pgadapter
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           directory: ./target/site/jacoco-merged-test-coverage-report
           fail_ci_if_error: false
@@ -155,7 +159,7 @@ jobs:
           verbose: true
       - id: create-issue-on-failure
         if: "${{ failure() && (github.event.schedule=='52 4 * * *' || github.event.schedule=='14 3 * * *' || inputs.endpoint != '')}}"
-        uses: JasonEtco/create-an-issue@v2
+        uses: JasonEtco/create-an-issue@1b14a70e4d8dc185e5cc76d3bec9eab20257b2c5 # v2.9.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ENDPOINT: ${{ env.GOOGLE_CLOUD_ENDPOINT }}
