@@ -1,4 +1,4 @@
-psycopg[binary]==3.3.4
+psycopg[binary]==3.3.5
 pytz==2026.3.post1
 sqlalchemy==2.0.52
 google~=3.0.0
