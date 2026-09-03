@@ -2,7 +2,7 @@ module migrate
 
 go 1.25.0
 
-toolchain go1.26.6
+toolchain go1.27.1
 
 require (
 	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.2
