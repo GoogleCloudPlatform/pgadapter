@@ -21,7 +21,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <junixsocket.version>2.11.0</junixsocket.version>
+    <junixsocket.version>2.11.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -34,12 +34,13 @@
     Benchmark test for comparing the latency of the PostgreSQL JDBC driver with the Cloud Spanner JDBC driver.
   </description>
 
+
   <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.86.0</version>
+        <version>26.87.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
