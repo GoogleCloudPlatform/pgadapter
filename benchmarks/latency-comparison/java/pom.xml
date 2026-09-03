@@ -147,7 +147,7 @@
     <profile>
       <id>format</id>
       <activation>
-        <jdk>[17,)</jdk>
+        <jdk>[21,)</jdk>
       </activation>
       <build>
         <plugins>
@@ -166,7 +166,7 @@
               <dependency>
                 <groupId>com.google.googlejavaformat</groupId>
                 <artifactId>google-java-format</artifactId>
-                <version>1.28.0</version>
+                <version>1.36.1</version>
               </dependency>
             </dependencies>
           </plugin>
