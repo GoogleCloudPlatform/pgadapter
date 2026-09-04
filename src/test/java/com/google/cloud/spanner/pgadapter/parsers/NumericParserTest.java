@@ -14,13 +14,23 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ProtobufResultSet;
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
@@ -52,5 +62,100 @@ public class NumericParserTest {
         "foo",
         new NumericParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).stringParse());
     assertNull(new NumericParser(null).stringParse());
+  }
+
+  @Test
+  public void testConvertToPG() throws IOException {
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getString(0)).thenReturn("3.14");
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+    SessionState sessionState = mock(SessionState.class);
+
+    // Text format
+    assertNull(
+        NumericParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    byte[] textBytes = "3.14".getBytes(StandardCharsets.UTF_8);
+    ByteArrayOutputStream expectedText = new ByteArrayOutputStream();
+    DataOutputStream expectedTextStream = new DataOutputStream(expectedText);
+    expectedTextStream.writeInt(textBytes.length);
+    expectedTextStream.write(textBytes);
+    assertArrayEquals(expectedText.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Binary format
+    assertNull(
+        NumericParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    byte[] binaryBytes = ByteConverter.numeric(new BigDecimal("3.14"));
+    ByteArrayOutputStream expectedBinary = new ByteArrayOutputStream();
+    DataOutputStream expectedBinaryStream = new DataOutputStream(expectedBinary);
+    expectedBinaryStream.writeInt(binaryBytes.length);
+    expectedBinaryStream.write(binaryBytes);
+    assertArrayEquals(expectedBinary.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Spanner format
+    assertNull(
+        NumericParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.SPANNER));
+    assertArrayEquals(expectedText.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Verify backward compatibility method
+    assertArrayEquals(
+        textBytes, NumericParser.convertToPG(resultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    assertArrayEquals(
+        binaryBytes, NumericParser.convertToPG(resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    assertArrayEquals(textBytes, NumericParser.convertToPG(resultSet, 0, DataFormat.SPANNER));
+  }
+
+  @Test
+  public void testConvertToPGNaNAndNegative() throws IOException {
+    SessionState sessionState = mock(SessionState.class);
+
+    // NaN
+    ResultSet nanResultSet = mock(ResultSet.class);
+    when(nanResultSet.getString(0)).thenReturn("NaN");
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+
+    assertNull(
+        NumericParser.convertToPG(
+            sessionState, dataOutputStream, nanResultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    assertArrayEquals(
+        new byte[] {0, 0, 0, 8, 0, 0, 0, 0, (byte) 0xC0, 0, 0, 0}, output.toByteArray());
+    output.reset();
+
+    // Negative numeric
+    ResultSet negResultSet = mock(ResultSet.class);
+    when(negResultSet.getString(0)).thenReturn("-123.456");
+    assertNull(
+        NumericParser.convertToPG(
+            sessionState, dataOutputStream, negResultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    assertArrayEquals(
+        new byte[] {0, 0, 0, 12, 0, 2, 0, 0, (byte) 0x40, 0, 0, 3, 0, 123, 0x11, (byte) 0xd0},
+        output.toByteArray());
+  }
+
+  @Test
+  public void testConvertToPGProtobufResultSet() throws IOException {
+    ProtobufResultSet protobufResultSet = mock(ProtobufResultSet.class);
+    when(protobufResultSet.canGetProtobufValue(0)).thenReturn(true);
+    when(protobufResultSet.getProtobufValue(0))
+        .thenReturn(com.google.protobuf.Value.newBuilder().setStringValue("9876.54321").build());
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+    SessionState sessionState = mock(SessionState.class);
+
+    assertNull(
+        NumericParser.convertToPG(
+            sessionState, dataOutputStream, protobufResultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    assertArrayEquals(
+        new byte[] {0, 0, 0, 10, '9', '8', '7', '6', '.', '5', '4', '3', '2', '1'},
+        output.toByteArray());
   }
 }

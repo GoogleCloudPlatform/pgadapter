@@ -22,8 +22,11 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Set;
@@ -42,6 +45,8 @@ public class BooleanParser extends Parser<Boolean> {
   private static final byte[] FALSE_VALUE_BYTES = new byte[] {'f'};
   private static final byte[] TRUE_VALUE_BYTES_BINARY = new byte[1];
   private static final byte[] FALSE_VALUE_BYTES_BINARY = new byte[1];
+  private static final byte[] TRUE_SPANNER_BYTES = "true".getBytes(StandardCharsets.UTF_8);
+  private static final byte[] FALSE_SPANNER_BYTES = "false".getBytes(StandardCharsets.UTF_8);
 
   static {
     ByteConverter.bool(TRUE_VALUE_BYTES_BINARY, 0, true);
@@ -131,10 +136,47 @@ public class BooleanParser extends Parser<Boolean> {
     return result;
   }
 
+  public static byte[] convertToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    writeToPG(sessionState, outputStream, resultSet, position, format);
+    return null;
+  }
+
+  static void writeToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    switch (format) {
+      case SPANNER:
+        byte[] bytes = resultSet.getBoolean(position) ? TRUE_SPANNER_BYTES : FALSE_SPANNER_BYTES;
+        outputStream.writeInt(bytes.length);
+        outputStream.write(bytes);
+        break;
+      case POSTGRESQL_TEXT:
+        outputStream.writeInt(1);
+        outputStream.writeByte(resultSet.getBoolean(position) ? 't' : 'f');
+        break;
+      case POSTGRESQL_BINARY:
+        outputStream.writeInt(1);
+        outputStream.writeByte(resultSet.getBoolean(position) ? 1 : 0);
+        break;
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
+  }
+
   public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
     switch (format) {
       case SPANNER:
-        return Boolean.toString(resultSet.getBoolean(position)).getBytes(StandardCharsets.UTF_8);
+        return resultSet.getBoolean(position) ? TRUE_SPANNER_BYTES : FALSE_SPANNER_BYTES;
       case POSTGRESQL_TEXT:
         return resultSet.getBoolean(position) ? TRUE_VALUE_BYTES : FALSE_VALUE_BYTES;
       case POSTGRESQL_BINARY:

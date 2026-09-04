@@ -16,11 +16,15 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
@@ -98,6 +102,47 @@ public class NumericParser extends Parser<String> {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid numeric value: " + value);
     }
+  }
+
+  public static byte[] convertToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    writeToPG(sessionState, outputStream, resultSet, position, format);
+    return null;
+  }
+
+  static void writeToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    switch (format) {
+      case SPANNER:
+      case POSTGRESQL_TEXT:
+        StringParser.writeToPG(sessionState, outputStream, getNumericAsString(resultSet, position));
+        break;
+      case POSTGRESQL_BINARY:
+        byte[] value = convertToPG(getNumericAsString(resultSet, position));
+        outputStream.writeInt(value.length);
+        outputStream.write(value);
+        break;
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
+  }
+
+  static String getNumericAsString(ResultSet resultSet, int column) {
+    if (resultSet instanceof ProtobufResultSet
+        && ((ProtobufResultSet) resultSet).canGetProtobufValue(column)) {
+      return ((ProtobufResultSet) resultSet).getProtobufValue(column).getStringValue();
+    }
+    return resultSet.getString(column);
   }
 
   public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
