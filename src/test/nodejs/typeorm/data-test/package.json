@@ -8,7 +8,7 @@
       "typescript": "7.0.2"
    },
    "dependencies": {
-      "typeorm": "1.1.0",
+      "typeorm": "1.1.1",
       "reflect-metadata": "^0.2.1",
       "pg": "^8.9.0",
       "yargs": "^18.1.0"
