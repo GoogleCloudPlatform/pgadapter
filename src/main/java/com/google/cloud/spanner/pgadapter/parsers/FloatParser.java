@@ -22,11 +22,11 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
@@ -93,16 +93,33 @@ public class FloatParser extends Parser<Float> {
   }
 
   public static byte[] convertToPG(
-      DataOutputStream outputStream, ResultSet resultSet, int position, DataFormat format)
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    writeToPG(sessionState, outputStream, resultSet, position, format);
+    return null;
+  }
+
+  static void writeToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
       throws IOException {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        return Float.toString(resultSet.getFloat(position)).getBytes(StandardCharsets.UTF_8);
+        StringParser.writeToPG(
+            sessionState, outputStream, Float.toString(resultSet.getFloat(position)));
+        break;
       case POSTGRESQL_BINARY:
         outputStream.writeInt(4);
         outputStream.writeFloat(resultSet.getFloat(position));
-        return null;
+        break;
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }

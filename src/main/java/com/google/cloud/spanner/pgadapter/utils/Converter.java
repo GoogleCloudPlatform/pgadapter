@@ -120,7 +120,7 @@ public class Converter implements AutoCloseable {
         DataFormat format = this.columnFormats[column_index];
         byte[] column =
             Converter.convertToPG(outputStream, this.resultSet, column_index, format, sessionState);
-        // TODO: Remove this if statement and write statements once all data types are written
+        // TODO: Remove this if statement and write statements once ARRAY data types are written
         // directly to the output stream.
         if (column != null) {
           outputStream.writeInt(column.length);
@@ -148,7 +148,8 @@ public class Converter implements AutoCloseable {
    * @return a byte array containing the data in the specified format or null if the data was
    *     written directly to the output stream.
    */
-  // TODO: Rename this method to writeToPG and change return type to void once all data types write
+  // TODO: Rename this method to writeToPG and change return type to void once ARRAY data types
+  // write
   // directly to the output stream.
   public static byte[] convertToPG(
       DataOutputStream outputStream,
@@ -161,28 +162,28 @@ public class Converter implements AutoCloseable {
     Type type = result.getColumnType(position);
     switch (type.getCode()) {
       case BOOL:
-        return BooleanParser.convertToPG(result, position, format);
+        return BooleanParser.convertToPG(sessionState, outputStream, result, position, format);
       case BYTES:
         return BinaryParser.convertToPG(sessionState, outputStream, result, position, format);
       case DATE:
         return DateParser.convertToPG(sessionState, outputStream, result, position, format);
       case FLOAT32:
-        return FloatParser.convertToPG(outputStream, result, position, format);
+        return FloatParser.convertToPG(sessionState, outputStream, result, position, format);
       case FLOAT64:
-        return DoubleParser.convertToPG(outputStream, result, position, format);
+        return DoubleParser.convertToPG(sessionState, outputStream, result, position, format);
       case INT64:
       case PG_OID:
         return LongParser.convertToPG(sessionState, outputStream, result, position, format);
       case PG_NUMERIC:
-        return NumericParser.convertToPG(result, position, format);
+        return NumericParser.convertToPG(sessionState, outputStream, result, position, format);
       case STRING:
         return StringParser.convertToPG(sessionState, outputStream, result, position);
       case UUID:
-        return UuidParser.convertToPG(result, position, format);
+        return UuidParser.convertToPG(sessionState, outputStream, result, position, format);
       case TIMESTAMP:
-        return TimestampParser.convertToPG(result, position, format, sessionState.getTimezone());
+        return TimestampParser.convertToPG(sessionState, outputStream, result, position, format);
       case INTERVAL:
-        return IntervalParser.convertToPG(result, position, format);
+        return IntervalParser.convertToPG(sessionState, outputStream, result, position, format);
       case PG_JSONB:
         return JsonbParser.convertToPG(sessionState, outputStream, result, position, format);
       case ARRAY:
