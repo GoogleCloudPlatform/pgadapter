@@ -42,3 +42,9 @@ samples/**/composer.lock
 samples/**/.phpunit.result.cache
 src/test/**/vendor
 src/test/**/composer.lock
+
+# PG Starter local build outputs and runtime caches
+/custom-jre/
+/install_path.txt
+/pgadapter.jar
+/pgadapter.jsa

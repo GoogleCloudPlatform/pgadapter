@@ -1,0 +1,117 @@
+# Google Cloud Build - Spanner PG Starter Release Pipeline
+# Automates compiling the starter code, JRE stripping, packaging, and deploying to GCS.
+
+substitutions:
+  _VERSION: '0.0.0'
+  _AR_LOCATION: 'us-central1'
+  _AR_REPOSITORY: 'spanner-pg-connector'
+
+steps:
+  # Step 1: Compile and package using assembly profile (JDK 25)
+  - name: 'mirror.gcr.io/library/maven:3.9-eclipse-temurin-25'
+    id: 'build-assembly'
+    entrypoint: 'mvn'
+    args: ['-Passembly', '-DskipTests', '-Dfmt.skip', 'clean', 'package']
+
+  # Step 2: Assemble the minimal platform-specific JREs via jlink cross-linking (JDK 25)
+  - name: 'mirror.gcr.io/library/eclipse-temurin:25'
+    id: 'link-jre'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        set -e
+        apt-get update && apt-get install -y unzip curl
+        
+        JDK_VER="jdk-25.0.3+9"
+        
+        mkdir -p /tmp/downloads /tmp/jmods
+        
+        # Download target JMOD packages directly from Adoptium APIs
+        curl -fsSL -o /tmp/downloads/linux-x64.tar.gz "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jmods/hotspot/normal/eclipse"
+        curl -fsSL -o /tmp/downloads/mac-aarch64.tar.gz "https://api.adoptium.net/v3/binary/latest/25/ga/mac/aarch64/jmods/hotspot/normal/eclipse"
+        curl -fsSL -o /tmp/downloads/mac-x64.tar.gz "https://api.adoptium.net/v3/binary/latest/25/ga/mac/x64/jmods/hotspot/normal/eclipse"
+        curl -fsSL -o /tmp/downloads/windows-x64.zip "https://api.adoptium.net/v3/binary/latest/25/ga/windows/x64/jmods/hotspot/normal/eclipse"
+        
+        # Extract target JMOD directories
+        tar -xzf /tmp/downloads/linux-x64.tar.gz -C /tmp/
+        mv "/tmp/$${JDK_VER}-jmods" /tmp/jmods/linux-x64
+        
+        tar -xzf /tmp/downloads/mac-aarch64.tar.gz -C /tmp/
+        mv "/tmp/$${JDK_VER}-jmods" /tmp/jmods/mac-aarch64
+        
+        tar -xzf /tmp/downloads/mac-x64.tar.gz -C /tmp/
+        mv "/tmp/$${JDK_VER}-jmods" /tmp/jmods/mac-x64
+        
+        unzip -q /tmp/downloads/windows-x64.zip -d /tmp/
+        mv "/tmp/$${JDK_VER}-jmods" /tmp/jmods/windows-x64
+        
+        # Strip JRE to the bare minimum required for PGAdapter and Spanner Clients
+        # Excludes unused desktop/GUI, RMI, scripting, and compiler modules
+        MODULES="java.base,java.management,java.naming,java.security.jgss,java.sql,jdk.unsupported,jdk.crypto.cryptoki,jdk.crypto.ec"
+        
+        # Execute cross-linking using the host JVM's native jlink command
+        jlink --module-path /tmp/jmods/linux-x64 --add-modules $${MODULES} --strip-debug --no-man-pages --no-header-files --compress=zip-9 --output target/custom-jres/linux-x64
+        jlink --module-path /tmp/jmods/mac-aarch64 --add-modules $${MODULES} --strip-debug --no-man-pages --no-header-files --compress=zip-9 --output target/custom-jres/mac-aarch64
+        jlink --module-path /tmp/jmods/mac-x64 --add-modules $${MODULES} --strip-debug --no-man-pages --no-header-files --compress=zip-9 --output target/custom-jres/mac-x64
+        jlink --module-path /tmp/jmods/windows-x64 --add-modules $${MODULES} --strip-debug --no-man-pages --no-header-files --compress=zip-9 --output target/custom-jres/windows-x64
+
+  # Step 3: Bundle assets into target platform packages
+  - name: 'mirror.gcr.io/library/alpine:3.20'
+    id: 'package-bundle'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        apk add --no-cache zip
+        
+        mkdir -p target/release/versioned-package target/release/latest-assets
+        
+        # Linux x64
+        mkdir -p target/dist/linux-x64
+        cp target/pgadapter/pgadapter.jar target/dist/linux-x64/
+        cp -r target/pgadapter/lib target/dist/linux-x64/
+        cp -r target/custom-jres/linux-x64 target/dist/linux-x64/custom-jre
+        cp starter/spanner-pg-connector target/dist/linux-x64/
+        cp starter/spgc target/dist/linux-x64/
+        tar -czf target/release/versioned-package/spanner-pg-connector-linux-x64.tar.gz -C target/dist/linux-x64 spanner-pg-connector spgc pgadapter.jar lib/ custom-jre/
+        
+        # macOS aarch64
+        mkdir -p target/dist/mac-aarch64
+        cp target/pgadapter/pgadapter.jar target/dist/mac-aarch64/
+        cp -r target/pgadapter/lib target/dist/mac-aarch64/
+        cp -r target/custom-jres/mac-aarch64 target/dist/mac-aarch64/custom-jre
+        cp starter/spanner-pg-connector target/dist/mac-aarch64/
+        cp starter/spgc target/dist/mac-aarch64/
+        tar -czf target/release/versioned-package/spanner-pg-connector-mac-aarch64.tar.gz -C target/dist/mac-aarch64 spanner-pg-connector spgc pgadapter.jar lib/ custom-jre/
+        
+        # macOS x64
+        mkdir -p target/dist/mac-x64
+        cp target/pgadapter/pgadapter.jar target/dist/mac-x64/
+        cp -r target/pgadapter/lib target/dist/mac-x64/
+        cp -r target/custom-jres/mac-x64 target/dist/mac-x64/custom-jre
+        cp starter/spanner-pg-connector target/dist/mac-x64/
+        cp starter/spgc target/dist/mac-x64/
+        tar -czf target/release/versioned-package/spanner-pg-connector-mac-x64.tar.gz -C target/dist/mac-x64 spanner-pg-connector spgc pgadapter.jar lib/ custom-jre/
+        
+        # Windows x64
+        mkdir -p target/dist/windows-x64
+        cp target/pgadapter/pgadapter.jar target/dist/windows-x64/
+        cp -r target/pgadapter/lib target/dist/windows-x64/
+        cp -r target/custom-jres/windows-x64 target/dist/windows-x64/custom-jre
+        cp starter/spanner-pg-connector.cmd target/dist/windows-x64/
+        cp starter/spgc.cmd target/dist/windows-x64/
+        cd target/dist/windows-x64
+        zip -q -r ../../release/versioned-package/spanner-pg-connector-windows-x64.zip spanner-pg-connector.cmd spgc.cmd pgadapter.jar lib/ custom-jre/
+        cd ../../..
+
+
+options:
+  requestedVerifyOption: VERIFIED
+  logging: CLOUD_LOGGING_ONLY
+
+artifacts:
+  generic_artifacts:
+    - registry_path: 'projects/${PROJECT_ID}/locations/${_AR_LOCATION}/repositories/${_AR_REPOSITORY}/packages/spanner-pg-connector/versions/${_VERSION}'
+      folder: 'target/release/versioned-package'
+

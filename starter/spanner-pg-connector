@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Resolve the directory where this script is located, resolving symlinks
+PRG="$0"
+while [ -h "$PRG" ]; do
+  ls=`ls -ld "$PRG"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+  else
+    PRG=`dirname "$PRG"`/"$link"
+  fi
+done
+SCRIPT_DIR=`dirname "$PRG"`
+SCRIPT_DIR=`cd "$SCRIPT_DIR" >/dev/null; pwd`
+
+JAR_PATH="${SCRIPT_DIR}/pgadapter.jar"
+
+# Run the PGAdapter starter wrapper.
+# We run directly using absolute paths to preserve the caller's working directory.
+exec "${SCRIPT_DIR}/custom-jre/bin/java" \
+  --enable-native-access=ALL-UNNAMED \
+  --sun-misc-unsafe-memory-access=allow \
+  -Dio.netty.noUnsafe=true \
+  -Dio.grpc.netty.shaded.io.netty.noUnsafe=true \
+  -cp "${JAR_PATH}:${SCRIPT_DIR}/lib/*" \
+  com.google.cloud.spanner.pgadapter.SpannerPGConnector \
+  "$@"
