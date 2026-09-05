@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.55.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.55.2...v0.55.3) (2026-09-05)
+
+
+### Dependencies
+
+* update dependency @prisma/adapter-pg to v7.10.0 ([#4829](https://github.com/GoogleCloudPlatform/pgadapter/issues/4829)) ([365cdc0](https://github.com/GoogleCloudPlatform/pgadapter/commit/365cdc0626db35c9269e154c563cbf6649ac05ec))
+* update dependency @prisma/client to v7.10.0 ([#4830](https://github.com/GoogleCloudPlatform/pgadapter/issues/4830)) ([a354150](https://github.com/GoogleCloudPlatform/pgadapter/commit/a354150688f9d78ca85f3f248ea4192d41161093))
+* update dependency com.fasterxml.jackson.core:jackson-databind to v2.22.2 ([#4755](https://github.com/GoogleCloudPlatform/pgadapter/issues/4755)) ([81f48a1](https://github.com/GoogleCloudPlatform/pgadapter/commit/81f48a191bd672324b8ec010d622d6ec47784977))
+* update dependency google.auth to v2.57.0 ([#4832](https://github.com/GoogleCloudPlatform/pgadapter/issues/4832)) ([0585fc2](https://github.com/GoogleCloudPlatform/pgadapter/commit/0585fc23822ba322448365713cebb3547e964934))
+* update dependency google.auth to v2.57.1 ([#4839](https://github.com/GoogleCloudPlatform/pgadapter/issues/4839)) ([e49790d](https://github.com/GoogleCloudPlatform/pgadapter/commit/e49790d37040c3119507ae8b6d5c7815756f959e))
+* update dependency gunicorn to v26.1.0 ([#4758](https://github.com/GoogleCloudPlatform/pgadapter/issues/4758)) ([c3c60b0](https://github.com/GoogleCloudPlatform/pgadapter/commit/c3c60b06eee03b8fdc90594f26ca55a7f8ab0415))
+* update dependency gunicorn to v26.2.0 ([#4833](https://github.com/GoogleCloudPlatform/pgadapter/issues/4833)) ([f526a6b](https://github.com/GoogleCloudPlatform/pgadapter/commit/f526a6bfefbd687cde74052abbe599582955bef4))
+* update dependency microsoft.net.test.sdk to 18.9.0 ([#4744](https://github.com/GoogleCloudPlatform/pgadapter/issues/4744)) ([b3c6179](https://github.com/GoogleCloudPlatform/pgadapter/commit/b3c617941863121464f373b99ba7d1e4cb31ad2c))
+* update dependency nunit3testadapter to 6.3.0 ([#4834](https://github.com/GoogleCloudPlatform/pgadapter/issues/4834)) ([6e0663e](https://github.com/GoogleCloudPlatform/pgadapter/commit/6e0663e03d1f6d7b80e7a2d50987a2e6309ad4fb))
+* update dependency org.springframework.boot:spring-boot-dependencies to v4.1.1 ([#4769](https://github.com/GoogleCloudPlatform/pgadapter/issues/4769)) ([91ac478](https://github.com/GoogleCloudPlatform/pgadapter/commit/91ac4780aed301cd41e69dc5313bc62ac7658e23))
+* update dependency org.springframework.boot:spring-boot-starter-parent to v4.1.1 ([#4770](https://github.com/GoogleCloudPlatform/pgadapter/issues/4770)) ([d801642](https://github.com/GoogleCloudPlatform/pgadapter/commit/d8016423c9e4aa1b7fe19047bb02885e702b976c))
+* update dependency prisma to v7.10.0 ([#4835](https://github.com/GoogleCloudPlatform/pgadapter/issues/4835)) ([cb58740](https://github.com/GoogleCloudPlatform/pgadapter/commit/cb58740f7ac7d7ffaa7ea5fa7dfadf84527c4068))
+* update dependency psycopg to v3.3.5 ([#4823](https://github.com/GoogleCloudPlatform/pgadapter/issues/4823)) ([24ef9f9](https://github.com/GoogleCloudPlatform/pgadapter/commit/24ef9f9100b24dea1f58f2fdd14d5910512fa5dc))
+* update dependency psycopg-binary to v3.3.5 ([#4824](https://github.com/GoogleCloudPlatform/pgadapter/issues/4824)) ([4b5f8ab](https://github.com/GoogleCloudPlatform/pgadapter/commit/4b5f8ab89cd0ea9701cda15a58e939ea13f81d7c))
+* update dependency sqlalchemy to v2.0.52 ([#4732](https://github.com/GoogleCloudPlatform/pgadapter/issues/4732)) ([f90887a](https://github.com/GoogleCloudPlatform/pgadapter/commit/f90887a6652d081c477eb407cd54222b8219d9c2))
+* update dependency testcontainers to 4.14.0 ([#4745](https://github.com/GoogleCloudPlatform/pgadapter/issues/4745)) ([9cfa4d2](https://github.com/GoogleCloudPlatform/pgadapter/commit/9cfa4d2ed3afb60612525477b4d9b4804ed8ac3e))
+* update gcr.io/google.com/cloudsdktool/google-cloud-cli docker tag to v580 ([#4731](https://github.com/GoogleCloudPlatform/pgadapter/issues/4731)) ([95819b8](https://github.com/GoogleCloudPlatform/pgadapter/commit/95819b83a50b3012f1e072e086fd17d092b78bff))
+* update gcr.io/google.com/cloudsdktool/google-cloud-cli docker tag to v581 ([#4759](https://github.com/GoogleCloudPlatform/pgadapter/issues/4759)) ([44a9796](https://github.com/GoogleCloudPlatform/pgadapter/commit/44a9796aa07eab54118683ae1cedc5e6aa4c74db))
+* update gcr.io/google.com/cloudsdktool/google-cloud-cli docker tag to v583 ([#4844](https://github.com/GoogleCloudPlatform/pgadapter/issues/4844)) ([912ba84](https://github.com/GoogleCloudPlatform/pgadapter/commit/912ba84e1c87e2bcb07e46960c7ff50cab2795f7))
+* update go toolchain directive to v1.26.6 ([#4734](https://github.com/GoogleCloudPlatform/pgadapter/issues/4734)) ([e0e23bf](https://github.com/GoogleCloudPlatform/pgadapter/commit/e0e23bfcfde33b0a967896b7c34ea0a6e66e5e82))
+* update go toolchain directive to v1.27.1 ([#4743](https://github.com/GoogleCloudPlatform/pgadapter/issues/4743)) ([45947f2](https://github.com/GoogleCloudPlatform/pgadapter/commit/45947f2e4c1f925537d26c90a8cc1a2d3a938f86))
+* update golang docker tag ([#4735](https://github.com/GoogleCloudPlatform/pgadapter/issues/4735)) ([2f8412b](https://github.com/GoogleCloudPlatform/pgadapter/commit/2f8412b65f22edea44e98ff14c352cde368df09b))
+* update junixsocket.version to v2.11.1 ([#4825](https://github.com/GoogleCloudPlatform/pgadapter/issues/4825)) ([84181cd](https://github.com/GoogleCloudPlatform/pgadapter/commit/84181cdd8192e9d7d49a57e5400ba7868f5502f3))
+* update module cloud.google.com/go/spanner to v1.95.0 ([#4836](https://github.com/GoogleCloudPlatform/pgadapter/issues/4836)) ([aff864b](https://github.com/GoogleCloudPlatform/pgadapter/commit/aff864b3d362e97c7dce904b2bbdb62a55a2d660))
+* update module github.com/googlecloudplatform/pgadapter/wrappers/golang to v0.55.2 ([#4723](https://github.com/GoogleCloudPlatform/pgadapter/issues/4723)) ([f49bd1b](https://github.com/GoogleCloudPlatform/pgadapter/commit/f49bd1bfa3c7271c7c8b0789073bf6a8fcf29701))
+* update module github.com/moby/moby/api to v1.56.0 ([#4837](https://github.com/GoogleCloudPlatform/pgadapter/issues/4837)) ([1fb5941](https://github.com/GoogleCloudPlatform/pgadapter/commit/1fb59414ec46131cef883e6dfc5eb6479337b2b1))
+* update module github.com/montanaflynn/stats to v0.12.4 ([#4756](https://github.com/GoogleCloudPlatform/pgadapter/issues/4756)) ([4d006ce](https://github.com/GoogleCloudPlatform/pgadapter/commit/4d006ce484d5ce3a65fda2d34d991b61496bd1cd))
+* update module github.com/montanaflynn/stats to v0.12.5 ([#4826](https://github.com/GoogleCloudPlatform/pgadapter/issues/4826)) ([ac46117](https://github.com/GoogleCloudPlatform/pgadapter/commit/ac46117c81b158a456fded7e095dabe241667113))
+* update module google.golang.org/api to v0.293.0 ([#4733](https://github.com/GoogleCloudPlatform/pgadapter/issues/4733)) ([84b55f5](https://github.com/GoogleCloudPlatform/pgadapter/commit/84b55f5eb9a2b98f7b95bdff9880ed3ac3fda9fc))
+* update module google.golang.org/api to v0.297.0 ([#4838](https://github.com/GoogleCloudPlatform/pgadapter/issues/4838)) ([ca993ed](https://github.com/GoogleCloudPlatform/pgadapter/commit/ca993ed1586ffbf2f2fe1e7df3ee542c7b9f395d))
+* update spring-boot.version to v4.1.1 ([#4772](https://github.com/GoogleCloudPlatform/pgadapter/issues/4772)) ([5baabda](https://github.com/GoogleCloudPlatform/pgadapter/commit/5baabdaa1f8474e377b05f43dc8745a6cbf272b1))
+
 ## [0.55.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.55.1...v0.55.2) (2026-08-11)
 
 
