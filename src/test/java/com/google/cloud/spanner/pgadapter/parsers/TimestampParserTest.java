@@ -35,6 +35,9 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableList;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.Random;
@@ -92,6 +95,103 @@ public class TimestampParserTest {
     assertArrayEquals(
         "2022-07-08T07:22:59.123456789Z".getBytes(StandardCharsets.UTF_8),
         TimestampParser.convertToPG(resultSet, 0, DataFormat.SPANNER, ZoneId.of("UTC")));
+  }
+
+  @Test
+  public void testConvertToPGStream() throws IOException {
+    ResultSet resultSet =
+        ResultSets.forRows(
+            Type.struct(StructField.of("ts", Type.timestamp())),
+            ImmutableList.of(
+                Struct.newBuilder()
+                    .set("ts")
+                    .to(Timestamp.parseTimestamp("2022-07-08T07:22:59.123456789Z"))
+                    .build()));
+    resultSet.next();
+
+    SessionState sessionState = mock(SessionState.class);
+    when(sessionState.getTimezone()).thenReturn(ZoneId.of("UTC"));
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+
+    // Text format
+    assertNull(
+        TimestampParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    byte[] textBytes =
+        TimestampParser.convertToPG(resultSet, 0, DataFormat.POSTGRESQL_TEXT, ZoneId.of("UTC"));
+    ByteArrayOutputStream expectedText = new ByteArrayOutputStream();
+    DataOutputStream expectedTextStream = new DataOutputStream(expectedText);
+    expectedTextStream.writeInt(textBytes.length);
+    expectedTextStream.write(textBytes);
+    assertArrayEquals(expectedText.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Binary format
+    assertNull(
+        TimestampParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    byte[] binaryBytes =
+        TimestampParser.convertToPG(resultSet, 0, DataFormat.POSTGRESQL_BINARY, ZoneId.of("UTC"));
+    ByteArrayOutputStream expectedBinary = new ByteArrayOutputStream();
+    DataOutputStream expectedBinaryStream = new DataOutputStream(expectedBinary);
+    expectedBinaryStream.writeInt(binaryBytes.length);
+    expectedBinaryStream.write(binaryBytes);
+    assertArrayEquals(expectedBinary.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Spanner format
+    assertNull(
+        TimestampParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.SPANNER));
+    byte[] spannerBytes =
+        TimestampParser.convertToPG(resultSet, 0, DataFormat.SPANNER, ZoneId.of("UTC"));
+    ByteArrayOutputStream expectedSpanner = new ByteArrayOutputStream();
+    DataOutputStream expectedSpannerStream = new DataOutputStream(expectedSpanner);
+    expectedSpannerStream.writeInt(spannerBytes.length);
+    expectedSpannerStream.write(spannerBytes);
+    assertArrayEquals(expectedSpanner.toByteArray(), output.toByteArray());
+    output.reset();
+  }
+
+  @Test
+  public void testConvertToPGPre2000EpochAndNonUtcTimezone() throws IOException {
+    Timestamp pre2000 = Timestamp.parseTimestamp("1970-01-01T00:00:00Z");
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getTimestamp(0)).thenReturn(pre2000);
+
+    SessionState sessionState = mock(SessionState.class);
+    ZoneId nyZone = ZoneId.of("America/New_York");
+    when(sessionState.getTimezone()).thenReturn(nyZone);
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+
+    // Binary format (pre-2000 produces negative microsecond offset relative to PG epoch 2000-01-01)
+    assertNull(
+        TimestampParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    byte[] binaryBytes =
+        TimestampParser.convertToPG(resultSet, 0, DataFormat.POSTGRESQL_BINARY, nyZone);
+    ByteArrayOutputStream expectedBinary = new ByteArrayOutputStream();
+    DataOutputStream expectedBinaryStream = new DataOutputStream(expectedBinary);
+    expectedBinaryStream.writeInt(8);
+    expectedBinaryStream.write(binaryBytes);
+    assertArrayEquals(expectedBinary.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Text format with non-UTC timezone
+    assertNull(
+        TimestampParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    byte[] textBytes =
+        TimestampParser.convertToPG(resultSet, 0, DataFormat.POSTGRESQL_TEXT, nyZone);
+    ByteArrayOutputStream expectedText = new ByteArrayOutputStream();
+    DataOutputStream expectedTextStream = new DataOutputStream(expectedText);
+    expectedTextStream.writeInt(textBytes.length);
+    expectedTextStream.write(textBytes);
+    assertArrayEquals(expectedText.toByteArray(), output.toByteArray());
   }
 
   @Test

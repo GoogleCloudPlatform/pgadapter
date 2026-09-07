@@ -26,6 +26,8 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -215,6 +217,47 @@ public class TimestampParser extends Parser<Timestamp> {
     byte[] result = new byte[8];
     ByteConverter.int8(result, 0, microseconds);
     return result;
+  }
+
+  public static byte[] convertToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    writeToPG(sessionState, outputStream, resultSet, position, format);
+    return null;
+  }
+
+  static void writeToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    switch (format) {
+      case SPANNER:
+        StringParser.writeToPG(
+            sessionState, outputStream, resultSet.getTimestamp(position).toString());
+        break;
+      case POSTGRESQL_TEXT:
+        ZoneId zoneId = sessionState.getTimezone();
+        StringParser.writeToPG(
+            sessionState, outputStream, toPGString(resultSet.getTimestamp(position), zoneId));
+        break;
+      case POSTGRESQL_BINARY:
+        Timestamp value = resultSet.getTimestamp(position);
+        long microseconds =
+            ((value.getSeconds() - PG_EPOCH_SECONDS) * MICROSECONDS_IN_SECOND)
+                + (value.getNanos() / NANOSECONDS_IN_MICROSECONDS);
+        outputStream.writeInt(8);
+        outputStream.writeLong(microseconds);
+        break;
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
   }
 
   public static byte[] convertToPG(
