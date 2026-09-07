@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.55.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.55.3...v0.55.4) (2026-09-07)
+
+
+### Dependencies
+
+* update dependency org.jetbrains.kotlin:kotlin-stdlib-jdk8 to v2.4.20 ([#4850](https://github.com/GoogleCloudPlatform/pgadapter/issues/4850)) ([448b3ad](https://github.com/GoogleCloudPlatform/pgadapter/commit/448b3ad76e508ee74ae72313824832832053f9f6))
+
 ## [0.55.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.55.2...v0.55.3) (2026-09-07)
 
 
