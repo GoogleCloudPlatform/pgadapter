@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-gem 'json', '< 3.0.0'
+gem 'json', '< 3.0.1'
 gem "testcontainers"
 gem 'pg'
 gem 'rake'
