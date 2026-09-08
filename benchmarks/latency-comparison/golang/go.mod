@@ -11,7 +11,7 @@ require (
 	github.com/moby/moby/api v1.56.0
 	github.com/montanaflynn/stats v0.12.5
 	github.com/testcontainers/testcontainers-go v0.44.0
-	golang.org/x/oauth2 v0.36.0
+	golang.org/x/oauth2 v0.37.0
 	google.golang.org/api v0.297.0
 )
 
