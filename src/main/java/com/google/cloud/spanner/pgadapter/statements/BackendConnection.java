@@ -24,7 +24,6 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW;
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
-import com.google.cloud.Tuple;
 import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
 import com.google.cloud.spanner.BatchTransactionId;
@@ -99,7 +98,6 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -204,21 +202,12 @@ public class BackendConnection {
     return false;
   }
 
-  boolean shouldReplaceStatement(Statement statement) {
-    if (!localStatements.get().isEmpty() && localStatements.get().containsKey(statement.getSql())) {
-      LocalStatement localStatement = localStatements.get().get(statement.getSql());
-      if (localStatement != null) {
-        return localStatement.hasReplacementStatement();
-      }
-    }
-    return false;
-  }
-
-  Tuple<Statement, ParsedStatement> replaceStatement(Statement statement) {
-    LocalStatement localStatement = localStatements.get().get(statement.getSql());
-    Statement replacement =
-        Objects.requireNonNull(localStatement).getReplacementStatement(statement);
-    return Tuple.of(replacement, Objects.requireNonNull(PARSER.parse(replacement)));
+  /**
+   * Returns the local statement for the given statement, or null if the statement is not a local
+   * statement.
+   */
+  LocalStatement getLocalStatement(Statement statement) {
+    return localStatements.get().get(statement.getSql());
   }
 
   /**
@@ -231,10 +220,10 @@ public class BackendConnection {
     final SettableFuture<T> result;
 
     BufferedStatement(ParsedStatement parsedStatement, Statement statement) {
-      if (shouldReplaceStatement(statement)) {
-        Tuple<Statement, ParsedStatement> replacement = replaceStatement(statement);
-        statement = replacement.x();
-        parsedStatement = replacement.y();
+      LocalStatement localStatement = getLocalStatement(statement);
+      if (localStatement != null && localStatement.hasReplacementStatement()) {
+        statement = localStatement.getReplacementStatement(statement);
+        parsedStatement = Objects.requireNonNull(PARSER.parse(statement));
       }
       this.parsedStatement = parsedStatement;
       this.statement = statement;
@@ -330,13 +319,8 @@ public class BackendConnection {
         //  block.
         SessionStatement sessionStatement =
             getSessionManagementStatement(updatedStatement, parsedStatement);
-        if (!localStatements.get().isEmpty()
-            && localStatements.get().containsKey(statement.getSql())
-            && localStatements.get().get(statement.getSql()) != null
-            && !Objects.requireNonNull(localStatements.get().get(statement.getSql()))
-                .hasReplacementStatement()) {
-          LocalStatement localStatement =
-              Objects.requireNonNull(localStatements.get().get(statement.getSql()));
+        LocalStatement localStatement = getLocalStatement(statement);
+        if (localStatement != null && !localStatement.hasReplacementStatement()) {
           result.set(localStatement.execute(BackendConnection.this, statement));
         } else if (sessionStatement != null) {
           result.set(sessionStatement.execute(sessionState, spannerConnection));
@@ -872,7 +856,7 @@ public class BackendConnection {
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final String currentSchema = "public";
-  private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
+  private final List<BufferedStatement<?>> bufferedStatements = new ArrayList<>();
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
