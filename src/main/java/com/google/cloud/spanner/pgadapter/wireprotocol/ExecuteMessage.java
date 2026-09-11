@@ -25,6 +25,7 @@ import java.text.MessageFormat;
 @InternalApi
 public class ExecuteMessage extends AbstractQueryProtocolMessage {
   protected static final char IDENTIFIER = 'E';
+  private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final String name;
   private final int maxRows;
@@ -85,6 +86,11 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
   @Override
   public String getIdentifier() {
     return String.valueOf(IDENTIFIER);
+  }
+
+  @Override
+  public String receivedEventDescription() {
+    return RECEIVED_EVENT_DESCRIPTION;
   }
 
   public String getName() {
