@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -34,6 +35,41 @@ import org.junit.runners.JUnit4;
 public class PgCatalogTest {
   @Test
   public void testReplaceCatalogTables() {}
+
+  @Test
+  public void testReplacePgCatalogTablesChecksAllCheckPrefixes() {
+    PgCatalog catalog = new PgCatalog(mock(SessionState.class), WellKnownClient.UNSPECIFIED);
+
+    // Statements that contain none of the check prefixes are returned unchanged.
+    Statement statement = Statement.of("select * from my_table");
+    assertSame(statement, catalog.replacePgCatalogTables(statement, statement.getSql()));
+
+    // 'pg_' is the first check prefix.
+    Statement pgClassStatement = Statement.of("select * from pg_class");
+    assertTrue(
+        catalog
+            .replacePgCatalogTables(pgClassStatement, pgClassStatement.getSql())
+            .getSql()
+            .startsWith("with pg_class as ("));
+
+    // 'information_schema.' is the second check prefix, so the first match may not end the search.
+    Statement sequencesStatement = Statement.of("select * from information_schema.sequences");
+    assertTrue(
+        catalog
+            .replacePgCatalogTables(sequencesStatement, sequencesStatement.getSql())
+            .getSql()
+            .startsWith("with pg_information_schema_sequences as ("));
+
+    // Clients can add prefixes of their own. Prisma adds '_prisma_migrations'.
+    PgCatalog prismaCatalog = new PgCatalog(mock(SessionState.class), WellKnownClient.PRISMA);
+    Statement prismaStatement = Statement.of("select * from _prisma_migrations");
+    assertEquals(
+        Statement.of("select * from prisma_migrations"),
+        prismaCatalog.replacePgCatalogTables(prismaStatement, prismaStatement.getSql()));
+    // Other clients do not have that prefix, so the statement is not touched.
+    assertSame(
+        prismaStatement, catalog.replacePgCatalogTables(prismaStatement, prismaStatement.getSql()));
+  }
 
   @Test
   public void testAddCommonTableExpressions() {

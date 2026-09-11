@@ -113,6 +113,41 @@ public class SimpleParserTest {
   }
 
   @Test
+  public void testEatKeywordIgnoresCase() {
+    assertTrue(new SimpleParser("INSERT INTO foo").eatKeyword("insert", "into"));
+    assertTrue(new SimpleParser("InSeRt InTo foo").eatKeyword("insert", "into"));
+    assertTrue(new SimpleParser("insert into foo").eatKeyword("INSERT", "INTO"));
+
+    assertFalse(new SimpleParser("INSET INTO foo").eatKeyword("insert"));
+    assertFalse(new SimpleParser("INSERTINTO foo").eatKeyword("insert", "into"));
+
+    // The keyword is compared with the same case folding as String.equalsIgnoreCase, which maps
+    // U+0130 (LATIN CAPITAL LETTER I WITH DOT ABOVE) to 'i'.
+    assertTrue(new SimpleParser("\u0130NSERT INTO foo").eatKeyword("insert", "into"));
+  }
+
+  @Test
+  public void testEatKeywordAtEndOfInput() {
+    assertTrue(new SimpleParser("insert").eatKeyword("insert"));
+    assertFalse(new SimpleParser("ins").eatKeyword("insert"));
+    assertFalse(new SimpleParser("").eatKeyword("insert"));
+    assertFalse(new SimpleParser("insert into").eatKeyword("insert", "into", "foo"));
+  }
+
+  @Test
+  public void testPeekKeywordKeepsPosition() {
+    SimpleParser parser = new SimpleParser("  insert into foo");
+    assertTrue(parser.peekKeyword("insert"));
+    assertEquals(0, parser.getPos());
+
+    assertFalse(parser.peekKeyword("update"));
+    assertEquals(0, parser.getPos());
+
+    assertTrue(parser.eatKeyword("insert"));
+    assertEquals(8, parser.getPos());
+  }
+
+  @Test
   public void testEatToken() {
     assertTrue(new SimpleParser("(foo").eatToken("("));
     assertTrue(new SimpleParser("(").eatToken("("));
@@ -368,6 +403,40 @@ public class SimpleParserTest {
         "insert into foo (\"\"\"\")",
         new SimpleParser("insert into foo (\"\"\"\") select * from bar")
             .parseExpressionUntilKeyword(ImmutableList.of("select")));
+  }
+
+  @Test
+  public void testParseExpressionUntilOneOfSeveralKeywords() {
+    // The expression stops at whichever keyword occurs first, regardless of its position in the
+    // list.
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1 order by name")
+            .parseExpressionUntilKeyword(ImmutableList.of("order", "limit", "offset")));
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1 order by name")
+            .parseExpressionUntilKeyword(ImmutableList.of("limit", "offset", "order")));
+    assertEquals(
+        "select * from foo where id=1 limit 10",
+        new SimpleParser("select * from foo where id=1 limit 10 offset 5")
+            .parseExpressionUntilKeyword(ImmutableList.of("offset", "for")));
+
+    // No keyword matches, so the whole expression is returned.
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1")
+            .parseExpressionUntilKeyword(ImmutableList.of("limit", "offset")));
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1")
+            .parseExpressionUntilKeyword(ImmutableList.of()));
+
+    // Keywords are only checked at the start parentheses level if that is requested.
+    assertEquals(
+        "foo(order by)",
+        new SimpleParser("foo(order by) order by x")
+            .parseExpressionUntilKeyword(ImmutableList.of("limit", "order"), true, true));
   }
 
   @Test
