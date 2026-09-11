@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -23,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.io.DataOutputStream;
 import java.text.MessageFormat;
+import java.util.List;
 import org.postgresql.core.Oid;
 
 /** Sends back qualifier for a row. */
@@ -47,6 +49,12 @@ public class RowDescriptionResponse extends WireOutput {
   private final OptionsMetadata options;
   private final int columnCount;
 
+  /**
+   * The UTF-8 encoded column names. These are encoded once and used both to determine the length of
+   * the message and to write the payload, as the two must always agree.
+   */
+  private final byte[][] columnNames;
+
   public RowDescriptionResponse(
       DataOutputStream output,
       IntermediateStatement statement,
@@ -54,21 +62,42 @@ public class RowDescriptionResponse extends WireOutput {
       OptionsMetadata options,
       QueryMode mode)
       throws Exception {
-    super(output, calculateLength(columns));
+    this(output, statement, columns, options, mode, encodeColumnNames(columns));
+  }
+
+  private RowDescriptionResponse(
+      DataOutputStream output,
+      IntermediateStatement statement,
+      Type columns,
+      OptionsMetadata options,
+      QueryMode mode,
+      byte[][] columnNames)
+      throws Exception {
+    super(output, calculateLength(columnNames));
     this.statement = statement;
     this.columns = columns;
     this.options = options;
     this.mode = mode;
     this.columnCount = columns.getStructFields().size();
+    this.columnNames = columnNames;
   }
 
-  private static int calculateLength(Type columns) {
+  private static byte[][] encodeColumnNames(Type columns) {
+    List<StructField> fields = columns.getStructFields();
+    byte[][] columnNames = new byte[fields.size()][];
+    for (int columnIndex = 0; /* columns start at 0 */ columnIndex < fields.size(); columnIndex++) {
+      columnNames[columnIndex] = fields.get(columnIndex).getName().getBytes(UTF8);
+    }
+    return columnNames;
+  }
+
+  private static int calculateLength(byte[][] columnNames) {
     int length = HEADER_LENGTH + FIELD_NUMBER_LENGTH;
-    for (int column_index = 0; /* columns start at 0 */
-        column_index < columns.getStructFields().size();
-        column_index++) {
+    for (byte[] columnName : columnNames) {
+      // Note: This must be the number of bytes of the encoded name, and not the number of
+      // characters in the name, as these differ for non-ASCII column names.
       length +=
-          columns.getStructFields().get(column_index).getName().length()
+          columnName.length
               + NULL_TERMINATOR_LENGTH
               + TABLE_OID_LENGTH
               + COLUMN_INDEX_LENGTH
@@ -87,8 +116,7 @@ public class RowDescriptionResponse extends WireOutput {
     for (int columnIndex = 0; /* columns start at 0 */
         columnIndex < this.columnCount;
         columnIndex++) {
-      this.outputStream.write(
-          this.columns.getStructFields().get(columnIndex).getName().getBytes(UTF8));
+      this.outputStream.write(this.columnNames[columnIndex]);
       // If it can be identified as a column of a table, the object ID of the table.
       this.outputStream.writeByte(DEFAULT_FLAG);
       // If it can be identified as a column of a table, the attribute number of the column

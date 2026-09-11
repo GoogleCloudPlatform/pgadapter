@@ -352,4 +352,79 @@ public final class RowDescriptionTest {
 
     assertEquals(Oid.UNSPECIFIED, response.getOidType(0));
   }
+
+  @Test
+  public void testMessageLengthWithAsciiColumnNames() throws Exception {
+    assertMessageLengthMatchesPayload(
+        Type.struct(StructField.of("id", Type.int64()), StructField.of("value", Type.string())));
+  }
+
+  /**
+   * The length that is included in a RowDescription message must be the number of bytes in the
+   * message, and not the number of characters. These differ as soon as a column name contains a
+   * non-ASCII character, as the names are encoded as UTF-8 on the wire.
+   */
+  @Test
+  public void testMessageLengthWithNonAsciiColumnNames() throws Exception {
+    assertMessageLengthMatchesPayload(
+        Type.struct(
+            // 'é' is two bytes in UTF-8, and the emoji is four.
+            StructField.of("café", Type.int64()),
+            StructField.of("naïve_column", Type.string()),
+            StructField.of("日本語", Type.string()),
+            StructField.of("emoji_🍺", Type.bool())));
+  }
+
+  /**
+   * Sends a RowDescription message for the given row type and verifies that the length that is
+   * included in the message header corresponds with the number of bytes that were actually written.
+   * A client uses this length to determine where the next message starts, so a mismatch means that
+   * the client loses track of the message boundaries in the stream.
+   */
+  private void assertMessageLengthMatchesPayload(Type rowType) throws Exception {
+    JSONParser parser = new JSONParser();
+    JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
+    OptionsMetadata options =
+        new OptionsMetadata(
+            "jdbc:cloudspanner:/projects/test-project/instances/test-instance/databases/test-database",
+            8888,
+            TextFormat.POSTGRESQL,
+            false,
+            false,
+            false,
+            false,
+            commandMetadata);
+    RowDescriptionResponse response =
+        new RowDescriptionResponse(output, null, rowType, options, QueryMode.EXTENDED);
+
+    response.send();
+
+    byte[] message = buffer.toByteArray();
+    DataInputStream outputReader = new DataInputStream(new ByteArrayInputStream(message));
+    assertEquals('T', outputReader.readByte());
+    int lengthInMessage = outputReader.readInt();
+    // The length includes the four bytes of the length itself, but not the message identifier.
+    assertEquals(
+        "The length in the message header must match the number of bytes that were written",
+        message.length - 1,
+        lengthInMessage);
+
+    // Verify that reading exactly the number of bytes that the header promises consumes the
+    // complete message, which is what a client does to find the start of the next message.
+    assertEquals(rowType.getStructFields().size(), outputReader.readShort());
+    for (StructField field : rowType.getStructFields()) {
+      byte[] name = new byte[field.getName().getBytes(UTF8).length];
+      outputReader.readFully(name);
+      assertEquals(field.getName(), new String(name, UTF8));
+      assertEquals(DEFAULT_FLAG, outputReader.readByte());
+      // table oid, column index, type oid, type size, type modifier and format code
+      outputReader.readInt();
+      outputReader.readShort();
+      outputReader.readInt();
+      outputReader.readShort();
+      outputReader.readInt();
+      outputReader.readShort();
+    }
+    assertEquals("The message must be fully consumed", 0, outputReader.available());
+  }
 }
