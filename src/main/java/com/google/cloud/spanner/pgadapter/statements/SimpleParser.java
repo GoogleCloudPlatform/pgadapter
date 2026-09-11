@@ -574,8 +574,7 @@ public class SimpleParser {
       } else if (stopAtEndOfExpression && parens == 0 && stopAtComma && sql.charAt(pos) == ',') {
         break;
       }
-      if ((!sameParensLevelAsStart || parens == 0)
-          && keywords.stream().anyMatch(this::peekKeyword)) {
+      if ((!sameParensLevelAsStart || parens == 0) && peekAnyKeyword(keywords)) {
         break;
       }
       pos++;
@@ -584,6 +583,19 @@ public class SimpleParser {
       return null;
     }
     return sql.substring(start, pos).trim();
+  }
+
+  /** Returns true if any of the given keywords is found at the current position. */
+  private boolean peekAnyKeyword(ImmutableList<String> keywords) {
+    // This is called for every character of an expression, so use an indexed loop. Both a stream
+    // and an iterator would allocate.
+    int size = keywords.size();
+    for (int index = 0; index < size; index++) {
+      if (peekKeyword(keywords.get(index))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   List<TableOrIndexName> readTableList() {
@@ -892,7 +904,7 @@ public class SimpleParser {
       }
       return false;
     }
-    if (sql.substring(pos, pos + keyword.length()).equalsIgnoreCase(keyword)
+    if (sql.regionMatches(true, pos, keyword, 0, keyword.length())
         && (!requireWhitespaceAfter || isValidEndOfKeyword(pos + keyword.length()))) {
       if (updatePos) {
         pos = pos + keyword.length();
