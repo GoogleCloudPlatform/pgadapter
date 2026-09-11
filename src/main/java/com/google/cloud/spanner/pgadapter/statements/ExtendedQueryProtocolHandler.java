@@ -35,7 +35,6 @@ import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -48,7 +47,7 @@ public class ExtendedQueryProtocolHandler {
   private static final Logger logger =
       Logger.getLogger(ExtendedQueryProtocolHandler.class.getName());
 
-  private final LinkedList<AbstractQueryProtocolMessage> messages = new LinkedList<>();
+  private final List<AbstractQueryProtocolMessage> messages = new ArrayList<>();
   private final ConnectionHandler connectionHandler;
   private final BackendConnection backendConnection;
 
@@ -92,6 +91,11 @@ public class ExtendedQueryProtocolHandler {
 
   public Tracer getTracer() {
     return backendConnection.getTracer();
+  }
+
+  /** Returns the connection id that is used as a trace attribute. */
+  public String getConnectionId() {
+    return connectionId;
   }
 
   @VisibleForTesting
