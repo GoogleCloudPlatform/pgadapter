@@ -154,7 +154,7 @@ public class PgCatalog {
               Pattern.compile("obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
               "''::varchar AS obj_description"));
 
-  private final ImmutableSet<String> checkPrefixes;
+  private final ImmutableList<String> checkPrefixes;
 
   private final ImmutableMap<TableOrIndexName, TableOrIndexName> tableReplacements;
   private final ImmutableMap<TableOrIndexName, PgCatalogTable> pgCatalogTables;
@@ -181,7 +181,7 @@ public class PgCatalog {
 
   public PgCatalog(@Nonnull SessionState sessionState, @Nonnull WellKnownClient wellKnownClient) {
     this.sessionState = Preconditions.checkNotNull(sessionState);
-    this.checkPrefixes = wellKnownClient.getPgCatalogCheckPrefixes();
+    this.checkPrefixes = ImmutableList.copyOf(wellKnownClient.getPgCatalogCheckPrefixes());
     ImmutableMap.Builder<TableOrIndexName, TableOrIndexName> builder =
         ImmutableMap.<TableOrIndexName, TableOrIndexName>builder()
             .putAll(DEFAULT_TABLE_REPLACEMENTS);
@@ -229,7 +229,7 @@ public class PgCatalog {
   /** Replace supported pg_catalog tables with Common Table Expressions. */
   public Statement replacePgCatalogTables(Statement statement, String lowerCaseSql) {
     // Only replace tables if the statement contains at least one of the known prefixes.
-    if (checkPrefixes.stream().noneMatch(lowerCaseSql::contains)) {
+    if (!containsAnyCheckPrefix(lowerCaseSql)) {
       return statement;
     }
 
@@ -247,6 +247,19 @@ public class PgCatalog {
     }
 
     return addCommonTableExpressions(replacedTablesStatement.y(), cteBuilder.build());
+  }
+
+  /** Returns true if the given SQL string contains at least one of the check prefixes. */
+  private boolean containsAnyCheckPrefix(String lowerCaseSql) {
+    // This runs for every statement, so use an indexed loop. Both a stream and an iterator would
+    // allocate.
+    int size = checkPrefixes.size();
+    for (int index = 0; index < size; index++) {
+      if (lowerCaseSql.contains(checkPrefixes.get(index))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Tuple<String, ReplacementStatus> replaceKnownUnsupportedFunctions(Statement statement) {
