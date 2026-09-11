@@ -72,6 +72,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'P';
+  private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final String name;
   private final IntermediatePreparedStatement statement;
@@ -318,6 +319,11 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   @Override
   public String getIdentifier() {
     return String.valueOf(IDENTIFIER);
+  }
+
+  @Override
+  public String receivedEventDescription() {
+    return RECEIVED_EVENT_DESCRIPTION;
   }
 
   @Override
