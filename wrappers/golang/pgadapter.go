@@ -62,6 +62,10 @@ type ExecutionEnvironment interface {
 const dockerImage = "gcr.io/cloud-spanner-pg-adapter/pgadapter"
 const dockerImageWithEmulator = "gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator"
 
+// emulatorReadyMessage is logged by the Spanner emulator in the pgadapter-emulator Docker image
+// once it accepts requests.
+const emulatorReadyMessage = "Cloud Spanner emulator running."
+
 // Docker contains the specific configuration for running PGAdapter in a test Docker container.
 // This Docker execution environment can be used for tests and development. You should however
 // not use this Docker execution environment in production, as it uses a test container.
@@ -646,11 +650,20 @@ func startDocker(ctx context.Context, config Config) (pgadapter *PGAdapter, err 
 	if config.Version != "" {
 		image += ":" + config.Version
 	}
+	// PGAdapter accepts connections before the emulator in the same container is ready, so wait
+	// for the emulator as well when the combined image is used.
+	var waitStrategy wait.Strategy = wait.ForListeningPort("5432/tcp")
+	if config.ConnectToEmulator {
+		waitStrategy = wait.ForAll(
+			wait.ForListeningPort("5432/tcp"),
+			wait.ForLog(emulatorReadyMessage),
+		)
+	}
 	req := testcontainers.ContainerRequest{
 		AlwaysPullImage: config.ExecutionEnvironment.(*Docker).AlwaysPullImage,
 		Image:           image,
 		ExposedPorts:    []string{"5432/tcp"},
-		WaitingFor:      wait.ForListeningPort("5432/tcp"),
+		WaitingFor:      waitStrategy,
 		HostConfigModifier: func(hostConfig *container.HostConfig) {
 			if !config.ExecutionEnvironment.(*Docker).KeepContainer {
 				hostConfig.AutoRemove = true

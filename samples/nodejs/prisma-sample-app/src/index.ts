@@ -19,7 +19,7 @@ import {
   deleteExistingData, deployMigrations, printAlbumsReleasedBefore1900,
   printSingersAndAlbums, staleRead, updateVenueDescription
 } from "./sample";
-import {GenericContainer, PullPolicy, StartedTestContainer, TestContainer} from "testcontainers";
+import {GenericContainer, PullPolicy, StartedTestContainer, TestContainer, Wait} from "testcontainers";
 import fs from "fs";
 import path from "path";
 
@@ -110,7 +110,12 @@ export async function startPGAdapter(): Promise<StartedTestContainer> {
   console.log("Pulling PGAdapter and Spanner emulator");
   const container: TestContainer = new GenericContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
     .withPullPolicy(PullPolicy.alwaysPull())
-    .withExposedPorts(5432);
+    .withExposedPorts(5432)
+    // PGAdapter starts accepting connections before the emulator is ready, so wait for the
+    // emulator as well.
+    .withWaitStrategy(Wait.forAll([
+      Wait.forListeningPorts(),
+      Wait.forLogMessage("Cloud Spanner emulator running.")]));
   console.log("Starting PGAdapter and Spanner emulator");
   return await container.start();
 }
