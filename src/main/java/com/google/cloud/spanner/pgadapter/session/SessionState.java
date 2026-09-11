@@ -415,12 +415,23 @@ public class SessionState {
         settings.put(toKey(setting.getExtension(), setting.getName()), setting);
       }
     }
+    // Dropping the local settings can uncover a different value, so the cache must go. Promoting
+    // the transaction settings cannot: internalGet(..) returns the same PGSetting instance either
+    // way. The distinction matters, as commit() runs for every statement in autocommit mode.
+    if (localSettings != null) {
+      invalidateCache();
+    }
     this.localSettings = null;
     this.transactionSettings = null;
   }
 
   /** Rolls back the current transaction and abandons any pending changes to the settings. */
   public void rollback() {
+    // Both maps are dropped here, so the cached values are only stale if the transaction changed
+    // something.
+    if (localSettings != null || transactionSettings != null) {
+      invalidateCache();
+    }
     this.localSettings = null;
     this.transactionSettings = null;
   }
