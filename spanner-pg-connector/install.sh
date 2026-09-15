@@ -123,6 +123,12 @@ PACKAGE_NAME="spanner-pg-connector-${OS_NAME}-${ARCH_NAME}.tar.gz"
 mkdir -p "${INSTALL_DIR}"
 rm -f "${INSTALL_DIR}/pgadapter.jsa" "${INSTALL_DIR}/install_path.txt"
 
+# Remove the previous installation's payload, otherwise its jars stay in lib/ and the launcher's
+# lib/* classpath loads two versions of the same dependency. INSTALL_DIR itself is left alone.
+for managed in lib custom-jre pgadapter.jar spanner-pg-connector spgc; do
+  rm -rf "${INSTALL_DIR:?}/${managed}"
+done
+
 # 3. Download and Extract Release Bundle
 if [ -f "./target/dist/${PACKAGE_NAME}" ]; then
   echo "Found local release package. Installing locally..."
@@ -203,26 +209,91 @@ esac
 
 PATH_EXPORT="export PATH=\"\${PATH}:${INSTALL_DIR}\""
 
-if [ -n "${SHELL_CONFIG}" ]; then
-  if [ -f "${SHELL_CONFIG}" ]; then
-    if ! grep -q "${INSTALL_DIR}" "${SHELL_CONFIG}"; then
-      printf "\n# Spanner PG Connector CLI path mapping\n" >> "${SHELL_CONFIG}"
-      printf "%s\n" "${PATH_EXPORT}" >> "${SHELL_CONFIG}"
-      echo "Added installation path to ${SHELL_CONFIG}."
-    else
-      echo "Installation path already configured in ${SHELL_CONFIG}."
-    fi
+# The PATH entry lives in a delimited block that is rewritten in place. Appending was not
+# idempotent: it duplicated entries and left old install directories on PATH forever.
+BEGIN_MARKER="# >>> spanner-pg-connector >>>"
+END_MARKER="# <<< spanner-pg-connector <<<"
+
+# Leaves exactly one managed block at the end of SHELL_CONFIG, also removing the un-delimited
+# entries written by earlier versions of this installer. Returns 2 if no change was needed.
+write_managed_block() {
+  config="$1"
+  tmp="${config}.spgc-tmp.$$"
+
+  if [ -f "${config}" ]; then
+    awk -v begin_marker="${BEGIN_MARKER}" -v end_marker="${END_MARKER}" '
+      # Drop any existing managed block.
+      $0 == begin_marker { in_block = 1; next }
+      $0 == end_marker   { in_block = 0; next }
+      in_block { next }
+
+      # Legacy, un-delimited entries.
+      /^# Spanner PG (Connector|Starter) CLI path mapping$/ { after_legacy_header = 1; next }
+      after_legacy_header && /^export PATH=.*(spanner-pg-connector|spanner-pg-starter)/ {
+        after_legacy_header = 0
+        next
+      }
+      { after_legacy_header = 0; print }
+    ' "${config}" > "${tmp}" || { rm -f "${tmp}"; return 1; }
   else
-    printf "%s\n" "${PATH_EXPORT}" >> "${SHELL_CONFIG}"
-    echo "Created and added path mapping to ${SHELL_CONFIG}."
+    : > "${tmp}"
   fi
+
+  # Collapse any run of blank lines that removals may have left at the end of the file.
+  awk 'BEGIN { blanks = 0 }
+       /^[[:space:]]*$/ { blanks++; next }
+       { while (blanks-- > 0) print ""; blanks = 0; print }
+      ' "${tmp}" > "${tmp}.trimmed" && mv "${tmp}.trimmed" "${tmp}"
+
+  {
+    printf "\n%s\n" "${BEGIN_MARKER}"
+    printf "%s\n" "${PATH_EXPORT}"
+    printf "%s\n" "${END_MARKER}"
+  } >> "${tmp}"
+
+  # A no-op run must not touch the file, so that it does not churn the user's dotfiles or backups.
+  if [ -f "${config}" ] && cmp -s "${tmp}" "${config}"; then
+    rm -f "${tmp}"
+    return 2
+  fi
+
+  if [ -f "${config}" ]; then
+    cp "${config}" "${config}.spanner-pg-connector.bak"
+  fi
+  mv "${tmp}" "${config}"
+  return 0
+}
+
+if [ -n "${SHELL_CONFIG}" ]; then
+  # Capture the status conditionally; a bare call would abort the installer under `set -e`.
+  write_managed_block "${SHELL_CONFIG}" && block_status=0 || block_status=$?
+  case "${block_status}" in
+    0)
+      echo "Configured installation path in ${SHELL_CONFIG}."
+      if [ -f "${SHELL_CONFIG}.spanner-pg-connector.bak" ]; then
+        echo "  (previous contents saved to ${SHELL_CONFIG}.spanner-pg-connector.bak)"
+      fi
+      ;;
+    2)
+      echo "Installation path already configured in ${SHELL_CONFIG}."
+      ;;
+    *)
+      echo "Warning: could not update ${SHELL_CONFIG}. Please add this to your PATH manually:"
+      echo "  ${PATH_EXPORT}"
+      ;;
+  esac
 else
   echo "Warning: Could not automatically detect shell profile. Please add this manually to your PATH:"
   echo "  ${PATH_EXPORT}"
 fi
+
 printf "\n-----------------------------------------------------\n"
 echo "Installation complete!"
-echo "Please reload your terminal session or run:"
-echo "  source ${SHELL_CONFIG}"
+if [ -n "${SHELL_CONFIG}" ]; then
+  echo "Please reload your terminal session or run:"
+  echo "  source ${SHELL_CONFIG}"
+else
+  echo "Please add ${INSTALL_DIR} to your PATH, then reload your terminal session."
+fi
 echo "To begin using: spgc psql"
 echo "-----------------------------------------------------"

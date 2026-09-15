@@ -98,13 +98,38 @@ Write-Host "Extracting files to $InstallDir..."
 Expand-Archive -Path $ZipPath -DestinationPath $InstallDir -Force
 Remove-Item $ZipPath
 
-# 4. Add to user PATH environment variable if not already present
+# 4. Add to user PATH environment variable
+# Rebuild the entry rather than only appending, so that an older install directory does not stay
+# on PATH and win over this one.
 Write-Host "Configuring environment PATH..."
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($UserPath -split ";" -notcontains $InstallDir) {
-    [Environment]::SetEnvironmentVariable("Path", "$UserPath;$InstallDir", "User")
-    $env:PATH = "$env:PATH;$InstallDir"
+$Entries = @()
+if ($UserPath) {
+    $Entries = $UserPath -split ";"
+}
+
+# Drop empty entries, this install dir, and any directory left behind by an earlier run.
+$Cleaned = $Entries | Where-Object {
+    $_ -and
+    $_.TrimEnd("\") -ne $InstallDir.TrimEnd("\") -and
+    $_ -notmatch "spanner-pg-connector" -and
+    $_ -notmatch "spanner-pg-starter"
+}
+
+$Removed = $Entries.Count - $Cleaned.Count
+if ($Removed -gt 0) {
+    Write-Host "Removed $Removed stale Spanner PG Connector entry/entries from user PATH." -ForegroundColor Yellow
+}
+
+$NewPath = (@($Cleaned) + $InstallDir) -join ";"
+if ($NewPath -ne $UserPath) {
+    [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
     Write-Host "Added $InstallDir to user PATH." -ForegroundColor Cyan
+} else {
+    Write-Host "User PATH already up to date." -ForegroundColor Cyan
+}
+if (($env:PATH -split ";") -notcontains $InstallDir) {
+    $env:PATH = "$env:PATH;$InstallDir"
 }
 Write-Host "-----------------------------------------------------" -ForegroundColor Green
 Write-Host "Installation complete!" -ForegroundColor Green
