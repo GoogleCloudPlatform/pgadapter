@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -79,9 +80,10 @@ public class SpannerPGConnectorMockServerTest extends AbstractMockServerTest {
     try {
       Future<Integer> future =
           executor.submit(() -> SpannerPGConnector.runCommand(pgServer, database, command));
-      return future.get();
+      // Bounded: a psql that hangs or prompts would otherwise stall the entire build.
+      return future.get(60L, TimeUnit.SECONDS);
     } finally {
-      executor.shutdown();
+      executor.shutdownNow();
     }
   }
 

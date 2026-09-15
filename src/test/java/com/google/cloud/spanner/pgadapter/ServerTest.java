@@ -165,10 +165,14 @@ public class ServerTest {
     try {
       Future<Integer> exitCode =
           executor.submit(() -> Server.startAndWait(new ProcessBuilder("sleep", "300")));
-      // startAndWait must have registered the process before it can be destroyed.
-      Thread.sleep(500L);
 
-      Server.destroyClientProcess();
+      // Retry rather than sleeping a fixed amount: destroyClientProcess() is a no-op until
+      // startAndWait has registered the process, and that can be slow on a loaded machine.
+      long deadline = System.currentTimeMillis() + 10_000L;
+      while (!exitCode.isDone() && System.currentTimeMillis() < deadline) {
+        Server.destroyClientProcess();
+        Thread.sleep(50L);
+      }
 
       assertNotEquals(0, exitCode.get(10L, TimeUnit.SECONDS).intValue());
     } finally {

@@ -62,11 +62,16 @@ if ([string]::IsNullOrEmpty($Version)) {
 
 Write-Host "Installing Spanner PG Connector..." -ForegroundColor Green
 
-# 1. Clean previous installation
+# 1. Remove the previous installation's payload. Only managed assets are deleted, so user files
+# survive and a directory that some shell is sitting in does not block the upgrade.
 if (Test-Path $InstallDir) {
-    Remove-Item -Recurse -Force $InstallDir
+    foreach ($managed in @("lib", "custom-jre", "pgadapter.jar", "spanner-pg-connector.cmd", "spgc.cmd")) {
+        $target = Join-Path $InstallDir $managed
+        if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+    }
+} else {
+    New-Item -ItemType Directory -Path $InstallDir | Out-Null
 }
-New-Item -ItemType Directory -Path $InstallDir | Out-Null
 
 # 2. Download package
 Write-Host "Downloading package from Artifact Registry..."
@@ -121,7 +126,9 @@ if ($Removed -gt 0) {
     Write-Host "Removed $Removed stale Spanner PG Connector entry/entries from user PATH." -ForegroundColor Yellow
 }
 
-$NewPath = (@($Cleaned) + $InstallDir) -join ";"
+# Filter blanks: @($null) is a one-element array, and an empty PATH entry is interpreted by
+# Windows as the current directory.
+$NewPath = (@($Cleaned) + $InstallDir | Where-Object { $_ }) -join ";"
 if ($NewPath -ne $UserPath) {
     [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
     Write-Host "Added $InstallDir to user PATH." -ForegroundColor Cyan

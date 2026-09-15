@@ -1,3 +1,4 @@
 @echo off
 
-"%~dp0spanner-pg-connector.cmd" %*
+call "%~dp0spanner-pg-connector.cmd" %*
+exit /b %ERRORLEVEL%

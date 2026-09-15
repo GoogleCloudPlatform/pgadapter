@@ -165,7 +165,10 @@ public class SpannerPGConnector {
       Server.destroyClientProcess();
       return 130;
     } catch (Throwable throwable) {
-      err.printf("%s: failed to start PGAdapter: %s%n", PROGRAM_NAME, throwable.getMessage());
+      // getMessage() is null for exceptions such as NullPointerException.
+      String message =
+          throwable.getMessage() == null ? throwable.toString() : throwable.getMessage();
+      err.printf("%s: failed to start PGAdapter: %s%n", PROGRAM_NAME, message);
       return 1;
     } finally {
       Server.stopProxyServer(proxyServer, proxyServerStopped);

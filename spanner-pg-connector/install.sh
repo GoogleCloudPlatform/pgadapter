@@ -46,12 +46,14 @@ if [ -z "${VERSION}" ]; then
     RESPONSE=$(curl -s -L "${VERSIONS_URL}" 2>/dev/null || true)
   fi
 
+  # `sort -V` is GNU-only and silently yields nothing on macOS. The grep above guarantees three
+  # numeric fields, so sort them as numbers instead.
   VERSION=$(echo "${RESPONSE}" \
     | grep -oE '"name": "[^"]+"' \
     | cut -d'"' -f4 \
     | awk -F/ '{print $NF}' \
     | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-    | sort -V \
+    | sort -t. -k 1,1n -k 2,2n -k 3,3n \
     | tail -n 1)
 
   # If curl didn't find any version and gcloud is installed, try gcloud as fallback
@@ -63,7 +65,7 @@ if [ -z "${VERSION}" ]; then
       --repository="${AR_REPOSITORY}" \
       --format="value(name)" 2>/dev/null \
       | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-      | sort -V \
+      | sort -t. -k 1,1n -k 2,2n -k 3,3n \
       | tail -n 1 || true)
   fi
 
@@ -130,12 +132,21 @@ for managed in lib custom-jre pgadapter.jar spanner-pg-connector spgc; do
 done
 
 # 3. Download and Extract Release Bundle
-if [ -f "./target/dist/${PACKAGE_NAME}" ]; then
-  echo "Found local release package. Installing locally..."
-  tar -xzf "./target/dist/${PACKAGE_NAME}" -C "${INSTALL_DIR}"
-elif [ -f "./${PACKAGE_NAME}" ]; then
-  echo "Found local package in root. Installing locally..."
-  tar -xzf "./${PACKAGE_NAME}" -C "${INSTALL_DIR}"
+# versioned-package is where the release build writes the tarballs; dist holds unpacked staging.
+LOCAL_PACKAGE=""
+for candidate in \
+  "./target/release/versioned-package/${PACKAGE_NAME}" \
+  "./target/dist/${PACKAGE_NAME}" \
+  "./${PACKAGE_NAME}"; do
+  if [ -f "${candidate}" ]; then
+    LOCAL_PACKAGE="${candidate}"
+    break
+  fi
+done
+
+if [ -n "${LOCAL_PACKAGE}" ]; then
+  echo "Found local release package at ${LOCAL_PACKAGE}. Installing locally..."
+  tar -xzf "${LOCAL_PACKAGE}" -C "${INSTALL_DIR}"
 else
   # Download from Generic Artifact Registry
   DOWNLOAD_URL="https://artifactregistry.googleapis.com/v1/projects/${PROJECT_ID}/locations/${AR_LOCATION}/repositories/${AR_REPOSITORY}/files/spanner-pg-connector:${VERSION}:${PACKAGE_NAME}:download?alt=media"
