@@ -23,11 +23,12 @@ substitutions:
   _AR_REPOSITORY: 'spanner-pg-connector'
 
 steps:
-  # Step 1: Compile and package using assembly profile (JDK 25)
+  # Step 1: Compile and package using assembly profile (JDK 25).
+  # The connector profile adds slf4j-nop, which keeps SLF4J warnings off stderr.
   - name: 'mirror.gcr.io/library/maven:3.9-eclipse-temurin-25'
     id: 'build-assembly'
     entrypoint: 'mvn'
-    args: ['-Passembly', '-DskipTests', '-Dfmt.skip', 'clean', 'package']
+    args: ['-Passembly,connector', '-DskipTests', '-Dfmt.skip', 'clean', 'package']
 
   # Step 2: Assemble the minimal platform-specific JREs via jlink cross-linking (JDK 25)
   - name: 'mirror.gcr.io/library/eclipse-temurin:25'
