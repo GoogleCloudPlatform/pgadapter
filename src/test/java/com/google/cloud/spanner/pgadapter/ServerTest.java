@@ -15,11 +15,21 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -127,5 +137,77 @@ public class ServerTest {
         System.setProperty("javax.net.ssl.keyStore", originalKeyStore);
       }
     }
+  }
+
+  @Test
+  public void testStartAndWaitReturnsExitCode() throws Exception {
+    assumeFalse(isWindows());
+
+    assertEquals(0, Server.startAndWait(new ProcessBuilder("sh", "-c", "exit 0")));
+    assertEquals(3, Server.startAndWait(new ProcessBuilder("sh", "-c", "exit 3")));
+  }
+
+  @Test
+  public void testDestroyClientProcessIsNoOpWhenNothingIsRunning() {
+    Server.destroyClientProcess();
+    Server.destroyClientProcess();
+  }
+
+  /**
+   * Killing this process does not kill the client tool, so the shutdown hook must stop it
+   * explicitly. Verifies that a running command is actually stopped.
+   */
+  @Test
+  public void testDestroyClientProcessStopsRunningCommand() throws Exception {
+    assumeFalse(isWindows());
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<Integer> exitCode =
+          executor.submit(() -> Server.startAndWait(new ProcessBuilder("sleep", "300")));
+      // startAndWait must have registered the process before it can be destroyed.
+      Thread.sleep(500L);
+
+      Server.destroyClientProcess();
+
+      assertNotEquals(0, exitCode.get(10L, TimeUnit.SECONDS).intValue());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testStopProxyServerOnlyStopsOnce() {
+    ProxyServer proxyServer = mock(ProxyServer.class);
+    AtomicBoolean stopped = new AtomicBoolean(false);
+
+    Server.stopProxyServer(proxyServer, stopped);
+    Server.stopProxyServer(proxyServer, stopped);
+
+    verify(proxyServer).stopServer();
+  }
+
+  @Test
+  public void testStopProxyServerIgnoresErrors() {
+    ProxyServer proxyServer = mock(ProxyServer.class);
+    doThrow(new IllegalStateException("test")).when(proxyServer).stopServer();
+
+    Server.stopProxyServer(proxyServer, new AtomicBoolean(false));
+    Server.stopProxyServer(null, new AtomicBoolean(false));
+  }
+
+  @Test
+  public void testRemoveShutdownHook() {
+    Server.removeShutdownHook(null);
+
+    Thread shutdownHook = new Thread(() -> {});
+    Runtime.getRuntime().addShutdownHook(shutdownHook);
+    Server.removeShutdownHook(shutdownHook);
+    // Removing a hook that is no longer registered must not throw.
+    Server.removeShutdownHook(shutdownHook);
+  }
+
+  private static boolean isWindows() {
+    return System.getProperty("os.name", "").toLowerCase().startsWith("windows");
   }
 }
