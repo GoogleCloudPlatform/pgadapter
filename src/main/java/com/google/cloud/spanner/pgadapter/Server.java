@@ -69,23 +69,46 @@ import org.w3c.dom.NodeList;
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
 
-  /** Exit code that is used when the JVM is terminated by a TERM signal (128 + SIGTERM). */
-  private static final int TERM_EXIT_CODE = 143;
+  /** Exit code that is used when PGAdapter itself could not be started. */
+  private static final int STARTUP_FAILED_EXIT_CODE = 1;
+
+  /**
+   * Exit code that is used when the tool given with --command could not be executed. 127 is the
+   * conventional shell exit code for 'command not found'.
+   */
+  private static final int COMMAND_NOT_EXECUTED_EXIT_CODE = 127;
 
   /** The client tool that was started by {@link #runCommand}, if any. */
   private static final AtomicReference<Process> clientProcess = new AtomicReference<>();
 
-  private static volatile ShutdownHandler shutdownHandler;
+  /**
+   * Serializes starting the client tool against shutting down, so that a tool that is still being
+   * started cannot be missed by the shutdown hook and left running.
+   */
+  @VisibleForTesting static final Object clientProcessLock = new Object();
 
-  static {
-    registerSignalHandlers();
-  }
+  /** Set by the shutdown hook, so that a client tool that is still starting is not started. */
+  @VisibleForTesting static final AtomicBoolean shuttingDown = new AtomicBoolean(false);
+
+  private static volatile ShutdownHandler shutdownHandler;
 
   /**
    * Main method for running a Spanner PostgreSQL Adapter {@link Server} as a stand-alone
    * application. Here we call for parameter parsing and start the Proxy Server.
    */
   public static void main(String[] args) {
+    int exitCode = run(args);
+    if (exitCode != 0) {
+      System.exit(exitCode);
+    }
+  }
+
+  /**
+   * Runs PGAdapter and returns the exit code that this process should use. Returns zero without
+   * blocking when PGAdapter is started in the background, as the proxy keeps the JVM alive.
+   */
+  @VisibleForTesting
+  static int run(String[] args) {
     try {
       DefaultLogConfiguration.configureLogging(args);
       OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
@@ -102,29 +125,51 @@ public class Server {
         if (optionsMetadata.getDefaultDatabaseId() != null) {
           database = optionsMetadata.getDefaultDatabaseId().getDatabase();
         }
-        AtomicBoolean stopped = new AtomicBoolean(false);
-        // Stops the command and PGAdapter if this process is terminated. handleTerm routes
-        // SIGTERM back into this hook.
-        Thread shutdownHook =
-            createShutdownHook(proxyServer, stopped, "pgadapter-shutdown-handler");
-        Runtime.getRuntime().addShutdownHook(shutdownHook);
-        try {
-          // runCommand will block until the command has finished (e.g. when the user exits psql).
-          runCommand(proxyServer, database, optionsMetadata.getCommand());
-        } finally {
-          // Shut down PGAdapter when the command has finished. This must also happen when the
-          // command could not be started, as the proxy holds non-daemon threads.
-          stopProxyServer(proxyServer, stopped);
-          removeShutdownHook(shutdownHook);
-        }
-      } else {
-        // There's no command that should be executed against PGAdapter, so we should keep it
-        // running in the background. Create a shutdown handler and register signal handlers for the
-        // signals that should terminate the server.
-        Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
+        return runCommandAndStop(proxyServer, database, optionsMetadata.getCommand());
       }
+      // There's no command that should be executed against PGAdapter, so we should keep it
+      // running in the background. Create a shutdown handler and register signal handlers for the
+      // signals that should terminate the server.
+      Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
+      registerSignalHandlers();
+      return 0;
     } catch (Exception e) {
       printError(e, System.err, System.out);
+      return STARTUP_FAILED_EXIT_CODE;
+    }
+  }
+
+  /**
+   * Runs the given client tool and stops PGAdapter when it has finished, returning the exit code of
+   * the tool.
+   *
+   * <p>No handler is registered for TERM: the JVM's own handler already runs the shutdown hook
+   * below and then exits with 143, and registering a handler here would take that away from
+   * applications that embed PGAdapter.
+   */
+  private static int runCommandAndStop(
+      ProxyServer proxyServer, @Nullable String database, String... command) {
+    ignoreInterruptSignal();
+    Thread shutdownHook = createShutdownHook(proxyServer, "pgadapter-shutdown-handler");
+    Runtime.getRuntime().addShutdownHook(shutdownHook);
+    try {
+      // runCommand will block until the command has finished (e.g. when the user exits psql).
+      return runCommand(proxyServer, database, command);
+    } catch (IOException couldNotStart) {
+      System.err.printf(
+          "The command could not be started: %s%n",
+          couldNotStart.getMessage() == null
+              ? couldNotStart.toString()
+              : couldNotStart.getMessage());
+      return COMMAND_NOT_EXECUTED_EXIT_CODE;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return COMMAND_NOT_EXECUTED_EXIT_CODE;
+    } finally {
+      // Shut down PGAdapter when the command has finished. This must also happen when the
+      // command could not be started, as the proxy holds non-daemon threads.
+      stopProxyServer(proxyServer);
+      removeShutdownHook(shutdownHook);
     }
   }
 
@@ -145,8 +190,16 @@ public class Server {
 
   /** Starts the given process and waits for it, tracking it so that it can be stopped on exit. */
   static int startAndWait(ProcessBuilder builder) throws IOException, InterruptedException {
-    Process process = builder.start();
-    clientProcess.set(process);
+    Process process;
+    synchronized (clientProcessLock) {
+      if (shuttingDown.get()) {
+        // Shutdown already looked for a client tool and found none, so starting one now would
+        // leave it running after this process has gone.
+        return COMMAND_NOT_EXECUTED_EXIT_CODE;
+      }
+      process = builder.start();
+      clientProcess.set(process);
+    }
     try {
       return process.waitFor();
     } finally {
@@ -175,11 +228,18 @@ public class Server {
   }
 
   /** Creates a hook that stops the client tool and then the given server. */
-  static Thread createShutdownHook(ProxyServer proxyServer, AtomicBoolean stopped, String name) {
+  static Thread createShutdownHook(ProxyServer proxyServer, String name) {
+    // Static state, so reset it in case this process has already run a command.
+    shuttingDown.set(false);
     return new Thread(
         () -> {
-          destroyClientProcess();
-          stopProxyServer(proxyServer, stopped);
+          // The JVM halts as soon as this thread returns, so it must not return while a client
+          // tool is still being started on another thread. Holding the lock makes it wait.
+          synchronized (clientProcessLock) {
+            shuttingDown.set(true);
+            destroyClientProcess();
+          }
+          stopProxyServer(proxyServer);
         },
         name);
   }
@@ -196,11 +256,14 @@ public class Server {
   }
 
   /** Stops the given {@link ProxyServer}. This method is safe to call more than once. */
-  static void stopProxyServer(@Nullable ProxyServer proxyServer, AtomicBoolean stopped) {
-    if (proxyServer == null || !stopped.compareAndSet(false, true)) {
+  static void stopProxyServer(@Nullable ProxyServer proxyServer) {
+    if (proxyServer == null) {
       return;
     }
     try {
+      // stopServer() is idempotent and blocks until the server has terminated. Concurrent callers
+      // must therefore wait here rather than return early: a shutdown hook that returns while
+      // another thread is still stopping the server lets the JVM halt halfway through.
       proxyServer.stopServer();
     } catch (Throwable ignore) {
       // Ignore any errors during shutdown, as there is nothing that we can do about them, and
@@ -209,10 +272,34 @@ public class Server {
   }
 
   /**
-   * Registers signal handlers for TERM, INT, and QUIT. This method uses reflection and fails
-   * gracefully if signal handling is not available on this JVM.
+   * Registers signal handlers for TERM, INT, and QUIT. This is only done when PGAdapter owns the
+   * process, as replacing a signal handler affects the entire JVM.
    */
   static void registerSignalHandlers() {
+    registerSignalHandler("TERM", "handleTerm", Level.WARNING);
+    registerSignalHandler("INT", "handleInt", Level.WARNING);
+    // QUIT is normally already registered by the JVM, so this is expected to fail. QUIT signals
+    // then just stop the server through the JVM instead of through PGAdapter.
+    registerSignalHandler("QUIT", "handleQuit", Level.FINE);
+  }
+
+  /**
+   * Stops Ctrl+C from killing PGAdapter while it is wrapping a client tool. The terminal sends INT
+   * to the whole foreground process group, so the tool itself decides what to do with it (psql
+   * cancels the running query rather than exiting).
+   *
+   * <p>A handler that does nothing is used rather than SIG_IGN, because SIG_IGN would be inherited
+   * by the client tool across exec, while handlers are reset to the default.
+   */
+  static void ignoreInterruptSignal() {
+    registerSignalHandler("INT", "handleIgnore", Level.WARNING);
+  }
+
+  /**
+   * Registers a single signal handler. This method uses reflection and fails gracefully if signal
+   * handling is not available on this JVM, or if the signal is already owned by the JVM.
+   */
+  private static void registerSignalHandler(String signalName, String methodName, Level failLevel) {
     Class<?> signalClass = getSignalClass();
     Class<?> signalHandlerClass = getSignalHandlerClass();
     if (signalClass == null || signalHandlerClass == null) {
@@ -222,39 +309,11 @@ public class Server {
       Method handleMethod =
           signalClass.getDeclaredMethod("handle", signalClass, signalHandlerClass);
       Constructor<?> signalConstructor = signalClass.getConstructor(String.class);
-
-      Object termSignal = signalConstructor.newInstance("TERM");
-      Object intSignal = signalConstructor.newInstance("INT");
-      Object quitSignal = signalConstructor.newInstance("QUIT");
-
-      Object termHandler = createSignalHandler(signalClass, signalHandlerClass, "handleTerm");
-      Object intHandler = createSignalHandler(signalClass, signalHandlerClass, "handleInt");
-      Object quitHandler = createSignalHandler(signalClass, signalHandlerClass, "handleQuit");
-
-      // Register the actual signal handlers. This will fail if the JVM has already registered a
-      // signal handler for the given signal. Normally, TERM and INT can be registered. QUIT is
-      // normally registered by the JVM.
-      try {
-        handleMethod.invoke(null, termSignal, termHandler);
-      } catch (Throwable throwable) {
-        logger.log(Level.WARNING, "Failed to register signal handler for TERM", throwable);
-      }
-      try {
-        handleMethod.invoke(null, intSignal, intHandler);
-      } catch (Throwable throwable) {
-        logger.log(Level.WARNING, "Failed to register signal handler for INT", throwable);
-      }
-      try {
-        handleMethod.invoke(null, quitSignal, quitHandler);
-      } catch (Throwable throwable) {
-        // Log this at FINE level, as QUIT is normally already registered by the JVM. This means
-        // that registering QUIT will fail on most JVMs. This means that QUIT signals will still
-        // lead to the server stopping quickly, just that it is handled directly by the JVM instead
-        // of PGAdapter.
-        logger.log(Level.FINE, "Failed to register signal handler for QUIT", throwable);
-      }
-    } catch (Throwable exception) {
-      logger.log(Level.WARNING, "Failed to register signal handlers", exception);
+      Object signal = signalConstructor.newInstance(signalName);
+      Object handler = createSignalHandler(signalClass, signalHandlerClass, methodName);
+      handleMethod.invoke(null, signal, handler);
+    } catch (Throwable throwable) {
+      logger.log(failLevel, "Failed to register signal handler for " + signalName, throwable);
     }
   }
 
@@ -309,21 +368,12 @@ public class Server {
   static void handleTerm(Object ignoredSignal) {
     logger.log(Level.INFO, "Server received TERM");
     if (Server.shutdownHandler == null) {
-      // Registering a handler replaces the JVM default for TERM, so without this the JVM would
-      // keep running. Happens when PGAdapter is embedded or wraps a client (SpannerPGConnector).
-      System.exit(TERM_EXIT_CODE);
       return;
     }
     Server.shutdownHandler.shutdown(ShutdownMode.SMART);
   }
 
-  /**
-   * This method is called by the signal handler that is registered for INT.
-   *
-   * <p>INT is deliberately ignored when no shutdown handler is registered: the terminal sends it to
-   * the whole foreground process group, so the wrapped client decides what to do (psql cancels the
-   * running query rather than exiting).
-   */
+  /** This method is called by the signal handler that is registered for INT. */
   static void handleInt(Object ignoredSignal) {
     if (Server.shutdownHandler == null) {
       return;
@@ -332,10 +382,12 @@ public class Server {
     Server.shutdownHandler.shutdown(ShutdownMode.FAST);
   }
 
+  /** Signal handler that does nothing. See {@link #ignoreInterruptSignal()}. */
+  static void handleIgnore(Object ignoredSignal) {}
+
   /**
    * This method is called by the signal handler that is registered for QUIT. Normally unused, as
-   * the JVM already registers QUIT. Ignored without a shutdown handler, as with {@link
-   * #handleInt(Object)}.
+   * the JVM already registers QUIT.
    */
   static void handleQuit(Object ignoredSignal) {
     if (Server.shutdownHandler == null) {

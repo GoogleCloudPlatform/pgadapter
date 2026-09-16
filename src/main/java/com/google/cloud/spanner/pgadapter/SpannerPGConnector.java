@@ -24,7 +24,6 @@ import io.opentelemetry.api.OpenTelemetry;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 
 /**
@@ -135,7 +134,6 @@ public class SpannerPGConnector {
       // Failing to reconfigure logging must not prevent the client tool from starting.
     }
     ProxyServer proxyServer = null;
-    AtomicBoolean proxyServerStopped = new AtomicBoolean(false);
     Thread shutdownHook = null;
     try {
       OptionsMetadata options = createOptionsMetadata(environment);
@@ -143,11 +141,12 @@ public class SpannerPGConnector {
       proxyServer = new ProxyServer(options, openTelemetry);
       proxyServer.startServer();
 
-      // Stops the client tool and PGAdapter if this process is terminated. Server#handleTerm
-      // routes SIGTERM back into this hook.
-      shutdownHook =
-          Server.createShutdownHook(
-              proxyServer, proxyServerStopped, PROGRAM_NAME + "-shutdown-handler");
+      // Ctrl+C is sent to the whole foreground process group, so leave it to the client tool to
+      // act on (psql cancels the running query rather than exiting).
+      Server.ignoreInterruptSignal();
+      // Stops the client tool and PGAdapter if this process is terminated. No TERM handler is
+      // registered: the JVM's own handler already runs this hook and then exits with 143.
+      shutdownHook = Server.createShutdownHook(proxyServer, PROGRAM_NAME + "-shutdown-handler");
       Runtime.getRuntime().addShutdownHook(shutdownHook);
 
       return runCommand(proxyServer, getDatabase(args, environment), args);
@@ -171,7 +170,7 @@ public class SpannerPGConnector {
       err.printf("%s: failed to start PGAdapter: %s%n", PROGRAM_NAME, message);
       return 1;
     } finally {
-      Server.stopProxyServer(proxyServer, proxyServerStopped);
+      Server.stopProxyServer(proxyServer);
       Server.removeShutdownHook(shutdownHook);
     }
   }

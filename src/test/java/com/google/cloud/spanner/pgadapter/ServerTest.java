@@ -15,11 +15,13 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -29,13 +31,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ServerTest {
+
+  /** Static state, so tests that run a shutdown hook would otherwise affect the ones after them. */
+  @After
+  public void resetShutdownState() {
+    Server.shuttingDown.set(false);
+  }
 
   @Test
   public void testExtractMetadata() {
@@ -89,7 +97,7 @@ public class ServerTest {
     System.setErr(err);
 
     try {
-      Server.main(new String[] {"--invalid-param"});
+      assertEquals(1, Server.run(new String[] {"--invalid-param"}));
       assertEquals(
           "The server could not be started because an error occurred: Unrecognized option: --invalid-param\n",
           errArrayStream.toString());
@@ -120,7 +128,7 @@ public class ServerTest {
     System.setProperty("javax.net.ssl.keyStore", "/path/to/non/existing/file.pfx");
 
     try {
-      Server.main(new String[] {});
+      assertEquals(1, Server.run(new String[] {}));
       assertEquals(
           "The server could not be started because an error occurred: Key store /path/to/non/existing/file.pfx does not exist\n",
           errArrayStream.toString());
@@ -180,15 +188,47 @@ public class ServerTest {
     }
   }
 
+  /**
+   * The JVM halts as soon as the last shutdown hook returns. A hook that returned while a client
+   * tool was still being started would leave that tool running.
+   */
   @Test
-  public void testStopProxyServerOnlyStopsOnce() {
+  public void testShutdownHookWaitsWhileTheClientToolIsStarting() throws Exception {
+    Thread shutdownHook = Server.createShutdownHook(mock(ProxyServer.class), "test-shutdown-hook");
+
+    // Holding the lock stands in for being inside ProcessBuilder.start().
+    synchronized (Server.clientProcessLock) {
+      shutdownHook.start();
+      shutdownHook.join(500L);
+      assertTrue("The shutdown hook must wait for the client tool", shutdownHook.isAlive());
+    }
+
+    shutdownHook.join(10_000L);
+    assertFalse(shutdownHook.isAlive());
+  }
+
+  /** Starting a tool after shutdown has looked for one would leave it running. */
+  @Test
+  public void testClientToolIsNotStartedWhenAlreadyShuttingDown() throws Exception {
+    assumeFalse(isWindows());
+    Server.createShutdownHook(mock(ProxyServer.class), "test-shutdown-hook").run();
+
+    assertEquals(127, Server.startAndWait(new ProcessBuilder("sh", "-c", "exit 0")));
+  }
+
+  /**
+   * Every caller must reach stopServer, as that is what makes them wait for the shutdown to finish.
+   * Returning early instead would allow the JVM to halt while another thread is still stopping the
+   * server.
+   */
+  @Test
+  public void testStopProxyServerWaitsOnEveryCall() {
     ProxyServer proxyServer = mock(ProxyServer.class);
-    AtomicBoolean stopped = new AtomicBoolean(false);
 
-    Server.stopProxyServer(proxyServer, stopped);
-    Server.stopProxyServer(proxyServer, stopped);
+    Server.stopProxyServer(proxyServer);
+    Server.stopProxyServer(proxyServer);
 
-    verify(proxyServer).stopServer();
+    verify(proxyServer, times(2)).stopServer();
   }
 
   @Test
@@ -196,8 +236,8 @@ public class ServerTest {
     ProxyServer proxyServer = mock(ProxyServer.class);
     doThrow(new IllegalStateException("test")).when(proxyServer).stopServer();
 
-    Server.stopProxyServer(proxyServer, new AtomicBoolean(false));
-    Server.stopProxyServer(null, new AtomicBoolean(false));
+    Server.stopProxyServer(proxyServer);
+    Server.stopProxyServer(null);
   }
 
   @Test
