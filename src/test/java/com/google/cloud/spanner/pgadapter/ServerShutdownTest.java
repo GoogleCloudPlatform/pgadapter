@@ -159,7 +159,8 @@ public class ServerShutdownTest {
                 "-cp",
                 System.getProperty("java.class.path"),
                 EmbeddedHost.class.getName(),
-                pidFile.getAbsolutePath())
+                pidFile.getAbsolutePath(),
+                credentialsFile().getAbsolutePath())
             .redirectErrorStream(true)
             .redirectOutput(new File(folder.getRoot(), "host-" + signal + ".log"))
             .start();
@@ -187,6 +188,7 @@ public class ServerShutdownTest {
                   .setProject("p")
                   .setInstance("i")
                   .setDatabase("d")
+                  .setCredentialsFile(args[1])
                   .setPort(0)
                   .build())
           .startServer();
@@ -209,9 +211,23 @@ public class ServerShutdownTest {
     command.add(System.getProperty("java.class.path"));
     command.add(Server.class.getName());
     Collections.addAll(command, "-p", "p", "-i", "i", "-d", "d", "-s", "0");
+    Collections.addAll(command, "-c", credentialsFile().getAbsolutePath());
     Collections.addAll(command, extraArgs);
 
     return new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log).start();
+  }
+
+  /**
+   * PGAdapter refuses to start without credentials, and machines that run these tests do not
+   * necessarily have application default credentials. The file is never read, because these tests
+   * never connect a client to Spanner.
+   */
+  private File credentialsFile() throws IOException {
+    File file = new File(folder.getRoot(), "credentials.json");
+    if (!file.exists()) {
+      Files.asCharSink(file, Charsets.UTF_8).write("{}");
+    }
+    return file;
   }
 
   private static String javaExecutable() {
@@ -225,7 +241,7 @@ public class ServerShutdownTest {
     return script;
   }
 
-  private static String awaitContents(File file) throws Exception {
+  private String awaitContents(File file) throws Exception {
     long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(EXIT_TIMEOUT_SECONDS);
     while (System.currentTimeMillis() < deadline) {
       if (file.length() > 0L) {
@@ -236,10 +252,10 @@ public class ServerShutdownTest {
       }
       Thread.sleep(100L);
     }
-    throw new AssertionError("Timed out waiting for " + file + " to be written");
+    throw new AssertionError(withServerOutput("Timed out waiting for " + file + " to be written"));
   }
 
-  private static void awaitLogContains(File log, String expected) throws Exception {
+  private void awaitLogContains(File log, String expected) throws Exception {
     long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(EXIT_TIMEOUT_SECONDS);
     while (System.currentTimeMillis() < deadline) {
       if (log.exists() && Files.asCharSource(log, Charsets.UTF_8).read().contains(expected)) {
@@ -247,7 +263,27 @@ public class ServerShutdownTest {
       }
       Thread.sleep(100L);
     }
-    throw new AssertionError("Timed out waiting for '" + expected + "' in " + log);
+    throw new AssertionError(
+        withServerOutput("Timed out waiting for '" + expected + "' in " + log));
+  }
+
+  /** A timeout is almost always caused by the forked JVM failing, so report what it printed. */
+  private String withServerOutput(String message) {
+    StringBuilder builder = new StringBuilder(message);
+    File[] files = folder.getRoot().listFiles();
+    if (files != null) {
+      for (File file : files) {
+        if (file.getName().endsWith(".log")) {
+          builder.append("\n--- ").append(file.getName()).append(" ---\n");
+          try {
+            builder.append(Files.asCharSource(file, Charsets.UTF_8).read());
+          } catch (IOException exception) {
+            builder.append("could not be read: ").append(exception);
+          }
+        }
+      }
+    }
+    return builder.toString();
   }
 
   /** Returns whether the process is still running, after giving it a moment to be cleaned up. */
