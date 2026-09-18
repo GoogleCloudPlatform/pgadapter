@@ -394,6 +394,72 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyOutCsvWithHeaderAndNoRows() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from all_types"),
+            ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut("COPY all_types TO STDOUT (header, format csv)", writer);
+
+      // Like PostgreSQL, the header is written even if the query returns no rows.
+      assertEquals(
+          "col_bigint,col_bool,col_bytea,col_float4,col_float8,col_int,col_numeric,"
+              + "col_timestamptz,col_interval,col_date,col_varchar,col_jsonb,col_array_bigint,"
+              + "col_array_bool,col_array_bytea,col_array_float4,col_array_float8,col_array_int,"
+              + "col_array_numeric,col_array_timestamptz,col_array_interval,col_array_date,"
+              + "col_array_varchar,col_array_jsonb\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutTextWithHeader() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from all_types"),
+            ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut("COPY all_types TO STDOUT (header, format text)", writer);
+
+      assertEquals(
+          "col_bigint\tcol_bool\tcol_bytea\tcol_float4\tcol_float8\tcol_int\tcol_numeric\t"
+              + "col_timestamptz\tcol_interval\tcol_date\tcol_varchar\tcol_jsonb\tcol_array_bigint\t"
+              + "col_array_bool\tcol_array_bytea\tcol_array_float4\tcol_array_float8\tcol_array_int\t"
+              + "col_array_numeric\tcol_array_timestamptz\tcol_array_interval\tcol_array_date\t"
+              + "col_array_varchar\tcol_array_jsonb\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithHeaderOnlyExecutesTheCopyQuery() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut("COPY all_types TO STDOUT (header, format csv)", writer);
+
+      assertTrue(writer.toString().startsWith("col_bigint,col_bool,"));
+    }
+
+    // The column names for the header come from the metadata of the COPY query itself. That means
+    // that no additional query is needed to determine them.
+    List<ExecuteSqlRequest> sqlRequests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, sqlRequests.size());
+    assertEquals("select * from all_types", sqlRequests.get(0).getSql());
+    assertEquals(ExecuteSqlRequest.QueryMode.NORMAL, sqlRequests.get(0).getQueryMode());
+  }
+
+  @Test
   public void testCopyOutCsvWithQuote() throws SQLException, IOException {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
@@ -707,6 +773,38 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testCopyOutPartitionedCsvWithHeader() throws SQLException, IOException {
+    // Use enough rows that multiple partitions return data. All partitions are written by separate
+    // threads, and only one of them may write the header.
+    int expectedRowCount = 100;
+    RandomResultSetGenerator randomResultSetGenerator =
+        new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
+    com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from random"), resultSet));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.copy_partition_query=true");
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      long rows = copyManager.copyOut("COPY random TO STDOUT (header, format csv)", writer);
+
+      assertEquals(expectedRowCount, rows);
+      StringBuilder expectedHeader = new StringBuilder();
+      for (StructType.Field field : resultSet.getMetadata().getRowType().getFieldsList()) {
+        if (expectedHeader.length() > 0) {
+          expectedHeader.append(',');
+        }
+        expectedHeader.append(field.getName());
+      }
+      String[] lines = writer.toString().split("\n");
+      assertEquals(expectedRowCount + 1, lines.length);
+      assertEquals(expectedHeader.toString(), lines[0]);
+    }
+    assertEquals(1, PARTITION_QUERY_REQUESTS.size());
   }
 
   @Test
