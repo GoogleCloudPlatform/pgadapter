@@ -102,7 +102,11 @@ public class SimpleQueryStatement {
             break;
           }
         }
-        new ParseMessage(connectionHandler, parsedStatement, statement).send();
+        ParseMessage parseMessage = new ParseMessage(connectionHandler, parsedStatement, statement);
+        parseMessage.send();
+        if (parseMessage.getStatement().hasException()) {
+          break;
+        }
         new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
         new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
         new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
