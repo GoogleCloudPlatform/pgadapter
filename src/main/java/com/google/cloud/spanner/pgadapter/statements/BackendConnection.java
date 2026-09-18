@@ -859,6 +859,27 @@ public class BackendConnection {
     }
   }
 
+  private final class Invalid extends BufferedStatement<StatementResult> {
+    private final InvalidStatement invalidStatement;
+
+    Invalid(InvalidStatement invalidStatement) {
+      super(invalidStatement.parsedStatement, invalidStatement.originalStatement);
+      this.invalidStatement = invalidStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void doExecute() {
+      PGException pgException = invalidStatement.getException();
+      result.setException(pgException);
+      throw pgException;
+    }
+  }
+
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
   static final StatementResult NO_RESULT = new NoResult();
@@ -1068,6 +1089,12 @@ public class BackendConnection {
     RollbackTo savepoint = new RollbackTo(rollbackToStatement);
     bufferedStatements.add(savepoint);
     return savepoint.result;
+  }
+
+  public Future<StatementResult> execute(InvalidStatement invalidStatement) {
+    Invalid invalid = new Invalid(invalidStatement);
+    bufferedStatements.add(invalid);
+    return invalid.result;
   }
 
   /** Flushes the buffered statements to Spanner. */

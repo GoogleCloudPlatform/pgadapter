@@ -17,7 +17,14 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage.createStatement;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.Dialect;
@@ -28,13 +35,20 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.statements.ReleaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.RollbackToStatement;
 import com.google.cloud.spanner.pgadapter.statements.SavepointStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.util.concurrent.ExecutionException;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -107,5 +121,74 @@ public class ParseMessageTest {
     assertEquals(IntermediatePreparedStatement.class, preparedStatement.getClass());
     assertEquals(StatementType.CLIENT_SIDE, parsedStatement.getType());
     assertEquals(ClientSideStatementType.ROLLBACK, parsedStatement.getClientSideStatementType());
+  }
+
+  @Test
+  public void testInvalidStatementLifecycle() {
+    Statement statement = Statement.of("copy bad_syntax");
+    IntermediatePreparedStatement preparedStatement =
+        createStatement(connectionHandler, "", PARSER.parse(statement), statement, new int[] {});
+    assertEquals(InvalidStatement.class, preparedStatement.getClass());
+    InvalidStatement invalidStatement = (InvalidStatement) preparedStatement;
+    assertTrue(invalidStatement.hasException());
+    assertSame(
+        invalidStatement,
+        invalidStatement.createPortal("", new byte[0][], new short[0], new short[0]));
+
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    invalidStatement.autoDescribeParameters(new byte[][] {"1".getBytes()}, backendConnection);
+    invalidStatement.executeAsync(backendConnection);
+    assertTrue(invalidStatement.isExecuted());
+    verify(backendConnection, never()).analyze(any(), any(), any());
+    verify(backendConnection, never()).execute(any(), any(), any(), any());
+
+    assertThrows(PGException.class, invalidStatement::describe);
+    ExecutionException executionException =
+        assertThrows(
+            ExecutionException.class,
+            () -> invalidStatement.describeAsync(backendConnection).get());
+    assertEquals(invalidStatement.getException(), executionException.getCause());
+  }
+
+  @Test
+  public void testParseMessageUnnamedAndInvalidLifecycle() throws Exception {
+    ConnectionHandler localConnection = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ConnectionMetadata metadata = mock(ConnectionMetadata.class);
+    ExtendedQueryProtocolHandler protocolHandler = mock(ExtendedQueryProtocolHandler.class);
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(outputBytes);
+
+    when(server.getOptions()).thenReturn(options);
+    when(localConnection.getServer()).thenReturn(server);
+    when(localConnection.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    when(localConnection.getConnectionMetadata()).thenReturn(metadata);
+    when(metadata.getOutputStream()).thenReturn(outputStream);
+    when(localConnection.getExtendedQueryProtocolHandler()).thenReturn(protocolHandler);
+    when(protocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(localConnection.hasStatement("")).thenReturn(true);
+
+    Statement statement = Statement.of("copy bad_syntax");
+    ParseMessage parseMessage =
+        new ParseMessage(localConnection, PARSER.parse(statement), statement);
+    // Constructing a ParseMessage should not mutate ConnectionHandler statements before buffer().
+    verify(localConnection, never()).closeStatement("");
+    verify(localConnection, never()).registerStatement(eq(""), any());
+    assertEquals(InvalidStatement.class, parseMessage.getStatement().getClass());
+
+    when(localConnection.getStatement("")).thenReturn(parseMessage.getStatement());
+    parseMessage.buffer(backendConnection);
+    verify(backendConnection).execute((InvalidStatement) parseMessage.getStatement());
+    verify(localConnection).registerStatement("", parseMessage.getStatement());
+    // No ErrorResponse should be written during buffer().
+    assertEquals(0, outputBytes.size());
+
+    // flush() must close the unnamed statement "" and emit ErrorResponse.
+    parseMessage.flush();
+    verify(localConnection).closeStatement("");
+    assertTrue(parseMessage.isReturnedErrorResponse());
+    assertTrue(outputBytes.size() > 0);
   }
 }
