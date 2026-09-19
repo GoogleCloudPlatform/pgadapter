@@ -135,12 +135,13 @@ public class SimpleQueryStatement {
   @VisibleForTesting
   static Statement translatePotentialMetadataCommand(
       Statement parsedStatement, ConnectionHandler connectionHandler) {
-    Tracer tracer = connectionHandler.getExtendedQueryProtocolHandler().getTracer();
+    ExtendedQueryProtocolHandler queryProtocolHandler =
+        connectionHandler.getExtendedQueryProtocolHandler();
+    Tracer tracer = queryProtocolHandler.getTracer();
     Span span =
         tracer
             .spanBuilder("translatePotentialMetadataCommand")
-            .setAttribute(
-                "pgadapter.connection_id", connectionHandler.getTraceConnectionId().toString())
+            .setAttribute("pgadapter.connection_id", queryProtocolHandler.getConnectionId())
             .setAttribute(DB_STATEMENT, parsedStatement.getSql())
             .startSpan();
     try (Scope ignore = span.makeCurrent()) {
