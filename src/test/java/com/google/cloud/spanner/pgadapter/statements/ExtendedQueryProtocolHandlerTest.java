@@ -16,6 +16,8 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +32,10 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanBuilder;
+import io.opentelemetry.api.trace.Tracer;
 import java.io.DataOutputStream;
 import java.util.UUID;
 import org.junit.Before;
@@ -148,5 +154,53 @@ public class ExtendedQueryProtocolHandlerTest {
     PGException exception = assertThrows(PGException.class, () -> handler.sync(false));
     assertEquals("Query cancelled", exception.getMessage());
     assertEquals(SQLState.QueryCanceled, exception.getSQLState());
+  }
+
+  @Test
+  public void testBufferDoesNotCreateEventsForNonRecordingSpan() {
+    Span span = startSpan(/* isRecording= */ false);
+    ParseMessage parseMessage = mock(ParseMessage.class);
+
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
+    handler.maybeStartSpan(true);
+    handler.buffer(parseMessage);
+
+    verify(span, never()).addEvent(anyString(), any(Attributes.class));
+    // The attributes of the event contain the SQL statement. Getting the description and the SQL
+    // statement must be skipped as well, as the event is dropped by the span anyway.
+    verify(parseMessage, never()).receivedEventDescription();
+    verify(parseMessage, never()).getSql();
+  }
+
+  @Test
+  public void testBufferCreatesEventsForRecordingSpan() {
+    Span span = startSpan(/* isRecording= */ true);
+    ParseMessage parseMessage = mock(ParseMessage.class);
+    when(parseMessage.receivedEventDescription()).thenReturn("Received message: 'P'");
+    when(parseMessage.getSql()).thenReturn("select 1");
+
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
+    handler.maybeStartSpan(true);
+    handler.buffer(parseMessage);
+
+    verify(span)
+        .addEvent(
+            "Received message: 'P'", Attributes.of(BackendConnection.DB_STATEMENT, "select 1"));
+  }
+
+  /** Sets up the mocks that are needed for {@link ExtendedQueryProtocolHandler#maybeStartSpan}. */
+  private Span startSpan(boolean isRecording) {
+    Span span = mock(Span.class);
+    when(span.isRecording()).thenReturn(isRecording);
+    SpanBuilder spanBuilder = mock(SpanBuilder.class);
+    when(spanBuilder.setNoParent()).thenReturn(spanBuilder);
+    when(spanBuilder.setAttribute(anyString(), anyString())).thenReturn(spanBuilder);
+    when(spanBuilder.startSpan()).thenReturn(span);
+    Tracer tracer = mock(Tracer.class);
+    when(tracer.spanBuilder(anyString())).thenReturn(spanBuilder);
+    when(backendConnection.getTracer()).thenReturn(tracer);
+    return span;
   }
 }

@@ -138,7 +138,13 @@ public class ExtendedQueryProtocolHandler {
    * received.
    */
   public void buffer(AbstractQueryProtocolMessage message) {
-    addEvent(message.receivedEventDescription(), Attributes.of(DB_STATEMENT, message.getSql()));
+    // Only build the event if the span actually records it. A null check is not enough: the span is
+    // a no-op span if tracing is disabled, and building an event that is then dropped would
+    // allocate for every message that is received. The span is only null if the message was not
+    // created by the wire protocol.
+    if (isRecordingEvents()) {
+      addEvent(message.receivedEventDescription(), Attributes.of(DB_STATEMENT, message.getSql()));
+    }
     messages.add(message);
   }
 
@@ -229,6 +235,14 @@ public class ExtendedQueryProtocolHandler {
       logger.log(Level.FINER, Logging.format("Flushing messages", Action.Finished));
       endSpan();
     }
+  }
+
+  /**
+   * Returns true if the current span records the events that are added to it. Events that are added
+   * to a span that does not record them are dropped, so building them is a waste of time.
+   */
+  private boolean isRecordingEvents() {
+    return span != null && span.isRecording();
   }
 
   private void addEvent(String event) {
