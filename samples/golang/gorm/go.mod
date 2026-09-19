@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.27.1
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.2
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.3
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgtype v1.14.4
 	github.com/shopspring/decimal v1.4.0
@@ -51,7 +51,7 @@ require (
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.0 // indirect
-	github.com/moby/moby/api v1.55.0 // indirect
+	github.com/moby/moby/api v1.56.0 // indirect
 	github.com/moby/moby/client v0.5.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
