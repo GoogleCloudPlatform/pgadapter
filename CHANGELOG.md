@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.55.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.55.3...v0.55.4) (2026-09-19)
+
+
+### Dependencies
+
+* update dependency org.jetbrains.kotlin:kotlin-stdlib-jdk8 to v2.4.20 ([#4850](https://github.com/GoogleCloudPlatform/pgadapter/issues/4850)) ([448b3ad](https://github.com/GoogleCloudPlatform/pgadapter/commit/448b3ad76e508ee74ae72313824832832053f9f6))
+* update module github.com/googlecloudplatform/pgadapter/wrappers/golang to v0.55.3 ([#4855](https://github.com/GoogleCloudPlatform/pgadapter/issues/4855)) ([516a443](https://github.com/GoogleCloudPlatform/pgadapter/commit/516a443833b1930d6e240071d7dde5a628b70cfc))
+
 ## [0.55.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.55.2...v0.55.3) (2026-09-07)
 
 
