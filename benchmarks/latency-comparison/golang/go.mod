@@ -7,7 +7,7 @@ toolchain go1.27.1
 require (
 	cloud.google.com/go/spanner v1.95.0
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/moby/moby/api v1.56.0
 	github.com/montanaflynn/stats v0.12.5
 	github.com/testcontainers/testcontainers-go v0.44.0
