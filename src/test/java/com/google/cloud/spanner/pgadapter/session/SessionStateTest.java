@@ -34,6 +34,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactio
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,6 +49,53 @@ public class SessionStateTest {
   public void testShowInitialSetting() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     assertEquals("UTF8", state.get(null, "client_encoding").getSetting());
+  }
+
+  @Test
+  public void testForceAutocommit() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertFalse(state.isForceAutocommit());
+
+    state.set("spanner", "force_autocommit", "on");
+    assertTrue(state.isForceAutocommit());
+
+    state.set("spanner", "force_autocommit", "off");
+    assertFalse(state.isForceAutocommit());
+
+    state.setLocal("spanner", "force_autocommit", "on");
+    assertTrue(state.isForceAutocommit());
+  }
+
+  @Test
+  public void testLogSlowStatementThreshold() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    // The setting is not part of pg_settings.txt, so the hard-coded default is used.
+    assertEquals(Duration.ofSeconds(120L), state.getLogSlowStatementThreshold());
+
+    state.set("spanner", "log_slow_statement_threshold", "PT1S");
+    assertEquals(Duration.ofSeconds(1L), state.getLogSlowStatementThreshold());
+
+    state.set("spanner", "log_slow_statement_threshold", "PT30S");
+    assertEquals(Duration.ofSeconds(30L), state.getLogSlowStatementThreshold());
+
+    state.setLocal("spanner", "log_slow_statement_threshold", "PT2S");
+    assertEquals(Duration.ofSeconds(2L), state.getLogSlowStatementThreshold());
+  }
+
+  @Test
+  public void testHotSettingsAreCached() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+
+    // Duration.ofSeconds allocates a new instance every time, so the same instance can only be
+    // returned twice if the value is cached.
+    Duration threshold = state.getLogSlowStatementThreshold();
+    assertSame(threshold, state.getLogSlowStatementThreshold());
+
+    // Changing any setting invalidates the cache.
+    state.set("spanner", "log_slow_statement_threshold", "PT1S");
+    Duration updatedThreshold = state.getLogSlowStatementThreshold();
+    assertEquals(Duration.ofSeconds(1L), updatedThreshold);
+    assertSame(updatedThreshold, state.getLogSlowStatementThreshold());
   }
 
   @Test
