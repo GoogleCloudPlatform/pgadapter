@@ -5,7 +5,7 @@ go 1.26.0
 toolchain go1.27.1
 
 require (
-	cloud.google.com/go/spanner v1.95.0
+	cloud.google.com/go/spanner v1.95.1
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/moby/moby/api v1.56.0
