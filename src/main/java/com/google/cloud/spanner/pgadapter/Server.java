@@ -68,7 +68,6 @@ public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
 
   private static volatile ShutdownHandler shutdownHandler;
-  private static boolean loggedMissingSignalSupport;
 
   /**
    * Main method for running a Spanner PostgreSQL Adapter {@link Server} as a stand-alone
@@ -214,8 +213,11 @@ public class Server {
   static Object registerSignalHandler(
       String signalName, String methodName, Level registrationFailLevel) {
     Class<?> signalClass = getSignalClass();
+    if (signalClass == null) {
+      return null;
+    }
     Class<?> signalHandlerClass = getSignalHandlerClass();
-    if (signalClass == null || signalHandlerClass == null) {
+    if (signalHandlerClass == null) {
       return null;
     }
     try {
@@ -234,8 +236,11 @@ public class Server {
       return null;
     }
     Class<?> signalClass = getSignalClass();
+    if (signalClass == null) {
+      return null;
+    }
     Class<?> signalHandlerClass = getSignalHandlerClass();
-    if (signalClass == null || signalHandlerClass == null) {
+    if (signalHandlerClass == null) {
       return null;
     }
     return setSignalHandler(
@@ -279,15 +284,12 @@ public class Server {
     }
   }
 
-  private static synchronized void logMissingSignalSupport(String className) {
-    if (!loggedMissingSignalSupport) {
-      loggedMissingSignalSupport = true;
-      logger.log(
-          Level.INFO,
-          "Cannot register shutdown signal handlers as "
-              + className
-              + " is not available on this JVM");
-    }
+  private static void logMissingSignalSupport(String className) {
+    logger.log(
+        Level.INFO,
+        "Cannot register shutdown signal handlers as "
+            + className
+            + " is not available on this JVM");
   }
 
   /**
