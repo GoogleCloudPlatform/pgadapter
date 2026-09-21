@@ -26,6 +26,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -74,10 +75,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.InOrder;
 
 @RunWith(JUnit4.class)
 public class BackendConnectionTest {
@@ -589,10 +592,11 @@ public class BackendConnectionTest {
         .thenReturn(ClientSideStatementType.ROLLBACK);
     StatementResult rollbackResult = mock(StatementResult.class);
     when(rollbackResult.getResultType()).thenReturn(ResultType.NO_RESULT);
-    when(connection.execute(rollbackStatement))
-        .thenThrow(
+    doThrow(
             SpannerExceptionFactory.newSpannerException(
-                ErrorCode.FAILED_PRECONDITION, "internal error"));
+                ErrorCode.FAILED_PRECONDITION, "internal error"))
+        .when(connection)
+        .rollback();
 
     BackendConnection backendConnection =
         new BackendConnection(
@@ -619,6 +623,45 @@ public class BackendConnectionTest {
 
     // Verify that the connection is now in the idle state.
     assertEquals(ConnectionState.IDLE, backendConnection.getConnectionState());
+  }
+
+  @Test
+  public void testRollbackWithoutTimeout_clearsAndRestoresStatementTimeout() throws Exception {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    when(connection.hasStatementTimeout()).thenReturn(true);
+    when(connection.getStatementTimeout(TimeUnit.NANOSECONDS)).thenReturn(5_000_000L);
+
+    Statement rollbackStatement = Statement.of("rollback");
+    ParsedStatement parsedRollbackStatement = mock(ParsedStatement.class);
+    when(parsedRollbackStatement.getType()).thenReturn(StatementType.CLIENT_SIDE);
+    when(parsedRollbackStatement.getClientSideStatementType())
+        .thenReturn(ClientSideStatementType.ROLLBACK);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+    Future<StatementResult> rollbackFuture =
+        backendConnection.execute(
+            "ROLLBACK", parsedRollbackStatement, rollbackStatement, Function.identity());
+    backendConnection.flush();
+    assertEquals(ResultType.NO_RESULT, rollbackFuture.get().getResultType());
+
+    InOrder inOrder = inOrder(connection);
+    inOrder.verify(connection).setStatementTag(null);
+    inOrder.verify(connection).getStatementTimeout(TimeUnit.NANOSECONDS);
+    inOrder.verify(connection).clearStatementTimeout();
+    inOrder.verify(connection).rollback();
+    inOrder.verify(connection).setStatementTimeout(5_000_000L, TimeUnit.NANOSECONDS);
   }
 
   @Test

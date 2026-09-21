@@ -108,6 +108,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -513,7 +514,10 @@ public class BackendConnection {
                 Action.Starting,
                 () -> String.format("Statement: %s", statement.getSql())));
         Stopwatch stopwatch = Stopwatch.createStarted();
-        StatementResult result = spannerConnection.execute(statement);
+        StatementResult result =
+            isRollback(parsedStatement)
+                ? rollbackWithoutTimeout()
+                : spannerConnection.execute(statement);
         Duration executionDuration = stopwatch.elapsed();
         metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         logger.log(
@@ -848,7 +852,7 @@ public class BackendConnection {
     @Override
     void doExecute() {
       try {
-        spannerConnection.rollbackToSavepoint(rollbackToStatement.getSavepointName());
+        rollbackToSavepointWithoutTimeout(rollbackToStatement.getSavepointName());
         result.set(NO_RESULT);
       } catch (Exception exception) {
         PGException pgException =
@@ -863,7 +867,6 @@ public class BackendConnection {
       ImmutableMap.of();
   static final StatementResult NO_RESULT = new NoResult();
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
-  private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final Runnable closeAllPortals;
   private final SessionState sessionState;
@@ -1229,16 +1232,51 @@ public class BackendConnection {
       closeAllPortals.run();
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
-        if (spannerConnection.isDmlBatchActive()) {
-          spannerConnection.abortBatch();
+        if (!isRollback(index)) {
+          rollbackWithoutTimeout();
         }
-        spannerConnection.setStatementTag(null);
-        spannerConnection.execute(ROLLBACK);
       } else if (spannerConnection.isDdlBatchActive()) {
         spannerConnection.abortBatch();
       }
     } finally {
       bufferedStatements.clear();
+    }
+  }
+
+  private StatementResult rollbackWithoutTimeout() {
+    if (spannerConnection.isDmlBatchActive()) {
+      spannerConnection.abortBatch();
+    }
+    spannerConnection.setStatementTag(null);
+    TimeUnit timeoutUnit = spannerConnection.hasStatementTimeout() ? TimeUnit.NANOSECONDS : null;
+    long previousTimeout =
+        timeoutUnit != null ? spannerConnection.getStatementTimeout(timeoutUnit) : 0L;
+    if (timeoutUnit != null) {
+      spannerConnection.clearStatementTimeout();
+    }
+    try {
+      spannerConnection.rollback();
+      return ROLLBACK_RESULT;
+    } finally {
+      if (timeoutUnit != null) {
+        spannerConnection.setStatementTimeout(previousTimeout, timeoutUnit);
+      }
+    }
+  }
+
+  private void rollbackToSavepointWithoutTimeout(String savepointName) {
+    TimeUnit timeoutUnit = spannerConnection.hasStatementTimeout() ? TimeUnit.NANOSECONDS : null;
+    long previousTimeout =
+        timeoutUnit != null ? spannerConnection.getStatementTimeout(timeoutUnit) : 0L;
+    if (timeoutUnit != null) {
+      spannerConnection.clearStatementTimeout();
+    }
+    try {
+      spannerConnection.rollbackToSavepoint(savepointName);
+    } finally {
+      if (timeoutUnit != null) {
+        spannerConnection.setStatementTimeout(previousTimeout, timeoutUnit);
+      }
     }
   }
 
@@ -1314,12 +1352,8 @@ public class BackendConnection {
     try {
       if (connectionState != ConnectionState.ABORTED) {
         sessionState.commit();
-      }
-      if (spannerConnection.isInTransaction()) {
-        spannerConnection.setStatementTag(null);
-        if (connectionState == ConnectionState.ABORTED) {
-          spannerConnection.rollback();
-        } else {
+        if (spannerConnection.isInTransaction()) {
+          spannerConnection.setStatementTag(null);
           spannerConnection.commit();
         }
       }
