@@ -28,7 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.common.base.Charsets;
+import com.google.common.base.Stopwatch;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import java.io.BufferedReader;
@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import org.junit.Rule;
@@ -168,7 +169,7 @@ public class ServerTest {
       Server.restoreSignalHandler("TERM", probeTerm);
 
       File creds = folder.newFile("creds.json");
-      Files.asCharSink(creds, Charsets.UTF_8).write("{}");
+      Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
       OptionsMetadata options =
           OptionsMetadata.newBuilder()
               .setProject("p")
@@ -239,7 +240,7 @@ public class ServerTest {
     assumeFalse(isWindows());
 
     File creds = folder.newFile("standalone-creds.json");
-    Files.asCharSink(creds, Charsets.UTF_8).write("{}");
+    Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
     Process server =
         new ProcessBuilder(
                 new File(new File(System.getProperty("java.home"), "bin"), "java").getPath(),
@@ -279,11 +280,109 @@ public class ServerTest {
   }
 
   @Test(timeout = 60_000L)
+  public void testCommandModeIgnoresSigIntAndTerminatesChildOnSigTerm() throws Exception {
+    assumeFalse(isWindows());
+
+    File creds = folder.newFile("cmd-creds.json");
+    Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
+    File childPidFile = new File(folder.getRoot(), "child.pid");
+    File childIntFile = new File(folder.getRoot(), "child.int");
+    File childScript = folder.newFile("child-cmd.sh");
+    Files.asCharSink(childScript, StandardCharsets.UTF_8)
+        .write(
+            "#!/bin/sh\n"
+                + "trap 'echo INT_RECEIVED > \""
+                + childIntFile.getAbsolutePath()
+                + "\"' INT\n"
+                + "echo $$ > \""
+                + childPidFile.getAbsolutePath()
+                + "\"\n"
+                + "echo CHILD_READY\n"
+                + "while :; do\n"
+                + "  sleep 1\n"
+                + "done\n");
+    assertTrue(childScript.setExecutable(true));
+
+    String javaBin = new File(new File(System.getProperty("java.home"), "bin"), "java").getPath();
+    Process server =
+        new ProcessBuilder(
+                "sh",
+                "-c",
+                "echo SERVER_PID=$$; exec \"$@\"",
+                "sh",
+                javaBin,
+                "-cp",
+                System.getProperty("java.class.path"),
+                Server.class.getName(),
+                "-p",
+                "p",
+                "-i",
+                "i",
+                "-d",
+                "d",
+                "-s",
+                "0",
+                "-c",
+                creds.getAbsolutePath(),
+                "-cmd",
+                childScript.getAbsolutePath())
+            .redirectErrorStream(true)
+            .start();
+
+    String serverPid = null;
+    String childPid = null;
+    try (BufferedReader out = new BufferedReader(new InputStreamReader(server.getInputStream()))) {
+      boolean childReady = false;
+      String line;
+      while ((line = out.readLine()) != null) {
+        if (line.startsWith("SERVER_PID=")) {
+          serverPid = line.substring("SERVER_PID=".length()).trim();
+        } else if (line.equals("CHILD_READY")) {
+          childReady = true;
+          break;
+        }
+      }
+      assertTrue("Child command never reported CHILD_READY", childReady);
+      assertNotNull("Server PID was not captured", serverPid);
+      childPid = Files.asCharSource(childPidFile, StandardCharsets.UTF_8).read().trim();
+
+      // Simulate Ctrl+C (SIGINT) delivered to both PGAdapter and the child process.
+      assertEquals(0, new ProcessBuilder("kill", "-INT", serverPid, childPid).start().waitFor());
+
+      Stopwatch intTimer = Stopwatch.createStarted();
+      while (!childIntFile.exists() && intTimer.elapsed(TimeUnit.SECONDS) < 5L) {
+        Thread.sleep(50L);
+      }
+      assertTrue("Child process did not receive SIGINT", childIntFile.exists());
+      assertTrue("PGAdapter in --cmd mode must ignore SIGINT while child runs", server.isAlive());
+
+      // Now send SIGTERM to PGAdapter and verify both PGAdapter and the child process terminate.
+      server.destroy();
+      assertTrue(server.waitFor(15L, TimeUnit.SECONDS));
+      assertEquals(143, server.exitValue());
+
+      Stopwatch childExitTimer = Stopwatch.createStarted();
+      while (new ProcessBuilder("kill", "-0", childPid).start().waitFor() == 0
+          && childExitTimer.elapsed(TimeUnit.SECONDS) < 5L) {
+        Thread.sleep(50L);
+      }
+      assertTrue(
+          "Child process should be terminated by PGAdapter shutdown hook",
+          new ProcessBuilder("kill", "-0", childPid).start().waitFor() != 0);
+    } finally {
+      server.destroyForcibly();
+      if (childPid != null) {
+        new ProcessBuilder("kill", "-9", childPid).start().waitFor();
+      }
+    }
+  }
+
+  @Test(timeout = 60_000L)
   public void testEmbeddedHostHandlesSigTermAndRunsShutdownHooks() throws Exception {
     assumeFalse(isWindows());
 
     File creds = folder.newFile("embedded-creds.json");
-    Files.asCharSink(creds, Charsets.UTF_8).write("{}");
+    Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
     File hookFile = folder.newFile("hook.txt");
     Process host =
         new ProcessBuilder(
@@ -310,7 +409,7 @@ public class ServerTest {
 
       assertTrue(host.waitFor(15L, TimeUnit.SECONDS));
       assertEquals(143, host.exitValue());
-      assertEquals("HOOK_RAN", Files.asCharSource(hookFile, Charsets.UTF_8).read());
+      assertEquals("HOOK_RAN", Files.asCharSource(hookFile, StandardCharsets.UTF_8).read());
     } finally {
       host.destroyForcibly();
     }
@@ -323,7 +422,7 @@ public class ServerTest {
               new Thread(
                   () -> {
                     try {
-                      Files.asCharSink(new File(args[1]), Charsets.UTF_8).write("HOOK_RAN");
+                      Files.asCharSink(new File(args[1]), StandardCharsets.UTF_8).write("HOOK_RAN");
                     } catch (IOException ignored) {
                       // ignore
                     }

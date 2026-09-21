@@ -53,7 +53,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -126,13 +125,16 @@ public class Server {
       builder.environment().put("PGDATABASE", database);
     }
     builder.inheritIO();
-    AtomicReference<Process> processRef = new AtomicReference<>();
+    Process process = builder.start();
     Thread shutdownHook =
-        new Thread(() -> stopCommand(processRef.get(), proxyServer), "pgadapter-cmd-shutdown-hook");
-    Runtime.getRuntime().addShutdownHook(shutdownHook);
+        new Thread(() -> stopCommand(process, proxyServer), "pgadapter-cmd-shutdown-hook");
     try {
-      Process process = builder.start();
-      processRef.set(process);
+      Runtime.getRuntime().addShutdownHook(shutdownHook);
+    } catch (IllegalStateException shutdownInProgress) {
+      stopCommand(process, proxyServer);
+      return;
+    }
+    try {
       process.waitFor();
     } finally {
       removeShutdownHook(shutdownHook);
