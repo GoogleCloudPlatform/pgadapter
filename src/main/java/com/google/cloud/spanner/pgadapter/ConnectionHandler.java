@@ -70,6 +70,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import com.google.spanner.v1.TransactionOptions.IsolationLevel;
@@ -92,7 +96,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Future;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -117,6 +121,8 @@ public class ConnectionHandler implements Runnable {
   private final ProxyServer server;
   private Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
+  private final Map<String, ListenableFuture<DescribeResult>> inFlightAutoDescribedStatements =
+      new ConcurrentHashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
   private Thread thread;
@@ -513,9 +519,7 @@ public class ConnectionHandler implements Runnable {
                 "RunConnection",
                 () -> String.format("Closing connection handler with ID %s", getName())));
         try {
-          if (this.spannerConnection != null) {
-            this.spannerConnection.close();
-          }
+          handleTerminate();
           this.socket.close();
         } catch (SpannerException | IOException e) {
           logger.log(
@@ -617,8 +621,13 @@ public class ConnectionHandler implements Runnable {
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
   public void handleTerminate() {
     synchronized (this) {
+      if (this.extendedQueryProtocolHandler != null
+          && this.extendedQueryProtocolHandler.getBackendConnection() != null) {
+        this.extendedQueryProtocolHandler.getBackendConnection().close();
+      }
       closeAllPortals();
       closeAllStatements();
+      this.inFlightAutoDescribedStatements.clear();
       if (this.spannerConnection != null) {
         this.spannerConnection.close();
       }
@@ -810,19 +819,38 @@ public class ConnectionHandler implements Runnable {
    * Returns the parameter types of a cached auto-described statement, or null if none is available
    * in the cache.
    */
-  public Future<DescribeResult> getAutoDescribedStatement(String sql) {
+  public ListenableFuture<DescribeResult> getAutoDescribedStatement(String sql) {
     if (this.databaseName == null) {
       return null;
     }
-    return this.server.autoDescribedStatementsCache.getIfPresent(this.databaseName + sql);
+    ListenableFuture<DescribeResult> cached =
+        this.server.autoDescribedStatementsCache.getIfPresent(this.databaseName + sql);
+    return cached != null ? cached : this.inFlightAutoDescribedStatements.get(sql);
   }
 
   /** Stores the parameter types of an auto-described statement in the cache. */
-  public void registerAutoDescribedStatement(String sql, Future<DescribeResult> describeResult) {
+  public void registerAutoDescribedStatement(
+      String sql, ListenableFuture<DescribeResult> describeResult) {
     if (this.databaseName == null) {
       return;
     }
-    this.server.autoDescribedStatementsCache.put(this.databaseName + sql, describeResult);
+    String cacheKey = this.databaseName + sql;
+    this.inFlightAutoDescribedStatements.put(sql, describeResult);
+    Futures.addCallback(
+        describeResult,
+        new FutureCallback<DescribeResult>() {
+          @Override
+          public void onSuccess(DescribeResult result) {
+            server.autoDescribedStatementsCache.put(cacheKey, describeResult);
+            inFlightAutoDescribedStatements.remove(sql, describeResult);
+          }
+
+          @Override
+          public void onFailure(Throwable throwable) {
+            inFlightAutoDescribedStatements.remove(sql, describeResult);
+          }
+        },
+        MoreExecutors.directExecutor());
   }
 
   private boolean shouldSkipForClientDetection(

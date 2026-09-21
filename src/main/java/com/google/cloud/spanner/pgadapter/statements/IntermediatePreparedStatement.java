@@ -39,7 +39,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   protected final int[] givenParameterDataTypes;
   protected Statement statement;
-  private Future<DescribeResult> describeResult;
+  private ListenableFuture<DescribeResult> describeResult;
 
   public IntermediatePreparedStatement(
       ConnectionHandler connectionHandler,
@@ -96,7 +96,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     ListenableFuture<StatementResult> statementResultFuture =
         backendConnection.analyze(this.command, this.parsedStatement, this.statement);
     setFutureStatementResult(statementResultFuture);
-    this.describeResult =
+    ListenableFuture<DescribeResult> describeResultFuture =
         Futures.transform(
             statementResultFuture,
             result -> {
@@ -111,6 +111,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
               return describeResult;
             },
             MoreExecutors.directExecutor());
+    this.describeResult = describeResultFuture;
     this.described = true;
     return statementResultFuture;
   }
@@ -158,7 +159,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
       // As this describe-request is an auto-describe request, we can safely try to look it up in a
       // cache.
-      Future<DescribeResult> cachedDescribeResult =
+      ListenableFuture<DescribeResult> cachedDescribeResult =
           getConnectionHandler().getAutoDescribedStatement(this.originalStatement.getSql());
       if (cachedDescribeResult != null) {
         this.described = true;
