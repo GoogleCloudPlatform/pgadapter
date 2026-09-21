@@ -82,8 +82,8 @@ public class Server {
       ProxyServer proxyServer = new ProxyServer(optionsMetadata, openTelemetry);
       if (!optionsMetadata.hasCommand()) {
         // There's no command that should be executed against PGAdapter, so we should keep it
-        // running in the background. Create a shutdown handler and register signal handlers for the
-        // signals that should terminate the server before starting the server.
+        // running in the background. The shutdown handler and the signal handlers must be in
+        // place before the server starts accepting connections.
         Server.shutdownHandler = proxyServer.getOrCreateShutdownHandler();
         registerSignalHandlers();
       }
@@ -182,9 +182,10 @@ public class Server {
    * Registers signal handlers for TERM, INT, and QUIT. This method uses reflection and fails
    * gracefully if signal handling is not available on this JVM.
    *
-   * <p>MUST NOT be called from a static initializer: loading {@link Server} must not mutate the
-   * host JVM's signal handlers, because {@link ProxyServer} can be embedded in another application
-   * (e.g. {@code new ProxyServer(options)} invokes {@link #setupOpenTelemetry(OptionsMetadata)}).
+   * <p>Signal handlers are process-global: registering them replaces any handler the surrounding
+   * JVM already installed. Only call this when PGAdapter owns the process lifecycle, which is the
+   * case when it runs as a stand-alone server. An application that embeds {@link ProxyServer} keeps
+   * its own handlers and is responsible for its own shutdown.
    */
   static void registerSignalHandlers() {
     registerSignalHandler("TERM", "handleTerm", Level.WARNING);

@@ -179,8 +179,8 @@ public class ServerTest {
               .setPort(0)
               .build();
 
-      // Load ProxyServer and Server in a fresh ClassLoader so that Server.<clinit> genuinely runs
-      // after probeInt and probeTerm have been installed.
+      // Load ProxyServer and Server in a fresh ClassLoader so that Server.<clinit> runs after
+      // probeInt and probeTerm have been installed.
       ClassLoader freshLoader = new IsolatedServerClassLoader(ServerTest.class.getClassLoader());
       Class<?> freshProxyServerClass =
           Class.forName(ProxyServer.class.getName(), true, freshLoader);
