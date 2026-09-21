@@ -168,14 +168,11 @@ public class ServerTest {
       Server.restoreSignalHandler("INT", probeInt);
       Server.restoreSignalHandler("TERM", probeTerm);
 
-      File creds = folder.newFile("creds.json");
-      Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
       OptionsMetadata options =
           OptionsMetadata.newBuilder()
               .setProject("p")
               .setInstance("i")
               .setDatabase("d")
-              .setCredentialsFile(creds.getAbsolutePath())
               .setPort(0)
               .build();
 
@@ -239,8 +236,6 @@ public class ServerTest {
   public void testStandaloneServerStopsGracefullyOnSigTerm() throws Exception {
     assumeFalse(isWindows());
 
-    File creds = folder.newFile("standalone-creds.json");
-    Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
     Process server =
         new ProcessBuilder(
                 new File(new File(System.getProperty("java.home"), "bin"), "java").getPath(),
@@ -254,9 +249,7 @@ public class ServerTest {
                 "-d",
                 "d",
                 "-s",
-                "0",
-                "-c",
-                creds.getAbsolutePath())
+                "0")
             .redirectErrorStream(true)
             .start();
 
@@ -283,8 +276,6 @@ public class ServerTest {
   public void testCommandModeIgnoresSigIntAndTerminatesChildOnSigTerm() throws Exception {
     assumeFalse(isWindows());
 
-    File creds = folder.newFile("cmd-creds.json");
-    Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
     File childPidFile = new File(folder.getRoot(), "child.pid");
     File childIntFile = new File(folder.getRoot(), "child.int");
     File childScript = folder.newFile("child-cmd.sh");
@@ -322,8 +313,6 @@ public class ServerTest {
                 "d",
                 "-s",
                 "0",
-                "-c",
-                creds.getAbsolutePath(),
                 "-cmd",
                 childScript.getAbsolutePath())
             .redirectErrorStream(true)
@@ -381,8 +370,6 @@ public class ServerTest {
   public void testEmbeddedHostHandlesSigTermAndRunsShutdownHooks() throws Exception {
     assumeFalse(isWindows());
 
-    File creds = folder.newFile("embedded-creds.json");
-    Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
     File hookFile = folder.newFile("hook.txt");
     Process host =
         new ProcessBuilder(
@@ -390,7 +377,6 @@ public class ServerTest {
                 "-cp",
                 System.getProperty("java.class.path"),
                 EmbeddedHost.class.getName(),
-                creds.getAbsolutePath(),
                 hookFile.getAbsolutePath())
             .redirectErrorStream(true)
             .start();
@@ -422,7 +408,7 @@ public class ServerTest {
               new Thread(
                   () -> {
                     try {
-                      Files.asCharSink(new File(args[1]), StandardCharsets.UTF_8).write("HOOK_RAN");
+                      Files.asCharSink(new File(args[0]), StandardCharsets.UTF_8).write("HOOK_RAN");
                     } catch (IOException ignored) {
                       // ignore
                     }
@@ -432,7 +418,6 @@ public class ServerTest {
                   .setProject("p")
                   .setInstance("i")
                   .setDatabase("d")
-                  .setCredentialsFile(args[0])
                   .setPort(0)
                   .build())
           .startServer();
