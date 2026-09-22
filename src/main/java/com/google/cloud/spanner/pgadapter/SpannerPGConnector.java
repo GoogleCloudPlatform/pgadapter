@@ -164,10 +164,10 @@ public class SpannerPGConnector {
       // runCommand has already stopped the client tool before propagating the interruption.
       Thread.currentThread().interrupt();
       return EXIT_CODE_INTERRUPTED;
-    } catch (Throwable throwable) {
+    } catch (Exception exception) {
       // getMessage() is null for exceptions such as NullPointerException.
       String message =
-          throwable.getMessage() == null ? throwable.toString() : throwable.getMessage();
+          exception.getMessage() == null ? exception.toString() : exception.getMessage();
       err.printf("%s: failed to start PGAdapter: %s%n", PROGRAM_NAME, message);
       return 1;
     } finally {
