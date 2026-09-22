@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.logging.DefaultLogConfiguration;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
@@ -48,6 +49,12 @@ public class SpannerPGConnector {
   static final String DATABASE_ENV_VAR = "SPANNER_DATABASE";
   static final String EMULATOR_ENV_VAR = "SPANNER_EMULATOR_HOST";
 
+  /**
+   * Project that is used when the emulator is used without a project. The emulator creates
+   * instances and databases on demand, so the value only has to be a valid project id.
+   */
+  static final String DEFAULT_EMULATOR_PROJECT = "emulator-project";
+
   /** Exit code that is used by POSIX shells for 'command not found'. */
   static final int EXIT_CODE_COMMAND_NOT_FOUND = 127;
 
@@ -74,6 +81,13 @@ public class SpannerPGConnector {
    * that is started by this program. These are the standard libpq short options for host and port.
    */
   private static final String CONNECTION_OVERRIDE_SHORT_OPTIONS = "hp";
+
+  /**
+   * Short options that take a value. Scanning a bundled short option group must stop at the first
+   * of these, because everything that follows it is the value and not a further option. The list
+   * follows psql; other tools may give the same letter a different arity.
+   */
+  private static final String VALUE_TAKING_SHORT_OPTIONS = "cdfFLoPRTUv";
 
   /** Long options that are used by PostgreSQL tools to select the database. */
   private static final ImmutableSet<String> DATABASE_LONG_OPTIONS =
@@ -195,14 +209,22 @@ public class SpannerPGConnector {
             .disableUnixDomainSockets();
 
     String project = environment.get(PROJECT_ENV_VAR);
+    String instance = environment.get(INSTANCE_ENV_VAR);
+    boolean useEmulator = !isNullOrEmpty(environment.get(EMULATOR_ENV_VAR));
+    if (isNullOrEmpty(project) && !isNullOrEmpty(instance)) {
+      // An instance without a project is rejected by OptionsMetadata. The emulator creates the
+      // instance and the database on the fly, so any project works there. Otherwise fall back to
+      // the project of the environment (for example `gcloud config set project`), which is also
+      // what PGAdapter does when it is started with -i and without -p.
+      project = useEmulator ? DEFAULT_EMULATOR_PROJECT : SpannerOptions.getDefaultProjectId();
+    }
     if (!isNullOrEmpty(project)) {
       builder.setProject(project);
     }
-    String instance = environment.get(INSTANCE_ENV_VAR);
     if (!isNullOrEmpty(instance)) {
       builder.setInstance(instance);
     }
-    if (!isNullOrEmpty(environment.get(EMULATOR_ENV_VAR))) {
+    if (useEmulator) {
       builder.autoConfigureEmulator();
     }
     return builder.build();
@@ -289,8 +311,7 @@ public class SpannerPGConnector {
 
   /**
    * Returns the first command line argument that would redirect the client tool to a different
-   * server, or null if there is none. Best-effort: recognizes the standard libpq spellings, but not
-   * bundled short options such as {@code -tAh}.
+   * server, or null if there is none. Best-effort: recognizes the standard libpq spellings.
    */
   @VisibleForTesting
   @Nullable
@@ -314,11 +335,30 @@ public class SpannerPGConnector {
         if (CONNECTION_OVERRIDE_LONG_OPTIONS.contains(name)) {
           return arg;
         }
-      } else if (CONNECTION_OVERRIDE_SHORT_OPTIONS.indexOf(arg.charAt(1)) > -1) {
+      } else if (isConnectionOverrideShortOptions(arg)) {
         return arg;
       }
     }
     return null;
+  }
+
+  /**
+   * Returns true if any option in the given short option argument redirects the client tool to a
+   * different server. Short options can be bundled, so {@code -tAh} selects a host just like {@code
+   * -h} does, and every flag in the group has to be checked.
+   */
+  private static boolean isConnectionOverrideShortOptions(String arg) {
+    for (int index = 1; index < arg.length(); index++) {
+      char option = arg.charAt(index);
+      if (CONNECTION_OVERRIDE_SHORT_OPTIONS.indexOf(option) > -1) {
+        return true;
+      }
+      if (VALUE_TAKING_SHORT_OPTIONS.indexOf(option) > -1) {
+        // The remainder is the value of this option, for example the query in `-cselect 1`.
+        break;
+      }
+    }
+    return false;
   }
 
   /**

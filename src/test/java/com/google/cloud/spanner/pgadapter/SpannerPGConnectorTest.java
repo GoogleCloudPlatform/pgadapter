@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.SpannerPGConnector.DEFAULT_EMULATOR_PROJECT;
 import static com.google.cloud.spanner.pgadapter.SpannerPGConnector.configureEnvironment;
 import static com.google.cloud.spanner.pgadapter.SpannerPGConnector.createOptionsMetadata;
 import static com.google.cloud.spanner.pgadapter.SpannerPGConnector.findConnectionOverride;
@@ -23,7 +24,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeNotNull;
 
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
@@ -135,6 +138,11 @@ public class SpannerPGConnectorTest {
           {"--port", "psql", "--port", "5432"},
           {"--port=5432", "psql", "--port=5432"},
           {"-h", "psql", "-d", "my-database", "-c", "select 1", "-h", "localhost"},
+          // Short options can be bundled, so every flag in the group has to be checked.
+          {"-tAh", "psql", "-tAh", "localhost"},
+          {"-tAhlocalhost", "psql", "-tAhlocalhost"},
+          {"-Ap", "psql", "-Ap", "5432"},
+          {"-xh", "psql", "-xh", "localhost"},
         };
     for (String[] testCase : rejectedArguments) {
       String expected = testCase[0];
@@ -161,6 +169,15 @@ public class SpannerPGConnectorTest {
           {"pg_dump", "--schema-only", "--no-owner"},
           // Everything after '--' is a positional argument.
           {"psql", "--", "-h", "localhost"},
+          // Bundled flags that select no server.
+          {"psql", "-tA", "-c", "select 1"},
+          {"psql", "-tAc", "select 1"},
+          // An 'h' or 'p' inside the value of an option is not a host or a port.
+          {"psql", "-chost"},
+          {"psql", "-cselect * from hosts"},
+          {"psql", "-dhostdb"},
+          {"pg_dump", "-Thosts"},
+          {"psql", "-vport=5432"},
         };
     for (String[] args : acceptedArguments) {
       assertNull(String.join(" ", args), findConnectionOverride(args));
@@ -327,5 +344,30 @@ public class SpannerPGConnectorTest {
                 "GOOGLE_CLOUD_PROJECT", "", "SPANNER_INSTANCE", "", "SPANNER_EMULATOR_HOST", ""));
 
     assertFalse(options.hasDefaultInstanceId());
+  }
+
+  @Test
+  public void testInstanceWithoutProjectUsesDefaultProject() {
+    String defaultProject = SpannerOptions.getDefaultProjectId();
+    assumeNotNull("This test requires a default project to be set", defaultProject);
+
+    OptionsMetadata options =
+        createOptionsMetadata(ImmutableMap.of("SPANNER_INSTANCE", "my-instance"));
+
+    assertTrue(options.hasDefaultInstanceId());
+    assertEquals(defaultProject, options.getDefaultInstanceId().getProject());
+    assertEquals("my-instance", options.getDefaultInstanceId().getInstance());
+  }
+
+  @Test
+  public void testInstanceWithoutProjectUsesEmulatorProject() {
+    OptionsMetadata options =
+        createOptionsMetadata(
+            ImmutableMap.of(
+                "SPANNER_INSTANCE", "my-instance", "SPANNER_EMULATOR_HOST", "localhost:9010"));
+
+    assertTrue(options.hasDefaultInstanceId());
+    assertEquals(DEFAULT_EMULATOR_PROJECT, options.getDefaultInstanceId().getProject());
+    assertEquals("my-instance", options.getDefaultInstanceId().getInstance());
   }
 }

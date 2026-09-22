@@ -62,48 +62,83 @@ if ([string]::IsNullOrEmpty($Version)) {
 
 Write-Host "Installing Spanner PG Connector..." -ForegroundColor Green
 
-# 1. Remove the previous installation's payload. Only managed assets are deleted, so user files
-# survive and a directory that some shell is sitting in does not block the upgrade.
-if (Test-Path $InstallDir) {
+# 1. Download and extract into a staging directory. The installation that is already there is only
+# touched once the new payload is on disk and complete, so that a failed download or a corrupt
+# archive leaves the existing installation working.
+$StagingDir = Join-Path $env:TEMP "spanner-pg-connector-staging-$PID"
+$ZipPath = Join-Path $env:TEMP "spanner-pg-connector-windows-x64-$PID.zip"
+$KeptMessage = "The existing installation in $InstallDir has been left unchanged."
+
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $StagingDir
+Remove-Item -Force -ErrorAction SilentlyContinue $ZipPath
+New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
+
+try {
+    # 2. Download package
+    Write-Host "Downloading package from Artifact Registry..."
+    $DownloadUrl = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/files/spanner-pg-connector:$Version:spanner-pg-connector-windows-x64.zip:download?alt=media"
+
+    $DownloadSuccess = $false
+    try {
+        Invoke-RestMethod -Uri $DownloadUrl -Headers $Headers -OutFile $ZipPath -ErrorAction Stop
+        $DownloadSuccess = $true
+    } catch {
+        if (Get-Command gcloud -ErrorAction SilentlyContinue) {
+            Write-Host "Direct download failed, falling back to gcloud artifacts..." -ForegroundColor Yellow
+            gcloud artifacts generic download --project=$Project --location=$Location --repository=$Repository --package="spanner-pg-connector" --version="$Version" --name="spanner-pg-connector-windows-x64.zip" --destination="$StagingDir"
+            $Downloaded = Join-Path $StagingDir "spanner-pg-connector-windows-x64.zip"
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $Downloaded)) {
+                Move-Item -Force $Downloaded $ZipPath
+                $DownloadSuccess = $true
+            }
+        }
+    }
+
+    if (-not $DownloadSuccess) {
+        Write-Error "Error: Failed to download spanner-pg-connector-windows-x64.zip version $Version from Artifact Registry."
+        Write-Host "If the repository is private, please set `$env:TOKEN or run 'gcloud auth login'." -ForegroundColor Yellow
+        Write-Host $KeptMessage -ForegroundColor Yellow
+        Exit 1
+    }
+
+    # 3. Extract into staging
+    Write-Host "Extracting files..."
+    try {
+        Expand-Archive -Path $ZipPath -DestinationPath $StagingDir -Force -ErrorAction Stop
+    } catch {
+        Write-Error "Error: Failed to extract the downloaded archive. It may be corrupt. $_"
+        Write-Host $KeptMessage -ForegroundColor Yellow
+        Exit 1
+    }
+
+    # A truncated archive can extract without error, so check that the payload is actually usable
+    # before the working installation is replaced with it.
+    foreach ($required in @("spanner-pg-connector.cmd", "pgadapter.jar")) {
+        if (-not (Test-Path (Join-Path $StagingDir $required))) {
+            Write-Error "Error: The downloaded package is incomplete, '$required' is missing."
+            Write-Host $KeptMessage -ForegroundColor Yellow
+            Exit 1
+        }
+    }
+
+    # 4. Swap the staged payload in. Only managed assets are replaced, so user files survive and a
+    # directory that some shell is sitting in does not block the upgrade.
+    Write-Host "Installing to $InstallDir..."
+    if (-not (Test-Path $InstallDir)) {
+        New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+    }
     foreach ($managed in @("lib", "custom-jre", "pgadapter.jar", "spanner-pg-connector.cmd", "spgc.cmd")) {
         $target = Join-Path $InstallDir $managed
         if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+        $staged = Join-Path $StagingDir $managed
+        if (Test-Path $staged) { Move-Item -Force $staged $target }
     }
-} else {
-    New-Item -ItemType Directory -Path $InstallDir | Out-Null
+} finally {
+    Remove-Item -Force -ErrorAction SilentlyContinue $ZipPath
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $StagingDir
 }
 
-# 2. Download package
-Write-Host "Downloading package from Artifact Registry..."
-$DownloadUrl = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/files/spanner-pg-connector:$Version:spanner-pg-connector-windows-x64.zip:download?alt=media"
-$ZipPath = Join-Path $env:TEMP "spanner-pg-connector-windows-x64.zip"
-
-$DownloadSuccess = $false
-try {
-    Invoke-RestMethod -Uri $DownloadUrl -Headers $Headers -OutFile $ZipPath -ErrorAction Stop
-    $DownloadSuccess = $true
-} catch {
-    if (Get-Command gcloud -ErrorAction SilentlyContinue) {
-        Write-Host "Direct download failed, falling back to gcloud artifacts..." -ForegroundColor Yellow
-        gcloud artifacts generic download --project=$Project --location=$Location --repository=$Repository --package="spanner-pg-connector" --version="$Version" --name="spanner-pg-connector-windows-x64.zip" --destination="$env:TEMP"
-        if (Test-Path $ZipPath) {
-            $DownloadSuccess = $true
-        }
-    }
-}
-
-if (-not $DownloadSuccess) {
-    Write-Error "Error: Failed to download spanner-pg-connector-windows-x64.zip from Artifact Registry."
-    Write-Host "If the repository is private, please set `$env:TOKEN or run 'gcloud auth login'." -ForegroundColor Yellow
-    Exit 1
-}
-
-# 3. Extract zip
-Write-Host "Extracting files to $InstallDir..."
-Expand-Archive -Path $ZipPath -DestinationPath $InstallDir -Force
-Remove-Item $ZipPath
-
-# 4. Add to user PATH environment variable
+# 5. Add to user PATH environment variable
 # Rebuild the entry rather than only appending, so that an older install directory does not stay
 # on PATH and win over this one.
 Write-Host "Configuring environment PATH..."

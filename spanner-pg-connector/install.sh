@@ -121,76 +121,87 @@ echo "Detected Platform: ${OS_NAME}-${ARCH_NAME}"
 # 2. Define package names
 PACKAGE_NAME="spanner-pg-connector-${OS_NAME}-${ARCH_NAME}.tar.gz"
 
-# Setup install directory
-mkdir -p "${INSTALL_DIR}"
-rm -f "${INSTALL_DIR}/pgadapter.jsa" "${INSTALL_DIR}/install_path.txt"
+# 3. Download the release bundle into a staging directory. The installation that is already there
+# is only touched once the new payload is on disk and complete, so that a failed download or a
+# corrupt archive leaves the existing installation working.
+STAGING_DIR="${INSTALL_DIR}.staging.$$"
+trap 'rm -rf "${STAGING_DIR}"' EXIT
+rm -rf "${STAGING_DIR}"
+mkdir -p "${STAGING_DIR}"
 
-# Remove the previous installation's payload, otherwise its jars stay in lib/ and the launcher's
-# lib/* classpath loads two versions of the same dependency. INSTALL_DIR itself is left alone.
-for managed in lib custom-jre pgadapter.jar spanner-pg-connector spgc; do
-  rm -rf "${INSTALL_DIR:?}/${managed}"
-done
+KEPT_MESSAGE="The existing installation in ${INSTALL_DIR} has been left unchanged."
+DOWNLOAD_URL="https://artifactregistry.googleapis.com/v1/projects/${PROJECT_ID}/locations/${AR_LOCATION}/repositories/${AR_REPOSITORY}/files/spanner-pg-connector:${VERSION}:${PACKAGE_NAME}:download?alt=media"
+ARCHIVE="${STAGING_DIR}/${PACKAGE_NAME}"
 
-# 3. Download and Extract Release Bundle
-# versioned-package is where the release build writes the tarballs; dist holds unpacked staging.
-LOCAL_PACKAGE=""
-for candidate in \
-  "./target/release/versioned-package/${PACKAGE_NAME}" \
-  "./target/dist/${PACKAGE_NAME}" \
-  "./${PACKAGE_NAME}"; do
-  if [ -f "${candidate}" ]; then
-    LOCAL_PACKAGE="${candidate}"
-    break
-  fi
-done
+DOWNLOAD_SUCCESS=false
+if command -v curl >/dev/null 2>&1; then
+  echo "Downloading package from Artifact Registry..."
 
-if [ -n "${LOCAL_PACKAGE}" ]; then
-  echo "Found local release package at ${LOCAL_PACKAGE}. Installing locally..."
-  tar -xzf "${LOCAL_PACKAGE}" -C "${INSTALL_DIR}"
-else
-  # Download from Generic Artifact Registry
-  DOWNLOAD_URL="https://artifactregistry.googleapis.com/v1/projects/${PROJECT_ID}/locations/${AR_LOCATION}/repositories/${AR_REPOSITORY}/files/spanner-pg-connector:${VERSION}:${PACKAGE_NAME}:download?alt=media"
-
-  DOWNLOAD_SUCCESS=false
-  if command -v curl >/dev/null 2>&1; then
-    echo "Downloading package from Artifact Registry..."
-    TMP_ARCHIVE="${INSTALL_DIR}/${PACKAGE_NAME}"
-
-    if [ -n "${AUTH_HEADER}" ]; then
-      HTTP_STATUS=$(curl -s -L -H "${AUTH_HEADER}" -w "%{http_code}" -o "${TMP_ARCHIVE}" "${DOWNLOAD_URL}" 2>/dev/null || true)
-    else
-      HTTP_STATUS=$(curl -s -L -w "%{http_code}" -o "${TMP_ARCHIVE}" "${DOWNLOAD_URL}" 2>/dev/null || true)
-    fi
-
-    if [ "${HTTP_STATUS}" = "200" ] && [ -s "${TMP_ARCHIVE}" ]; then
-      tar -xzf "${TMP_ARCHIVE}" -C "${INSTALL_DIR}"
-      rm -f "${TMP_ARCHIVE}"
-      DOWNLOAD_SUCCESS=true
-    else
-      rm -f "${TMP_ARCHIVE}"
-    fi
+  if [ -n "${AUTH_HEADER}" ]; then
+    HTTP_STATUS=$(curl -s -L -H "${AUTH_HEADER}" -w "%{http_code}" -o "${ARCHIVE}" "${DOWNLOAD_URL}" 2>/dev/null || true)
+  else
+    HTTP_STATUS=$(curl -s -L -w "%{http_code}" -o "${ARCHIVE}" "${DOWNLOAD_URL}" 2>/dev/null || true)
   fi
 
-  if [ "${DOWNLOAD_SUCCESS}" != "true" ]; then
-    if command -v gcloud >/dev/null 2>&1; then
-      echo "Direct download not available or failed; falling back to gcloud artifacts..."
-      gcloud artifacts generic download \
-        --project="${PROJECT_ID}" \
-        --location="${AR_LOCATION}" \
-        --repository="${AR_REPOSITORY}" \
-        --package="spanner-pg-connector" \
-        --version="${VERSION}" \
-        --name="${PACKAGE_NAME}" \
-        --destination="${INSTALL_DIR}"
-      tar -xzf "${INSTALL_DIR}/${PACKAGE_NAME}" -C "${INSTALL_DIR}"
-      rm -f "${INSTALL_DIR}/${PACKAGE_NAME}"
-    else
-      echo "Error: Failed to download ${PACKAGE_NAME} from Artifact Registry." >&2
-      echo "If the repository is private, please set TOKEN=\"<token>\" or install and authenticate 'gcloud'." >&2
-      exit 1
-    fi
+  if [ "${HTTP_STATUS}" = "200" ] && [ -s "${ARCHIVE}" ]; then
+    DOWNLOAD_SUCCESS=true
+  else
+    rm -f "${ARCHIVE}"
   fi
 fi
+
+if [ "${DOWNLOAD_SUCCESS}" != "true" ] && command -v gcloud >/dev/null 2>&1; then
+  echo "Direct download not available or failed; falling back to gcloud artifacts..."
+  # Guarded by `if`, because a bare call would abort the installer under `set -e` and skip the
+  # diagnostics below.
+  if gcloud artifacts generic download \
+    --project="${PROJECT_ID}" \
+    --location="${AR_LOCATION}" \
+    --repository="${AR_REPOSITORY}" \
+    --package="spanner-pg-connector" \
+    --version="${VERSION}" \
+    --name="${PACKAGE_NAME}" \
+    --destination="${STAGING_DIR}" && [ -s "${ARCHIVE}" ]; then
+    DOWNLOAD_SUCCESS=true
+  fi
+fi
+
+if [ "${DOWNLOAD_SUCCESS}" != "true" ]; then
+  echo "Error: Failed to download ${PACKAGE_NAME} version ${VERSION} from Artifact Registry." >&2
+  echo "If the repository is private, please set TOKEN=\"<token>\" or install and authenticate 'gcloud'." >&2
+  echo "${KEPT_MESSAGE}" >&2
+  exit 1
+fi
+
+if ! tar -xzf "${ARCHIVE}" -C "${STAGING_DIR}"; then
+  echo "Error: Failed to extract ${PACKAGE_NAME}. The download may be corrupt." >&2
+  echo "${KEPT_MESSAGE}" >&2
+  exit 1
+fi
+rm -f "${ARCHIVE}"
+
+# A truncated archive can extract without error, so check that the payload is actually usable
+# before the working installation is replaced with it.
+for required in spanner-pg-connector pgadapter.jar; do
+  if [ ! -e "${STAGING_DIR}/${required}" ]; then
+    echo "Error: The downloaded package is incomplete, '${required}' is missing." >&2
+    echo "${KEPT_MESSAGE}" >&2
+    exit 1
+  fi
+done
+
+# 4. Swap the staged payload in. The previous payload is removed entry by entry rather than the
+# whole directory, otherwise its jars stay in lib/ and the launcher's lib/* classpath loads two
+# versions of the same dependency. INSTALL_DIR itself is left alone, so a shell sitting in it does
+# not block the upgrade and unmanaged files survive.
+mkdir -p "${INSTALL_DIR}"
+rm -f "${INSTALL_DIR}/pgadapter.jsa" "${INSTALL_DIR}/install_path.txt"
+for managed in lib custom-jre pgadapter.jar spanner-pg-connector spgc; do
+  rm -rf "${INSTALL_DIR:?}/${managed}"
+  if [ -e "${STAGING_DIR}/${managed}" ]; then
+    mv "${STAGING_DIR}/${managed}" "${INSTALL_DIR}/"
+  fi
+done
 
 # Ensure launcher is executable and create alias symlink
 chmod +x "${INSTALL_DIR}/spanner-pg-connector"
@@ -198,7 +209,7 @@ ln -sf spanner-pg-connector "${INSTALL_DIR}/spgc"
 
 echo "Extracted files to ${INSTALL_DIR}"
 
-# 4. Add to Shell Profile PATH
+# 5. Add to Shell Profile PATH
 SHELL_CONFIG=""
 case "${SHELL}" in
   */zsh)
