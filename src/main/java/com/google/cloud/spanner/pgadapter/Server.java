@@ -135,6 +135,9 @@ public class Server {
     }
     try {
       process.waitFor();
+    } catch (InterruptedException interrupted) {
+      stopCommand(process, proxyServer);
+      throw interrupted;
     } finally {
       removeShutdownHook(shutdownHook);
     }
