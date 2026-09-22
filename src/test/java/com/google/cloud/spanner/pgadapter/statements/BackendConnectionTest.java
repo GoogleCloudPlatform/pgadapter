@@ -592,11 +592,10 @@ public class BackendConnectionTest {
         .thenReturn(ClientSideStatementType.ROLLBACK);
     StatementResult rollbackResult = mock(StatementResult.class);
     when(rollbackResult.getResultType()).thenReturn(ResultType.NO_RESULT);
-    doThrow(
+    when(connection.execute(rollbackStatement))
+        .thenThrow(
             SpannerExceptionFactory.newSpannerException(
-                ErrorCode.FAILED_PRECONDITION, "internal error"))
-        .when(connection)
-        .rollback();
+                ErrorCode.FAILED_PRECONDITION, "internal error"));
 
     BackendConnection backendConnection =
         new BackendConnection(
@@ -626,17 +625,16 @@ public class BackendConnectionTest {
   }
 
   @Test
-  public void testRollbackWithoutTimeout_clearsAndRestoresStatementTimeout() throws Exception {
+  public void testInternalRollbackWithoutTimeout_clearsAndRestoresStatementTimeout() {
     Connection connection = mock(Connection.class);
     when(connection.isInTransaction()).thenReturn(true);
     when(connection.hasStatementTimeout()).thenReturn(true);
     when(connection.getStatementTimeout(TimeUnit.NANOSECONDS)).thenReturn(5_000_000L);
 
-    Statement rollbackStatement = Statement.of("rollback");
-    ParsedStatement parsedRollbackStatement = mock(ParsedStatement.class);
-    when(parsedRollbackStatement.getType()).thenReturn(StatementType.CLIENT_SIDE);
-    when(parsedRollbackStatement.getClientSideStatementType())
-        .thenReturn(ClientSideStatementType.ROLLBACK);
+    Statement statement = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    RuntimeException error = new RuntimeException("test error");
+    when(connection.execute(statement)).thenThrow(error);
 
     BackendConnection backendConnection =
         new BackendConnection(
@@ -650,11 +648,13 @@ public class BackendConnectionTest {
             () -> WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             () -> EMPTY_LOCAL_STATEMENTS);
-    Future<StatementResult> rollbackFuture =
-        backendConnection.execute(
-            "ROLLBACK", parsedRollbackStatement, rollbackStatement, Function.identity());
+    Future<StatementResult> resultFuture =
+        backendConnection.execute("INSERT", parsedStatement, statement, Function.identity());
     backendConnection.flush();
-    assertEquals(ResultType.NO_RESULT, rollbackFuture.get().getResultType());
+
+    ExecutionException executionException =
+        assertThrows(ExecutionException.class, resultFuture::get);
+    assertEquals(PGException.class, executionException.getCause().getClass());
 
     InOrder inOrder = inOrder(connection);
     inOrder.verify(connection).setStatementTag(null);

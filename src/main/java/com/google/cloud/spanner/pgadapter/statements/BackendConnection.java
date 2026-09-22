@@ -514,10 +514,7 @@ public class BackendConnection {
                 Action.Starting,
                 () -> String.format("Statement: %s", statement.getSql())));
         Stopwatch stopwatch = Stopwatch.createStarted();
-        StatementResult result =
-            isRollback(parsedStatement)
-                ? rollbackWithoutTimeout()
-                : spannerConnection.execute(statement);
+        StatementResult result = spannerConnection.execute(statement);
         Duration executionDuration = stopwatch.elapsed();
         metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         logger.log(
@@ -852,7 +849,7 @@ public class BackendConnection {
     @Override
     void doExecute() {
       try {
-        rollbackToSavepointWithoutTimeout(rollbackToStatement.getSavepointName());
+        spannerConnection.rollbackToSavepoint(rollbackToStatement.getSavepointName());
         result.set(NO_RESULT);
       } catch (Exception exception) {
         PGException pgException =
@@ -1243,7 +1240,7 @@ public class BackendConnection {
     }
   }
 
-  private StatementResult rollbackWithoutTimeout() {
+  private void rollbackWithoutTimeout() {
     if (spannerConnection.isDmlBatchActive()) {
       spannerConnection.abortBatch();
     }
@@ -1256,23 +1253,6 @@ public class BackendConnection {
     }
     try {
       spannerConnection.rollback();
-      return ROLLBACK_RESULT;
-    } finally {
-      if (timeoutUnit != null) {
-        spannerConnection.setStatementTimeout(previousTimeout, timeoutUnit);
-      }
-    }
-  }
-
-  private void rollbackToSavepointWithoutTimeout(String savepointName) {
-    TimeUnit timeoutUnit = spannerConnection.hasStatementTimeout() ? TimeUnit.NANOSECONDS : null;
-    long previousTimeout =
-        timeoutUnit != null ? spannerConnection.getStatementTimeout(timeoutUnit) : 0L;
-    if (timeoutUnit != null) {
-      spannerConnection.clearStatementTimeout();
-    }
-    try {
-      spannerConnection.rollbackToSavepoint(savepointName);
     } finally {
       if (timeoutUnit != null) {
         spannerConnection.setStatementTimeout(previousTimeout, timeoutUnit);

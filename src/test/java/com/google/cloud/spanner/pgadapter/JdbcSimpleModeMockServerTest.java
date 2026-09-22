@@ -963,7 +963,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     mockSpanner.setRollbackExecutionTime(SimulatedExecutionTime.ofMinimumAndRandomTime(20, 0));
     try (Connection connection = DriverManager.getConnection(createUrl());
         Statement statement = connection.createStatement()) {
-      // 1. Implicit rollback when a statement actually times out due to statement_timeout ('1ms')
+      // Implicit rollback when a statement actually times out due to statement_timeout ('1ms')
       // should still complete the 20ms Rollback RPC without inheriting the 1ms statement_timeout.
       statement.execute("begin");
       statement.execute(INSERT_STATEMENT.getSql());
@@ -978,47 +978,6 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       mockSpanner.setExecuteSqlExecutionTime(SimulatedExecutionTime.none());
       statement.execute("rollback");
       assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
-
-      // 2. Explicit ROLLBACK (even with an active statement_tag or active DML batch) should clear
-      // the tag, abort the batch, and not inherit the 1ms statement_timeout.
-      statement.execute("set statement_timeout = 0");
-      statement.execute("begin");
-      statement.execute(INSERT_STATEMENT.getSql());
-      statement.execute("set spanner.statement_tag = 'ignored_on_rollback'");
-      statement.execute("set statement_timeout = '1ms'");
-      stopwatch = Stopwatch.createStarted();
-      statement.execute("rollback");
-      assertTrue(stopwatch.elapsed(TimeUnit.MILLISECONDS) >= 20L);
-      assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
-
-      statement.execute("set statement_timeout = 0");
-      statement.execute("begin");
-      statement.execute(INSERT_STATEMENT.getSql());
-      statement.execute("start batch dml");
-      statement.execute(INSERT_STATEMENT.getSql());
-      statement.execute("set statement_timeout = '1ms'");
-      stopwatch = Stopwatch.createStarted();
-      statement.execute("rollback");
-      assertTrue(stopwatch.elapsed(TimeUnit.MILLISECONDS) >= 20L);
-      assertEquals(3, mockSpanner.countRequestsOfType(RollbackRequest.class));
-
-      // 3. ROLLBACK TO SAVEPOINT should not inherit the 1ms statement_timeout.
-      statement.execute("set statement_timeout = 0");
-      statement.execute("begin");
-      statement.execute(INSERT_STATEMENT.getSql());
-      statement.execute("savepoint s1");
-      statement.execute(INSERT_STATEMENT.getSql());
-      statement.execute("set statement_timeout = '1ms'");
-      stopwatch = Stopwatch.createStarted();
-      statement.execute("rollback to savepoint s1");
-      assertTrue(stopwatch.elapsed(TimeUnit.MILLISECONDS) >= 20L);
-      statement.execute("rollback");
-      assertEquals(4, mockSpanner.countRequestsOfType(RollbackRequest.class));
-
-      try (ResultSet resultSet = statement.executeQuery("show statement_timeout")) {
-        assertTrue(resultSet.next());
-        assertEquals("1ms", resultSet.getString(1));
-      }
     } finally {
       mockSpanner.unfreeze();
       mockSpanner.removeAllExecutionTimes();
