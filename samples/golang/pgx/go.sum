@@ -8,6 +8,8 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEK
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.2 h1:cgVgBT2UWElxevAJ8q7xCuL8ignfpwSxl2YeBZZO9LY=
 github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.2/go.mod h1:rN3Ll2t4hP15Kq5ewQ9NJtoqKG0SQC6Rt2Jc+47hCm8=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.3 h1:33dXA2vjAD2yOXsZEvGitL2fJO7wSaoPO9lAwPjKgPc=
+github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.3/go.mod h1:+8yyddMLG8eivla13OBCNF7e6bA0jLrgkAg8pjSR28o=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
@@ -57,6 +59,8 @@ github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 h1:iCEnooe7Ulw
 github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761/go.mod h1:5TJZWKEWniPve33vlWYSoGYefn3gLQRzjfDlhSJ9ZKM=
 github.com/jackc/pgx/v5 v5.10.0 h1:VhSvgU2jSli8o3AqIEOTJr7rZwAEUVo4E4XhR94Zfr0=
 github.com/jackc/pgx/v5 v5.10.0/go.mod h1:mal1tBGAFfLHvZzaYh77YS/eC6IX9OWbRV1QIIM0Jn4=
+github.com/jackc/pgx/v5 v5.11.0 h1:IzBBtyK9AHqf98cctWFifYSci2hgQR/cd56wB4p+ogg=
+github.com/jackc/pgx/v5 v5.11.0/go.mod h1:mal1tBGAFfLHvZzaYh77YS/eC6IX9OWbRV1QIIM0Jn4=
 github.com/jackc/puddle/v2 v2.2.2 h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo=
 github.com/jackc/puddle/v2 v2.2.2/go.mod h1:vriiEXHvEE654aYKXXjOvZM39qJ0q+azkZFrfEOc3H4=
 github.com/klauspost/compress v1.18.7 h1:aUyZsS4kH3QTKurYhAOwAHxllVPnOthb3vPfnF1Ehjw=
@@ -75,6 +79,8 @@ github.com/moby/go-archive v0.3.0 h1:nos4BtzzUIqB406BgQnWGMI4qib9BZ8XUHU+ucv/n1c
 github.com/moby/go-archive v0.3.0/go.mod h1:Npdv43fFqlhZW7Xo8fbm3ZMYFvAGNviUPqX21VERbcE=
 github.com/moby/moby/api v1.55.0 h1:2/sexvQyqIWS8pRSCFddBfpW2qE7vR7FCL+vN8pxwMc=
 github.com/moby/moby/api v1.55.0/go.mod h1:+RQ6wluLwtYaTd1WnPLykIDPekkuyD/ROWQClE83pzs=
+github.com/moby/moby/api v1.56.0 h1:GQzua3NA599ASSIICx0iFgiJeO9YkdDARvQsm23ZZuQ=
+github.com/moby/moby/api v1.56.0/go.mod h1:sZ+THbVWkjOmBPPfbnzdD/G1LuIexWhqlSHHPTDQ1Uk=
 github.com/moby/moby/client v0.5.0 h1:5XhyPk2fuOWf6RlSFa3MkIIgDZkF25xToXW8Q/BH7cc=
 github.com/moby/moby/client v0.5.0/go.mod h1:rcVpF8ncl9vo5gaIBdol6CnbEtSj1uxMvEV/UrykF/s=
 github.com/moby/patternmatcher v0.6.1 h1:qlhtafmr6kgMIJjKJMDmMWq7WLkKIo23hsrpR3x084U=

@@ -51,6 +51,9 @@ public class SpannerPGConnector {
   /** Exit code that is used by POSIX shells for 'command not found'. */
   static final int EXIT_CODE_COMMAND_NOT_FOUND = 127;
 
+  /** Exit code that is used by POSIX shells for a process that was stopped by SIGINT (128 + 2). */
+  static final int EXIT_CODE_INTERRUPTED = 130;
+
   /** Arguments that make this program print its usage information instead of running a command. */
   private static final ImmutableSet<String> HELP_ARGUMENTS =
       ImmutableSet.of("-?", "--help", "-help", "help");
@@ -134,7 +137,7 @@ public class SpannerPGConnector {
       // Failing to reconfigure logging must not prevent the client tool from starting.
     }
     ProxyServer proxyServer = null;
-    Thread shutdownHook = null;
+    Object previousIntHandler = null;
     try {
       OptionsMetadata options = createOptionsMetadata(environment);
       OpenTelemetry openTelemetry = Server.setupOpenTelemetry(options);
@@ -143,12 +146,10 @@ public class SpannerPGConnector {
 
       // Ctrl+C is sent to the whole foreground process group, so leave it to the client tool to
       // act on (psql cancels the running query rather than exiting).
-      Server.ignoreInterruptSignal();
-      // Stops the client tool and PGAdapter if this process is terminated. No TERM handler is
-      // registered: the JVM's own handler already runs this hook and then exits with 143.
-      shutdownHook = Server.createShutdownHook(proxyServer, PROGRAM_NAME + "-shutdown-handler");
-      Runtime.getRuntime().addShutdownHook(shutdownHook);
+      previousIntHandler = Server.ignoreInterruptSignal();
 
+      // No TERM handler is registered: the JVM's own handler runs the shutdown hook that
+      // runCommand installs for the client tool, and then exits with 143.
       return runCommand(proxyServer, getDatabase(args, environment), args);
     } catch (IOException ioException) {
       // ProcessBuilder#start() throws an IOException if the command could not be started, which is
@@ -160,9 +161,9 @@ public class SpannerPGConnector {
       err.println("on your PATH.");
       return EXIT_CODE_COMMAND_NOT_FOUND;
     } catch (InterruptedException interruptedException) {
+      // runCommand has already stopped the client tool before propagating the interruption.
       Thread.currentThread().interrupt();
-      Server.destroyClientProcess();
-      return 130;
+      return EXIT_CODE_INTERRUPTED;
     } catch (Throwable throwable) {
       // getMessage() is null for exceptions such as NullPointerException.
       String message =
@@ -170,8 +171,10 @@ public class SpannerPGConnector {
       err.printf("%s: failed to start PGAdapter: %s%n", PROGRAM_NAME, message);
       return 1;
     } finally {
-      Server.stopProxyServer(proxyServer);
-      Server.removeShutdownHook(shutdownHook);
+      // Signal handlers are process-global, so the previous handler must be put back for callers
+      // that run this method in-process.
+      Server.restoreSignalHandler("INT", previousIntHandler);
+      Server.stopServerQuietly(proxyServer);
     }
   }
 
@@ -216,7 +219,7 @@ public class SpannerPGConnector {
     builder.command(command);
     configureEnvironment(builder.environment(), proxyServer.getLocalPort(), database);
     builder.inheritIO();
-    return Server.startAndWait(builder);
+    return Server.startAndWait(builder, proxyServer);
   }
 
   /**

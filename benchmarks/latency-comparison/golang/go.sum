@@ -23,6 +23,8 @@ cloud.google.com/go/spanner v1.94.0 h1:tve2XojeMa32SsrDNkp3J08TW4TZUVrv8TvTqGUif
 cloud.google.com/go/spanner v1.94.0/go.mod h1:Z2+83J5oVDmd1n5ntVMmjEuiNoXOpAyNeG7y1tuEHk0=
 cloud.google.com/go/spanner v1.95.0 h1:qIffeZvIZLBOA0Dvvi/6YwVtIxb8P61kEf3uqFQxU2o=
 cloud.google.com/go/spanner v1.95.0/go.mod h1:Z2+83J5oVDmd1n5ntVMmjEuiNoXOpAyNeG7y1tuEHk0=
+cloud.google.com/go/spanner v1.95.1 h1:9HYr+AAeAOubn0NZAYv34dFHQ3NbIUcWHZmgJvufPzk=
+cloud.google.com/go/spanner v1.95.1/go.mod h1:Z2+83J5oVDmd1n5ntVMmjEuiNoXOpAyNeG7y1tuEHk0=
 dario.cat/mergo v1.0.2 h1:85+piFYR1tMbRrLcDwR18y4UKJ3aH1Tbzi24VRW1TK8=
 dario.cat/mergo v1.0.2/go.mod h1:E/hbnu0NxMFBjpMIE34DRGLWqDy0g5FuKDhCb31ngxA=
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 h1:He8afgbRMd7mFxO99hRNu+6tazq8nFF9lIwo9JFroBk=
@@ -188,6 +190,8 @@ github.com/jackc/pgx/v4 v4.18.3 h1:dE2/TrEsGX3RBprb3qryqSV9Y60iZN1C6i8IrmW9/BA=
 github.com/jackc/pgx/v4 v4.18.3/go.mod h1:Ey4Oru5tH5sB6tV7hDmfWFahwF15Eb7DNXlRKx2CkVw=
 github.com/jackc/pgx/v5 v5.10.0 h1:VhSvgU2jSli8o3AqIEOTJr7rZwAEUVo4E4XhR94Zfr0=
 github.com/jackc/pgx/v5 v5.10.0/go.mod h1:mal1tBGAFfLHvZzaYh77YS/eC6IX9OWbRV1QIIM0Jn4=
+github.com/jackc/pgx/v5 v5.11.0 h1:IzBBtyK9AHqf98cctWFifYSci2hgQR/cd56wB4p+ogg=
+github.com/jackc/pgx/v5 v5.11.0/go.mod h1:mal1tBGAFfLHvZzaYh77YS/eC6IX9OWbRV1QIIM0Jn4=
 github.com/jackc/puddle v0.0.0-20190413234325-e4ced69a3a2b/go.mod h1:m4B5Dj62Y0fbyuIc15OsIqK0+JU8nkqQjsgx7dvjSWk=
 github.com/jackc/puddle v0.0.0-20190608224051-11cab39313c9/go.mod h1:m4B5Dj62Y0fbyuIc15OsIqK0+JU8nkqQjsgx7dvjSWk=
 github.com/jackc/puddle v1.1.3/go.mod h1:m4B5Dj62Y0fbyuIc15OsIqK0+JU8nkqQjsgx7dvjSWk=
@@ -245,6 +249,8 @@ github.com/montanaflynn/stats v0.12.4 h1:amtNRsti20yIhcrkfUJGwoYqBR82jKQFE8SNNYV
 github.com/montanaflynn/stats v0.12.4/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/montanaflynn/stats v0.12.5 h1:bmGi2m9LQJ6qKrDAvd/xZ3IKz+BEfZT2JnCYVbYKU7Y=
 github.com/montanaflynn/stats v0.12.5/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
+github.com/montanaflynn/stats v0.12.7 h1:NiiPEuigflz3Jja6pzDlCrMRI8MxUThKF/XHQBZfSv0=
+github.com/montanaflynn/stats v0.12.7/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=

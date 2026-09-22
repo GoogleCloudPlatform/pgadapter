@@ -67,10 +67,14 @@ public class CommandMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 100L));
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
-    Future<Integer> future =
-        executor.submit(() -> Server.runCommand(pgServer, "d", "psql", "-c", sql));
+    Future<Void> future =
+        executor.submit(
+            () -> {
+              Server.runCommand(pgServer, "d", "psql", "-c", sql);
+              return null;
+            });
     executor.shutdown();
-    assertEquals(0, future.get().intValue());
+    future.get();
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
