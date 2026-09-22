@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import {Knex} from "knex";
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 
 interface User {
   id: number;
@@ -153,8 +155,8 @@ async function testReadOnlyTransaction(client: Knex) {
   }
 }
 
-require('yargs')
-.demand(4)
+yargs(hideBin(process.argv))
+.demandCommand(1)
 .command(
     'testSelect1 <host> <port> <database>',
     'Executes SELECT 1',

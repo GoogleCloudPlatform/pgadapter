@@ -29,6 +29,7 @@ samples/snippets/**/dotnet-snippets/**/bin
 samples/snippets/**/dotnet-snippets/**/obj
 
 src/test/nodejs/**/.DS_Store
+src/test/nodejs/**/build/
 samples/nodejs/**/.DS_Store
 samples/cloud-run/nodejs/**/.DS_Store
 samples/nodejs/sequelize/**/*.js

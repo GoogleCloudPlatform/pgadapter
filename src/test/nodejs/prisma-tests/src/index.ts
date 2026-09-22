@@ -14,6 +14,8 @@
 
 import {Prisma, PrismaClient, User} from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 import {exec} from "child_process";
 import {promisify} from "util";
 
@@ -398,8 +400,8 @@ async function testCreateManyAllTypes(client: PrismaClient) {
   console.log(rows);
 }
 
-require('yargs')
-.demand(4)
+yargs(hideBin(process.argv))
+.demandCommand(1)
 .command(
     'testSelect1 <host> <port> <database>',
     'Executes SELECT 1',

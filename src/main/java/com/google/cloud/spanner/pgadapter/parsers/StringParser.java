@@ -75,7 +75,7 @@ public class StringParser extends Parser<String> {
   }
 
   public static byte[] convertToPG(
-      SessionState sessionState,
+      @Nonnull SessionState sessionState,
       DataOutputStream dataOutputStream,
       ResultSet resultSet,
       int position) {
@@ -84,12 +84,15 @@ public class StringParser extends Parser<String> {
   }
 
   static void writeToPG(
-      SessionState sessionState, DataOutputStream dataOutputStream, String value) {
+      @Nonnull SessionState sessionState, DataOutputStream dataOutputStream, String value) {
     writeToPG(sessionState, dataOutputStream, value, HEADER);
   }
 
   static void writeToPG(
-      SessionState sessionState, DataOutputStream dataOutputStream, String value, byte[] header) {
+      @Nonnull SessionState sessionState,
+      DataOutputStream dataOutputStream,
+      String value,
+      byte[] header) {
     int bufferSize = sessionState.getStringConversionBufferSize();
     int length = value.length();
     try {

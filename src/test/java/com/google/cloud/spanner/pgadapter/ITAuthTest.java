@@ -55,7 +55,7 @@ public class ITAuthTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws ClassNotFoundException {
-    IntegrationTest.skipOnExperimentalHost("Cloud auth is not applicable for experimental host");
+    IntegrationTest.skipOnSpannerOmni("Cloud auth is not applicable for Spanner Omni");
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
 

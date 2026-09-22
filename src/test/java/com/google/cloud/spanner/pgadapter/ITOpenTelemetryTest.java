@@ -56,7 +56,7 @@ public class ITOpenTelemetryTest implements IntegrationTest {
   @BeforeClass
   public static void setup() throws IOException {
     IntegrationTest.skipOnEmulator("This test requires credentials");
-    IntegrationTest.skipOnExperimentalHost("Cloud auth is not applicable for experimental host");
+    IntegrationTest.skipOnSpannerOmni("Cloud auth is not applicable for Spanner Omni");
 
     OptionsMetadata.Builder openTelemetryOptionsBuilder =
         OptionsMetadata.newBuilder()

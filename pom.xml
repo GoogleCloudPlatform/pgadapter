@@ -37,7 +37,7 @@
     </excludedTests>
     <excludedIntegrationTests/>
 
-    <junixsocket.version>2.10.1</junixsocket.version>
+    <junixsocket.version>2.11.1</junixsocket.version>
     <opentelemetry.exporter.version>0.37.0</opentelemetry.exporter.version>
     <mockito.artifactId>mockito-core</mockito.artifactId>
     <mockito.version>4.11.0</mockito.version>
@@ -45,7 +45,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.55.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.55.4-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -57,7 +57,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.17.0</version>
+    <version>1.21.0</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -78,18 +78,35 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>io.opentelemetry</groupId>
-        <artifactId>opentelemetry-bom</artifactId>
-        <version>1.63.0</version>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>26.88.1</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
-        <artifactId>libraries-bom</artifactId>
-        <version>26.84.0</version>
+        <artifactId>google-cloud-spanner-bom</artifactId>
+        <version>6.122.0</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>1.65.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>1.86</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcutil-jdk18on</artifactId>
+        <version>1.85</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -156,13 +173,13 @@
     <dependency>
       <groupId>org.jetbrains.kotlin</groupId>
       <artifactId>kotlin-stdlib-jdk8</artifactId>
-      <version>2.4.0</version>
+      <version>2.4.20</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.11</version>
+      <version>42.7.13</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
@@ -194,7 +211,7 @@
     <dependency>
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
-      <version>1.22.0</version>
+      <version>1.22.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -214,12 +231,12 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.84</version>
+      <version>1.85</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.mojo</groupId>
       <artifactId>animal-sniffer-annotations</artifactId>
-      <version>1.27</version>
+      <version>1.28</version>
       <optional>true</optional>
     </dependency>
 
@@ -401,13 +418,14 @@
     <profile>
       <id>format</id>
       <activation>
-        <jdk>[17,)</jdk>
+        <jdk>[21,)</jdk>
       </activation>
       <build>
         <plugins>
           <plugin>
             <groupId>com.spotify.fmt</groupId>
             <artifactId>fmt-maven-plugin</artifactId>
+            <version>2.29</version>
             <executions>
               <execution>
                 <goals>
@@ -415,6 +433,13 @@
                 </goals>
               </execution>
             </executions>
+            <dependencies>
+              <dependency>
+                <groupId>com.google.googlejavaformat</groupId>
+                <artifactId>google-java-format</artifactId>
+                <version>1.36.1</version>
+              </dependency>
+            </dependencies>
           </plugin>
         </plugins>
       </build>

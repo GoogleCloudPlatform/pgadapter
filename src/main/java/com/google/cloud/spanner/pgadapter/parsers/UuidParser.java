@@ -15,14 +15,18 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ProtobufResultSet;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.NullValue;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -122,6 +126,48 @@ public class UuidParser extends Parser<UUID> {
         .setSQLState(SQLState.InvalidParameterValue)
         .setCause(cause)
         .build();
+  }
+
+  public static byte[] convertToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    writeToPG(sessionState, outputStream, resultSet, position, format);
+    return null;
+  }
+
+  static void writeToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    switch (format) {
+      case SPANNER:
+      case POSTGRESQL_TEXT:
+        StringParser.writeToPG(sessionState, outputStream, getUuidAsString(resultSet, position));
+        break;
+      case POSTGRESQL_BINARY:
+        UUID uuid = resultSet.getUuid(position);
+        outputStream.writeInt(16);
+        outputStream.writeLong(uuid.getMostSignificantBits());
+        outputStream.writeLong(uuid.getLeastSignificantBits());
+        break;
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
+  }
+
+  static String getUuidAsString(ResultSet resultSet, int column) {
+    if (resultSet instanceof ProtobufResultSet
+        && ((ProtobufResultSet) resultSet).canGetProtobufValue(column)) {
+      return ((ProtobufResultSet) resultSet).getProtobufValue(column).getStringValue();
+    }
+    return resultSet.getUuid(column).toString();
   }
 
   public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {

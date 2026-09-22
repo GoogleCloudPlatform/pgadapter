@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import {DataTypes, literal, Op} from "sequelize";
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 
 const { Sequelize, QueryTypes, Transaction } = require('sequelize');
 
@@ -221,8 +223,8 @@ async function testContinueAfterFailedTransaction(client) {
   }
 }
 
-require('yargs')
-.demand(4)
+yargs(hideBin(process.argv))
+.demandCommand(1)
 .command(
     'testSelectUsers <host> <port> <database>',
     'Executes SELECT * FROM users',

@@ -1,7 +1,7 @@
-psycopg[binary]==3.3.4
-pytz==2026.2
-sqlalchemy==2.0.51
+psycopg[binary]==3.3.5
+pytz==2026.3.post1
+sqlalchemy==2.0.54
 google~=3.0.0
-google.auth~=2.55.0
-testcontainers~=4.14.1
+google.auth~=2.57.0
+testcontainers~=4.15.0
 requests==2.34.2

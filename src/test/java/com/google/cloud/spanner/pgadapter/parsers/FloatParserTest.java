@@ -14,16 +14,25 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import org.junit.Test;
@@ -113,5 +122,78 @@ public class FloatParserTest {
     assertEquals(Value.string("NaN"), parameters.get("nan"));
     assertEquals(Value.string("Infinity"), parameters.get("inf"));
     assertEquals(Value.string("-Infinity"), parameters.get("-inf"));
+  }
+
+  @Test
+  public void testConvertToPG() throws IOException {
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getFloat(0)).thenReturn(3.14f);
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+    SessionState sessionState = mock(SessionState.class);
+
+    // Text format
+    assertNull(
+        FloatParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    assertArrayEquals(new byte[] {0, 0, 0, 4, '3', '.', '1', '4'}, output.toByteArray());
+    output.reset();
+
+    // Binary format
+    assertNull(
+        FloatParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    assertArrayEquals(
+        new byte[] {0, 0, 0, 4, 0x40, 0x48, (byte) 0xf5, (byte) 0xc3}, output.toByteArray());
+    output.reset();
+
+    // Spanner format
+    assertNull(
+        FloatParser.convertToPG(sessionState, dataOutputStream, resultSet, 0, DataFormat.SPANNER));
+    assertArrayEquals(new byte[] {0, 0, 0, 4, '3', '.', '1', '4'}, output.toByteArray());
+  }
+
+  @Test
+  public void testConvertToPGSpecialValues() throws IOException {
+    SessionState sessionState = mock(SessionState.class);
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+
+    float[] specialValues =
+        new float[] {0.0f, -0.0f, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NaN};
+    byte[][] expectedBinary =
+        new byte[][] {
+          {0, 0, 0, 4, 0, 0, 0, 0},
+          {0, 0, 0, 4, (byte) 0x80, 0, 0, 0},
+          {0, 0, 0, 4, 0x7f, (byte) 0x80, 0, 0},
+          {0, 0, 0, 4, (byte) 0xff, (byte) 0x80, 0, 0},
+          {0, 0, 0, 4, 0x7f, (byte) 0xc0, 0, 0},
+        };
+    byte[][] expectedText =
+        new byte[][] {
+          {0, 0, 0, 3, '0', '.', '0'},
+          {0, 0, 0, 4, '-', '0', '.', '0'},
+          {0, 0, 0, 8, 'I', 'n', 'f', 'i', 'n', 'i', 't', 'y'},
+          {0, 0, 0, 9, '-', 'I', 'n', 'f', 'i', 'n', 'i', 't', 'y'},
+          {0, 0, 0, 3, 'N', 'a', 'N'},
+        };
+
+    for (int i = 0; i < specialValues.length; i++) {
+      ResultSet resultSet = mock(ResultSet.class);
+      when(resultSet.getFloat(0)).thenReturn(specialValues[i]);
+
+      output.reset();
+      assertNull(
+          FloatParser.convertToPG(
+              sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+      assertArrayEquals(expectedBinary[i], output.toByteArray());
+
+      output.reset();
+      assertNull(
+          FloatParser.convertToPG(
+              sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_TEXT));
+      assertArrayEquals(expectedText[i], output.toByteArray());
+    }
   }
 }

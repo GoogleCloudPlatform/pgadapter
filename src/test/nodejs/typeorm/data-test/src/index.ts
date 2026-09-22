@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import "reflect-metadata"
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 import { DataSource } from "typeorm"
 import {AllTypes} from "./entity/AllTypes";
 import { User } from "./entity/User"
@@ -137,8 +139,8 @@ async function testUpdateAllTypes(dataSource: DataSource) {
     console.log('Updated one record')
 }
 
-require('yargs')
-    .demand(4)
+yargs(hideBin(process.argv))
+    .demandCommand(1)
     .command(
         'findOneUser <host> <port> <database>',
         'Selects one user by id',

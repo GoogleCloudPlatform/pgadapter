@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import "reflect-metadata"
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 const { Client } = require('pg')
 
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>) {
@@ -305,8 +307,8 @@ async function testDdlBatch(client) {
   }
 }
 
-require('yargs')
-.demand(4)
+yargs(hideBin(process.argv))
+.demandCommand(1)
 .command(
     'testSelect1 <host> <port> <database>',
     'Executes SELECT 1',

@@ -23,7 +23,10 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableMap;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -146,6 +149,45 @@ public class IntervalParser extends Parser<Interval> {
     ByteConverter.int4(result, 8, days);
     ByteConverter.int4(result, 12, months);
     return result;
+  }
+
+  public static byte[] convertToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    writeToPG(sessionState, outputStream, resultSet, position, format);
+    return null;
+  }
+
+  static void writeToPG(
+      @Nonnull SessionState sessionState,
+      DataOutputStream outputStream,
+      ResultSet resultSet,
+      int position,
+      DataFormat format)
+      throws IOException {
+    switch (format) {
+      case SPANNER:
+      case POSTGRESQL_TEXT:
+        StringParser.writeToPG(
+            sessionState, outputStream, toPGString(resultSet.getInterval(position)));
+        break;
+      case POSTGRESQL_BINARY:
+        Interval value = resultSet.getInterval(position);
+        long microseconds = value.getNanos().divide(NANOS_PER_MICRO_BIG_INTEGER).longValue();
+        int days = value.getDays();
+        int months = value.getMonths();
+        outputStream.writeInt(16);
+        outputStream.writeLong(microseconds);
+        outputStream.writeInt(days);
+        outputStream.writeInt(months);
+        break;
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
   }
 
   public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {

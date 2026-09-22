@@ -22,15 +22,15 @@ public interface IntegrationTest {
     assumeFalse(reason, isRunningOnEmulator());
   }
 
-  static void skipOnExperimentalHost(String reason) {
-    assumeFalse(reason, isRunningOnExperimentalHost());
+  static void skipOnSpannerOmni(String reason) {
+    assumeFalse(reason, isRunningOnSpannerOmni());
   }
 
   static boolean isRunningOnEmulator() {
     return System.getenv("SPANNER_EMULATOR_HOST") != null;
   }
 
-  static boolean isRunningOnExperimentalHost() {
-    return System.getProperty("SPANNER_EXPERIMENTAL_HOST") != null;
+  static boolean isRunningOnSpannerOmni() {
+    return System.getProperty("SPANNER_OMNI_HOST") != null;
   }
 }

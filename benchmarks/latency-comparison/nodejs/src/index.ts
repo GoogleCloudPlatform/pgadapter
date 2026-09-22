@@ -16,6 +16,7 @@ import {runBenchmark as runPostgresBenchmark} from "./postgresql_benchmark_runne
 import {runBenchmark as runSpannerBenchmark} from "./spanner_benchmark_runner";
 import {configDotenv} from "dotenv";
 import yargs from "yargs";
+import {hideBin} from "yargs/helpers";
 import * as os from "os";
 import {GenericContainer, PullPolicy, StartedTestContainer, TestContainer} from "testcontainers";
 
@@ -36,7 +37,7 @@ async function main() {
   const instance = process.env['SPANNER_INSTANCE'] || 'my-instance';
   const database = process.env['SPANNER_DATABASE'] || 'my-database';
 
-  const args = await yargs(process.argv).options({
+  const args = await yargs(hideBin(process.argv)).options({
     d: { type: 'string', alias: 'database', default: `projects/${project}/instances/${instance}/databases/${database}`, description: 'The database to use for benchmarking.' },
     c: { type: 'number', alias: 'clients', default: 16, description: 'The number of clients that will be executing queries in parallel.' },
     o: { type: 'number', alias: 'operations', default: 1000, description: 'The number of operations that that each client will run. The total number of operations is clients*operations.' },

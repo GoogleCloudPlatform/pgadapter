@@ -57,10 +57,7 @@ public class PGAdapter {
    */
   static ProxyServer startPGAdapter(String project, String instance) {
     OptionsMetadata options =
-        OptionsMetadata.newBuilder()
-            .setProject(project)
-            .setInstance(instance)
-            .build();
+        OptionsMetadata.newBuilder().setProject(project).setInstance(instance).build();
     ProxyServer server = new ProxyServer(options);
     server.startServer();
     server.awaitRunning();

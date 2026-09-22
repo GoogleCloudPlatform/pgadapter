@@ -121,7 +121,7 @@ public class AdbcMockServerTest extends AbstractMockServerTest {
             + ",\n"
             + PgCatalog.PgType.PG_TYPE_CTE
             + "\n"
-            + "SELECT oid, typname, typreceive, typbasetype, typrelid, typarray FROM pg_type  WHERE (typreceive != '0'::varchar OR typsend != '0'::varchar) AND typtype != 'r' AND typreceive::TEXT != 'array_recv'";
+            + "SELECT oid, typname, typreceive, typbasetype, typrelid, typarray FROM pg_type WHERE (typreceive != '0'::varchar OR typsend != '0'::varchar) AND typtype != 'r' AND typreceive::TEXT != 'array_recv'";
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(typeSql), createEmptyTypeResultSet()));
   }

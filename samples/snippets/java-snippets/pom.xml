@@ -21,7 +21,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <junixsocket.version>2.9.0</junixsocket.version>
+    <junixsocket.version>2.10.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -38,7 +38,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.7.11</version>
+      <version>42.7.13</version>
     </dependency>
 
     <dependency>
@@ -149,7 +149,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>3.6.3</version>
+        <version>3.6.4</version>
         <configuration>
           <mainClass>com.google.example.SampleRunner</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>

@@ -20,12 +20,19 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.ProtobufResultSet;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.Test;
@@ -145,5 +152,97 @@ public class UuidParserTest {
     assertEquals(SQLState.InternalError, exception.getSQLState());
     assertEquals(Severity.ERROR, exception.getSeverity());
     assertEquals("Unsupported format: TEXT", exception.getMessage());
+  }
+
+  @Test
+  public void testConvertToPG() throws IOException {
+    UUID uuid = UUID.fromString("c852ee2a-7521-4a70-a02f-2b9d0dd9c19a");
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getUuid(0)).thenReturn(uuid);
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+    SessionState sessionState = mock(SessionState.class);
+
+    // Text format
+    assertNull(
+        UuidParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    byte[] textBytes = uuid.toString().getBytes(StandardCharsets.UTF_8);
+    ByteArrayOutputStream expectedText = new ByteArrayOutputStream();
+    DataOutputStream expectedTextStream = new DataOutputStream(expectedText);
+    expectedTextStream.writeInt(textBytes.length);
+    expectedTextStream.write(textBytes);
+    assertArrayEquals(expectedText.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Binary format
+    assertNull(
+        UuidParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    ByteArrayOutputStream expectedBinary = new ByteArrayOutputStream();
+    DataOutputStream expectedBinaryStream = new DataOutputStream(expectedBinary);
+    expectedBinaryStream.writeInt(16);
+    expectedBinaryStream.writeLong(uuid.getMostSignificantBits());
+    expectedBinaryStream.writeLong(uuid.getLeastSignificantBits());
+    assertArrayEquals(expectedBinary.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Spanner format
+    assertNull(
+        UuidParser.convertToPG(sessionState, dataOutputStream, resultSet, 0, DataFormat.SPANNER));
+    assertArrayEquals(expectedText.toByteArray(), output.toByteArray());
+    output.reset();
+
+    // Verify backward compatibility method
+    assertArrayEquals(textBytes, UuidParser.convertToPG(resultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    byte[] binaryBytes = new byte[16];
+    ByteConverter.int8(binaryBytes, 0, uuid.getMostSignificantBits());
+    ByteConverter.int8(binaryBytes, 8, uuid.getLeastSignificantBits());
+    assertArrayEquals(
+        binaryBytes, UuidParser.convertToPG(resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    assertArrayEquals(textBytes, UuidParser.convertToPG(resultSet, 0, DataFormat.SPANNER));
+  }
+
+  @Test
+  public void testConvertToPGNilUuid() throws IOException {
+    UUID nilUuid = new UUID(0L, 0L);
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getUuid(0)).thenReturn(nilUuid);
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+    SessionState sessionState = mock(SessionState.class);
+
+    assertNull(
+        UuidParser.convertToPG(
+            sessionState, dataOutputStream, resultSet, 0, DataFormat.POSTGRESQL_BINARY));
+    assertArrayEquals(
+        new byte[] {0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        output.toByteArray());
+  }
+
+  @Test
+  public void testConvertToPGProtobufResultSet() throws IOException {
+    String uuidString = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+    ProtobufResultSet protobufResultSet = mock(ProtobufResultSet.class);
+    when(protobufResultSet.canGetProtobufValue(0)).thenReturn(true);
+    when(protobufResultSet.getProtobufValue(0))
+        .thenReturn(com.google.protobuf.Value.newBuilder().setStringValue(uuidString).build());
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(output);
+    SessionState sessionState = mock(SessionState.class);
+
+    assertNull(
+        UuidParser.convertToPG(
+            sessionState, dataOutputStream, protobufResultSet, 0, DataFormat.POSTGRESQL_TEXT));
+    assertArrayEquals(
+        new byte[] {
+          0, 0, 0, 36, 'a', '0', 'e', 'e', 'b', 'c', '9', '9', '-', '9', 'c', '0', 'b', '-', '4',
+          'e', 'f', '8', '-', 'b', 'b', '6', 'd', '-', '6', 'b', 'b', '9', 'b', 'd', '3', '8', '0',
+          'a', '1', '1'
+        },
+        output.toByteArray());
   }
 }

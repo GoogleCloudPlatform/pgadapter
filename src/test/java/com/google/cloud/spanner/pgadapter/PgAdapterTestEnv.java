@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 
 import com.google.api.gax.longrunning.OperationFuture;
+import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.Database;
@@ -43,7 +44,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Bytes;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
-import io.grpc.ManagedChannelBuilder;
 import io.opentelemetry.api.OpenTelemetry;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -114,8 +114,13 @@ public class PgAdapterTestEnv {
   // Default Spanner url. Null indicates that the default URL should be used.
   static final String DEFAULT_SPANNER_URL = null;
 
-  public static final String SPANNER_EXPERIMENTAL_HOST =
-      System.getProperty("SPANNER_EXPERIMENTAL_HOST", null);
+  public static final String SPANNER_OMNI_HOST = System.getProperty("SPANNER_OMNI_HOST", null);
+  private static final boolean USE_PLAIN_TEXT =
+      Boolean.parseBoolean(System.getProperty("USE_PLAIN_TEXT", "false"));
+  public static final String SPANNER_OMNI_CLIENT_KEY =
+      System.getProperty("SPANNER_OMNI_CLIENT_KEY", null);
+  public static final String SPANNER_OMNI_CLIENT_CERT =
+      System.getProperty("SPANNER_OMNI_CLIENT_CERT", null);
 
   public static final ImmutableList<String> DEFAULT_DATA_MODEL =
       ImmutableList.of(
@@ -239,7 +244,7 @@ public class PgAdapterTestEnv {
 
   private void startPGAdapterServer(
       String databaseId, Iterable<String> additionalPGAdapterOptions, OpenTelemetry openTelemetry) {
-    if (PG_ADAPTER_ADDRESS == null && SPANNER_EXPERIMENTAL_HOST == null) {
+    if (PG_ADAPTER_ADDRESS == null && SPANNER_OMNI_HOST == null) {
       additionalPGAdapterOptions = maybeAddAutoConfigEmulator(additionalPGAdapterOptions);
       String credentials = getCredentials();
       ImmutableList.Builder<String> argsListBuilder =
@@ -262,14 +267,20 @@ public class PgAdapterTestEnv {
       String[] args = argsListBuilder.build().toArray(new String[0]);
       server = new ProxyServer(new OptionsMetadata(args), openTelemetry);
       server.startServer();
-    } else if (SPANNER_EXPERIMENTAL_HOST != null) {
+    } else if (SPANNER_OMNI_HOST != null) {
+      StringBuilder rOption = new StringBuilder();
+      if (USE_PLAIN_TEXT) {
+        rOption.append("usePlainText=true;");
+      }
+      if (SPANNER_OMNI_CLIENT_CERT != null && SPANNER_OMNI_CLIENT_KEY != null) {
+        rOption.append(
+            String.format(
+                "clientCertificate=%s;clientKey=%s;",
+                SPANNER_OMNI_CLIENT_CERT, SPANNER_OMNI_CLIENT_KEY));
+      }
+      rOption.append("type=omni");
       ImmutableList.Builder<String> argsListBuilder =
-          ImmutableList.<String>builder()
-              .add(
-                  "-e",
-                  SPANNER_EXPERIMENTAL_HOST,
-                  "-r",
-                  "isExperimentalHost=true;usePlainText=true");
+          ImmutableList.<String>builder().add("-e", SPANNER_OMNI_HOST, "-r", rOption.toString());
       if (databaseId != null) {
         argsListBuilder.add("-d", databaseId);
       }
@@ -369,8 +380,8 @@ public class PgAdapterTestEnv {
     if (hostUrl == null) {
       hostUrl = System.getProperty(TEST_SPANNER_URL_PROPERTY, DEFAULT_SPANNER_URL);
     }
-    if (SPANNER_EXPERIMENTAL_HOST != null) {
-      hostUrl = SPANNER_EXPERIMENTAL_HOST;
+    if (SPANNER_OMNI_HOST != null) {
+      hostUrl = SPANNER_OMNI_HOST;
     }
     return hostUrl;
   }
@@ -383,7 +394,7 @@ public class PgAdapterTestEnv {
     if (projectId == null) {
       projectId = System.getProperty(TEST_PROJECT_PROPERTY, DEFAULT_PROJECT_ID);
     }
-    if (SPANNER_EXPERIMENTAL_HOST != null) {
+    if (SPANNER_OMNI_HOST != null) {
       projectId = "default";
     }
     return projectId;
@@ -393,7 +404,7 @@ public class PgAdapterTestEnv {
     if (instanceId == null) {
       instanceId = System.getProperty(TEST_INSTANCE_PROPERTY, DEFAULT_INSTANCE_ID);
     }
-    if (SPANNER_EXPERIMENTAL_HOST != null) {
+    if (SPANNER_OMNI_HOST != null) {
       instanceId = "default";
     }
     return instanceId;
@@ -544,8 +555,8 @@ public class PgAdapterTestEnv {
 
     Map<String, String> env = System.getenv();
     gcpCredentials = env.get(GCP_CREDENTIALS);
-    GoogleCredentials credentials = null;
-    if (!Strings.isNullOrEmpty(gcpCredentials) && SPANNER_EXPERIMENTAL_HOST == null) {
+    Credentials credentials = null;
+    if (!Strings.isNullOrEmpty(gcpCredentials) && SPANNER_OMNI_HOST == null) {
       try {
         credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
       } catch (IOException e) {
@@ -580,16 +591,17 @@ public class PgAdapterTestEnv {
       builder.setHost(spannerHost);
     }
 
-    if (SPANNER_EXPERIMENTAL_HOST != null) {
-      if (!SPANNER_EXPERIMENTAL_HOST.startsWith("http")) {
-        builder.setExperimentalHost("http://" + SPANNER_EXPERIMENTAL_HOST);
-      } else {
-        builder.setExperimentalHost(SPANNER_EXPERIMENTAL_HOST);
-      }
+    if (SPANNER_OMNI_HOST != null) {
       builder
-          .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
-          .setCredentials(NoCredentials.getInstance());
-      credentials = null;
+          .setHost((USE_PLAIN_TEXT ? "http://" : "https://") + SPANNER_OMNI_HOST)
+          .setType(SpannerOptions.InstanceType.OMNI);
+      if (USE_PLAIN_TEXT) {
+        builder.usePlainText();
+      }
+      if (SPANNER_OMNI_CLIENT_CERT != null && SPANNER_OMNI_CLIENT_KEY != null) {
+        builder.useClientCert(SPANNER_OMNI_CLIENT_CERT, SPANNER_OMNI_CLIENT_KEY);
+      }
+      credentials = NoCredentials.getInstance();
     }
 
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) == null && credentials != null) {

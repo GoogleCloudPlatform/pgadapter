@@ -5,15 +5,15 @@
   "type": "commonjs",
   "devDependencies": {
     "@types/node": "^20.1.4",
-    "ts-node": "10.9.1",
-    "typescript": "5.2.2"
+    "tsx": "^4.22.4",
+    "typescript": "7.0.2"
   },
   "dependencies": {
     "pg": "^8.9.0",
     "knex": "^3.0.1",
-    "yargs": "^17.5.1"
+    "yargs": "^18.1.0"
   },
   "scripts": {
-    "start": "ts-node src/index.ts"
+    "start": "tsx src/index.ts"
   }
 }

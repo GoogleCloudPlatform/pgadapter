@@ -1253,19 +1253,19 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     String errors;
     String output;
 
-    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
-        BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()));
-        BufferedReader errorReader =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-      // The 'INSERT INTO FOO VALUES ('abc')' statement will return an error.
+    // The 'INSERT INTO FOO VALUES ('abc')' statement will return an error.
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream())) {
       writer.write(
           "SELECT 1\\;copy users from stdin\\;INSERT INTO FOO VALUES ('abc')\\;copy users from stdin\\;SELECT 2;\n"
               + "1\t2\t3\n"
               + "\\.\n"
               + "\n"
               + "\\q\n");
-      writer.flush();
+    }
+    try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       errors = errorReader.lines().collect(Collectors.joining("\n"));
       output = reader.lines().collect(Collectors.joining("\n"));
     }
