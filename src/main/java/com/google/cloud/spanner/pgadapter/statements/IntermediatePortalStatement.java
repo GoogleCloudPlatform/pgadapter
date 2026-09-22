@@ -65,10 +65,12 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   }
 
   public short getParameterFormatCode(int index) {
-    if (this.parameterFormatCodes.length == 0) {
+    if (this.parameterFormatCodes == null || this.parameterFormatCodes.length == 0) {
       return 0;
-    } else if (index >= this.parameterFormatCodes.length) {
+    } else if (this.parameterFormatCodes.length == 1) {
       return this.parameterFormatCodes[0];
+    } else if (index < 0 || index >= this.parameterFormatCodes.length) {
+      return 0;
     } else {
       return this.parameterFormatCodes[index];
     }
@@ -80,6 +82,8 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       return super.getResultFormatCode(index);
     } else if (this.resultFormatCodes.length == 1) {
       return this.resultFormatCodes[0];
+    } else if (index < 0 || index >= this.resultFormatCodes.length) {
+      return super.getResultFormatCode(index);
     } else {
       return this.resultFormatCodes[index];
     }

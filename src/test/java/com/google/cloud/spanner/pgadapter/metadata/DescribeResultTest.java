@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.metadata;
 import static com.google.cloud.spanner.pgadapter.metadata.DescribeResult.extractParameterTypes;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -109,5 +110,46 @@ public class DescribeResultTest {
                                 .build())
                         .build()));
     assertEquals("Invalid parameter name: foo", exception.getMessage());
+  }
+
+  @Test
+  public void testOf() {
+    com.google.cloud.spanner.Type columnsType =
+        com.google.cloud.spanner.Type.struct(
+            com.google.cloud.spanner.Type.StructField.of(
+                "c1", com.google.cloud.spanner.Type.int64()),
+            com.google.cloud.spanner.Type.StructField.of(
+                "c2", com.google.cloud.spanner.Type.string()));
+    int[] parameters = new int[] {Oid.INT8, Oid.VARCHAR};
+
+    DescribeResult describeResult = DescribeResult.of(parameters, columnsType);
+    assertArrayEquals(parameters, describeResult.getParameters());
+    assertEquals(columnsType, describeResult.getColumns());
+
+    DescribeResult nullColumnsResult = DescribeResult.of(parameters, null);
+    assertArrayEquals(parameters, nullColumnsResult.getParameters());
+    assertNull(nullColumnsResult.getColumns());
+
+    DescribeResult constructorResult = new DescribeResult(parameters, columnsType);
+    assertArrayEquals(parameters, constructorResult.getParameters());
+    assertEquals(columnsType, constructorResult.getColumns());
+  }
+
+  @Test
+  public void testNullParametersThrows() {
+    com.google.cloud.spanner.Type columnsType =
+        com.google.cloud.spanner.Type.struct(
+            com.google.cloud.spanner.Type.StructField.of(
+                "c1", com.google.cloud.spanner.Type.int64()));
+
+    assertThrows(NullPointerException.class, () -> DescribeResult.of(null, columnsType));
+    assertThrows(NullPointerException.class, () -> new DescribeResult(null, columnsType));
+    assertThrows(NullPointerException.class, () -> DescribeResult.of(null, null));
+    assertThrows(
+        NullPointerException.class,
+        () -> new DescribeResult(null, (com.google.cloud.spanner.Type) null));
+    assertThrows(
+        NullPointerException.class,
+        () -> new DescribeResult(null, (com.google.cloud.spanner.ResultSet) null));
   }
 }

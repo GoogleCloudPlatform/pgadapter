@@ -106,7 +106,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
                     new DescribeResult(this.givenParameterDataTypes, result.getResultSet());
                 result.getResultSet().close();
               } else {
-                describeResult = new DescribeResult(this.givenParameterDataTypes, null);
+                describeResult = DescribeResult.of(this.givenParameterDataTypes, null);
               }
               return describeResult;
             },
@@ -120,7 +120,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     if (this.describeResult == null) {
       // Just return a DescribeResult that contains whatever information we were given in the
       // PARSE message.
-      return new DescribeResult(this.givenParameterDataTypes, null);
+      return DescribeResult.of(this.givenParameterDataTypes, null);
     }
     try {
       return this.describeResult.get();

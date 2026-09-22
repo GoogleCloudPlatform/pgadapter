@@ -5042,6 +5042,128 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testPreparedStatementReturningWithConcurrentSchemaChange() throws SQLException {
+    String sql = "update test_table set value=? where id=? RETURNING *";
+    String pgSql = "update test_table set value=$1 where id=$2 RETURNING *";
+
+    com.google.spanner.v1.ResultSet sevenColumnsResultSet =
+        com.google.spanner.v1.ResultSet.newBuilder()
+            .setMetadata(
+                createMetadata(
+                    ImmutableList.of(
+                        TypeCode.INT64,
+                        TypeCode.STRING,
+                        TypeCode.INT64,
+                        TypeCode.STRING,
+                        TypeCode.INT64,
+                        TypeCode.STRING,
+                        TypeCode.INT64),
+                    ImmutableList.of("c1", "c2", "c3", "c4", "c5", "c6", "c7")))
+            .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("1").build())
+                    .addValues(Value.newBuilder().setStringValue("v2").build())
+                    .addValues(Value.newBuilder().setStringValue("3").build())
+                    .addValues(Value.newBuilder().setStringValue("v4").build())
+                    .addValues(Value.newBuilder().setStringValue("5").build())
+                    .addValues(Value.newBuilder().setStringValue("v6").build())
+                    .addValues(Value.newBuilder().setStringValue("7").build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(pgSql), sevenColumnsResultSet));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSql).bind("p1").to("v1").bind("p2").to(1L).build(),
+            sevenColumnsResultSet));
+
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "&prepareThreshold=1&binaryTransferEnable=int8")) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        preparedStatement.setString(1, "v1");
+        preparedStatement.setLong(2, 1L);
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertEquals("v2", resultSet.getString(2));
+          assertFalse(resultSet.next());
+        }
+
+        // Schema change: MockSpanner now returns 8 columns for the statement.
+        com.google.spanner.v1.ResultSet eightColumnsResultSet =
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.STRING,
+                            TypeCode.INT64,
+                            TypeCode.STRING,
+                            TypeCode.INT64,
+                            TypeCode.STRING,
+                            TypeCode.INT64,
+                            TypeCode.STRING),
+                        ImmutableList.of("c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8")))
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("v2").build())
+                        .addValues(Value.newBuilder().setStringValue("3").build())
+                        .addValues(Value.newBuilder().setStringValue("v4").build())
+                        .addValues(Value.newBuilder().setStringValue("5").build())
+                        .addValues(Value.newBuilder().setStringValue("v6").build())
+                        .addValues(Value.newBuilder().setStringValue("7").build())
+                        .addValues(Value.newBuilder().setStringValue("new_col").build())
+                        .build())
+                .build();
+        mockSpanner.putStatementResult(
+            StatementResult.query(Statement.of(pgSql), eightColumnsResultSet));
+        mockSpanner.putStatementResult(
+            StatementResult.query(
+                Statement.newBuilder(pgSql).bind("p1").to("v2").bind("p2").to(2L).build(),
+                eightColumnsResultSet));
+
+        // Re-execute prepared statement with executeQuery
+        preparedStatement.setString(1, "v2");
+        preparedStatement.setLong(2, 2L);
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(2L, resultSet.getLong(1));
+          assertEquals("v2", resultSet.getString(2));
+          assertEquals(3L, resultSet.getLong(3));
+          assertEquals("v4", resultSet.getString(4));
+          assertEquals(5L, resultSet.getLong(5));
+          assertEquals("v6", resultSet.getString(6));
+          assertEquals(7L, resultSet.getLong(7));
+          // The JDBC driver cached 7 columns on the client side for this specific PreparedStatement
+          // instance, so getMetaData().getColumnCount() is 7 and accessing column 8 on this old
+          // PreparedStatement throws a client-side SQLException.
+          assertEquals(7, resultSet.getMetaData().getColumnCount());
+          assertThrows(SQLException.class, () -> resultSet.getString(8));
+          assertFalse(resultSet.next());
+        }
+
+        // A new prepared statement on the same connection reflects the updated 8 columns because
+        // prepareStatement describes the statement against Spanner, returning the updated schema.
+        try (PreparedStatement secondPreparedStatement = connection.prepareStatement(sql)) {
+          secondPreparedStatement.setString(1, "v2");
+          secondPreparedStatement.setLong(2, 2L);
+          try (ResultSet resultSet = secondPreparedStatement.executeQuery()) {
+            assertEquals(8, resultSet.getMetaData().getColumnCount());
+            assertTrue(resultSet.next());
+            assertEquals(2L, resultSet.getLong(1));
+            assertEquals("new_col", resultSet.getString(8));
+            assertFalse(resultSet.next());
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   public void testUUIDParameter() throws SQLException {
     String jdbcSql = "SELECT * FROM all_types WHERE col_uuid=?";
     String pgSql = "SELECT * FROM all_types WHERE col_uuid=$1";
