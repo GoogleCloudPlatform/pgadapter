@@ -511,6 +511,38 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyOutCsvWithForceQuoteAllAndHeader() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY all_types TO STDOUT (format csv, header, escape '\\', delimiter '|', quote '\"', force_quote *)",
+          writer);
+
+      // In PostgreSQL, FORCE_QUOTE applies only to data values and not to header column names.
+      assertEquals(
+          "col_bigint|col_bool|col_bytea|col_float4|col_float8|col_int|col_numeric|"
+              + "col_timestamptz|col_interval|col_date|col_varchar|col_jsonb|col_array_bigint|"
+              + "col_array_bool|col_array_bytea|col_array_float4|col_array_float8|col_array_int|"
+              + "col_array_numeric|col_array_timestamptz|col_array_interval|col_array_date|"
+              + "col_array_varchar|col_array_jsonb\n"
+              + "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"3.14\"|\"100\"|\"6.626\"|\"2022-02-16 13:18:02.123456+00\"|"
+              + "\"14 mons 3 days 04:05:6.789000\"|\"2022-03-29\"|\"testÄ\"|\"{\\\"key\\\": \\\"value\\\"}\"|"
+              + "\"{1,NULL,2}\"|\"{t,NULL,f}\"|\"{\\\"\\\\\\\\x627974657331\\\",NULL,\\\"\\\\\\\\x627974657332\\\"}\"|"
+              + "\"{3.14,NULL,-99.99}\"|\"{3.14,NULL,-99.99}\"|\"{-100,NULL,-200}\"|\"{6.626,NULL,-3.14}\"|"
+              + "\"{\\\"2022-02-16 16:18:02.123456+00\\\",NULL,\\\"2000-01-01 00:00:00+00\\\"}\"|"
+              + "\"{-100 mons 0 days 34:17:36.789000,NULL,12 mons 0 days 00:00:0.000000}\"|"
+              + "\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\"|\"{\\\"string1\\\",NULL,\\\"string2\\\"}\"|"
+              + "\"{\\\"{\\\\\\\"key\\\\\\\": \\\\\\\"value1\\\\\\\"}\\\",NULL,\\\"{\\\\\\\"key\\\\\\\": \\\\\\\"value2\\\\\\\"}\\\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
   public void testCopyOutCsvWithForceQuoteColumn() throws SQLException, IOException {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));

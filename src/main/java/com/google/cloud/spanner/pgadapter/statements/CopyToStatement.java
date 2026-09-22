@@ -54,6 +54,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   private final ParsedCopyStatement parsedCopyStatement;
   private final CSVFormat csvFormat;
+  private final CSVFormat headerCsvFormat;
   private final AtomicBoolean hasReturnedData = new AtomicBoolean(false);
 
   public CopyToStatement(
@@ -76,6 +77,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
     this.parsedCopyStatement = parsedCopyStatement;
     if (parsedCopyStatement.format == CopyStatement.Format.BINARY) {
       this.csvFormat = null;
+      this.headerCsvFormat = null;
     } else {
       CSVFormat baseFormat =
           parsedCopyStatement.format == Format.TEXT
@@ -114,6 +116,14 @@ public class CopyToStatement extends IntermediatePortalStatement {
         }
       }
       this.csvFormat = formatBuilder.build();
+      // In PostgreSQL, the CSV header row always uses QuoteMode.MINIMAL, regardless of whether
+      // FORCE_QUOTE is used for data rows.
+      if (parsedCopyStatement.format == Format.CSV
+          && this.csvFormat.getQuoteMode() != QuoteMode.MINIMAL) {
+        this.headerCsvFormat = this.csvFormat.builder().setQuoteMode(QuoteMode.MINIMAL).build();
+      } else {
+        this.headerCsvFormat = this.csvFormat;
+      }
     }
   }
 
@@ -158,6 +168,11 @@ public class CopyToStatement extends IntermediatePortalStatement {
   @VisibleForTesting
   CSVFormat getCsvFormat() {
     return csvFormat;
+  }
+
+  @VisibleForTesting
+  CSVFormat getHeaderCsvFormat() {
+    return headerCsvFormat;
   }
 
   public boolean isBinary() {
@@ -206,7 +221,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
             this.outputStream,
             resultSet.getColumnCount(),
             this.parsedCopyStatement.format.getDataFormat().getCode());
-    if (csvFormat == null || !parsedCopyStatement.header) {
+    if (headerCsvFormat == null || !parsedCopyStatement.header) {
       return new WireOutput[] {copyOutResponse};
     }
     // PostgreSQL writes the header as a separate CopyData message before any row. Doing the same
@@ -216,8 +231,8 @@ public class CopyToStatement extends IntermediatePortalStatement {
       copyOutResponse,
       new CopyDataResponse(
           this.outputStream,
-          csvFormat.format((Object[]) createHeader(resultSet)),
-          csvFormat.getRecordSeparator().charAt(0))
+          headerCsvFormat.format((Object[]) createHeader(resultSet)),
+          headerCsvFormat.getRecordSeparator().charAt(0))
     };
   }
 
