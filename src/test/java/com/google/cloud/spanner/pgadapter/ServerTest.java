@@ -103,7 +103,7 @@ public class ServerTest {
     System.setErr(err);
 
     try {
-      Server.main(new String[] {"--invalid-param"});
+      assertEquals(1, Server.run(new String[] {"--invalid-param"}));
       assertEquals(
           "The server could not be started because an error occurred: Unrecognized option: --invalid-param\n",
           errArrayStream.toString());
@@ -134,7 +134,7 @@ public class ServerTest {
     System.setProperty("javax.net.ssl.keyStore", "/path/to/non/existing/file.pfx");
 
     try {
-      Server.main(new String[] {});
+      assertEquals(1, Server.run(new String[] {}));
       assertEquals(
           "The server could not be started because an error occurred: Key store /path/to/non/existing/file.pfx does not exist\n",
           errArrayStream.toString());
@@ -233,6 +233,82 @@ public class ServerTest {
     verify(hungProcess).destroy();
     verify(hungProcess).destroyForcibly();
     verify(proxyServer2).stopServer();
+  }
+
+  @Test
+  public void testStartAndWaitReturnsExitCode() throws Exception {
+    assumeFalse(isWindows());
+
+    assertEquals(
+        0, Server.startAndWait(new ProcessBuilder("sh", "-c", "exit 0"), mock(ProxyServer.class)));
+    assertEquals(
+        3, Server.startAndWait(new ProcessBuilder("sh", "-c", "exit 3"), mock(ProxyServer.class)));
+    // A command that is terminated by a signal reports 128 + the signal number.
+    assertEquals(
+        130,
+        Server.startAndWait(
+            new ProcessBuilder("sh", "-c", "kill -INT $$"), mock(ProxyServer.class)));
+  }
+
+  /** Starts PGAdapter in a separate JVM with the given client tool as the command to run. */
+  private Process startServerWithCommand(String command) throws IOException {
+    File creds = folder.newFile();
+    Files.asCharSink(creds, StandardCharsets.UTF_8).write("{}");
+    return new ProcessBuilder(
+            new File(new File(System.getProperty("java.home"), "bin"), "java").getPath(),
+            "-cp",
+            System.getProperty("java.class.path"),
+            Server.class.getName(),
+            "-p",
+            "p",
+            "-i",
+            "i",
+            "-d",
+            "d",
+            "-s",
+            "0",
+            "-c",
+            creds.getAbsolutePath(),
+            "-cmd",
+            command)
+        .redirectErrorStream(true)
+        .start();
+  }
+
+  @Test(timeout = 60_000L)
+  public void testExitsWhenCommandCannotBeStarted() throws Exception {
+    assumeFalse(isWindows());
+
+    Process server = startServerWithCommand("/nonexistent/binary");
+    try {
+      assertTrue(
+          "PGAdapter must exit when the command cannot be started",
+          server.waitFor(30L, TimeUnit.SECONDS));
+      // A shell wrapper can only detect the failure if this is not zero.
+      assertEquals(127, server.exitValue());
+    } finally {
+      server.destroyForcibly();
+    }
+  }
+
+  /** The exit code of the client tool is what a script calling PGAdapter needs to see. */
+  @Test(timeout = 60_000L)
+  public void testExitCodeOfClientToolIsPropagated() throws Exception {
+    assumeFalse(isWindows());
+
+    File tool = folder.newFile();
+    Files.asCharSink(tool, StandardCharsets.UTF_8).write("#!/bin/sh\nexit 3\n");
+    assertTrue(tool.setExecutable(true));
+
+    Process server = startServerWithCommand(tool.getAbsolutePath());
+    try {
+      assertTrue(
+          "PGAdapter must exit when the client tool has finished",
+          server.waitFor(30L, TimeUnit.SECONDS));
+      assertEquals(3, server.exitValue());
+    } finally {
+      server.destroyForcibly();
+    }
   }
 
   @Test(timeout = 60_000L)
