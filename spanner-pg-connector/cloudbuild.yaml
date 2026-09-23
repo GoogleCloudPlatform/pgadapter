@@ -73,7 +73,7 @@ steps:
         jlink --module-path /tmp/jmods/windows-x64 --add-modules $${MODULES} --strip-debug --no-man-pages --no-header-files --compress=zip-9 --output target/custom-jres/windows-x64
 
   # Step 3: Bundle assets into target platform packages
-  - name: 'mirror.gcr.io/library/alpine:3.20'
+  - name: 'mirror.gcr.io/library/alpine:3.24'
     id: 'package-bundle'
     entrypoint: 'sh'
     args:
