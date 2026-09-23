@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
 import com.google.common.base.Preconditions;
 import java.text.MessageFormat;
@@ -41,6 +42,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   private final short[] resultFormatCodes;
   private final byte[][] parameters;
   private final IntermediatePortalStatement statement;
+  private final boolean hasBindException;
 
   /** Constructor for Bind messages that are received from the front-end. */
   public BindMessage(ConnectionHandler connection) throws Exception {
@@ -50,10 +52,21 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.formatCodes = MessageReader.getFormatCodes(this.inputStream);
     this.parameters = getParameters(this.inputStream);
     this.resultFormatCodes = MessageReader.getFormatCodes(this.inputStream);
-    IntermediatePreparedStatement statement = connection.getStatement(statementName);
-    this.statement =
-        statement.createPortal(
-            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+    IntermediatePortalStatement portalStatement;
+    boolean bindException = false;
+    try {
+      IntermediatePreparedStatement statement = connection.getStatement(statementName);
+      portalStatement =
+          statement.createPortal(
+              this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+    } catch (Exception exception) {
+      bindException = true;
+      portalStatement =
+          new InvalidStatement(
+              connection, connection.getServer().getOptions(), this.portalName, exception);
+    }
+    this.hasBindException = bindException;
+    this.statement = portalStatement;
     this.connection.registerPortal(this.portalName, this.statement);
   }
 
@@ -75,6 +88,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.formatCodes = NO_FORMAT_CODES;
     this.resultFormatCodes = NO_FORMAT_CODES;
     this.parameters = Preconditions.checkNotNull(parameters);
+    this.hasBindException = false;
     IntermediatePreparedStatement statement = connection.getStatement(statementName);
     this.statement =
         statement.createPortal(
@@ -88,6 +102,10 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   void buffer(BackendConnection backendConnection) {
+    if (this.hasBindException && this.statement instanceof InvalidStatement) {
+      backendConnection.execute((InvalidStatement) this.statement);
+      return;
+    }
     if (isExtendedProtocol() && !this.statement.getPreparedStatement().isDescribed()) {
       try {
         // Make sure all parameters have been described, so we always send typed parameters to Cloud
@@ -105,9 +123,23 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   public void flush() throws Exception {
-    if (isExtendedProtocol()) {
+    if (this.hasBindException) {
+      if (this.connection.hasPortal(this.portalName)
+          && this.connection.getPortal(this.portalName) == this.statement) {
+        this.connection.closePortal(this.portalName);
+      }
+      handleError(this.statement.getException());
+    } else if (isExtendedProtocol()) {
       // The simple query protocol does not expect a BindComplete response.
       BindCompleteResponse.send(this.outputStream);
+    }
+  }
+
+  @Override
+  public void abort() throws Exception {
+    if (this.connection.hasPortal(this.portalName)
+        && this.connection.getPortal(this.portalName) == this.statement) {
+      this.connection.closePortal(this.portalName);
     }
   }
 

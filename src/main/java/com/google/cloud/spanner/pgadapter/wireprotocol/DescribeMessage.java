@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
@@ -45,11 +46,19 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     super(connection);
     this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
     this.name = this.readAll();
-    if (this.type == PreparedType.Portal) {
-      this.statement = this.connection.getPortal(this.name);
-    } else {
-      this.statement = this.connection.getStatement(this.name);
+    IntermediateStatement describedStatement;
+    try {
+      if (this.type == PreparedType.Portal) {
+        describedStatement = this.connection.getPortal(this.name);
+      } else {
+        describedStatement = this.connection.getStatement(this.name);
+      }
+    } catch (Exception exception) {
+      describedStatement =
+          new InvalidStatement(
+              connection, connection.getServer().getOptions(), this.name, exception);
     }
+    this.statement = describedStatement;
   }
 
   /** Constructor for manually created Describe messages from the simple query protocol. */
@@ -76,6 +85,9 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   @SuppressWarnings("unchecked")
   @Override
   void buffer(BackendConnection backendConnection) {
+    if (this.statement instanceof InvalidStatement) {
+      backendConnection.execute((InvalidStatement) this.statement);
+    }
     if (this.type == PreparedType.Portal && this.statement.containsResultSet()) {
       describePortalMetadata = this.statement.describeAsync(backendConnection);
     } else if (this.type == PreparedType.Statement) {
@@ -92,6 +104,11 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
         this.handleDescribeStatement();
       }
     } catch (Exception e) {
+      if (this.type == PreparedType.Statement
+          && this.connection.hasStatement(this.name)
+          && this.connection.getStatement(this.name) == this.statement) {
+        this.connection.closeStatement(this.name);
+      }
       handleError(e);
     }
   }
