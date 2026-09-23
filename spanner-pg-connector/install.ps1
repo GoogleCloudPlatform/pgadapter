@@ -148,12 +148,18 @@ if ($UserPath) {
     $Entries = $UserPath -split ";"
 }
 
-# Drop empty entries, this install dir, and any directory left behind by an earlier run.
+# Drop empty entries, this install dir, and the default locations used by earlier runs of this
+# installer and of its predecessor. Only directories that this installer can itself have created
+# are removed, so an unrelated directory that merely contains the product name in its path (a
+# source checkout, for example) keeps its place on PATH.
+$ManagedDirs = @(
+    $InstallDir
+    (Join-Path $HOME ".spanner-pg-connector")
+    (Join-Path $HOME ".spanner-pg-starter")
+) | ForEach-Object { $_.TrimEnd("\") }
+
 $Cleaned = $Entries | Where-Object {
-    $_ -and
-    $_.TrimEnd("\") -ne $InstallDir.TrimEnd("\") -and
-    $_ -notmatch "spanner-pg-connector" -and
-    $_ -notmatch "spanner-pg-starter"
+    $_ -and ($ManagedDirs -notcontains $_.TrimEnd("\"))
 }
 
 $Removed = $Entries.Count - $Cleaned.Count
