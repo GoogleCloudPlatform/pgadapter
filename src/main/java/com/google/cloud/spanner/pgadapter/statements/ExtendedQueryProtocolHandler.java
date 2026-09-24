@@ -53,9 +53,9 @@ public class ExtendedQueryProtocolHandler {
   private final BackendConnection backendConnection;
 
   private final String connectionId;
-  private volatile Span span;
-  private volatile Scope scope;
-  private volatile Stopwatch stopwatch;
+  private Span span;
+  private Scope scope;
+  private Stopwatch stopwatch;
 
   /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
