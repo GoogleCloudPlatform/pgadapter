@@ -21,10 +21,12 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -57,6 +59,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -952,6 +955,32 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       assertTrue(request.getTransaction().hasBegin());
       assertEquals(
           IsolationLevel.REPEATABLE_READ, request.getTransaction().getBegin().getIsolationLevel());
+    }
+  }
+
+  @Test
+  public void testRollbackIgnoresStatementTimeout() throws SQLException {
+    mockSpanner.setRollbackExecutionTime(SimulatedExecutionTime.ofMinimumAndRandomTime(20, 0));
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        Statement statement = connection.createStatement()) {
+      // Implicit rollback when a statement actually times out due to statement_timeout ('1ms')
+      // should still complete the 20ms Rollback RPC without inheriting the 1ms statement_timeout.
+      statement.execute("begin");
+      statement.execute(INSERT_STATEMENT.getSql());
+      mockSpanner.setExecuteSqlExecutionTime(SimulatedExecutionTime.ofMinimumAndRandomTime(20, 0));
+      statement.execute("set statement_timeout = '1ms'");
+      Stopwatch stopwatch = Stopwatch.createStarted();
+      PSQLException timeoutException =
+          assertThrows(PSQLException.class, () -> statement.execute(INSERT_STATEMENT.getSql()));
+      assertEquals(SQLState.QueryCanceled.toString(), timeoutException.getSQLState());
+      assertTrue(stopwatch.elapsed(TimeUnit.MILLISECONDS) >= 20L);
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+      mockSpanner.setExecuteSqlExecutionTime(SimulatedExecutionTime.none());
+      statement.execute("rollback");
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    } finally {
+      mockSpanner.unfreeze();
+      mockSpanner.removeAllExecutionTimes();
     }
   }
 }

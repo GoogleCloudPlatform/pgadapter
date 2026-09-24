@@ -83,6 +83,9 @@ public class DeallocateStatement extends IntermediatePortalStatement {
       }
     } catch (Exception exception) {
       setFutureStatementResult(Futures.immediateFailedFuture(exception));
+      backendConnection.execute(
+          new InvalidStatement(
+              connectionHandler, options, parsedStatement, originalStatement, exception));
       return;
     }
     setFutureStatementResult(Futures.immediateFuture(new NoResult()));

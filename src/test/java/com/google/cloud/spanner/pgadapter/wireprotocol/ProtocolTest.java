@@ -77,7 +77,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -1706,12 +1705,11 @@ public class ProtocolTest {
     assertEquals("on\0", readUntil(outputResult, "on\0".length()));
     assertEquals('S', outputResult.readByte());
 
-    // Timezone will vary depending on the default location of the JVM that is running.
-    String timezoneIdentifier = ZoneId.systemDefault().getId();
+    String timezoneIdentifier = "UTC";
     int expectedLength = timezoneIdentifier.getBytes(StandardCharsets.UTF_8).length + 10 + 4;
     assertEquals(expectedLength, outputResult.readInt());
     assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
-    readUntilNullTerminator(outputResult);
+    assertEquals("UTC\0", readUntil(outputResult, "UTC\0".length()));
 
     // ReadyResponse
     assertEquals('Z', outputResult.readByte());
@@ -1840,12 +1838,11 @@ public class ProtocolTest {
     assertEquals("on\0", readUntil(outputResult, "on\0".length()));
     assertEquals('S', outputResult.readByte());
 
-    // Timezone will vary depending on the default location of the JVM that is running.
-    String timezoneIdentifier = ZoneId.systemDefault().getId();
+    String timezoneIdentifier = "UTC";
     int expectedLength = timezoneIdentifier.getBytes(StandardCharsets.UTF_8).length + 10 + 4;
     assertEquals(expectedLength, outputResult.readInt());
     assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
-    readUntilNullTerminator(outputResult);
+    assertEquals("UTC\0", readUntil(outputResult, "UTC\0".length()));
 
     // ReadyResponse
     assertEquals('Z', outputResult.readByte());

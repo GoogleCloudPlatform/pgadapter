@@ -57,6 +57,12 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
 
   public abstract void flush() throws Exception;
 
+  /**
+   * Called when an earlier message in the extended query protocol pipeline returned an error
+   * response, causing remaining buffered messages in the pipeline to be discarded without flushing.
+   */
+  public void abort() throws Exception {}
+
   public abstract String getSql();
 
   public boolean isReturnedErrorResponse() {

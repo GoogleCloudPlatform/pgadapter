@@ -204,7 +204,8 @@ public class ExtendedQueryProtocolHandler {
     addEvent("Flushing messages");
     logger.log(Level.FINER, Logging.format("Flushing messages", Action.Starting));
     try {
-      for (AbstractQueryProtocolMessage message : messages) {
+      for (int i = 0; i < messages.size(); i++) {
+        AbstractQueryProtocolMessage message = messages.get(i);
         logger.log(
             Level.FINEST,
             Logging.format(
@@ -215,6 +216,9 @@ public class ExtendedQueryProtocolHandler {
             Logging.format(
                 "Flushing message", Action.Finished, () -> String.format("Message: %s", message)));
         if (message.isReturnedErrorResponse()) {
+          for (int j = i + 1; j < messages.size(); j++) {
+            messages.get(j).abort();
+          }
           break;
         }
       }
