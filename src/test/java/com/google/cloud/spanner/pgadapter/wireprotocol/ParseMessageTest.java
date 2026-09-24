@@ -36,6 +36,7 @@ import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementTy
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -190,5 +191,54 @@ public class ParseMessageTest {
     verify(localConnection).closeStatement("");
     assertTrue(parseMessage.isReturnedErrorResponse());
     assertTrue(outputBytes.size() > 0);
+  }
+
+  @Test
+  public void testParseMessageDuplicateStatementName() throws Exception {
+    ConnectionHandler localConnection = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ConnectionMetadata metadata = mock(ConnectionMetadata.class);
+    ExtendedQueryProtocolHandler protocolHandler = mock(ExtendedQueryProtocolHandler.class);
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    IntermediatePreparedStatement existingStatement = mock(IntermediatePreparedStatement.class);
+    ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(outputBytes);
+
+    when(server.getOptions()).thenReturn(options);
+    when(localConnection.getServer()).thenReturn(server);
+    when(localConnection.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    when(localConnection.getConnectionMetadata()).thenReturn(metadata);
+    when(metadata.getOutputStream()).thenReturn(outputStream);
+    when(localConnection.getExtendedQueryProtocolHandler()).thenReturn(protocolHandler);
+    when(protocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(localConnection.hasStatement("test_stmt")).thenReturn(true);
+    when(localConnection.getStatement("test_stmt")).thenReturn(existingStatement);
+
+    Statement statement = Statement.of("select 1");
+    ParseMessage parseMessage =
+        new ParseMessage(
+            localConnection, "test_stmt", new int[0], PARSER.parse(statement), statement);
+
+    // buffer() should not throw IllegalStateException, should not overwrite existingStatement,
+    // and should execute InvalidStatement with SQLState.DuplicatePreparedStatement.
+    parseMessage.buffer(backendConnection);
+    assertTrue(parseMessage.getStatement() instanceof InvalidStatement);
+    assertEquals(
+        SQLState.DuplicatePreparedStatement,
+        ((InvalidStatement) parseMessage.getStatement()).getException().getSQLState());
+    verify(backendConnection).execute((InvalidStatement) parseMessage.getStatement());
+    verify(localConnection, never()).registerStatement(eq("test_stmt"), any());
+
+    // flush() should send ErrorResponse without removing the existing statement from
+    // ConnectionHandler.
+    parseMessage.flush();
+    verify(localConnection, never()).closeStatement("test_stmt");
+    assertTrue(parseMessage.isReturnedErrorResponse());
+    assertTrue(outputBytes.size() > 0);
+
+    // abort() should also not close the existing statement.
+    parseMessage.abort();
+    verify(localConnection, never()).closeStatement("test_stmt");
   }
 }

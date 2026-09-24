@@ -25,6 +25,7 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
@@ -386,6 +387,188 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         assertTrue(statement.execute("execute my_prepared_statement"));
         try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareStatementWithErrorDoesNotReserveName() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of("select bad_statement"),
+            Status.INVALID_ARGUMENT
+                .withDescription("column \"bad_statement\" does not exist")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        PSQLException exception1 =
+            assertThrows(
+                PSQLException.class,
+                () ->
+                    statement.execute(
+                        "prepare test_q(timestamptz, timestamptz) as select bad_statement"));
+        assertTrue(exception1.getMessage().contains("column \"bad_statement\" does not exist"));
+
+        // Running the same failed prepare statement again should return the same error,
+        // and NOT complain that the statement name is already reserved or that the connection is
+        // closed.
+        PSQLException exception2 =
+            assertThrows(
+                PSQLException.class,
+                () ->
+                    statement.execute(
+                        "prepare test_q(timestamptz, timestamptz) as select bad_statement"));
+        assertTrue(exception2.getMessage().contains("column \"bad_statement\" does not exist"));
+
+        // Now prepare a valid statement using the same name.
+        statement.execute("prepare test_q as SELECT 1");
+        try (ResultSet resultSet = statement.executeQuery("execute test_q")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        statement.execute("deallocate test_q");
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareDuplicateStatementName() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("prepare test_dup as SELECT 1");
+
+        PSQLException exception =
+            assertThrows(
+                PSQLException.class, () -> statement.execute("prepare test_dup as SELECT 2"));
+        assertEquals("42P05", exception.getSQLState());
+        assertTrue(
+            exception.getMessage().contains("prepared statement \"test_dup\" already exists"));
+
+        // Verify that the original statement is still intact and runnable.
+        try (ResultSet resultSet = statement.executeQuery("execute test_dup")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        statement.execute("deallocate test_dup");
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareCaseInsensitiveAndQuotedIdentifier() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Unquoted mixed-case identifier folds to lowercase.
+        statement.execute("prepare MyStmt as SELECT 1");
+        try (ResultSet resultSet = statement.executeQuery("execute mystmt")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = statement.executeQuery("execute MyStmt")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        statement.execute("deallocate MyStmt");
+
+        // Quoted identifier preserves case.
+        statement.execute("prepare \"MyQuotedStmt\" as SELECT 2");
+        try (ResultSet resultSet = statement.executeQuery("execute \"MyQuotedStmt\"")) {
+          assertTrue(resultSet.next());
+          assertEquals(2L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        statement.execute("deallocate \"MyQuotedStmt\"");
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareZeroLengthDelimitedIdentifier() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        SQLException exception =
+            assertThrows(SQLException.class, () -> statement.execute("prepare \"\" as SELECT 1"));
+        assertEquals(SQLState.InvalidSqlStatementName.toString(), exception.getSQLState());
+        assertTrue(exception.getMessage().contains("zero-length delimited identifier"));
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareSelectCurrentSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // 1. Prepare and execute SELECT current_setting(...)
+        statement.execute("prepare test_setting as select current_setting('application_name')");
+        try (ResultSet resultSet = statement.executeQuery("execute test_setting")) {
+          assertTrue(resultSet.next());
+          assertEquals("PostgreSQL JDBC Driver", resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        statement.execute("deallocate test_setting");
+
+        // 2. Prepare and execute SELECT set_config(...)
+        statement.execute(
+            "prepare test_set_config as select set_config('application_name', 'my-custom-app', false)");
+        try (ResultSet resultSet = statement.executeQuery("execute test_set_config")) {
+          assertTrue(resultSet.next());
+          assertEquals("my-custom-app", resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        statement.execute("deallocate test_set_config");
+
+        // 3. Prepare an invalid client-side statement (syntax error for current_setting).
+        SQLException exception =
+            assertThrows(
+                SQLException.class,
+                () ->
+                    statement.execute("prepare test_invalid_setting as select current_setting()"));
+        assertTrue(exception.getMessage().contains("Invalid quote character"));
+
+        // Verify that the failed client-side statement did not reserve the name.
+        statement.execute("prepare test_invalid_setting as SELECT 1");
+        try (ResultSet resultSet = statement.executeQuery("execute test_invalid_setting")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        statement.execute("deallocate test_invalid_setting");
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareFailureInExplicitTransactionAbortsTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      connection.setAutoCommit(false);
+      try (java.sql.Statement statement = connection.createStatement()) {
+        SQLException prepareException =
+            assertThrows(
+                SQLException.class,
+                () ->
+                    statement.execute("prepare test_invalid as select * from non_existing_table"));
+        assertTrue(prepareException.getMessage().contains("non_existing_table"));
+
+        // Subsequent statements in the transaction must fail with 25P02 (transaction aborted).
+        SQLException abortedException =
+            assertThrows(SQLException.class, () -> statement.execute("SELECT 1"));
+        assertEquals(SQLState.InFailedSqlTransaction.toString(), abortedException.getSQLState());
+
+        connection.rollback();
+
+        // After rollback, the connection should be healthy again.
+        try (ResultSet resultSet = statement.executeQuery("SELECT 1")) {
           assertTrue(resultSet.next());
           assertEquals(1L, resultSet.getLong(1));
           assertFalse(resultSet.next());

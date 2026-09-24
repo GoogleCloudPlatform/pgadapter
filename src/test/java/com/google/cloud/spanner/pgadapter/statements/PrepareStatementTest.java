@@ -21,6 +21,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.PrepareStatement.ParsedPreparedStatement;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -125,5 +126,22 @@ public class PrepareStatementTest {
     assertThrows(PGException.class, () -> parse("prepare foo () as select 1"));
     assertThrows(PGException.class, () -> parse("prepare (bigint) as select 1"));
     assertThrows(PGException.class, () -> parse("prepare as select 1"));
+  }
+
+  @Test
+  public void testParseIdentifierCaseAndQuotes() {
+    ParsedPreparedStatement statement = parse("prepare MyStmt as select 1");
+    assertEquals("mystmt", statement.name);
+
+    statement = parse("prepare \"MyStmt\" as select 1");
+    assertEquals("MyStmt", statement.name);
+
+    statement = parse("prepare \"my_stmt\" as select 1");
+    assertEquals("my_stmt", statement.name);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("prepare \"\" as select 1"));
+    assertEquals(SQLState.InvalidSqlStatementName, exception.getSQLState());
+    assertEquals("zero-length delimited identifier", exception.getMessage());
   }
 }

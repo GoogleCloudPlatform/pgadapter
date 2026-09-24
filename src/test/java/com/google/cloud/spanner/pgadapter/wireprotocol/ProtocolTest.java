@@ -62,6 +62,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -505,7 +506,12 @@ public class ProtocolTest {
     WireMessage message = server.getMessageReader().create(connectionHandler);
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(true);
-    assertThrows(IllegalStateException.class, message::send);
+    message.send();
+    assertTrue(((ParseMessage) message).getStatement().hasException());
+    assertEquals(
+        SQLState.DuplicatePreparedStatement,
+        ((InvalidStatement) ((ParseMessage) message).getStatement()).getException().getSQLState());
+    verify(connectionHandler, never()).registerStatement(anyString(), any());
   }
 
   @Test
@@ -552,7 +558,12 @@ public class ProtocolTest {
     WireMessage message = server.getMessageReader().create(connectionHandler);
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(true);
-    assertThrows(IllegalStateException.class, message::send);
+    message.send();
+    assertTrue(((ParseMessage) message).getStatement().hasException());
+    assertEquals(
+        SQLState.DuplicatePreparedStatement,
+        ((InvalidStatement) ((ParseMessage) message).getStatement()).getException().getSQLState());
+    verify(connectionHandler, never()).registerStatement(anyString(), any());
   }
 
   @Test
