@@ -10,7 +10,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@google-cloud/spanner": "^8.0.0",
+    "@google-cloud/spanner": "^9.0.0",
     "@types/pg": "^8.11.6",
     "dotenv": "^17.0.0",
     "pg": "^8.11.3",
