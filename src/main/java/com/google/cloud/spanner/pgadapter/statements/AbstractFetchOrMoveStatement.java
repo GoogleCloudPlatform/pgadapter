@@ -154,6 +154,9 @@ abstract class AbstractFetchOrMoveStatement extends IntermediatePortalStatement 
         setFutureStatementResult(Futures.immediateFuture(null));
       } catch (Exception exception) {
         setFutureStatementResult(Futures.immediateFailedFuture(exception));
+        backendConnection.execute(
+            new InvalidStatement(
+                connectionHandler, options, parsedStatement, originalStatement, exception));
       }
     }
   }

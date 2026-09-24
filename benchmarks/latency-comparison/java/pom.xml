@@ -40,7 +40,7 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.88.0</version>
+        <version>26.88.1</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -54,7 +54,7 @@
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.65.0</version>
+        <version>1.66.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -66,17 +66,17 @@
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk18on</artifactId>
-        <version>1.85.2</version>
+        <version>1.86</version>
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcpkix-jdk18on</artifactId>
-        <version>1.85</version>
+        <version>1.86</version>
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcutil-jdk18on</artifactId>
-        <version>1.85</version>
+        <version>1.86</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -104,7 +104,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.55.2</version>
+      <version>0.55.3</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
@@ -180,7 +180,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>3.6.3</version>
+        <version>3.6.4</version>
         <configuration>
           <mainClass>com.google.cloud.spanner.pgadapter.latency.LatencyBenchmark</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>

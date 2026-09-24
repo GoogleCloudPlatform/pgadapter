@@ -41,6 +41,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.util.PSQLState;
 
 @RunWith(Parameterized.class)
 public class ShutdownModeMockServerTest extends AbstractMockServerTest {
@@ -117,11 +118,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
       // Verify that we cannot open a new connection.
       SQLException exception =
           assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl()));
-      assertEquals(
-          String.format(
-              "Connection to localhost:%d refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
-              proxyServer.getLocalPort()),
-          exception.getMessage());
+      assertConnectionRefused(exception);
       // Verify that the original connection is still valid.
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
@@ -174,11 +171,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
     // Verify that we cannot open a new connection.
     SQLException exception =
         assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl()));
-    assertEquals(
-        String.format(
-            "Connection to localhost:%d refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
-            proxyServer.getLocalPort()),
-        exception.getMessage());
+    assertConnectionRefused(exception);
 
     Stopwatch.createStarted();
     while (proxyServer.state() == State.STOPPING
@@ -234,11 +227,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
 
       // Verify that we cannot open a new connection.
       exception = assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl()));
-      assertEquals(
-          String.format(
-              "Connection to localhost:%d refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
-              proxyServer.getLocalPort()),
-          exception.getMessage());
+      assertConnectionRefused(exception);
     }
   }
 
@@ -280,11 +269,7 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
       // Verify that we cannot open a new connection.
       SQLException exception =
           assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl()));
-      assertEquals(
-          String.format(
-              "Connection to localhost:%d refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.",
-              proxyServer.getLocalPort()),
-          exception.getMessage());
+      assertConnectionRefused(exception);
       // Verify that the server is still stopping, but not yet terminated.
       assertEquals(State.STOPPING, proxyServer.state());
 
@@ -312,6 +297,19 @@ public class ShutdownModeMockServerTest extends AbstractMockServerTest {
           exception.getMessage().equals("An I/O error occurred while sending to the backend.")
               || exception.getMessage().equals("This connection has been closed."));
     }
+  }
+
+  /**
+   * Verifies that a connection attempt failed because the server is no longer accepting
+   * connections. PgJDBC uses "Connection to host:port refused..." if the operating system returns a
+   * ConnectException, and "The connection attempt failed." for any other I/O error. Both can happen
+   * when the server is shutting down, so the SQLState is the only stable part of the exception.
+   */
+  static void assertConnectionRefused(SQLException exception) {
+    assertEquals(
+        exception.getMessage(),
+        PSQLState.CONNECTION_UNABLE_TO_CONNECT.getState(),
+        exception.getSQLState());
   }
 
   ShutdownHandler createShutdownHandler() {

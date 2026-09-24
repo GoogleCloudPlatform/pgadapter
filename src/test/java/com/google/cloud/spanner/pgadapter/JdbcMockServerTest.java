@@ -6432,4 +6432,123 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         String.format("ERROR: unrecognized configuration parameter \"%s\"", setting),
         exception.getMessage());
   }
+
+  @Test
+  public void testInvalidParseStatementsDoNotReExecutePreviousUnnamedStatement()
+      throws SQLException {
+    ImmutableList<String> invalidParseStatements =
+        ImmutableList.of(
+            "deallocate non_existing_stmt",
+            "execute non_existing_stmt",
+            "prepare bad_syntax",
+            "copy bad_syntax",
+            "declare bad_cursor",
+            "fetch bad_cursor",
+            "move bad_cursor",
+            "close bad_cursor",
+            "vacuum (unknown_option)",
+            "truncate",
+            "savepoint 123_invalid",
+            "release 123_invalid",
+            "rollback to 123_invalid",
+            "select current_setting('a', 'b', 'c')",
+            "select set_config('a', 'b')");
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      assertEquals(1, connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql()));
+
+      for (String invalidSql : invalidParseStatements) {
+        assertThrows(
+            "Expected failure for: " + invalidSql,
+            SQLException.class,
+            () -> connection.createStatement().execute(invalidSql));
+      }
+
+      // Verify the connection is still healthy and usable.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertEquals(
+        1L,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
+            .count());
+  }
+
+  @Test
+  public void testMultiStatementWithInvalidParseDoesNotExecuteSubsequentOrPreviousDml()
+      throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // 1. First statement succeeds (INSERT), second fails in ParseMessage.createStatement.
+      // The INSERT must be executed only once (not re-executed by the failing second statement).
+      assertThrows(
+          SQLException.class,
+          () ->
+              connection
+                  .createStatement()
+                  .execute(INSERT_STATEMENT.getSql() + "; deallocate non_existing_stmt"));
+      assertEquals(
+          1L,
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
+              .count());
+
+      // 2. First statement fails in ParseMessage.createStatement, second statement is INSERT.
+      // Neither the previous INSERT nor the second INSERT should be executed.
+      assertThrows(
+          SQLException.class,
+          () ->
+              connection
+                  .createStatement()
+                  .execute("deallocate non_existing_stmt; " + INSERT_STATEMENT.getSql()));
+      assertEquals(
+          1L,
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
+              .count());
+    }
+  }
+
+  @Test
+  public void testInvalidParseStatementAbortsTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      for (String failingSql :
+          ImmutableList.of("copy bad_syntax", "deallocate non_existing_stmt")) {
+        assertEquals(1, connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql()));
+
+        assertThrows(SQLException.class, () -> connection.createStatement().execute(failingSql));
+
+        // The transaction must now be in the ABORTED state, rejecting subsequent statements until
+        // rollback.
+        SQLException abortedException =
+            assertThrows(
+                SQLException.class,
+                () -> connection.createStatement().executeQuery(SELECT1.getSql()));
+        assertEquals("25P02", abortedException.getSQLState());
+
+        connection.rollback();
+      }
+
+      // After rollback, the connection is usable again.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      connection.commit();
+    }
+
+    assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(
+        2L,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
+            .count());
+  }
 }

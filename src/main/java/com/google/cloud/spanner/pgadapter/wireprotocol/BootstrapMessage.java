@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationOkResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.KeyDataResponse;
@@ -164,10 +165,12 @@ public abstract class BootstrapMessage extends WireMessage {
             "standard_conforming_strings".getBytes(StandardCharsets.UTF_8),
             "on".getBytes(StandardCharsets.UTF_8))
         .send(false);
+    ZoneId zoneId = sessionState.getTimezone();
+    String timeZone = zoneId == null ? OptionsMetadata.DEFAULT_TIME_ZONE : zoneId.getId();
     new ParameterStatusResponse(
             output,
             "TimeZone".getBytes(StandardCharsets.UTF_8),
-            ZoneId.systemDefault().getId().getBytes(StandardCharsets.UTF_8))
+            timeZone.getBytes(StandardCharsets.UTF_8))
         .send(false);
     for (NoticeResponse noticeResponse : startupNotices) {
       noticeResponse.send(false);

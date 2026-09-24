@@ -181,7 +181,7 @@ log_statement	none	\N	Reporting and Logging / What to Log	Sets the type of state
 log_statement_sample_rate	1	\N	Reporting and Logging / When to Log	Fraction of statements exceeding log_min_duration_sample to be logged.	Use a value between 0.0 (never log) and 1.0 (always log).	superuser	real	default	0	1	\N	1	1	\N	\N	f
 log_statement_stats	off	\N	Statistics / Monitoring	Writes cumulative performance statistics to the server log.	\N	superuser	bool	default	\N	\N	\N	off	off	\N	\N	f
 log_temp_files	-1	kB	Reporting and Logging / What to Log	Log the use of temporary files larger than this number of kilobytes.	Zero logs all files. The default is -1 (turning this feature off).	superuser	integer	default	-1	2147483647	\N	-1	-1	\N	\N	f
-log_timezone	Europe/Berlin	\N	Reporting and Logging / What to Log	Sets the time zone to use in log messages.	\N	sighup	string	configuration file	\N	\N	\N	GMT	Europe/Berlin	/etc/postgresql/14/main/postgresql.conf	580	f
+log_timezone	UTC	\N	Reporting and Logging / What to Log	Sets the time zone to use in log messages.	\N	sighup	string	configuration file	\N	\N	\N	GMT	UTC	/etc/postgresql/14/main/postgresql.conf	580	f
 log_transaction_sample_rate	0	\N	Reporting and Logging / When to Log	Sets the fraction of transactions from which to log all statements.	Use a value between 0.0 (never log) and 1.0 (log all statements for all transactions).	superuser	real	default	0	1	\N	0	0	\N	\N	f
 log_truncate_on_rotation	off	\N	Reporting and Logging / Where to Log	Truncate existing log files of same name during log rotation.	\N	sighup	bool	default	\N	\N	\N	off	off	\N	\N	f
 logging_collector	off	\N	Reporting and Logging / Where to Log	Start a subprocess to capture stderr output and/or csvlogs into log files.	\N	postmaster	bool	default	\N	\N	\N	off	off	\N	\N	f
@@ -288,7 +288,7 @@ tcp_user_timeout	0	ms	Connections and Authentication / Connection Settings	TCP u
 temp_buffers	1024	8kB	Resource Usage / Memory	Sets the maximum number of temporary buffers used by each session.	\N	user	integer	default	100	1073741823	\N	1024	1024	\N	\N	f
 temp_file_limit	-1	kB	Resource Usage / Disk	Limits the total size of all temporary files used by each process.	-1 means no limit.	superuser	integer	default	-1	2147483647	\N	-1	-1	\N	\N	f
 temp_tablespaces		\N	Client Connection Defaults / Statement Behavior	Sets the tablespace(s) to use for temporary tables and sort files.	\N	user	string	default	\N	\N	\N			\N	\N	f
-TimeZone	Europe/Berlin	\N	Client Connection Defaults / Locale and Formatting	Sets the time zone for displaying and interpreting time stamps.	\N	user	string	configuration file	\N	\N	\N	GMT	Europe/Berlin	/etc/postgresql/14/main/postgresql.conf	696	f
+TimeZone	UTC	\N	Client Connection Defaults / Locale and Formatting	Sets the time zone for displaying and interpreting time stamps.	\N	user	string	configuration file	\N	\N	\N	GMT	UTC	/etc/postgresql/14/main/postgresql.conf	696	f
 timezone_abbreviations	Default	\N	Client Connection Defaults / Locale and Formatting	Selects a file of time zone abbreviations.	\N	user	string	default	\N	\N	\N	\N	Default	\N	\N	f
 trace_notify	off	\N	Developer Options	Generates debugging output for LISTEN and NOTIFY.	\N	user	bool	default	\N	\N	\N	off	off	\N	\N	f
 trace_recovery_messages	log	\N	Developer Options	Enables logging of recovery-related debugging information.	Each level includes all the levels that follow it. The later the level, the fewer messages are sent.	sighup	enum	default	\N	\N	{debug5,debug4,debug3,debug2,debug1,log,notice,warning,error}	log	log	\N	\N	f

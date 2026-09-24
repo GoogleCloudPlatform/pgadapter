@@ -149,4 +149,64 @@ public class ExtendedQueryProtocolHandlerTest {
     assertEquals("Query cancelled", exception.getMessage());
     assertEquals(SQLState.QueryCanceled, exception.getSQLState());
   }
+
+  @Test
+  public void testFlushAbortsRemainingMessagesOnError() throws Exception {
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ParseMessage parseMessage = mock(ParseMessage.class);
+    BindMessage bindMessage = mock(BindMessage.class);
+    DescribeMessage describeMessage = mock(DescribeMessage.class);
+    ExecuteMessage executeMessage = mock(ExecuteMessage.class);
+    when(parseMessage.isReturnedErrorResponse()).thenReturn(true);
+
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
+    handler.buffer(parseMessage);
+    handler.buffer(bindMessage);
+    handler.buffer(describeMessage);
+    handler.buffer(executeMessage);
+
+    handler.flush();
+
+    assertEquals(0, handler.getMessages().size());
+    verify(parseMessage).flush();
+    verify(bindMessage, never()).flush();
+    verify(describeMessage, never()).flush();
+    verify(executeMessage, never()).flush();
+    verify(bindMessage).abort();
+    verify(describeMessage).abort();
+    verify(executeMessage).abort();
+  }
+
+  @Test
+  public void testSyncAbortsRemainingMessagesOnError() throws Exception {
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ParseMessage parseMessage = mock(ParseMessage.class);
+    BindMessage bindMessage = mock(BindMessage.class);
+    DescribeMessage describeMessage = mock(DescribeMessage.class);
+    ExecuteMessage executeMessage = mock(ExecuteMessage.class);
+    when(parseMessage.isReturnedErrorResponse()).thenReturn(true);
+
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
+    handler.buffer(parseMessage);
+    handler.buffer(bindMessage);
+    handler.buffer(describeMessage);
+    handler.buffer(executeMessage);
+
+    handler.sync(false);
+
+    assertEquals(0, handler.getMessages().size());
+    verify(parseMessage).flush();
+    verify(bindMessage, never()).flush();
+    verify(describeMessage, never()).flush();
+    verify(executeMessage, never()).flush();
+    verify(bindMessage).abort();
+    verify(describeMessage).abort();
+    verify(executeMessage).abort();
+  }
 }

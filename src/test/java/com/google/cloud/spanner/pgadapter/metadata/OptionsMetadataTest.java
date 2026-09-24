@@ -41,6 +41,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Collections;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -788,5 +789,145 @@ public class OptionsMetadataTest {
             .setDatabase("test_db")
             .build()
             .getDefaultDatabaseId());
+  }
+
+  @Test
+  public void testDefaultTimeZone() {
+    OptionsMetadata options =
+        new OptionsMetadata(new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
+    assertFalse(options.hasDefaultTimeZone());
+    assertEquals("UTC", options.getDefaultTimeZone());
+  }
+
+  @Test
+  public void testCustomTimeZoneShortOption() {
+    OptionsMetadata options =
+        new OptionsMetadata(
+            new String[] {"-p", "p", "-i", "i", "-c", "credentials.json", "-z", "Europe/Berlin"});
+    assertTrue(options.hasDefaultTimeZone());
+    assertEquals("Europe/Berlin", options.getDefaultTimeZone());
+  }
+
+  @Test
+  public void testCustomTimeZoneLongOption() {
+    OptionsMetadata options =
+        new OptionsMetadata(
+            new String[] {
+              "-p",
+              "p",
+              "-i",
+              "i",
+              "-c",
+              "credentials.json",
+              "-default_time_zone",
+              "America/New_York"
+            });
+    assertTrue(options.hasDefaultTimeZone());
+    assertEquals("America/New_York", options.getDefaultTimeZone());
+  }
+
+  @Test
+  public void testCustomTimeZoneKebabCaseOption() {
+    OptionsMetadata options =
+        new OptionsMetadata(
+            new String[] {
+              "-p",
+              "p",
+              "-i",
+              "i",
+              "-c",
+              "credentials.json",
+              "--default-time-zone",
+              "America/New_York"
+            });
+    assertTrue(options.hasDefaultTimeZone());
+    assertEquals("America/New_York", options.getDefaultTimeZone());
+  }
+
+  @Test
+  public void testCustomTimeZoneNormalized() {
+    OptionsMetadata optionsUtc =
+        new OptionsMetadata(
+            new String[] {"-p", "p", "-i", "i", "-c", "credentials.json", "-z", "utc"});
+    assertTrue(optionsUtc.hasDefaultTimeZone());
+    assertEquals("UTC", optionsUtc.getDefaultTimeZone());
+
+    OptionsMetadata optionsLocal =
+        new OptionsMetadata(
+            new String[] {"-p", "p", "-i", "i", "-c", "credentials.json", "-z", "localtime"});
+    assertTrue(optionsLocal.hasDefaultTimeZone());
+    assertEquals(ZoneId.systemDefault().getId(), optionsLocal.getDefaultTimeZone());
+  }
+
+  @Test
+  public void testCustomTimeZoneSystemProperty() {
+    String original = System.getProperty(OptionsMetadata.DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME);
+    try {
+      System.setProperty(OptionsMetadata.DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME, "Asia/Tokyo");
+      OptionsMetadata options =
+          new OptionsMetadata(new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
+      assertTrue(options.hasDefaultTimeZone());
+      assertEquals("Asia/Tokyo", options.getDefaultTimeZone());
+    } finally {
+      if (original != null) {
+        System.setProperty(OptionsMetadata.DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME, original);
+      } else {
+        System.clearProperty(OptionsMetadata.DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME);
+      }
+    }
+  }
+
+  @Test
+  public void testInvalidTimeZone() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new OptionsMetadata(
+                    new String[] {
+                      "-p", "p", "-i", "i", "-c", "credentials.json", "-z", "Invalid/TimeZone"
+                    }));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains("Invalid timezone 'Invalid/TimeZone' for default timezone"));
+  }
+
+  @Test
+  public void testInvalidTimeZoneSystemProperty() {
+    String original = System.getProperty(OptionsMetadata.DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME);
+    try {
+      System.setProperty(
+          OptionsMetadata.DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME, "Invalid/TimeZone");
+      IllegalArgumentException exception =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  new OptionsMetadata(
+                      new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"}));
+      assertTrue(
+          exception
+              .getMessage()
+              .contains("Invalid timezone 'Invalid/TimeZone' for default timezone"));
+    } finally {
+      if (original != null) {
+        System.setProperty(OptionsMetadata.DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME, original);
+      } else {
+        System.clearProperty(OptionsMetadata.DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME);
+      }
+    }
+  }
+
+  @Test
+  public void testBuilderDefaultTimeZone() {
+    OptionsMetadata options =
+        OptionsMetadata.newBuilder()
+            .setProject("p")
+            .setInstance("i")
+            .setCredentials(NoCredentials.getInstance())
+            .setDefaultTimeZone("Europe/London")
+            .build();
+    assertTrue(options.hasDefaultTimeZone());
+    assertEquals("Europe/London", options.getDefaultTimeZone());
   }
 }

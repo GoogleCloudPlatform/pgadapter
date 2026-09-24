@@ -35,10 +35,10 @@ import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -456,7 +456,7 @@ public class SessionStateTest {
         + "select t->>'name' as name, t->>'setting' as setting, t->>'unit' as unit, t->>'category' as category, t->>'short_desc' as short_desc, t->>'extra_desc' as extra_desc, t->>'context' as context, t->>'vartype' as vartype, t->>'min_val' as min_val, t->>'max_val' as max_val, case when t->>'enumvals' is null then null::text[] else spanner.string_array((t->>'enumvals')::jsonb) end as enumvals, t->>'boot_val' as boot_val, t->>'reset_val' as reset_val, t->>'source' as source, (t->>'sourcefile')::varchar as sourcefile, (t->>'sourceline')::bigint as sourceline, (t->>'pending_restart')::boolean as pending_restart\n"
         + "from unnest(array[\n"
         + "'{\"name\":\"DateStyle\",\"setting\":\"ISO, MDY\",\"unit\":null,\"category\":\"Client Connection Defaults / Locale and Formatting\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"string\",\"min_val\":null,\"max_val\":null,\"enum_vals\":null,\"boot_val\":\"ISO, MDY\",\"reset_val\":\"ISO, MDY\",\"source\":\"configuration file\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
-        + "'{\"name\":\"TimeZone\",\"setting\":\"Europe/Berlin\",\"unit\":null,\"category\":\"Client Connection Defaults / Locale and Formatting\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"string\",\"min_val\":null,\"max_val\":null,\"enum_vals\":null,\"boot_val\":\"GMT\",\"reset_val\":\"Europe/Berlin\",\"source\":\"configuration file\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
+        + "'{\"name\":\"TimeZone\",\"setting\":\"UTC\",\"unit\":null,\"category\":\"Client Connection Defaults / Locale and Formatting\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"string\",\"min_val\":null,\"max_val\":null,\"enum_vals\":null,\"boot_val\":\"GMT\",\"reset_val\":\"UTC\",\"source\":\"configuration file\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
         + "'{\"name\":\"application_name\",\"setting\":null,\"unit\":null,\"category\":\"Reporting and Logging / What to Log\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"string\",\"min_val\":null,\"max_val\":null,\"enum_vals\":null,\"boot_val\":\"\",\"reset_val\":null,\"source\":\"client\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
         + "'{\"name\":\"bytea_output\",\"setting\":\"hex\",\"unit\":null,\"category\":\"Client Connection Defaults / Statement Behavior\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"enum\",\"min_val\":null,\"max_val\":null,\"enum_vals\":[\"escape\", \"hex\"],\"boot_val\":\"hex\",\"reset_val\":\"hex\",\"source\":\"default\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
         + "'{\"name\":\"default_transaction_isolation\",\"setting\":\"serializable\",\"unit\":null,\"category\":\"Client Connection Defaults / Statement Behavior\",\"short_desc\":null,\"extra_desc\":null,\"context\":\"user\",\"vartype\":\"enum\",\"min_val\":null,\"max_val\":null,\"enum_vals\":[\"serializable\", \"repeatable read\", \"read committed\", \"read uncommitted\"],\"boot_val\":\"serializable\",\"reset_val\":\"serializable\",\"source\":\"default\",\"sourcefile\":null,\"sourceline\":null,\"pending_restart\":false}'::jsonb,\n"
@@ -960,7 +960,7 @@ public class SessionStateTest {
     try {
       OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
       SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
-      assertEquals(TimeZone.getDefault().toZoneId(), state.getTimezone());
+      assertEquals(ZoneId.of("UTC"), state.getTimezone());
     } finally {
       SessionState.SERVER_SETTINGS.putAll(originalSettings);
     }
@@ -1059,9 +1059,58 @@ public class SessionStateTest {
     try {
       OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
       SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
-      assertEquals(TimeZone.getDefault().toZoneId(), state.getTimezone());
+      assertEquals(ZoneId.of("UTC"), state.getTimezone());
     } finally {
       SessionState.SERVER_SETTINGS.putAll(originalSettings);
     }
+  }
+
+  @Test
+  public void testDefaultTimeZoneFromOptions() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    when(optionsMetadata.hasDefaultTimeZone()).thenReturn(true);
+    when(optionsMetadata.getDefaultTimeZone()).thenReturn("Europe/Berlin");
+    SessionState state = new SessionState(optionsMetadata);
+    assertEquals(ZoneId.of("Europe/Berlin"), state.getTimezone());
+    assertEquals("Europe/Berlin", state.get(null, "TimeZone").getSetting());
+    assertEquals("Europe/Berlin", state.get(null, "TimeZone").getResetVal());
+
+    state.set(null, "TimeZone", "UTC");
+    assertEquals(ZoneId.of("UTC"), state.getTimezone());
+    assertEquals("UTC", state.get(null, "TimeZone").getSetting());
+
+    state.resetAll();
+    assertEquals(ZoneId.of("Europe/Berlin"), state.getTimezone());
+    assertEquals("Europe/Berlin", state.get(null, "TimeZone").getSetting());
+  }
+
+  @Test
+  public void testDefaultTimeZoneUTC() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    SessionState state = new SessionState(optionsMetadata);
+    assertEquals(ZoneId.of("UTC"), state.getTimezone());
+    assertEquals("UTC", state.get(null, "TimeZone").getSetting());
+    assertEquals("UTC", state.get(null, "TimeZone").getResetVal());
+    assertEquals("UTC", state.get(null, "log_timezone").getSetting());
+    assertEquals("UTC", state.get(null, "log_timezone").getResetVal());
+  }
+
+  @Test
+  public void testTimeZoneLocalSettingTransactionBoundaries() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    SessionState state = new SessionState(optionsMetadata);
+    assertEquals(ZoneId.of("UTC"), state.getTimezone());
+
+    // Test rollback clears cached local setting
+    state.setLocal(null, "TimeZone", "America/New_York");
+    assertEquals(ZoneId.of("America/New_York"), state.getTimezone());
+    state.rollback();
+    assertEquals(ZoneId.of("UTC"), state.getTimezone());
+
+    // Test commit clears cached local setting
+    state.setLocal(null, "TimeZone", "America/New_York");
+    assertEquals(ZoneId.of("America/New_York"), state.getTimezone());
+    state.commit();
+    assertEquals(ZoneId.of("UTC"), state.getTimezone());
   }
 }

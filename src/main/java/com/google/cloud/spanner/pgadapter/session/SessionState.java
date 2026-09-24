@@ -116,6 +116,11 @@ public class SessionState {
     initSettingValue(
         "spanner.replace_pg_catalog_tables", Boolean.toString(options.replacePgCatalogTables()));
 
+    if (options.hasDefaultTimeZone()) {
+      initServerSetting("TimeZone", options.getDefaultTimeZone());
+      initServerSetting("log_timezone", options.getDefaultTimeZone());
+    }
+
     initCopySettings(this.settings);
   }
 
@@ -167,6 +172,13 @@ public class SessionState {
     PGSetting setting = this.settings.get(key);
     if (setting != null) {
       setting.initSettingValue(value);
+    }
+  }
+
+  void initServerSetting(String key, String value) {
+    PGSetting setting = this.settings.get(key);
+    if (setting != null) {
+      setting.initServerSetting(value);
     }
   }
 
@@ -424,12 +436,14 @@ public class SessionState {
     }
     this.localSettings = null;
     this.transactionSettings = null;
+    invalidateCache();
   }
 
   /** Rolls back the current transaction and abandons any pending changes to the settings. */
   public void rollback() {
     this.localSettings = null;
     this.transactionSettings = null;
+    invalidateCache();
   }
 
   /** Returns the PostgreSQL version. */
@@ -642,11 +656,11 @@ public class SessionState {
         () -> {
           PGSetting setting = internalGet(toKey(null, "timezone"), false);
           if (setting == null) {
-            return ZoneId.systemDefault();
+            return ZoneId.of(OptionsMetadata.DEFAULT_TIME_ZONE);
           }
           String id =
               tryGetFirstNonNull(
-                  ZoneId.systemDefault().getId(),
+                  OptionsMetadata.DEFAULT_TIME_ZONE,
                   setting::getSetting,
                   setting::getResetVal,
                   setting::getBootVal);
@@ -657,9 +671,9 @@ public class SessionState {
 
   private ZoneId zoneIdFromString(String value) {
     try {
-      return ZoneId.of(value);
+      return ZoneId.of(PGSetting.convertToValidZoneId(value));
     } catch (Throwable ignore) {
-      return ZoneId.systemDefault();
+      return ZoneId.of(OptionsMetadata.DEFAULT_TIME_ZONE);
     }
   }
 

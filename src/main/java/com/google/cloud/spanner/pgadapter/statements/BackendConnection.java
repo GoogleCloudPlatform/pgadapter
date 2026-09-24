@@ -108,6 +108,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -859,11 +860,31 @@ public class BackendConnection {
     }
   }
 
+  private final class Invalid extends BufferedStatement<StatementResult> {
+    private final InvalidStatement invalidStatement;
+
+    Invalid(InvalidStatement invalidStatement) {
+      super(invalidStatement.parsedStatement, invalidStatement.originalStatement);
+      this.invalidStatement = invalidStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void doExecute() {
+      PGException pgException = invalidStatement.getException();
+      result.setException(pgException);
+      throw pgException;
+    }
+  }
+
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
   static final StatementResult NO_RESULT = new NoResult();
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
-  private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final Runnable closeAllPortals;
   private final SessionState sessionState;
@@ -1070,6 +1091,12 @@ public class BackendConnection {
     return savepoint.result;
   }
 
+  public Future<StatementResult> execute(InvalidStatement invalidStatement) {
+    Invalid invalid = new Invalid(invalidStatement);
+    bufferedStatements.add(invalid);
+    return invalid.result;
+  }
+
   /** Flushes the buffered statements to Spanner. */
   void flush() {
     flush(false);
@@ -1229,16 +1256,34 @@ public class BackendConnection {
       closeAllPortals.run();
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
-        if (spannerConnection.isDmlBatchActive()) {
-          spannerConnection.abortBatch();
+        if (!isRollback(index)) {
+          rollbackWithoutTimeout();
         }
-        spannerConnection.setStatementTag(null);
-        spannerConnection.execute(ROLLBACK);
       } else if (spannerConnection.isDdlBatchActive()) {
         spannerConnection.abortBatch();
       }
     } finally {
       bufferedStatements.clear();
+    }
+  }
+
+  private void rollbackWithoutTimeout() {
+    if (spannerConnection.isDmlBatchActive()) {
+      spannerConnection.abortBatch();
+    }
+    spannerConnection.setStatementTag(null);
+    TimeUnit timeoutUnit = spannerConnection.hasStatementTimeout() ? TimeUnit.NANOSECONDS : null;
+    long previousTimeout =
+        timeoutUnit != null ? spannerConnection.getStatementTimeout(timeoutUnit) : 0L;
+    if (timeoutUnit != null) {
+      spannerConnection.clearStatementTimeout();
+    }
+    try {
+      spannerConnection.rollback();
+    } finally {
+      if (timeoutUnit != null) {
+        spannerConnection.setStatementTimeout(previousTimeout, timeoutUnit);
+      }
     }
   }
 
@@ -1314,12 +1359,8 @@ public class BackendConnection {
     try {
       if (connectionState != ConnectionState.ABORTED) {
         sessionState.commit();
-      }
-      if (spannerConnection.isInTransaction()) {
-        spannerConnection.setStatementTag(null);
-        if (connectionState == ConnectionState.ABORTED) {
-          spannerConnection.rollback();
-        } else {
+        if (spannerConnection.isInTransaction()) {
+          spannerConnection.setStatementTag(null);
           spannerConnection.commit();
         }
       }
