@@ -35,7 +35,6 @@ import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -48,7 +47,10 @@ public class ExtendedQueryProtocolHandler {
   private static final Logger logger =
       Logger.getLogger(ExtendedQueryProtocolHandler.class.getName());
 
-  private final LinkedList<AbstractQueryProtocolMessage> messages = new LinkedList<>();
+  @VisibleForTesting static final int DEFAULT_BUFFER_CAPACITY = 32;
+  @VisibleForTesting static final int MAX_BUFFER_CAPACITY = 256;
+
+  private final ArrayList<AbstractQueryProtocolMessage> messages;
   private final ConnectionHandler connectionHandler;
   private final BackendConnection backendConnection;
 
@@ -80,9 +82,18 @@ public class ExtendedQueryProtocolHandler {
   @VisibleForTesting
   public ExtendedQueryProtocolHandler(
       ConnectionHandler connectionHandler, BackendConnection backendConnection) {
+    this(connectionHandler, backendConnection, new ArrayList<>(DEFAULT_BUFFER_CAPACITY));
+  }
+
+  @VisibleForTesting
+  ExtendedQueryProtocolHandler(
+      ConnectionHandler connectionHandler,
+      BackendConnection backendConnection,
+      ArrayList<AbstractQueryProtocolMessage> messages) {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
     this.connectionId = connectionHandler.getTraceConnectionId().toString();
     this.backendConnection = Preconditions.checkNotNull(backendConnection);
+    this.messages = Preconditions.checkNotNull(messages);
   }
 
   /** Returns the backend PG connection for this query handler. */
@@ -210,8 +221,20 @@ public class ExtendedQueryProtocolHandler {
             Logging.format(
                 "Flushing message", Action.Finished, () -> String.format("Message: %s", message)));
         if (message.isReturnedErrorResponse()) {
-          for (int j = i + 1; j < messages.size(); j++) {
-            messages.get(j).abort();
+          // Abort remaining messages in reverse (LIFO) order to correctly unwind state mutations in
+          // the opposite order that they were registered/buffered (e.g. if a pipeline contains a
+          // Close followed by a Parse/Bind reusing the same statement or portal name, or both
+          // creation and closure of a statement in the same aborted pipeline).
+          for (int j = messages.size() - 1; j > i; j--) {
+            AbstractQueryProtocolMessage messageToAbort = messages.get(j);
+            try {
+              messageToAbort.abort();
+            } catch (Exception exception) {
+              logger.log(
+                  Level.WARNING,
+                  exception,
+                  () -> String.format("Failed to abort message: %s", messageToAbort));
+            }
           }
           break;
         }
@@ -229,7 +252,12 @@ public class ExtendedQueryProtocolHandler {
       throw exception;
     } finally {
       connectionHandler.getConnectionMetadata().getOutputStream().flush();
+      boolean shouldTrimToSize = messages.size() > MAX_BUFFER_CAPACITY;
       messages.clear();
+      if (shouldTrimToSize) {
+        messages.trimToSize();
+        messages.ensureCapacity(DEFAULT_BUFFER_CAPACITY);
+      }
       logger.log(Level.FINER, Logging.format("Flushing messages", Action.Finished));
       endSpan();
     }

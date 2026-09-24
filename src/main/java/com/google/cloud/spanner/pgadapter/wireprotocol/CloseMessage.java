@@ -17,6 +17,9 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
+import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CloseCompleteResponse;
 import java.text.MessageFormat;
@@ -24,7 +27,7 @@ import javax.annotation.Nullable;
 
 /** Close the designated statement. */
 @InternalApi
-public class CloseMessage extends ControlMessage {
+public class CloseMessage extends AbstractQueryProtocolMessage {
 
   protected static final char IDENTIFIER = 'C';
 
@@ -51,19 +54,53 @@ public class CloseMessage extends ControlMessage {
     this.statement = statement;
   }
 
-  /** Close the statement server-side and clean up by deleting their metadata locally. */
   @Override
-  protected void sendPayload() throws Exception {
+  void buffer(BackendConnection backendConnection) throws Exception {
+    // Unregister the statement or portal immediately from the connection map so that subsequent
+    // messages in the same pipeline (e.g. a Parse or Bind reusing the same name) will see the name
+    // available, or attempts to use this closed statement will fail.
+    // Resource cleanup (statement.close()) is deferred until flush() so that:
+    // 1. If an earlier message in the pipeline fails, abort() can restore the statement.
+    // 2. Preceding messages in the pipeline (e.g. Execute) can finish streaming rows before
+    // closure.
     if (this.statement != null) {
       if (this.type == PreparedType.Portal) {
-        this.statement.close(); // Only portals need to be closed server side, since PS is not bound
-        this.connection.closePortal(this.name);
+        this.connection.unregisterPortal(this.name);
       } else {
-        this.connection.closeStatement(this.name);
+        this.connection.unregisterStatement(this.name);
       }
     }
-    CloseCompleteResponse.send(this.outputStream);
-    this.outputStream.flush();
+  }
+
+  @Override
+  public void flush() throws Exception {
+    try {
+      if (this.statement != null) {
+        this.statement.close();
+      }
+      CloseCompleteResponse.send(this.outputStream);
+    } catch (Exception exception) {
+      handleError(exception);
+    }
+  }
+
+  @Override
+  public void abort() {
+    // Only restore the statement or portal if it did not fail during creation (e.g. an
+    // InvalidStatement created by a failed Parse or Bind message must not be resurrected).
+    if (this.statement != null && !this.statement.hasException()) {
+      if (this.type == PreparedType.Portal) {
+        this.connection.registerPortal(this.name, (IntermediatePortalStatement) this.statement);
+      } else {
+        this.connection.registerStatement(
+            this.name, (IntermediatePreparedStatement) this.statement);
+      }
+    }
+  }
+
+  @Override
+  public String getSql() {
+    return this.statement == null ? "" : this.statement.getSql();
   }
 
   @Override
