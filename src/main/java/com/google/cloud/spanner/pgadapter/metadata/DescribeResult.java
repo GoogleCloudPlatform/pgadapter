@@ -20,6 +20,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.common.base.Preconditions;
 import com.google.spanner.v1.StructType;
 import java.util.Arrays;
 import javax.annotation.Nullable;
@@ -29,9 +30,19 @@ public class DescribeResult {
   @Nullable private final Type columns;
   private final int[] parameters;
 
+  public static DescribeResult of(int[] parameters, @Nullable Type columns) {
+    return new DescribeResult(parameters, columns);
+  }
+
   public DescribeResult(int[] givenParameterTypes, @Nullable ResultSet resultMetadata) {
-    this.parameters = extractParameters(givenParameterTypes, resultMetadata);
-    this.columns = resultMetadata == null ? null : resultMetadata.getType();
+    this(
+        extractParameters(givenParameterTypes, resultMetadata),
+        resultMetadata == null ? null : resultMetadata.getType());
+  }
+
+  public DescribeResult(int[] parameters, @Nullable Type columns) {
+    this.parameters = Preconditions.checkNotNull(parameters);
+    this.columns = columns;
   }
 
   static int[] extractParameters(int[] givenParameterTypes, @Nullable ResultSet resultSet) {
