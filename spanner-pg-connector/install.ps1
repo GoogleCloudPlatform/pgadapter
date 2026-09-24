@@ -42,12 +42,12 @@ if ([string]::IsNullOrEmpty($Version)) {
     $Uri = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/packages/spanner-pg-connector/versions"
     try {
         $Result = Invoke-RestMethod -Uri $Uri -Headers $Headers -ErrorAction Stop
-        $Version = $Result.versions.name | ForEach-Object { Split-Path $_ -Leaf } | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | Sort-Object {[version]$_} | Select-Object -Last 1
+        $Version = $Result.versions.name | ForEach-Object { Split-Path $_ -Leaf } | Where-Object { $_ -match '^v?\d+\.\d+\.\d+$' } | Sort-Object { [version]($_ -replace '^v', '') } | Select-Object -Last 1
     } catch {
         # Fallback to gcloud if available
         if (Get-Command gcloud -ErrorAction SilentlyContinue) {
             $VersionsList = gcloud artifacts versions list --package=spanner-pg-connector --project=$Project --location=$Location --repository=$Repository --format="value(name)" 2>$null
-            $Version = $VersionsList | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | Sort-Object {[version]$_} | Select-Object -Last 1
+            $Version = $VersionsList | Where-Object { $_ -match '^v?\d+\.\d+\.\d+$' } | Sort-Object { [version]($_ -replace '^v', '') } | Select-Object -Last 1
         }
     }
 
