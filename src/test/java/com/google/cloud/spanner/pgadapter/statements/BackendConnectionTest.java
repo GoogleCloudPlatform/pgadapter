@@ -26,6 +26,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -74,10 +75,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.InOrder;
 
 @RunWith(JUnit4.class)
 public class BackendConnectionTest {
@@ -619,6 +622,46 @@ public class BackendConnectionTest {
 
     // Verify that the connection is now in the idle state.
     assertEquals(ConnectionState.IDLE, backendConnection.getConnectionState());
+  }
+
+  @Test
+  public void testInternalRollbackWithoutTimeout_clearsAndRestoresStatementTimeout() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    when(connection.hasStatementTimeout()).thenReturn(true);
+    when(connection.getStatementTimeout(TimeUnit.NANOSECONDS)).thenReturn(5_000_000L);
+
+    Statement statement = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    RuntimeException error = new RuntimeException("test error");
+    when(connection.execute(statement)).thenThrow(error);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+    Future<StatementResult> resultFuture =
+        backendConnection.execute("INSERT", parsedStatement, statement, Function.identity());
+    backendConnection.flush();
+
+    ExecutionException executionException =
+        assertThrows(ExecutionException.class, resultFuture::get);
+    assertEquals(PGException.class, executionException.getCause().getClass());
+
+    InOrder inOrder = inOrder(connection);
+    inOrder.verify(connection).setStatementTag(null);
+    inOrder.verify(connection).getStatementTimeout(TimeUnit.NANOSECONDS);
+    inOrder.verify(connection).clearStatementTimeout();
+    inOrder.verify(connection).rollback();
+    inOrder.verify(connection).setStatementTimeout(5_000_000L, TimeUnit.NANOSECONDS);
   }
 
   @Test
