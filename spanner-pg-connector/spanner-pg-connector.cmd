@@ -8,5 +8,5 @@ SET LIB_PATH=%SCRIPT_DIR%lib\*
 SET JAVA_CMD="%SCRIPT_DIR%custom-jre\bin\java.exe"
 
 REM Run the Spanner PG Connector wrapper.
-%JAVA_CMD% --enable-native-access=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow -Dio.netty.noUnsafe=true -Dio.grpc.netty.shaded.io.netty.noUnsafe=true -cp "%JAR_PATH%;%LIB_PATH%" com.google.cloud.spanner.pgadapter.SpannerPGConnector %*
+%JAVA_CMD% --enable-native-access=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow -Dslf4j.internal.verbosity=ERROR -Dio.netty.noUnsafe=true -Dio.grpc.netty.shaded.io.netty.noUnsafe=true -cp "%JAR_PATH%;%LIB_PATH%" com.google.cloud.spanner.pgadapter.SpannerPGConnector %*
 exit /b %ERRORLEVEL%

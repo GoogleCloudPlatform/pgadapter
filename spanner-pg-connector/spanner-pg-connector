@@ -21,6 +21,7 @@ JAR_PATH="${SCRIPT_DIR}/pgadapter.jar"
 exec "${SCRIPT_DIR}/custom-jre/bin/java" \
   --enable-native-access=ALL-UNNAMED \
   --sun-misc-unsafe-memory-access=allow \
+  -Dslf4j.internal.verbosity=ERROR \
   -Dio.netty.noUnsafe=true \
   -Dio.grpc.netty.shaded.io.netty.noUnsafe=true \
   -cp "${JAR_PATH}:${SCRIPT_DIR}/lib/*" \

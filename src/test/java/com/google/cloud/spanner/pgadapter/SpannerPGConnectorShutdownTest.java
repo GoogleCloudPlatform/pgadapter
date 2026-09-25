@@ -58,6 +58,7 @@ public class SpannerPGConnectorShutdownTest {
     Process connector = startConnector(tool.getAbsolutePath());
     try {
       String clientPid = awaitContents(pidFile);
+      Thread.sleep(200L);
       connector.destroy(); // SIGTERM
 
       assertTrue(
