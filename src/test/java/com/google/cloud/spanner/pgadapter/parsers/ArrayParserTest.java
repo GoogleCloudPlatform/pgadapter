@@ -462,6 +462,53 @@ public class ArrayParserTest {
   }
 
   @Test
+  public void testStringArrayWithNonAsciiAndQuotes() {
+    ArrayParser parser =
+        new ArrayParser(
+            createArrayResultSet(
+                Type.string(),
+                Value.stringArray(
+                    Arrays.asList(
+                        "é", "café", "foo\"bar", "back\\slash", "line1\nline2", null, "中文", "🎉"))),
+            0,
+            mock(SessionState.class));
+
+    assertEquals(
+        "{\"é\",\"café\",\"foo\\\"bar\",\"back\\\\slash\",\"line1\nline2\",NULL,\"中文\",\"🎉\"}",
+        parser.stringParse());
+  }
+
+  @Test
+  public void testEscapeArrayElement() {
+    assertNull(ArrayParser.escapeArrayElement(null));
+    assertEquals("", ArrayParser.escapeArrayElement(""));
+    assertEquals("test", ArrayParser.escapeArrayElement("test"));
+    assertEquals("é", ArrayParser.escapeArrayElement("é"));
+    assertEquals("café", ArrayParser.escapeArrayElement("café"));
+    assertEquals("中文", ArrayParser.escapeArrayElement("中文"));
+    assertEquals("line1\nline2", ArrayParser.escapeArrayElement("line1\nline2"));
+    assertEquals("tab1\ttab2", ArrayParser.escapeArrayElement("tab1\ttab2"));
+    assertEquals("foo\\\"bar", ArrayParser.escapeArrayElement("foo\"bar"));
+    assertEquals("foo\\\\bar", ArrayParser.escapeArrayElement("foo\\bar"));
+    assertEquals("foo\\\\bar\\\"baz", ArrayParser.escapeArrayElement("foo\\bar\"baz"));
+    assertEquals("\\\\\\\"", ArrayParser.escapeArrayElement("\\\""));
+    assertEquals("\\\"start", ArrayParser.escapeArrayElement("\"start"));
+    assertEquals("end\\\"", ArrayParser.escapeArrayElement("end\""));
+    assertEquals("\\\\start", ArrayParser.escapeArrayElement("\\start"));
+    assertEquals("end\\\\", ArrayParser.escapeArrayElement("end\\"));
+    assertEquals("\\\"test\\\"", ArrayParser.escapeArrayElement("\"test\""));
+    assertEquals("\\\\test\\\\", ArrayParser.escapeArrayElement("\\test\\"));
+    assertEquals("\\\"", ArrayParser.escapeArrayElement("\""));
+    assertEquals("\\\\", ArrayParser.escapeArrayElement("\\"));
+    assertEquals("\\\"\\\"", ArrayParser.escapeArrayElement("\"\""));
+    assertEquals("\\\\\\\\", ArrayParser.escapeArrayElement("\\\\"));
+    assertEquals(
+        "café \\\"with quotes\\\" and \\\\",
+        ArrayParser.escapeArrayElement("café \"with quotes\" and \\"));
+    assertEquals("🎉", ArrayParser.escapeArrayElement("🎉"));
+  }
+
+  @Test
   public void testJsonStringParse() {
     ArrayParser parser =
         new ArrayParser(
