@@ -1,0 +1,50 @@
+name: Tag Deprecated Docker Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - tag-deprecated-images
+
+jobs:
+  tag-images:
+    name: Tag Older Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Tag non-latest images with no-new-use-public-image
+        run: |
+          set -euo pipefail
+          for repo in pgadapter pgadapter-distroless pgadapter-emulator; do
+            echo "=========================================="
+            echo "Processing repository: $repo"
+            echo "=========================================="
+            gcloud artifacts docker images list us-docker.pkg.dev/cloud-spanner-pg-adapter/gcr.io/$repo \
+              --include-tags \
+              --format=json | jq -r '
+                .[]
+                | select((.tags | index("latest") | not) and
+                         (.tags | any(startswith("no-new-use-public-image-") or
+                                      startswith("deprecated-public-image-") or
+                                      startswith("update-available-")) | not))
+                | .version
+              ' | while read -r version; do
+                if [ -n "$version" ]; then
+                  digest="${version#sha256:}"
+                  short_digest="${digest:0:12}"
+                  echo "Tagging $repo@$version with no-new-use-public-image-$short_digest"
+                  gcloud artifacts docker tags add \
+                    us-docker.pkg.dev/cloud-spanner-pg-adapter/gcr.io/$repo@$version \
+                    us-docker.pkg.dev/cloud-spanner-pg-adapter/gcr.io/$repo:no-new-use-public-image-$short_digest
+                fi
+              done
+          done
+          echo "Done! All non-latest images and manifests have been tagged."
