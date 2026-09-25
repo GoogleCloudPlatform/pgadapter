@@ -499,28 +499,48 @@ public class SimpleParserTest {
 
   @Test
   public void testReadArrayLiteral() {
-    assertEquals(ImmutableList.of(), SimpleParser.readArrayLiteral("{}", true));
-    assertEquals(ImmutableList.of("foo"), SimpleParser.readArrayLiteral("{\"foo\"}", true));
+    assertEquals(ImmutableList.of(), SimpleParser.readArrayLiteral("{}"));
+    assertEquals(ImmutableList.of("foo"), SimpleParser.readArrayLiteral("{\"foo\"}"));
     assertEquals(
-        ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{\"foo\", \"bar\"}", true));
+        ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{\"foo\", \"bar\"}"));
     assertEquals(
         Arrays.asList("foo", "bar", null),
-        SimpleParser.readArrayLiteral("{\"foo\", \"bar\", null}", true));
-    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{1, 2}", true));
-    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{\"1\", \"2\"}", true));
+        SimpleParser.readArrayLiteral("{\"foo\", \"bar\", null}"));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{1, 2}"));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{\"1\", \"2\"}"));
     assertEquals(
         ImmutableList.of("{\"foo\": \"bar\"}"),
-        SimpleParser.readArrayLiteral("{\"{\\\"foo\\\": \\\"bar\\\"}\"}", true));
+        SimpleParser.readArrayLiteral("{\"{\\\"foo\\\": \\\"bar\\\"}\"}"));
 
-    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2", true));
-    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2", true));
-    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2}", true));
-    assertThrows(
-        PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2} extra token", true));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2} extra token"));
 
-    assertEquals(ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{foo, bar}", true));
+    assertEquals(ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{foo, bar}"));
     assertEquals(
-        ImmutableList.of("foo 1", "bar 2"), SimpleParser.readArrayLiteral("{foo 1, bar 2}", true));
+        ImmutableList.of("foo 1", "bar 2"), SimpleParser.readArrayLiteral("{foo 1, bar 2}"));
+    assertEquals(
+        ImmutableList.of("{\"k\":\"\"}"),
+        SimpleParser.readArrayLiteral("{\"{\\\"k\\\":\\\"\\\"}\"}"));
+    assertEquals(ImmutableList.of("--foo"), SimpleParser.readArrayLiteral("{--foo}"));
+    assertEquals(ImmutableList.of("a", "--", "b"), SimpleParser.readArrayLiteral("{a, --, b}"));
+    assertEquals(ImmutableList.of("/*comment*/"), SimpleParser.readArrayLiteral("{/*comment*/}"));
+    assertEquals(ImmutableList.of("C:\\user"), SimpleParser.readArrayLiteral("{\"C:\\\\user\"}"));
+    assertEquals(
+        ImmutableList.of("a\\n", "b\\u1234"),
+        SimpleParser.readArrayLiteral("{\"a\\\\n\", \"b\\\\u1234\"}"));
+    assertEquals(ImmutableList.of(",", "}"), SimpleParser.readArrayLiteral("{\\,, \\}}"));
+    assertEquals(
+        Arrays.asList("foo", "null", null),
+        SimpleParser.readArrayLiteral("{\"foo\", \\null, null}"));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("[1:2]={1, 2}"));
+
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1,}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{,1}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1,,2}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{\"foo\"bar}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{foo\"bar}"));
   }
 
   @Test

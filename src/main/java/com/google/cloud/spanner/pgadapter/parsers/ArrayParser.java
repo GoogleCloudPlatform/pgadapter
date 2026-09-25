@@ -18,6 +18,7 @@ import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
@@ -27,7 +28,6 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
-import com.google.cloud.spanner.pgadapter.statements.SimpleParser;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayInputStream;
@@ -147,7 +147,7 @@ public class ArrayParser extends Parser<List<?>> {
     if (value == null) {
       return null;
     }
-    List<String> values = SimpleParser.readArrayLiteral(value, elementOid == Oid.BYTEA);
+    List<String> values = ArrayLiteralParser.readArrayLiteral(value);
     ArrayList<Object> result = new ArrayList<>(values.size());
     for (String element : values) {
       if (element == null) {
@@ -240,7 +240,8 @@ public class ArrayParser extends Parser<List<?>> {
         || arrayElementType == Code.DATE
         || arrayElementType == Code.STRING
         || arrayElementType == Code.TIMESTAMP
-        || arrayElementType == Code.PG_JSONB;
+        || arrayElementType == Code.PG_JSONB
+        || arrayElementType == Code.UUID;
   }
 
   /**
@@ -445,6 +446,9 @@ public class ArrayParser extends Parser<List<?>> {
         break;
       case Oid.DATE:
         parametersBuilder.put(name, Value.dateArray((List<Date>) list));
+        break;
+      case Oid.INTERVAL:
+        parametersBuilder.put(name, Value.intervalArray((List<Interval>) list));
         break;
       default:
         throw PGExceptionFactory.newPGException(
