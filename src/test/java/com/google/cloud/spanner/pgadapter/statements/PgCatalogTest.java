@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,7 +34,48 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class PgCatalogTest {
   @Test
-  public void testReplaceCatalogTables() {}
+  public void testReplaceCatalogTables() {
+    SessionState sessionState = mock(SessionState.class);
+    when(sessionState.getServerVersion()).thenReturn("14.1");
+    PgCatalog catalog = new PgCatalog(sessionState, WellKnownClient.UNSPECIFIED);
+
+    Statement statement = Statement.of("select typname from pg_catalog.pg_type where oid = 2950");
+    Statement replaced = catalog.replacePgCatalogTables(statement, statement.getSql());
+    assertTrue(
+        replaced
+            .getSql()
+            .startsWith(
+                "with "
+                    + PgCatalog.PgNamespace.PG_NAMESPACE_CTE
+                    + ",\n"
+                    + PgCatalog.PgType.PG_TYPE_CTE));
+    assertTrue(replaced.getSql().contains("select 2950 as oid, 'uuid' as typname"));
+    assertTrue(replaced.getSql().contains("select 2951 as oid, '_uuid' as typname"));
+    assertTrue(replaced.getSql().contains("select 26 as oid, 'oid' as typname"));
+    assertTrue(replaced.getSql().contains("select 1028 as oid, '_oid' as typname"));
+    assertTrue(replaced.getSql().endsWith("select typname from pg_type where oid = 2950"));
+  }
+
+  @Test
+  public void testReplacePgAttributeTable() {
+    SessionState sessionState = mock(SessionState.class);
+    when(sessionState.getServerVersion()).thenReturn("14.1");
+    when(sessionState.isEmulatePgClassTables()).thenReturn(true);
+    PgCatalog catalog = new PgCatalog(sessionState, WellKnownClient.UNSPECIFIED);
+
+    Statement statement =
+        Statement.of("select attname, atttypid from pg_catalog.pg_attribute where attrelid = 123");
+    Statement replaced = catalog.replacePgCatalogTables(statement, statement.getSql());
+    assertTrue(replaced.getSql().startsWith("with " + PgCatalog.PgAttribute.PG_ATTRIBUTE_CTE));
+    assertTrue(replaced.getSql().contains("when 'oid' then 26"));
+    assertTrue(replaced.getSql().contains("when 'uuid' then 2950"));
+    assertTrue(replaced.getSql().contains("when 'oid[]' then 1028"));
+    assertTrue(replaced.getSql().contains("when 'uuid[]' then 2951"));
+    assertTrue(
+        replaced
+            .getSql()
+            .endsWith("select attname, atttypid from pg_attribute where attrelid = 123"));
+  }
 
   @Test
   public void testAddCommonTableExpressions() {
