@@ -96,6 +96,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -120,6 +121,8 @@ public class ConnectionHandler implements Runnable {
   private final ProxyServer server;
   private Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
+  private final Map<String, ListenableFuture<DescribeResult>> inFlightAutoDescribedStatements =
+      new ConcurrentHashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
   private Thread thread;
@@ -516,9 +519,7 @@ public class ConnectionHandler implements Runnable {
                 "RunConnection",
                 () -> String.format("Closing connection handler with ID %s", getName())));
         try {
-          if (this.spannerConnection != null) {
-            this.spannerConnection.close();
-          }
+          handleTerminate();
           this.socket.close();
         } catch (SpannerException | IOException e) {
           logger.log(
@@ -620,8 +621,13 @@ public class ConnectionHandler implements Runnable {
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
   public void handleTerminate() {
     synchronized (this) {
+      if (this.extendedQueryProtocolHandler != null
+          && this.extendedQueryProtocolHandler.getBackendConnection() != null) {
+        this.extendedQueryProtocolHandler.getBackendConnection().close();
+      }
       closeAllPortals();
       closeAllStatements();
+      this.inFlightAutoDescribedStatements.clear();
       if (this.spannerConnection != null) {
         this.spannerConnection.close();
       }
@@ -810,14 +816,19 @@ public class ConnectionHandler implements Runnable {
   }
 
   /**
-   * Returns the parameter types of a cached auto-described statement, or null if none is available
-   * in the cache.
+   * Returns the parameter types of a cached or in-flight auto-described statement, or null if none
+   * is available.
    */
-  public DescribeResult getAutoDescribedStatement(String sql) {
+  public ListenableFuture<DescribeResult> getAutoDescribedStatement(String sql) {
     if (this.databaseName == null) {
       return null;
     }
-    return this.server.autoDescribedStatementsCache.getIfPresent(this.databaseName + sql);
+    DescribeResult cached =
+        this.server.autoDescribedStatementsCache.getIfPresent(this.databaseName + sql);
+    if (cached != null) {
+      return Futures.immediateFuture(cached);
+    }
+    return this.inFlightAutoDescribedStatements.get(sql);
   }
 
   /**
@@ -834,17 +845,19 @@ public class ConnectionHandler implements Runnable {
       return;
     }
     String key = this.databaseName + sql;
+    this.inFlightAutoDescribedStatements.put(sql, describeResult);
     Futures.addCallback(
         describeResult,
         new FutureCallback<DescribeResult>() {
           @Override
           public void onSuccess(DescribeResult result) {
             server.autoDescribedStatementsCache.put(key, result);
+            inFlightAutoDescribedStatements.remove(sql, describeResult);
           }
 
           @Override
           public void onFailure(Throwable throwable) {
-            // Do not cache failed or cancelled auto-describe results.
+            inFlightAutoDescribedStatements.remove(sql, describeResult);
           }
         },
         MoreExecutors.directExecutor());

@@ -1262,12 +1262,7 @@ public class BackendConnection {
       } else if (spannerConnection.isDdlBatchActive()) {
         spannerConnection.abortBatch();
       }
-      if (index + 1 < bufferedStatements.size()) {
-        for (BufferedStatement<?> bufferedStatement :
-            bufferedStatements.subList(index + 1, bufferedStatements.size())) {
-          bufferedStatement.result.setException(exception);
-        }
-      }
+      failBufferedStatements(exception);
     } finally {
       bufferedStatements.clear();
     }
@@ -1289,6 +1284,20 @@ public class BackendConnection {
     } finally {
       if (timeoutUnit != null) {
         spannerConnection.setStatementTimeout(previousTimeout, timeoutUnit);
+      }
+    }
+  }
+
+  /** Closes this backend connection and cancels any buffered statements. */
+  public void close() {
+    failBufferedStatements(PGExceptionFactory.newQueryCancelledException());
+    bufferedStatements.clear();
+  }
+
+  private void failBufferedStatements(Exception exception) {
+    for (BufferedStatement<?> bufferedStatement : bufferedStatements) {
+      if (!bufferedStatement.result.isDone()) {
+        bufferedStatement.result.setException(exception);
       }
     }
   }
