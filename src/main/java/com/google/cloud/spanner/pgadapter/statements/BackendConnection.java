@@ -1262,6 +1262,12 @@ public class BackendConnection {
       } else if (spannerConnection.isDdlBatchActive()) {
         spannerConnection.abortBatch();
       }
+      if (index + 1 < bufferedStatements.size()) {
+        for (BufferedStatement<?> bufferedStatement :
+            bufferedStatements.subList(index + 1, bufferedStatements.size())) {
+          bufferedStatement.result.setException(exception);
+        }
+      }
     } finally {
       bufferedStatements.clear();
     }
