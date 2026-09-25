@@ -1279,6 +1279,9 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(Oid.TEXT, types.getInt(1));
         assertEquals("text", types.getString(2));
         assertTrue(types.next());
+        assertEquals(Oid.OID, types.getInt(1));
+        assertEquals("oid", types.getString(2));
+        assertTrue(types.next());
         assertEquals(Oid.FLOAT4, types.getInt(1));
         assertEquals("float4", types.getString(2));
         assertTrue(types.next());
@@ -1315,6 +1318,9 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(Oid.FLOAT8_ARRAY, types.getInt(1));
         assertEquals("_float8", types.getString(2));
         assertTrue(types.next());
+        assertEquals(Oid.OID_ARRAY, types.getInt(1));
+        assertEquals("_oid", types.getString(2));
+        assertTrue(types.next());
         assertEquals(Oid.VARCHAR, types.getInt(1));
         assertEquals("varchar", types.getString(2));
         assertTrue(types.next());
@@ -1347,6 +1353,12 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(types.next());
         assertEquals(Oid.NUMERIC, types.getInt(1));
         assertEquals("numeric", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.UUID, types.getInt(1));
+        assertEquals("uuid", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.UUID_ARRAY, types.getInt(1));
+        assertEquals("_uuid", types.getString(2));
         assertTrue(types.next());
         assertEquals(Oid.JSONB, types.getInt(1));
         assertEquals("jsonb", types.getString(2));

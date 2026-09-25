@@ -57,6 +57,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.GetDatabaseDdlResponse;
@@ -5195,6 +5196,67 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertTrue(resultSet.next());
         assertEquals(1L, resultSet.getLong(1));
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectTypesFromPgType() throws SQLException {
+    ImmutableMap<Long, String> types =
+        ImmutableMap.of(
+            26L, "oid",
+            1028L, "_oid",
+            2950L, "uuid",
+            2951L, "_uuid");
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (Map.Entry<Long, String> entry : types.entrySet()) {
+        String sqlByOid =
+            String.format("select typname from pg_catalog.pg_type where oid = %d", entry.getKey());
+        String expectedTranslatedSqlByOid =
+            "with "
+                + PG_TYPE_PREFIX
+                + String.format("\nselect typname from pg_type where oid = %d", entry.getKey());
+        mockSpanner.putStatementResult(
+            StatementResult.query(
+                Statement.of(expectedTranslatedSqlByOid),
+                com.google.spanner.v1.ResultSet.newBuilder()
+                    .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                    .addRows(
+                        ListValue.newBuilder()
+                            .addValues(Value.newBuilder().setStringValue(entry.getValue()).build())
+                            .build())
+                    .build()));
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sqlByOid)) {
+          assertTrue(resultSet.next());
+          assertEquals(entry.getValue(), resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+
+        String sqlByName =
+            String.format(
+                "select oid from pg_catalog.pg_type where typname = '%s'", entry.getValue());
+        String expectedTranslatedSqlByName =
+            "with "
+                + PG_TYPE_PREFIX
+                + String.format("\nselect oid from pg_type where typname = '%s'", entry.getValue());
+        mockSpanner.putStatementResult(
+            StatementResult.query(
+                Statement.of(expectedTranslatedSqlByName),
+                com.google.spanner.v1.ResultSet.newBuilder()
+                    .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64)))
+                    .addRows(
+                        ListValue.newBuilder()
+                            .addValues(
+                                Value.newBuilder()
+                                    .setStringValue(entry.getKey().toString())
+                                    .build())
+                            .build())
+                    .build()));
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sqlByName)) {
+          assertTrue(resultSet.next());
+          assertEquals(entry.getKey().longValue(), resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
       }
     }
   }
