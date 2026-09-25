@@ -1,6 +1,6 @@
 psycopg[binary]==3.3.6
 pytz==2026.4
-sqlalchemy==2.0.54
+sqlalchemy==2.1.1
 google~=3.0.0
 google.auth~=2.58.0
 testcontainers~=4.15.0
