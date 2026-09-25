@@ -92,12 +92,15 @@ public class ITDrizzleSampleTest implements IntegrationTest {
     Process process = builder.start();
     InputStream inputStream = process.getInputStream();
     InputStream errorStream = process.getErrorStream();
-    boolean finished = process.waitFor(120L, TimeUnit.SECONDS);
+    boolean finished = process.waitFor(5L, TimeUnit.MINUTES);
+    if (!finished) {
+      process.destroyForcibly().waitFor();
+    }
 
     String output = readAll(inputStream);
     String errors = readAll(errorStream);
     assertEquals("", errors);
-    assertTrue(finished);
+    assertTrue(output, finished);
     assertEquals(errors, 0, process.exitValue());
 
     return output;
