@@ -42,7 +42,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.text.StringEscapeUtils;
 import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
 
@@ -277,10 +276,48 @@ public class ArrayParser extends Parser<List<?>> {
       return "NULL";
     }
     if (this.isStringEquivalent) {
-      value = StringEscapeUtils.escapeJava(value);
+      value = escapeArrayElement(value);
       return STRING_TOGGLE + value + STRING_TOGGLE;
     }
     return value;
+  }
+
+  static String escapeArrayElement(String value) {
+    if (value == null) {
+      return null;
+    }
+    int nextQuote = value.indexOf('"');
+    int nextBackslash = value.indexOf('\\');
+    if (nextQuote == -1 && nextBackslash == -1) {
+      return value;
+    }
+    StringBuilder builder = new StringBuilder(value.length() + 32);
+    int current = 0;
+    while (true) {
+      int next;
+      if (nextQuote == -1) {
+        next = nextBackslash;
+      } else if (nextBackslash == -1) {
+        next = nextQuote;
+      } else {
+        next = Math.min(nextQuote, nextBackslash);
+      }
+      if (next == -1) {
+        builder.append(value, current, value.length());
+        break;
+      }
+      builder.append(value, current, next);
+      builder.append('\\');
+      builder.append(value.charAt(next));
+      current = next + 1;
+      if (nextQuote == next) {
+        nextQuote = value.indexOf('"', current);
+      }
+      if (nextBackslash == next) {
+        nextBackslash = value.indexOf('\\', current);
+      }
+    }
+    return builder.toString();
   }
 
   @Override

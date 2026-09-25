@@ -252,6 +252,36 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testVarcharArrayWithNonAsciiAndEscapes() throws SQLException {
+    String sql = "SELECT VARCHAR_ARRAY FROM FOO";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            createResultSet(
+                "VARCHAR_ARRAY",
+                TypeCode.STRING,
+                ImmutableList.of(
+                    Values.of("é"),
+                    Values.of("café"),
+                    Values.of("foo\"bar"),
+                    Values.of("back\\slash"),
+                    Values.of("line1\nline2"),
+                    Values.ofNull(),
+                    Values.of("中文")))));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        Array array = resultSet.getArray("VARCHAR_ARRAY");
+        assertArrayEquals(
+            new String[] {"é", "café", "foo\"bar", "back\\slash", "line1\nline2", null, "中文"},
+            (String[]) array.getArray());
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testByteaArrayInResultSet() throws SQLException {
     String sql = "SELECT BYTEA_ARRAY FROM FOO";
     mockSpanner.putStatementResult(
