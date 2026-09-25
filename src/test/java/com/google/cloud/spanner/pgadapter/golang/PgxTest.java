@@ -33,6 +33,10 @@ public interface PgxTest extends Library {
 
   String TestInsertUUIDArray(GoString connString);
 
+  String TestInsertEmptyArray(GoString connString);
+
+  String TestSelectEmptyArray(GoString connString);
+
   String TestInsertNullsAllDataTypes(GoString connString);
 
   String TestInsertAllDataTypesReturning(GoString connString);
