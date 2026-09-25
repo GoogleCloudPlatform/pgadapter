@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import org.postgresql.core.Oid;
@@ -91,8 +92,45 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         name, this, parameters, parameterFormatCodes, resultFormatCodes);
   }
 
+  private void resetDescribeState() {
+    this.described = false;
+    this.describeResult = null;
+    this.futureStatementResult = null;
+    this.exception = null;
+  }
+
+  @Override
+  public boolean isDescribed() {
+    // Case 1: The statement has not been described yet, or a previous failed describe attempt was
+    // reset.
+    if (!this.described) {
+      return false;
+    }
+    // Case 2: An asynchronous describe request has been buffered in BackendConnection for the
+    // current extended-query pipeline and is waiting for the next Flush/Sync. Return true so
+    // subsequent pipelined Bind or Describe messages reuse this pending request instead of
+    // queueing duplicate AnalyzeSql RPCs.
+    if (!this.describeResult.isDone()) {
+      return true;
+    }
+    // Case 3: The describe request has completed. Verify that it succeeded; if it failed (for
+    // example due to a transient timeout, an aborted transaction, or an earlier failed statement
+    // in the pipeline), reset the describe state so subsequent executions can retry describing the
+    // statement.
+    try {
+      Futures.getDone(this.describeResult);
+      return true;
+    } catch (ExecutionException | CancellationException exception) {
+      resetDescribeState();
+      return false;
+    }
+  }
+
   @Override
   public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
+    if (isDescribed() && this.futureStatementResult != null) {
+      return this.futureStatementResult;
+    }
     ListenableFuture<StatementResult> statementResultFuture =
         backendConnection.analyze(this.command, this.parsedStatement, this.statement);
     setFutureStatementResult(statementResultFuture);
@@ -126,8 +164,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     try {
       return this.describeResult.get();
     } catch (ExecutionException exception) {
+      resetDescribeState();
       throw PGExceptionFactory.toPGException(exception.getCause());
-    } catch (InterruptedException interruptedException) {
+    } catch (InterruptedException | CancellationException exception) {
+      resetDescribeState();
       throw PGExceptionFactory.newQueryCancelledException();
     }
   }
@@ -163,7 +203,12 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           getConnectionHandler().getAutoDescribedStatement(this.originalStatement.getSql());
       if (cachedDescribeResult != null) {
         this.described = true;
-        this.describeResult = cachedDescribeResult;
+        this.describeResult =
+            Futures.transform(
+                cachedDescribeResult,
+                describeResult ->
+                    describeResult.withGivenParameterTypes(this.givenParameterDataTypes),
+                MoreExecutors.directExecutor());
         return;
       }
       // No cached result found. Add a describe-statement message to the queue.

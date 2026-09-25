@@ -816,32 +816,42 @@ public class ConnectionHandler implements Runnable {
   }
 
   /**
-   * Returns the parameter types of a cached auto-described statement, or null if none is available
-   * in the cache.
+   * Returns the parameter types of a cached or in-flight auto-described statement, or null if none
+   * is available.
    */
   public ListenableFuture<DescribeResult> getAutoDescribedStatement(String sql) {
     if (this.databaseName == null) {
       return null;
     }
-    ListenableFuture<DescribeResult> cached =
+    DescribeResult cached =
         this.server.autoDescribedStatementsCache.getIfPresent(this.databaseName + sql);
-    return cached != null ? cached : this.inFlightAutoDescribedStatements.get(sql);
+    if (cached != null) {
+      return Futures.immediateFuture(cached);
+    }
+    return this.inFlightAutoDescribedStatements.get(sql);
   }
 
-  /** Stores the parameter types of an auto-described statement in the cache. */
+  /**
+   * Registers an auto-described statement to be stored in the server-wide cache once its {@link
+   * DescribeResult} completes successfully.
+   *
+   * <p>The statement is intentionally not added to the cache while the {@code AnalyzeSql} request
+   * is still in flight or if the request fails or is cancelled. This prevents an abandoned or
+   * failed auto-describe on one connection from blocking or poisoning other connections.
+   */
   public void registerAutoDescribedStatement(
       String sql, ListenableFuture<DescribeResult> describeResult) {
     if (this.databaseName == null) {
       return;
     }
-    String cacheKey = this.databaseName + sql;
+    String key = this.databaseName + sql;
     this.inFlightAutoDescribedStatements.put(sql, describeResult);
     Futures.addCallback(
         describeResult,
         new FutureCallback<DescribeResult>() {
           @Override
           public void onSuccess(DescribeResult result) {
-            server.autoDescribedStatementsCache.put(cacheKey, describeResult);
+            server.autoDescribedStatementsCache.put(key, result);
             inFlightAutoDescribedStatements.remove(sql, describeResult);
           }
 

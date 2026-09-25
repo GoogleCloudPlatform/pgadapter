@@ -33,7 +33,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListenableFuture;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Tracer;
 import java.io.Closeable;
@@ -76,7 +75,7 @@ public class ProxyServer extends AbstractApiService {
   @VisibleForTesting
   static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS = new ConcurrentHashMap<>();
 
-  final Cache<String, ListenableFuture<DescribeResult>> autoDescribedStatementsCache;
+  final Cache<String, DescribeResult> autoDescribedStatementsCache;
 
   private final OptionsMetadata options;
   private final OpenTelemetry openTelemetry;
