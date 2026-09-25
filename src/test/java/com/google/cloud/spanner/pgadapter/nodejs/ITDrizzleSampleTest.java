@@ -94,7 +94,7 @@ public class ITDrizzleSampleTest implements IntegrationTest {
     InputStream errorStream = process.getErrorStream();
     boolean finished = process.waitFor(5L, TimeUnit.MINUTES);
     if (!finished) {
-      process.destroyForcibly();
+      process.destroyForcibly().waitFor();
     }
 
     String output = readAll(inputStream);
