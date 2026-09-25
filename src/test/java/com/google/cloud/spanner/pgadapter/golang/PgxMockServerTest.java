@@ -462,6 +462,110 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testInsertEmptyArray() {
+    String sql = "INSERT INTO my_test_table (id, bigint_arr) VALUES ($1, $2)";
+
+    // Put PLAN result to tell pgx and PGAdapter the parameter types (int8 and int8[])
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p2")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.INT64)
+                                                        .build())
+                                                .build())
+                                        .build())
+                                .build()))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+
+    // Put actual update result using partial matching
+    mockSpanner.putPartialStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    String result = pgxTest.TestInsertEmptyArray(createConnString());
+
+    assertNull(result);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeParamsRequest = requests.get(0);
+    assertEquals(sql, describeParamsRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+
+    // Explicitly verify the type codes and empty value received by Spanner for p2
+    assertTrue(executeRequest.getParamTypesMap().containsKey("p2"));
+    assertEquals(TypeCode.ARRAY, executeRequest.getParamTypesMap().get("p2").getCode());
+    assertEquals(
+        TypeCode.INT64,
+        executeRequest.getParamTypesMap().get("p2").getArrayElementType().getCode());
+    assertEquals(
+        0, executeRequest.getParams().getFieldsOrThrow("p2").getListValue().getValuesCount());
+  }
+
+  @Test
+  public void testSelectEmptyArray() {
+    String sql = "SELECT col_array_bigint FROM all_types WHERE col_bigint=1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("col_array_bigint")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.INT64)
+                                                        .build())
+                                                .build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder().setListValue(ListValue.newBuilder().build()).build())
+                        .build())
+                .build()));
+
+    String result = pgxTest.TestSelectEmptyArray(createConnString());
+
+    assertNull(result);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
+    assertEquals(sql, describeRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+  }
+
+  @Test
   public void testInsertAllDataTypesReturning() {
     String sql =
         "INSERT INTO all_types "
