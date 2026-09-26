@@ -142,6 +142,16 @@ public class CloseMessageMockServerTest extends AbstractMockServerTest {
     outputStream.writeInt(maxRows);
   }
 
+  private void sendDescribe(DataOutputStream outputStream, char type, String name)
+      throws IOException {
+    byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
+    outputStream.writeByte('D');
+    outputStream.writeInt(4 + 1 + nameBytes.length + 1);
+    outputStream.writeByte(type);
+    outputStream.write(nameBytes);
+    outputStream.writeByte(0);
+  }
+
   private void sendClose(DataOutputStream outputStream, char type, String name) throws IOException {
     byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
     outputStream.writeByte('C');
@@ -204,10 +214,26 @@ public class CloseMessageMockServerTest extends AbstractMockServerTest {
     assertEquals(4, inputStream.readInt());
   }
 
+  private void assertParameterDescription(DataInputStream inputStream) throws IOException {
+    assertEquals('t', inputStream.readByte());
+    int length = inputStream.readInt();
+    inputStream.readFully(new byte[length - 4]);
+  }
+
+  private void assertRowDescription(DataInputStream inputStream) throws IOException {
+    assertEquals('T', inputStream.readByte());
+    int length = inputStream.readInt();
+    inputStream.readFully(new byte[length - 4]);
+  }
+
   private void assertReadyForQuery(DataInputStream inputStream) throws IOException {
+    assertReadyForQuery(inputStream, 'I');
+  }
+
+  private void assertReadyForQuery(DataInputStream inputStream, char status) throws IOException {
     assertEquals('Z', inputStream.readByte());
     assertEquals(5, inputStream.readInt());
-    assertEquals('I', inputStream.readByte());
+    assertEquals(status, (char) inputStream.readByte());
   }
 
   private void assertErrorResponse(DataInputStream inputStream) throws IOException {
@@ -473,7 +499,7 @@ public class CloseMessageMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testPipelineErrorWithActivePortalPreservesPortal() throws Exception {
+  public void testPipelineErrorWithActivePortalDropsPortal() throws Exception {
     try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
         DataInputStream inputStream = new DataInputStream(socket.getInputStream());
         DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
@@ -502,13 +528,12 @@ public class CloseMessageMockServerTest extends AbstractMockServerTest {
       assertErrorResponse(inputStream);
       assertReadyForQuery(inputStream);
 
-      // Verify portal P1 was preserved and can still be executed to fetch row 2
+      // Verify portal P1 was dropped on error and cannot be executed
       sendExecute(outputStream, "P1", 1);
       sendSync(outputStream);
       outputStream.flush();
 
-      assertDataRow(inputStream);
-      assertCommandComplete(inputStream);
+      assertErrorResponse(inputStream);
       assertReadyForQuery(inputStream);
     }
   }
@@ -633,7 +658,7 @@ public class CloseMessageMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testPipelineErrorSkipsCloseAndRestoresPortalWithSubsequentBind() throws Exception {
+  public void testPipelineErrorWithCloseDropsPortalWithSubsequentBind() throws Exception {
     try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
         DataInputStream inputStream = new DataInputStream(socket.getInputStream());
         DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
@@ -669,15 +694,12 @@ public class CloseMessageMockServerTest extends AbstractMockServerTest {
       assertErrorResponse(inputStream);
       assertReadyForQuery(inputStream);
 
-      // Verify that P0 was restored to its original definition (bound to S0, returning "1")
+      // When the pipeline failed, closeAllPortals closed all portals. P0 must NOT exist.
       sendExecute(outputStream, "P0", 0);
-      sendClose(outputStream, 'P', "P0");
       sendSync(outputStream);
       outputStream.flush();
 
-      assertDataRow(inputStream, "1");
-      assertCommandComplete(inputStream);
-      assertCloseComplete(inputStream);
+      assertErrorResponse(inputStream);
       assertReadyForQuery(inputStream);
     }
   }
@@ -717,7 +739,7 @@ public class CloseMessageMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testPipelineErrorSkipsCloseAndRestoresPortalCreatedInSamePipeline() throws Exception {
+  public void testPipelineErrorWithCloseDropsPortalCreatedInSamePipeline() throws Exception {
     try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
         DataInputStream inputStream = new DataInputStream(socket.getInputStream());
         DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
@@ -741,16 +763,161 @@ public class CloseMessageMockServerTest extends AbstractMockServerTest {
       assertErrorResponse(inputStream);
       assertReadyForQuery(inputStream);
 
-      // P1 must still exist because Bind(P1) succeeded and Close(P1) was skipped/aborted!
+      // P1 was dropped when the pipeline failed and must NOT exist.
       sendExecute(outputStream, "P1", 0);
-      sendClose(outputStream, 'P', "P1");
       sendSync(outputStream);
       outputStream.flush();
 
+      assertErrorResponse(inputStream);
+      assertReadyForQuery(inputStream);
+    }
+  }
+
+  @Test
+  public void
+      testPipelineErrorWithDescribeAndCloseDoesNotThrowIllegalStateExceptionAndRestoresStatement()
+          throws Exception {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      initializeConnection(inputStream, outputStream);
+
+      // Pre-parse S0: SELECT 1
+      sendParse(outputStream, "S0", "SELECT 1");
+      sendSync(outputStream);
+      outputStream.flush();
+      assertParseComplete(inputStream);
+      assertReadyForQuery(inputStream);
+
+      // Pipeline: Parse(bad) -> Describe('S', S0) -> Close('S', S0) -> Sync
+      sendParse(outputStream, "bad", "copy bad_syntax");
+      sendDescribe(outputStream, 'S', "S0");
+      sendClose(outputStream, 'S', "S0");
+      sendSync(outputStream);
+      outputStream.flush();
+
+      assertErrorResponse(inputStream);
+      assertReadyForQuery(inputStream);
+
+      // S0 should be restored and usable (no IllegalStateException from uncompleted future)
+      sendDescribe(outputStream, 'S', "S0");
+      sendSync(outputStream);
+      outputStream.flush();
+
+      assertParameterDescription(inputStream);
+      assertRowDescription(inputStream);
+      assertReadyForQuery(inputStream);
+
+      sendBind(outputStream, "P0", "S0");
+      sendExecute(outputStream, "P0", 0);
+      sendClose(outputStream, 'P', "P0");
+      sendSync(outputStream);
+      outputStream.flush();
+
+      assertBindComplete(inputStream);
       assertDataRow(inputStream, "1");
       assertCommandComplete(inputStream);
       assertCloseComplete(inputStream);
       assertReadyForQuery(inputStream);
+    }
+  }
+
+  @Test
+  public void testPipelineErrorWithExecuteAndCloseDoesNotThrowIllegalStateExceptionAndDropsPortal()
+      throws Exception {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      initializeConnection(inputStream, outputStream);
+
+      // Pre-parse S0: SELECT 1
+      sendParse(outputStream, "S0", "SELECT 1");
+      sendBind(outputStream, "P1", "S0");
+      sendSync(outputStream);
+      outputStream.flush();
+      assertParseComplete(inputStream);
+      assertBindComplete(inputStream);
+      assertReadyForQuery(inputStream);
+
+      // Pipeline: Parse(bad) -> Execute(P1, 1) -> Close('P', P1) -> Sync
+      sendParse(outputStream, "bad", "copy bad_syntax");
+      sendExecute(outputStream, "P1", 1);
+      sendClose(outputStream, 'P', "P1");
+      sendSync(outputStream);
+      outputStream.flush();
+
+      assertErrorResponse(inputStream);
+      assertReadyForQuery(inputStream);
+
+      // P1 was dropped on error and cannot be executed
+      sendExecute(outputStream, "P1", 0);
+      sendSync(outputStream);
+      outputStream.flush();
+
+      assertErrorResponse(inputStream);
+      assertReadyForQuery(inputStream);
+    }
+  }
+
+  @Test
+  public void testTransactionAbortDropsPortalEvenIfClosedInFailingPipeline() throws Exception {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      initializeConnection(inputStream, outputStream);
+
+      // Start an explicit transaction
+      sendParse(outputStream, "begin", "BEGIN");
+      sendBind(outputStream, "p_begin", "begin");
+      sendExecute(outputStream, "p_begin", 0);
+      sendClose(outputStream, 'P', "p_begin");
+      sendSync(outputStream);
+      outputStream.flush();
+      assertParseComplete(inputStream);
+      assertBindComplete(inputStream);
+      assertCommandComplete(inputStream);
+      assertCloseComplete(inputStream);
+      assertReadyForQuery(inputStream, 'T');
+
+      // Create portal P1 in the transaction
+      sendParse(outputStream, "S0", "SELECT 1");
+      sendBind(outputStream, "P1", "S0");
+      sendSync(outputStream);
+      outputStream.flush();
+      assertParseComplete(inputStream);
+      assertBindComplete(inputStream);
+      assertReadyForQuery(inputStream, 'T');
+
+      // Pipeline that fails: Parse(bad) -> Close('P', P1) -> Sync
+      sendParse(outputStream, "bad", "copy bad_syntax");
+      sendClose(outputStream, 'P', "P1");
+      sendSync(outputStream);
+      outputStream.flush();
+
+      assertErrorResponse(inputStream);
+      // Transaction is now in ABORTED state ('E')
+      assertReadyForQuery(inputStream, 'E');
+
+      // Rollback the transaction
+      sendParse(outputStream, "rollback", "ROLLBACK");
+      sendBind(outputStream, "p_rollback", "rollback");
+      sendExecute(outputStream, "p_rollback", 0);
+      sendClose(outputStream, 'P', "p_rollback");
+      sendSync(outputStream);
+      outputStream.flush();
+      assertParseComplete(inputStream);
+      assertBindComplete(inputStream);
+      assertCommandComplete(inputStream);
+      assertCloseComplete(inputStream);
+      assertReadyForQuery(inputStream, 'I');
+
+      // P1 must NOT exist after the aborted transaction
+      sendExecute(outputStream, "P1", 0);
+      sendSync(outputStream);
+      outputStream.flush();
+
+      assertErrorResponse(inputStream);
+      assertReadyForQuery(inputStream, 'I');
     }
   }
 

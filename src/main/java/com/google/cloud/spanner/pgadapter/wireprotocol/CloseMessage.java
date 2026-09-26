@@ -18,9 +18,9 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
-import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CloseCompleteResponse;
 import java.text.MessageFormat;
 import javax.annotation.Nullable;
@@ -86,15 +86,13 @@ public class CloseMessage extends AbstractQueryProtocolMessage {
 
   @Override
   public void abort() {
-    // Only restore the statement or portal if it did not fail during creation (e.g. an
-    // InvalidStatement created by a failed Parse or Bind message must not be resurrected).
-    if (this.statement != null && !this.statement.hasException()) {
-      if (this.type == PreparedType.Portal) {
-        this.connection.registerPortal(this.name, (IntermediatePortalStatement) this.statement);
-      } else {
-        this.connection.registerStatement(
-            this.name, (IntermediatePreparedStatement) this.statement);
-      }
+    // Only restore prepared statements that did not fail during creation (an InvalidStatement
+    // created by a failed Parse message must not be resurrected).
+    // Portals are never restored: in PostgreSQL, any error in a pipeline drops all portals.
+    if (this.type == PreparedType.Statement
+        && this.statement instanceof IntermediatePreparedStatement
+        && !(this.statement instanceof InvalidStatement)) {
+      this.connection.registerStatement(this.name, (IntermediatePreparedStatement) this.statement);
     }
   }
 
