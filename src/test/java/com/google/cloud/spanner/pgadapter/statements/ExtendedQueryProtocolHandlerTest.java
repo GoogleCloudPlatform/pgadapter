@@ -15,7 +15,10 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,13 +28,18 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.CloseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import java.io.DataOutputStream;
+import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -58,6 +66,7 @@ public class ExtendedQueryProtocolHandlerTest {
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
+    CloseMessage closeMessage = mock(CloseMessage.class);
 
     ExtendedQueryProtocolHandler handler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
@@ -65,9 +74,10 @@ public class ExtendedQueryProtocolHandlerTest {
     handler.buffer(bindMessage);
     handler.buffer(describeMessage);
     handler.buffer(executeMessage);
+    handler.buffer(closeMessage);
 
     assertEquals(
-        ImmutableList.of(parseMessage, bindMessage, describeMessage, executeMessage),
+        ImmutableList.of(parseMessage, bindMessage, describeMessage, executeMessage, closeMessage),
         handler.getMessages());
   }
 
@@ -80,6 +90,7 @@ public class ExtendedQueryProtocolHandlerTest {
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
+    CloseMessage closeMessage = mock(CloseMessage.class);
 
     ExtendedQueryProtocolHandler handler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
@@ -87,8 +98,9 @@ public class ExtendedQueryProtocolHandlerTest {
     handler.buffer(bindMessage);
     handler.buffer(describeMessage);
     handler.buffer(executeMessage);
+    handler.buffer(closeMessage);
     assertEquals(
-        ImmutableList.of(parseMessage, bindMessage, describeMessage, executeMessage),
+        ImmutableList.of(parseMessage, bindMessage, describeMessage, executeMessage, closeMessage),
         handler.getMessages());
 
     handler.flush();
@@ -100,6 +112,7 @@ public class ExtendedQueryProtocolHandlerTest {
     verify(bindMessage).flush();
     verify(describeMessage).flush();
     verify(executeMessage).flush();
+    verify(closeMessage).flush();
   }
 
   @Test
@@ -111,6 +124,7 @@ public class ExtendedQueryProtocolHandlerTest {
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
+    CloseMessage closeMessage = mock(CloseMessage.class);
 
     ExtendedQueryProtocolHandler handler =
         new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
@@ -118,8 +132,9 @@ public class ExtendedQueryProtocolHandlerTest {
     handler.buffer(bindMessage);
     handler.buffer(describeMessage);
     handler.buffer(executeMessage);
+    handler.buffer(closeMessage);
     assertEquals(
-        ImmutableList.of(parseMessage, bindMessage, describeMessage, executeMessage),
+        ImmutableList.of(parseMessage, bindMessage, describeMessage, executeMessage, closeMessage),
         handler.getMessages());
 
     handler.sync(false);
@@ -131,6 +146,7 @@ public class ExtendedQueryProtocolHandlerTest {
     verify(bindMessage).flush();
     verify(describeMessage).flush();
     verify(executeMessage).flush();
+    verify(closeMessage).flush();
   }
 
   @Test
@@ -159,6 +175,7 @@ public class ExtendedQueryProtocolHandlerTest {
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
+    CloseMessage closeMessage = mock(CloseMessage.class);
     when(parseMessage.isReturnedErrorResponse()).thenReturn(true);
 
     ExtendedQueryProtocolHandler handler =
@@ -167,6 +184,7 @@ public class ExtendedQueryProtocolHandlerTest {
     handler.buffer(bindMessage);
     handler.buffer(describeMessage);
     handler.buffer(executeMessage);
+    handler.buffer(closeMessage);
 
     handler.flush();
 
@@ -175,9 +193,11 @@ public class ExtendedQueryProtocolHandlerTest {
     verify(bindMessage, never()).flush();
     verify(describeMessage, never()).flush();
     verify(executeMessage, never()).flush();
+    verify(closeMessage, never()).flush();
     verify(bindMessage).abort();
     verify(describeMessage).abort();
     verify(executeMessage).abort();
+    verify(closeMessage).abort();
   }
 
   @Test
@@ -189,6 +209,7 @@ public class ExtendedQueryProtocolHandlerTest {
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
+    CloseMessage closeMessage = mock(CloseMessage.class);
     when(parseMessage.isReturnedErrorResponse()).thenReturn(true);
 
     ExtendedQueryProtocolHandler handler =
@@ -197,6 +218,7 @@ public class ExtendedQueryProtocolHandlerTest {
     handler.buffer(bindMessage);
     handler.buffer(describeMessage);
     handler.buffer(executeMessage);
+    handler.buffer(closeMessage);
 
     handler.sync(false);
 
@@ -205,8 +227,106 @@ public class ExtendedQueryProtocolHandlerTest {
     verify(bindMessage, never()).flush();
     verify(describeMessage, never()).flush();
     verify(executeMessage, never()).flush();
+    verify(closeMessage, never()).flush();
     verify(bindMessage).abort();
     verify(describeMessage).abort();
     verify(executeMessage).abort();
+    verify(closeMessage).abort();
+  }
+
+  @Test
+  public void testFlushContinuesAbortingWhenAbortThrowsException() throws Exception {
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ParseMessage parseMessage = mock(ParseMessage.class);
+    BindMessage bindMessage = mock(BindMessage.class);
+    DescribeMessage describeMessage = mock(DescribeMessage.class);
+    ExecuteMessage executeMessage = mock(ExecuteMessage.class);
+    CloseMessage closeMessage = mock(CloseMessage.class);
+    when(parseMessage.isReturnedErrorResponse()).thenReturn(true);
+    doThrow(new RuntimeException("abort error")).when(executeMessage).abort();
+
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
+    handler.buffer(parseMessage);
+    handler.buffer(bindMessage);
+    handler.buffer(describeMessage);
+    handler.buffer(executeMessage);
+    handler.buffer(closeMessage);
+
+    handler.flush();
+
+    assertEquals(0, handler.getMessages().size());
+    verify(parseMessage).flush();
+    verify(bindMessage, never()).flush();
+    verify(describeMessage, never()).flush();
+    verify(executeMessage, never()).flush();
+    verify(closeMessage, never()).flush();
+    verify(closeMessage).abort();
+    verify(executeMessage).abort();
+    verify(describeMessage).abort();
+    verify(bindMessage).abort();
+  }
+
+  private static class TrimmableArrayList extends ArrayList<AbstractQueryProtocolMessage> {
+    private final AtomicBoolean trimmed = new AtomicBoolean();
+    private final AtomicInteger ensuredCapacity = new AtomicInteger();
+
+    @Override
+    public void trimToSize() {
+      trimmed.set(true);
+      super.trimToSize();
+    }
+
+    @Override
+    public void ensureCapacity(int minCapacity) {
+      ensuredCapacity.set(minCapacity);
+      super.ensureCapacity(minCapacity);
+    }
+  }
+
+  @Test
+  public void testFlushTrimsCapacityWhenExceedingThreshold() throws Exception {
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
+    TrimmableArrayList messages = new TrimmableArrayList();
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection, messages);
+    for (int index = 0; index <= ExtendedQueryProtocolHandler.MAX_BUFFER_CAPACITY; index++) {
+      handler.buffer(mock(AbstractQueryProtocolMessage.class));
+    }
+    assertEquals(
+        ExtendedQueryProtocolHandler.MAX_BUFFER_CAPACITY + 1, handler.getMessages().size());
+
+    handler.flush();
+
+    assertEquals(0, handler.getMessages().size());
+    assertTrue(messages.trimmed.get());
+    assertEquals(
+        ExtendedQueryProtocolHandler.DEFAULT_BUFFER_CAPACITY, messages.ensuredCapacity.get());
+  }
+
+  @Test
+  public void testFlushDoesNotTrimCapacityWhenUnderThreshold() throws Exception {
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
+    TrimmableArrayList messages = new TrimmableArrayList();
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection, messages);
+    for (int index = 0; index < 5; index++) {
+      handler.buffer(mock(AbstractQueryProtocolMessage.class));
+    }
+    assertEquals(5, handler.getMessages().size());
+
+    handler.flush();
+
+    assertEquals(0, handler.getMessages().size());
+    assertFalse(messages.trimmed.get());
+    assertEquals(0, messages.ensuredCapacity.get());
   }
 }

@@ -718,6 +718,15 @@ public class ConnectionHandler implements Runnable {
     portal.close();
   }
 
+  /**
+   * Unregisters a portal from the connection map without closing it. Returns the unregistered
+   * portal, or null if no portal was registered with this name. Unlike {@link
+   * #closePortal(String)}, this method does not throw an exception if the portal is not found.
+   */
+  public IntermediatePortalStatement unregisterPortal(String portalName) {
+    return this.portalsMap.remove(portalName);
+  }
+
   public boolean hasPortal(String portalName) {
     return this.portalsMap.containsKey(portalName);
   }
@@ -871,6 +880,16 @@ public class ConnectionHandler implements Runnable {
           SQLState.InvalidSqlStatementName);
     }
     this.statementsMap.remove(statementName);
+  }
+
+  /**
+   * Unregisters a prepared statement from the connection map without closing it. Returns the
+   * unregistered statement, or null if no statement was registered with this name. Unlike {@link
+   * #closeStatement(String)}, this method does not throw an exception if the statement is not
+   * found.
+   */
+  public IntermediatePreparedStatement unregisterStatement(String statementName) {
+    return this.statementsMap.remove(statementName);
   }
 
   public void closeAllStatements() {
