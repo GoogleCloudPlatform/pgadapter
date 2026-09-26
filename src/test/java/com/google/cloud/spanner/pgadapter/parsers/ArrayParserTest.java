@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Struct;
@@ -34,9 +35,12 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -489,10 +493,72 @@ public class ArrayParserTest {
         ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), false));
     assertNull(
         ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), true));
-    assertNull(
-        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), false));
-    assertNull(
-        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), true));
+  }
+
+  @Test
+  public void testStringArrayToList_jsonWithAdjacentQuotes() {
+    List<?> result =
+        ArrayParser.stringArrayToList(
+            "{\"{\\\"k\\\":\\\"\\\"}\"}", Oid.JSONB, mock(SessionState.class), false);
+    assertEquals(ImmutableList.of("{\"k\":\"\"}"), result);
+  }
+
+  @Test
+  public void testStringArrayToList_unquotedWithDashes() {
+    List<?> result =
+        ArrayParser.stringArrayToList(
+            "{--foo, a, --, b}", Oid.TEXT, mock(SessionState.class), false);
+    assertEquals(ImmutableList.of("--foo", "a", "--", "b"), result);
+  }
+
+  @Test
+  public void testBindIntervalArray() {
+    ImmutableMap.Builder<String, Value> builder = ImmutableMap.builder();
+    Interval interval = Interval.parseFromString("P1Y2M3DT4H5M6S");
+    ArrayParser.bind(builder, "p1", ImmutableList.of(interval), Oid.INTERVAL);
+    ImmutableMap<String, Value> parameters = builder.build();
+    assertEquals(Value.intervalArray(ImmutableList.of(interval)), parameters.get("p1"));
+  }
+
+  @Test
+  public void testParserBindIntervalArray() {
+    ImmutableMap.Builder<String, Value> builder = ImmutableMap.builder();
+    Parser.bind(
+        builder,
+        "p1",
+        "{1 year 2 months, 01:00:00}".getBytes(StandardCharsets.UTF_8),
+        Oid.INTERVAL_ARRAY,
+        FormatCode.TEXT,
+        mock(SessionState.class));
+    ImmutableMap<String, Value> parameters = builder.build();
+    assertEquals(
+        Value.intervalArray(
+            ImmutableList.of(
+                IntervalParser.toInterval("1 year 2 months"),
+                IntervalParser.toInterval("01:00:00"))),
+        parameters.get("p1"));
+  }
+
+  @Test
+  public void testStringParseUuid() {
+    UUID uuid = UUID.fromString("1e4d8cd3-099d-4954-a5c1-85272713c3e9");
+    ArrayParser parser =
+        new ArrayParser(
+            createArrayResultSet(Type.uuid(), Value.uuidArray(ImmutableList.of(uuid))),
+            0,
+            mock(SessionState.class));
+    assertEquals("{\"1e4d8cd3-099d-4954-a5c1-85272713c3e9\"}", parser.stringParse());
+  }
+
+  @Test
+  public void testStringParseInterval() {
+    Interval interval = IntervalParser.toInterval("1 year 2 months");
+    ArrayParser parser =
+        new ArrayParser(
+            createArrayResultSet(Type.interval(), Value.intervalArray(ImmutableList.of(interval))),
+            0,
+            mock(SessionState.class));
+    assertEquals("{14 mons 0 days 00:00:0.000000}", parser.stringParse());
   }
 
   static ResultSet createArrayResultSet(Type arrayElementType, Value value) {
