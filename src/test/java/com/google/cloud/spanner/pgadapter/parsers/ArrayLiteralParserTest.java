@@ -167,6 +167,41 @@ public class ArrayLiteralParserTest {
         ArrayLiteralParser.readArrayLiteral("[-2:2]={1, 2, 3, 4, 5}"));
     assertEquals(
         ImmutableList.of("1", "2"), ArrayLiteralParser.readArrayLiteral("  [1:2] = {1, 2}  "));
+    assertEquals(ImmutableList.of("1", "2"), ArrayLiteralParser.readArrayLiteral("[0:1]={1, 2}"));
+    assertEquals(ImmutableList.of("1"), ArrayLiteralParser.readArrayLiteral("[0:0]={1}"));
+    assertEquals(ImmutableList.of("1"), ArrayLiteralParser.readArrayLiteral("[1:1]={1}"));
+  }
+
+  @Test
+  public void testDimensionLengthMismatch() {
+    PGException exception =
+        assertThrows(
+            PGException.class, () -> ArrayLiteralParser.readArrayLiteral("[1:2]={1, 2, 3}"));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals(
+        "Specified array dimensions do not match array contents: [1:2]={1, 2, 3}",
+        exception.getMessage());
+
+    exception =
+        assertThrows(PGException.class, () -> ArrayLiteralParser.readArrayLiteral("[1:2]={}"));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals(
+        "Specified array dimensions do not match array contents: [1:2]={}", exception.getMessage());
+
+    exception =
+        assertThrows(PGException.class, () -> ArrayLiteralParser.readArrayLiteral("[3]={1, 2}"));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals(
+        "Specified array dimensions do not match array contents: [3]={1, 2}",
+        exception.getMessage());
+
+    exception =
+        assertThrows(
+            PGException.class, () -> ArrayLiteralParser.readArrayLiteral("[-2:1]={1, 2, 3}"));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals(
+        "Specified array dimensions do not match array contents: [-2:1]={1, 2, 3}",
+        exception.getMessage());
   }
 
   @Test
@@ -287,6 +322,16 @@ public class ArrayLiteralParserTest {
     assertInvalidParameter("[1:2:3]={1}");
     assertInvalidParameter("[-1]={1}");
     assertInvalidParameter("[0]={1}");
+
+    // Dimension length does not match parsed elements
+    assertInvalidParameter("[1:2]={1, 2, 3}");
+    assertInvalidParameter("[1:2]={1}");
+    assertInvalidParameter("[1:2]={}");
+    assertInvalidParameter("[3]={1, 2}");
+    assertInvalidParameter("[3]={1, 2, 3, 4}");
+    assertInvalidParameter("[3]={}");
+    assertInvalidParameter("[-2:1]={1, 2, 3}");
+    assertInvalidParameter("[-2:1]={1, 2, 3, 4, 5}");
   }
 
   private static void assertInvalidParameter(String expression) {

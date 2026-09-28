@@ -28,7 +28,8 @@ import java.util.List;
  * arrayfuncs.c}. Specifically:
  *
  * <ul>
- *   <li>Supports optional dimension decorations (e.g. {@code [1:2]={...}}).
+ *   <li>Supports optional dimension decorations (e.g. {@code [1:2]={...}}) and verifies that parsed
+ *       element count matches declared dimensions.
  *   <li>Quoted elements preserve adjacent quotes (unlike SQL string literals) and only unescape
  *       literal backslash escapes {@code \c -> c}.
  *   <li>Unquoted elements are not parsed as SQL expressions or comments, preserving tokens like
@@ -66,7 +67,7 @@ public class ArrayLiteralParser {
       throw PGExceptionFactory.newPGException(
           "Missing '{' at start of array value: " + expression, SQLState.InvalidParameterValue);
     }
-    skipDimensions();
+    int expectedElements = parseDimensions();
     if (position >= length || expression.charAt(position) != '{') {
       throw PGExceptionFactory.newPGException(
           "Missing '{' at start of array value: " + expression, SQLState.InvalidParameterValue);
@@ -76,11 +77,17 @@ public class ArrayLiteralParser {
     skipWhitespace();
     if (position < length && expression.charAt(position) == '}') {
       position++; // skip '}'
+      if (expectedElements >= 0) {
+        throw PGExceptionFactory.newPGException(
+            "Specified array dimensions do not match array contents: " + expression,
+            SQLState.InvalidParameterValue);
+      }
       checkEndOfArray();
       return new ArrayList<>(0);
     }
 
-    List<String> result = new ArrayList<>();
+    List<String> result =
+        expectedElements > 0 ? new ArrayList<>(expectedElements) : new ArrayList<>();
     while (true) {
       skipWhitespace();
       if (position >= length) {
@@ -109,6 +116,11 @@ public class ArrayLiteralParser {
       }
     }
 
+    if (expectedElements >= 0 && result.size() != expectedElements) {
+      throw PGExceptionFactory.newPGException(
+          "Specified array dimensions do not match array contents: " + expression,
+          SQLState.InvalidParameterValue);
+    }
     checkEndOfArray();
     return result;
   }
@@ -128,16 +140,16 @@ public class ArrayLiteralParser {
         || character == '\f';
   }
 
-  private void skipDimensions() {
+  private int parseDimensions() {
     if (expression.charAt(position) != '[') {
-      return;
+      return -1;
     }
     int closeBracket = expression.indexOf(']', position);
     if (closeBracket == -1) {
       throw PGExceptionFactory.newPGException(
           "Missing ']' in array dimensions: " + expression, SQLState.InvalidParameterValue);
     }
-    validateDimension(expression.substring(position + 1, closeBracket));
+    int expectedElements = validateDimension(expression.substring(position + 1, closeBracket));
     position = closeBracket + 1;
     skipWhitespace();
     if (position < length && expression.charAt(position) == '[') {
@@ -151,9 +163,10 @@ public class ArrayLiteralParser {
     }
     position++; // skip '='
     skipWhitespace();
+    return expectedElements;
   }
 
-  private void validateDimension(String dimension) {
+  private int validateDimension(String dimension) {
     int colonIndex = dimension.indexOf(':');
     try {
       if (colonIndex == -1) {
@@ -163,6 +176,11 @@ public class ArrayLiteralParser {
               "Upper bound cannot be less than lower bound: " + expression,
               SQLState.InvalidParameterValue);
         }
+        if (upper > Integer.MAX_VALUE) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid array dimensions: " + expression, SQLState.InvalidParameterValue);
+        }
+        return (int) upper;
       } else {
         long lower = Long.parseLong(dimension.substring(0, colonIndex).trim());
         long upper = Long.parseLong(dimension.substring(colonIndex + 1).trim());
@@ -171,6 +189,12 @@ public class ArrayLiteralParser {
               "Upper bound cannot be less than lower bound: " + expression,
               SQLState.InvalidParameterValue);
         }
+        long count = upper - lower + 1;
+        if (count < 1 || count > Integer.MAX_VALUE) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid array dimensions: " + expression, SQLState.InvalidParameterValue);
+        }
+        return (int) count;
       }
     } catch (NumberFormatException exception) {
       throw PGExceptionFactory.newPGException(
