@@ -494,11 +494,24 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testPrepareZeroLengthDelimitedIdentifier() throws SQLException {
+  public void testZeroLengthDelimitedIdentifier() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception =
             assertThrows(SQLException.class, () -> statement.execute("prepare \"\" as SELECT 1"));
+        assertEquals(SQLState.InvalidSqlStatementName.toString(), exception.getSQLState());
+        assertTrue(exception.getMessage().contains("zero-length delimited identifier"));
+
+        exception = assertThrows(SQLException.class, () -> statement.execute("execute \"\""));
+        assertEquals(SQLState.InvalidSqlStatementName.toString(), exception.getSQLState());
+        assertTrue(exception.getMessage().contains("zero-length delimited identifier"));
+
+        exception = assertThrows(SQLException.class, () -> statement.execute("deallocate \"\""));
+        assertEquals(SQLState.InvalidSqlStatementName.toString(), exception.getSQLState());
+        assertTrue(exception.getMessage().contains("zero-length delimited identifier"));
+
+        exception =
+            assertThrows(SQLException.class, () -> statement.execute("deallocate prepare \"\""));
         assertEquals(SQLState.InvalidSqlStatementName.toString(), exception.getSQLState());
         assertTrue(exception.getMessage().contains("zero-length delimited identifier"));
       }
