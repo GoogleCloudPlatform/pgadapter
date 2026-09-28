@@ -478,6 +478,7 @@ public class ITPsqlTest implements IntegrationTest {
             + " int2\n"
             + " int4\n"
             + " text\n"
+            + " oid\n"
             + " float4\n"
             + " float8\n"
             + " unknown\n"
@@ -490,6 +491,7 @@ public class ITPsqlTest implements IntegrationTest {
             + " _int8\n"
             + " _float4\n"
             + " _float8\n"
+            + " _oid\n"
             + " varchar\n"
             + " date\n"
             + " timestamp\n"
@@ -501,9 +503,11 @@ public class ITPsqlTest implements IntegrationTest {
             + " _interval\n"
             + " _numeric\n"
             + " numeric\n"
+            + " uuid\n"
+            + " _uuid\n"
             + " jsonb\n"
             + " _jsonb\n"
-            + "(31 rows)\n",
+            + "(35 rows)\n",
         output);
   }
 
