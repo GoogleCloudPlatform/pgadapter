@@ -1213,4 +1213,51 @@ public class BackendConnectionTest {
     assertTrue(executionException.getCause() instanceof PGException);
     assertEquals("Query failed", executionException.getCause().getMessage());
   }
+
+  @Test
+  public void testFlushFailsRemainingStatementsWhenRollbackThrowsException() {
+    Connection spannerConnection = mock(Connection.class);
+    when(spannerConnection.isInTransaction()).thenReturn(true);
+    doThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "Rollback failed"))
+        .when(spannerConnection)
+        .rollback();
+
+    Statement statement1 = Statement.of("select 1");
+    ParsedStatement parsedStatement1 = PARSER.parse(statement1);
+    Statement statement2 = Statement.of("select 2");
+    ParsedStatement parsedStatement2 = PARSER.parse(statement2);
+
+    SpannerException spannerException =
+        SpannerExceptionFactory.newSpannerException(ErrorCode.FAILED_PRECONDITION, "Query failed");
+    when(spannerConnection.execute(statement1)).thenThrow(spannerException);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+
+    Future<StatementResult> result1 =
+        backendConnection.execute("SELECT", parsedStatement1, statement1, Function.identity());
+    Future<StatementResult> result2 =
+        backendConnection.execute("SELECT", parsedStatement2, statement2, Function.identity());
+
+    assertThrows(SpannerException.class, backendConnection::flush);
+
+    assertTrue(result1.isDone());
+    ExecutionException executionException1 = assertThrows(ExecutionException.class, result1::get);
+    assertTrue(executionException1.getCause() instanceof PGException);
+    assertEquals("Query failed", executionException1.getCause().getMessage());
+
+    assertTrue(result2.isDone());
+    ExecutionException executionException2 = assertThrows(ExecutionException.class, result2::get);
+    assertSame(executionException1.getCause(), executionException2.getCause());
+  }
 }

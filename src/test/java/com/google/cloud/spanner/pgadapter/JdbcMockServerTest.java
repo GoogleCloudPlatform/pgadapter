@@ -1986,11 +1986,55 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       // Close Connection A's socket without ever sending Sync.
     }
 
-    // Also test a pipeline where an earlier statement fails during Sync before the auto-describe
-    // statement executes, ensuring the unexecuted auto-describe future is failed and evicted.
+    // A subsequent connection binds and executes the same SQL text again and reuses the cached
+    // auto-describe without needing another PLAN query, confirming the cached describe remains
+    // valid after Connection A closed.
+    mockSpanner.clearRequests();
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
+        preparedStatement.unwrap(PgStatement.class).setPrepareThreshold(0);
+        preparedStatement.setDate(1, java.sql.Date.valueOf("2022-03-29"));
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(java.sql.Date.valueOf("2022-03-29"), resultSet.getDate("col_date"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+    List<ExecuteSqlRequest> requestsAfterClose =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, requestsAfterClose.size());
+    assertEquals(QueryMode.NORMAL, requestsAfterClose.get(0).getQueryMode());
+  }
+
+  @Test(timeout = 10000L)
+  public void testAutoDescribedStatementWhenEarlierStatementInPipelineFails() throws Exception {
+    String jdbcSql = "select col_date from all_types where col_date=/* pipeline_failure */ ?";
+    String pgSql = "select col_date from all_types where col_date=/* pipeline_failure */ $1";
+    ResultSetMetadata metadata =
+        ALL_TYPES_METADATA.toBuilder()
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgSql), ALL_TYPES_RESULTSET.toBuilder().setMetadata(metadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSql).bind("p1").to(Date.parseDate("2022-03-29")).build(),
+            ALL_TYPES_RESULTSET));
     String failingSql = "select * from non_existent_table";
     mockSpanner.putStatementResult(
         StatementResult.exception(Statement.of(failingSql), Status.NOT_FOUND.asRuntimeException()));
+
+    // Test a pipeline where an earlier statement fails during Sync before the auto-describe
+    // statement executes, ensuring the unexecuted auto-describe future is failed and not cached.
     try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
         DataInputStream inputStream = new DataInputStream(socket.getInputStream());
         DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
@@ -2058,8 +2102,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // Connection B binds and executes the same SQL text again and reuses the cached auto-describe
-    // without needing another PLAN query.
+    // Connection B now binds and executes the same SQL text. It must not hang waiting on the
+    // unexecuted future from the failed pipeline, and must perform an auto-describe (PLAN query)
+    // because the failed describe was not cached.
     mockSpanner.clearRequests();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
@@ -2072,10 +2117,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         }
       }
     }
-    List<ExecuteSqlRequest> requestsAfterClose =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(1, requestsAfterClose.size());
-    assertEquals(QueryMode.NORMAL, requestsAfterClose.get(0).getQueryMode());
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, requests.size());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+    assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
   }
 
   @Test(timeout = 10000L)

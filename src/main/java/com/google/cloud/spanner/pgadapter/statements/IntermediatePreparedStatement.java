@@ -134,7 +134,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     ListenableFuture<StatementResult> statementResultFuture =
         backendConnection.analyze(this.command, this.parsedStatement, this.statement);
     setFutureStatementResult(statementResultFuture);
-    ListenableFuture<DescribeResult> describeResultFuture =
+    this.describeResult =
         Futures.transform(
             statementResultFuture,
             result -> {
@@ -149,7 +149,6 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
               return describeResult;
             },
             MoreExecutors.directExecutor());
-    this.describeResult = describeResultFuture;
     this.described = true;
     return statementResultFuture;
   }
