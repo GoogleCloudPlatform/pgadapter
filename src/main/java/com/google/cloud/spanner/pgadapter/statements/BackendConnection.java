@@ -24,7 +24,6 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SHOW;
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
-import com.google.cloud.Tuple;
 import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
 import com.google.cloud.spanner.BatchTransactionId;
@@ -99,7 +98,6 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -108,6 +106,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -204,21 +203,12 @@ public class BackendConnection {
     return false;
   }
 
-  boolean shouldReplaceStatement(Statement statement) {
-    if (!localStatements.get().isEmpty() && localStatements.get().containsKey(statement.getSql())) {
-      LocalStatement localStatement = localStatements.get().get(statement.getSql());
-      if (localStatement != null) {
-        return localStatement.hasReplacementStatement();
-      }
-    }
-    return false;
-  }
-
-  Tuple<Statement, ParsedStatement> replaceStatement(Statement statement) {
-    LocalStatement localStatement = localStatements.get().get(statement.getSql());
-    Statement replacement =
-        Objects.requireNonNull(localStatement).getReplacementStatement(statement);
-    return Tuple.of(replacement, Objects.requireNonNull(PARSER.parse(replacement)));
+  /**
+   * Returns the local statement for the given statement, or null if the statement is not a local
+   * statement.
+   */
+  LocalStatement getLocalStatement(Statement statement) {
+    return localStatements.get().get(statement.getSql());
   }
 
   /**
@@ -231,10 +221,10 @@ public class BackendConnection {
     final SettableFuture<T> result;
 
     BufferedStatement(ParsedStatement parsedStatement, Statement statement) {
-      if (shouldReplaceStatement(statement)) {
-        Tuple<Statement, ParsedStatement> replacement = replaceStatement(statement);
-        statement = replacement.x();
-        parsedStatement = replacement.y();
+      LocalStatement localStatement = getLocalStatement(statement);
+      if (localStatement != null && localStatement.hasReplacementStatement()) {
+        statement = localStatement.getReplacementStatement(statement);
+        parsedStatement = Objects.requireNonNull(PARSER.parse(statement));
       }
       this.parsedStatement = parsedStatement;
       this.statement = statement;
@@ -330,13 +320,8 @@ public class BackendConnection {
         //  block.
         SessionStatement sessionStatement =
             getSessionManagementStatement(updatedStatement, parsedStatement);
-        if (!localStatements.get().isEmpty()
-            && localStatements.get().containsKey(statement.getSql())
-            && localStatements.get().get(statement.getSql()) != null
-            && !Objects.requireNonNull(localStatements.get().get(statement.getSql()))
-                .hasReplacementStatement()) {
-          LocalStatement localStatement =
-              Objects.requireNonNull(localStatements.get().get(statement.getSql()));
+        LocalStatement localStatement = getLocalStatement(statement);
+        if (localStatement != null && !localStatement.hasReplacementStatement()) {
           result.set(localStatement.execute(BackendConnection.this, statement));
         } else if (sessionStatement != null) {
           result.set(sessionStatement.execute(sessionState, spannerConnection));
@@ -859,11 +844,31 @@ public class BackendConnection {
     }
   }
 
+  private final class Invalid extends BufferedStatement<StatementResult> {
+    private final InvalidStatement invalidStatement;
+
+    Invalid(InvalidStatement invalidStatement) {
+      super(invalidStatement.parsedStatement, invalidStatement.originalStatement);
+      this.invalidStatement = invalidStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void doExecute() {
+      PGException pgException = invalidStatement.getException();
+      result.setException(pgException);
+      throw pgException;
+    }
+  }
+
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
   static final StatementResult NO_RESULT = new NoResult();
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
-  private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final Runnable closeAllPortals;
   private final SessionState sessionState;
@@ -872,7 +877,7 @@ public class BackendConnection {
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final String currentSchema = "public";
-  private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
+  private final List<BufferedStatement<?>> bufferedStatements = new ArrayList<>();
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
@@ -1070,6 +1075,12 @@ public class BackendConnection {
     return savepoint.result;
   }
 
+  public Future<StatementResult> execute(InvalidStatement invalidStatement) {
+    Invalid invalid = new Invalid(invalidStatement);
+    bufferedStatements.add(invalid);
+    return invalid.result;
+  }
+
   /** Flushes the buffered statements to Spanner. */
   void flush() {
     flush(false);
@@ -1229,16 +1240,40 @@ public class BackendConnection {
       closeAllPortals.run();
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
-        if (spannerConnection.isDmlBatchActive()) {
-          spannerConnection.abortBatch();
+        if (!isRollback(index)) {
+          rollbackWithoutTimeout();
         }
-        spannerConnection.setStatementTag(null);
-        spannerConnection.execute(ROLLBACK);
       } else if (spannerConnection.isDdlBatchActive()) {
         spannerConnection.abortBatch();
       }
+      if (index + 1 < bufferedStatements.size()) {
+        for (BufferedStatement<?> bufferedStatement :
+            bufferedStatements.subList(index + 1, bufferedStatements.size())) {
+          bufferedStatement.result.setException(exception);
+        }
+      }
     } finally {
       bufferedStatements.clear();
+    }
+  }
+
+  private void rollbackWithoutTimeout() {
+    if (spannerConnection.isDmlBatchActive()) {
+      spannerConnection.abortBatch();
+    }
+    spannerConnection.setStatementTag(null);
+    TimeUnit timeoutUnit = spannerConnection.hasStatementTimeout() ? TimeUnit.NANOSECONDS : null;
+    long previousTimeout =
+        timeoutUnit != null ? spannerConnection.getStatementTimeout(timeoutUnit) : 0L;
+    if (timeoutUnit != null) {
+      spannerConnection.clearStatementTimeout();
+    }
+    try {
+      spannerConnection.rollback();
+    } finally {
+      if (timeoutUnit != null) {
+        spannerConnection.setStatementTimeout(previousTimeout, timeoutUnit);
+      }
     }
   }
 
@@ -1314,12 +1349,8 @@ public class BackendConnection {
     try {
       if (connectionState != ConnectionState.ABORTED) {
         sessionState.commit();
-      }
-      if (spannerConnection.isInTransaction()) {
-        spannerConnection.setStatementTag(null);
-        if (connectionState == ConnectionState.ABORTED) {
-          spannerConnection.rollback();
-        } else {
+        if (spannerConnection.isInTransaction()) {
+          spannerConnection.setStatementTag(null);
           spannerConnection.commit();
         }
       }

@@ -28,6 +28,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.Server;
+import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -38,6 +39,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.logging.Level;
@@ -118,6 +120,7 @@ public class OptionsMetadata {
     private String endpoint;
     private boolean usePlainText;
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
+    private String defaultTimeZone = System.getProperty(DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME);
     private String clientCertificate;
     private String clientKey;
 
@@ -268,6 +271,15 @@ public class OptionsMetadata {
     /** Enables OpenTelemetry tracing for PGAdapter. */
     public Builder setEnableOpenTelemetry() {
       this.enableOpenTelemetry = true;
+      return this;
+    }
+
+    /**
+     * (Optional) Sets the default timezone that should be used for sessions that do not specify a
+     * timezone. The default is UTC.
+     */
+    public Builder setDefaultTimeZone(String defaultTimeZone) {
+      this.defaultTimeZone = Preconditions.checkNotNull(defaultTimeZone);
       return this;
     }
 
@@ -589,6 +601,9 @@ public class OptionsMetadata {
         addOption(args, OPTION_INTERNAL_DEBUG_MODE);
         addOption(args, OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING);
       }
+      if (defaultTimeZone != null) {
+        addOption(args, OPTION_DEFAULT_TIME_ZONE, defaultTimeZone);
+      }
       addOption(args, OPTION_SERVER_PORT, String.valueOf(port));
       return args.build().toArray(new String[0]);
     }
@@ -698,6 +713,9 @@ public class OptionsMetadata {
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
   private static final String OPTION_SERVER_VERSION = "v";
+  public static final String DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME = "pgadapter.default_time_zone";
+  public static final String DEFAULT_TIME_ZONE = "UTC";
+  private static final String OPTION_DEFAULT_TIME_ZONE = "z";
   private static final String OPTION_INTERNAL_DEBUG_MODE = "internal_debug";
   private static final String OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING =
       "skip_internal_debug_warning";
@@ -744,6 +762,7 @@ public class OptionsMetadata {
   private final JSONObject commandMetadataJSON;
   private final Map<String, String> propertyMap;
   private final String serverVersion;
+  private final String defaultTimeZone;
   private final boolean debugMode;
   private final Duration startupTimeout;
   private final boolean logGrpcMessages;
@@ -856,6 +875,23 @@ public class OptionsMetadata {
     this.propertyMap = propertyMap;
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
+    String defaultTimeZoneOption =
+        commandLine.getOptionValue(
+            OPTION_DEFAULT_TIME_ZONE,
+            commandLine.getOptionValue(
+                "default_time_zone", System.getProperty(DEFAULT_TIME_ZONE_SYSTEM_PROPERTY_NAME)));
+    if (defaultTimeZoneOption != null) {
+      try {
+        this.defaultTimeZone = PGSetting.convertToValidZoneId(defaultTimeZoneOption);
+        ZoneId.of(this.defaultTimeZone);
+      } catch (Exception exception) {
+        throw new IllegalArgumentException(
+            String.format("Invalid timezone '%s' for default timezone", defaultTimeZoneOption),
+            exception);
+      }
+    } else {
+      this.defaultTimeZone = null;
+    }
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
     this.logGrpcMessages = commandLine.hasOption(OPTION_LOG_GRPC_MESSAGES);
     this.allowShutdownStatement = commandLine.hasOption(OPTION_ALLOW_SHUTDOWN_STATEMENT);
@@ -935,6 +971,7 @@ public class OptionsMetadata {
     this.propertyMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
+    this.defaultTimeZone = null;
     this.debugMode = false;
     this.logGrpcMessages = false;
     this.allowShutdownStatement = false;
@@ -1519,6 +1556,15 @@ public class OptionsMetadata {
             + "the value of this option could cause a client or driver to alter its behavior and cause unexpected "
             + "errors when used with PGAdapter.");
     options.addOption(
+        OPTION_DEFAULT_TIME_ZONE,
+        "default-time-zone",
+        true,
+        "This option specifies the default timezone for new sessions in PGAdapter. "
+            + "If not specified, it will default to UTC. "
+            + "Use this option to set a specific default timezone (for example Europe/Berlin or America/New_York) "
+            + "for applications that rely on a specific default timezone without explicitly setting it.");
+    options.addOption(null, "default_time_zone", true, "Alias for --default-time-zone.");
+    options.addOption(
         OPTION_LOG_GRPC_MESSAGES,
         "log-grpc-messages",
         false,
@@ -1831,6 +1877,14 @@ public class OptionsMetadata {
 
   public String getServerVersionNum() {
     return toServerVersionNum(this.serverVersion);
+  }
+
+  public boolean hasDefaultTimeZone() {
+    return defaultTimeZone != null;
+  }
+
+  public String getDefaultTimeZone() {
+    return defaultTimeZone == null ? DEFAULT_TIME_ZONE : defaultTimeZone;
   }
 
   public static String toServerVersionNum(String version) {

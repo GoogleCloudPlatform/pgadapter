@@ -51,6 +51,11 @@ import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.lite.ProtoLiteUtils;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -58,6 +63,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -529,6 +535,237 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "2022-12-27T23:00:00Z",
         executeRequest.getParams().getFieldsMap().get("p1").getStringValue());
+  }
+
+  @Test
+  public void testInvalidParseDoesNotReExecutePreviousUnnamedStatementSimpleMode()
+      throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      assertEquals(1, connection.createStatement().executeUpdate(INSERT1));
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().execute("copy bad_syntax"));
+      assertThrows(
+          SQLException.class,
+          () ->
+              connection.createStatement().execute("select * from non_existing_table; " + INSERT1));
+    }
+    List<ExecuteSqlRequest> insertRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(INSERT1))
+            .collect(Collectors.toList());
+    assertEquals(1, insertRequests.size());
+  }
+
+  @Test
+  public void testInvalidParseDoesNotReExecutePreviousUnnamedStatementExtendedMode()
+      throws Exception {
+    String invalidSql = "select * from non_existing_table";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Table not found").asRuntimeException()));
+
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+      DataInputStream in = new DataInputStream(socket.getInputStream());
+
+      // Send StartupMessage (protocol 3.0)
+      ByteArrayOutputStream startupPayload = new ByteArrayOutputStream();
+      DataOutputStream startupData = new DataOutputStream(startupPayload);
+      startupData.writeInt(196608);
+      startupData.writeBytes("user\0postgres\0database\0my-db\0\0");
+      byte[] startupBytes = startupPayload.toByteArray();
+      out.writeInt(startupBytes.length + 4);
+      out.write(startupBytes);
+      out.flush();
+      readUntilReadyForQuery(in);
+
+      // 1. Parse("", INSERT1) + Bind("", "") + Execute("") + Sync
+      writeParse(out, "", INSERT1);
+      writeBind(out, "", "");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(0, readUntilReadyForQuery(in));
+      assertEquals(
+          1,
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT1))
+              .count());
+
+      // 2. Refused Parse("", "copy bad_syntax") + Bind("", "") + Execute("") + Sync in one pipeline
+      writeParse(out, "", "copy bad_syntax");
+      writeBind(out, "", "");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+
+      // 3. Subsequent Bind("", "") + Execute("") + Sync after failed Parse("", "copy bad_syntax")
+      writeBind(out, "", "");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+
+      // 4. Re-register unnamed statement INSERT1 and execute once more (total = 2)
+      writeParse(out, "", INSERT1);
+      writeBind(out, "", "");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(0, readUntilReadyForQuery(in));
+      assertEquals(
+          2,
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT1))
+              .count());
+
+      // 5. Parse("", invalidSql) + Describe('S', "") + Sync (fails during DescribeStatement)
+      writeParse(out, "", invalidSql);
+      writeDescribeStatement(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+
+      // 6. Subsequent Bind("", "") + Execute("") + Sync must fail with 26000 and NOT re-execute
+      // INSERT1
+      writeBind(out, "", "");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+
+      // Verify INSERT1 was still only executed 2 times total on Spanner.
+      assertEquals(
+          2,
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT1))
+              .count());
+
+      // 7. Pipelined invalid Parse followed by valid Parse(INSERT1) + Bind + Execute in the SAME
+      // pipeline before Sync: the subsequent INSERT1 in the same pipeline must be aborted and NOT
+      // executed, and its unnamed statement registration must also be aborted.
+      writeParse(out, "", "copy bad_syntax");
+      writeBind(out, "", "");
+      writeExecute(out, "");
+      writeParse(out, "", INSERT1);
+      writeBind(out, "", "");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+      assertEquals(
+          2,
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT1))
+              .count());
+
+      // 8. Named invalid statement Parse("s1", "copy bad_syntax") must clean up "s1" on flush
+      // without errors, and subsequent Bind("", "s1") must fail with 26000.
+      writeParse(out, "s1", "copy bad_syntax");
+      writeBind(out, "", "s1");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+
+      writeBind(out, "", "s1");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+
+      // 9. Parse("", invalidSql) + Flush ('H') + Describe('S', "") + Sync must close "" when
+      // Describe('S', "") fails, so a subsequent Bind("", "") + Execute("") + Sync fails and does
+      // not execute any statement.
+      writeParse(out, "", invalidSql);
+      writeFlush(out);
+      writeDescribeStatement(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+
+      writeBind(out, "", "");
+      writeExecute(out, "");
+      writeSync(out);
+      out.flush();
+      assertEquals(1, readUntilReadyForQuery(in));
+      assertEquals(
+          2,
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+              .filter(request -> request.getSql().equals(INSERT1))
+              .count());
+
+      // Send Terminate ('X')
+      out.writeByte('X');
+      out.writeInt(4);
+      out.flush();
+    }
+  }
+
+  private static void writeParse(DataOutputStream out, String name, String sql) throws IOException {
+    byte[] nameBytes = (name + "\0").getBytes(StandardCharsets.UTF_8);
+    byte[] sqlBytes = (sql + "\0").getBytes(StandardCharsets.UTF_8);
+    out.writeByte('P');
+    out.writeInt(4 + nameBytes.length + sqlBytes.length + 2);
+    out.write(nameBytes);
+    out.write(sqlBytes);
+    out.writeShort(0);
+  }
+
+  private static void writeDescribeStatement(DataOutputStream out, String name) throws IOException {
+    byte[] nameBytes = (name + "\0").getBytes(StandardCharsets.UTF_8);
+    out.writeByte('D');
+    out.writeInt(4 + 1 + nameBytes.length);
+    out.writeByte('S');
+    out.write(nameBytes);
+  }
+
+  private static void writeBind(DataOutputStream out, String portal, String statement)
+      throws IOException {
+    byte[] portalBytes = (portal + "\0").getBytes(StandardCharsets.UTF_8);
+    byte[] statementBytes = (statement + "\0").getBytes(StandardCharsets.UTF_8);
+    out.writeByte('B');
+    out.writeInt(4 + portalBytes.length + statementBytes.length + 2 + 2 + 2);
+    out.write(portalBytes);
+    out.write(statementBytes);
+    out.writeShort(0);
+    out.writeShort(0);
+    out.writeShort(0);
+  }
+
+  private static void writeExecute(DataOutputStream out, String portal) throws IOException {
+    byte[] portalBytes = (portal + "\0").getBytes(StandardCharsets.UTF_8);
+    out.writeByte('E');
+    out.writeInt(4 + portalBytes.length + 4);
+    out.write(portalBytes);
+    out.writeInt(0);
+  }
+
+  private static void writeFlush(DataOutputStream out) throws IOException {
+    out.writeByte('H');
+    out.writeInt(4);
+  }
+
+  private static void writeSync(DataOutputStream out) throws IOException {
+    out.writeByte('S');
+    out.writeInt(4);
+  }
+
+  private static int readUntilReadyForQuery(DataInputStream in) throws IOException {
+    int errorCount = 0;
+    while (true) {
+      byte type = in.readByte();
+      int length = in.readInt();
+      byte[] payload = new byte[length - 4];
+      in.readFully(payload);
+      if (type == 'E') {
+        errorCount++;
+      } else if (type == 'Z') {
+        return errorCount;
+      }
+    }
   }
 
   static StatusRuntimeException newStatusResourceNotFoundException(

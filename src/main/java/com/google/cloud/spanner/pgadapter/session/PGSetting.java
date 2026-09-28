@@ -397,6 +397,15 @@ public class PGSetting {
     this.setting = value;
   }
 
+  /** Initializes the default value of the setting for server configuration. */
+  void initServerSetting(String value) {
+    if (this.vartype != null) {
+      value = checkValidValue(value);
+    }
+    this.setting = value;
+    this.resetVal = value;
+  }
+
   /** Initializes the value of the setting at connection startup. */
   void initConnectionValue(String value) {
     setSetting(Context.BACKEND, value);
@@ -489,7 +498,8 @@ public class PGSetting {
     return value;
   }
 
-  static String convertToValidZoneId(String value) {
+  @InternalApi
+  public static String convertToValidZoneId(String value) {
     if ("utc".equalsIgnoreCase(value)) {
       return "UTC";
     }

@@ -15,12 +15,10 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
-import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
@@ -55,7 +53,8 @@ public class CopyToStatement extends IntermediatePortalStatement {
       new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
   private final ParsedCopyStatement parsedCopyStatement;
-  private CSVFormat csvFormat;
+  private final CSVFormat csvFormat;
+  private final CSVFormat headerCsvFormat;
   private final AtomicBoolean hasReturnedData = new AtomicBoolean(false);
 
   public CopyToStatement(
@@ -78,6 +77,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
     this.parsedCopyStatement = parsedCopyStatement;
     if (parsedCopyStatement.format == CopyStatement.Format.BINARY) {
       this.csvFormat = null;
+      this.headerCsvFormat = null;
     } else {
       CSVFormat baseFormat =
           parsedCopyStatement.format == Format.TEXT
@@ -115,23 +115,15 @@ public class CopyToStatement extends IntermediatePortalStatement {
               "PGAdapter does not support force_quote modes per column", SQLState.InternalError);
         }
       }
-      if (parsedCopyStatement.header) {
-        if (parsedCopyStatement.columns == null) {
-          formatBuilder.setHeader(
-              retrieveHeader(
-                  connectionHandler
-                      .getExtendedQueryProtocolHandler()
-                      .getBackendConnection()
-                      .getSpannerConnection(),
-                  parsedCopyStatement));
-        } else {
-          formatBuilder.setHeader(
-              parsedCopyStatement.columns.stream()
-                  .map(TableOrIndexName::getUnquotedName)
-                  .toArray(String[]::new));
-        }
-      }
       this.csvFormat = formatBuilder.build();
+      // In PostgreSQL, the CSV header row always uses QuoteMode.MINIMAL, regardless of whether
+      // FORCE_QUOTE is used for data rows.
+      if (parsedCopyStatement.format == Format.CSV
+          && this.csvFormat.getQuoteMode() != QuoteMode.MINIMAL) {
+        this.headerCsvFormat = this.csvFormat.builder().setQuoteMode(QuoteMode.MINIMAL).build();
+      } else {
+        this.headerCsvFormat = this.csvFormat;
+      }
     }
   }
 
@@ -155,17 +147,6 @@ public class CopyToStatement extends IntermediatePortalStatement {
     return Statement.of("select * from " + parsedCopyStatement.table);
   }
 
-  static String[] retrieveHeader(Connection connection, ParsedCopyStatement parsedCopyStatement) {
-    try (ResultSet resultSet =
-        connection
-            .getDatabaseClient()
-            .singleUse()
-            .analyzeQuery(createSelectStatement(parsedCopyStatement), QueryAnalyzeMode.PLAN)) {
-      resultSet.next();
-      return convertColumnNamesToStringArray(resultSet);
-    }
-  }
-
   static String[] convertColumnNamesToStringArray(ResultSet resultSet) {
     String[] result = new String[resultSet.getColumnCount()];
     for (int index = 0; index < resultSet.getColumnCount(); index++) {
@@ -174,9 +155,24 @@ public class CopyToStatement extends IntermediatePortalStatement {
     return result;
   }
 
+  /** Returns the column names for the header row of this COPY statement. */
+  private String[] createHeader(ResultSet resultSet) {
+    if (parsedCopyStatement.columns == null) {
+      return convertColumnNamesToStringArray(resultSet);
+    }
+    return parsedCopyStatement.columns.stream()
+        .map(TableOrIndexName::getUnquotedName)
+        .toArray(String[]::new);
+  }
+
   @VisibleForTesting
   CSVFormat getCsvFormat() {
     return csvFormat;
+  }
+
+  @VisibleForTesting
+  CSVFormat getHeaderCsvFormat() {
+    return headerCsvFormat;
   }
 
   public boolean isBinary() {
@@ -220,11 +216,23 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   @Override
   public WireOutput[] createResultPrefix(ResultSet resultSet) {
+    CopyOutResponse copyOutResponse =
+        new CopyOutResponse(
+            this.outputStream,
+            resultSet.getColumnCount(),
+            this.parsedCopyStatement.format.getDataFormat().getCode());
+    if (headerCsvFormat == null || !parsedCopyStatement.header) {
+      return new WireOutput[] {copyOutResponse};
+    }
+    // PostgreSQL writes the header as a separate CopyData message before any row. Doing the same
+    // is also the only option here: the rows of a partitioned COPY are written by several threads,
+    // so there is no row that is guaranteed to be written first.
     return new WireOutput[] {
-      new CopyOutResponse(
+      copyOutResponse,
+      new CopyDataResponse(
           this.outputStream,
-          resultSet.getColumnCount(),
-          this.parsedCopyStatement.format.getDataFormat().getCode())
+          headerCsvFormat.format((Object[]) createHeader(resultSet)),
+          headerCsvFormat.getRecordSeparator().charAt(0))
     };
   }
 
@@ -271,10 +279,6 @@ public class CopyToStatement extends IntermediatePortalStatement {
       }
     }
     String row = csvFormat.format((Object[]) data);
-    // Only include the header with the first row.
-    if (!csvFormat.getSkipHeaderRecord()) {
-      csvFormat = csvFormat.builder().setSkipHeaderRecord(true).build();
-    }
     return new CopyDataResponse(this.outputStream, row, csvFormat.getRecordSeparator().charAt(0));
   }
 

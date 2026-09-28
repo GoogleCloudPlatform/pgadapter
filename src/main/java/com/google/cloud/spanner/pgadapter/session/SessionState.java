@@ -74,6 +74,9 @@ public class SessionState {
           "transaction_isolation",
           "transaction_read_only");
 
+  /** Default for `spanner.log_slow_statement_threshold`, which is not part of pg_settings.txt. */
+  private static final Duration DEFAULT_LOG_SLOW_STATEMENT_THRESHOLD = Duration.ofSeconds(120L);
+
   static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
   static {
@@ -113,6 +116,11 @@ public class SessionState {
     initSettingValue(
         "spanner.replace_pg_catalog_tables", Boolean.toString(options.replacePgCatalogTables()));
 
+    if (options.hasDefaultTimeZone()) {
+      initServerSetting("TimeZone", options.getDefaultTimeZone());
+      initServerSetting("log_timezone", options.getDefaultTimeZone());
+    }
+
     initCopySettings(this.settings);
   }
 
@@ -128,6 +136,8 @@ public class SessionState {
   private final AtomicReference<Boolean> cachedReplaceForUpdateClause = new AtomicReference<>();
   private final AtomicReference<Boolean> cachedReplacePgCatalogTables = new AtomicReference<>();
   private final AtomicReference<Boolean> cachedEmulatePgClassTables = new AtomicReference<>();
+  private final AtomicReference<Boolean> cachedForceAutocommit = new AtomicReference<>();
+  private final AtomicReference<Duration> cachedLogSlowStatementThreshold = new AtomicReference<>();
   private final AtomicReference<Integer> cachedBinaryConversionBufferSize = new AtomicReference<>();
   private final AtomicReference<Integer> cachedStringConversionBufferSize = new AtomicReference<>();
 
@@ -138,6 +148,8 @@ public class SessionState {
     cachedReplaceForUpdateClause.set(null);
     cachedReplacePgCatalogTables.set(null);
     cachedEmulatePgClassTables.set(null);
+    cachedForceAutocommit.set(null);
+    cachedLogSlowStatementThreshold.set(null);
     cachedBinaryConversionBufferSize.set(null);
     cachedStringConversionBufferSize.set(null);
   }
@@ -160,6 +172,13 @@ public class SessionState {
     PGSetting setting = this.settings.get(key);
     if (setting != null) {
       setting.initSettingValue(value);
+    }
+  }
+
+  void initServerSetting(String key, String value) {
+    PGSetting setting = this.settings.get(key);
+    if (setting != null) {
+      setting.initServerSetting(value);
     }
   }
 
@@ -467,7 +486,8 @@ public class SessionState {
    * in autocommit mode.
    */
   public boolean isForceAutocommit() {
-    return getBoolSetting("spanner", "force_autocommit", false);
+    return getCachedValue(
+        () -> getBoolSetting("spanner", "force_autocommit", false), cachedForceAutocommit);
   }
 
   /**
@@ -582,15 +602,19 @@ public class SessionState {
 
   /** Returns the threshold for when a query should be considered slow and should be logged. */
   public Duration getLogSlowStatementThreshold() {
-    PGSetting setting = internalGet(toKey("spanner", "log_slow_statement_threshold"), false);
-    if (setting == null) {
-      return Duration.ofSeconds(120L);
-    }
-    return tryGetFirstNonNull(
-        Duration.ofSeconds(120L),
-        () -> Duration.parse(setting.getSetting()),
-        () -> Duration.parse(setting.getResetVal()),
-        () -> Duration.parse(setting.getBootVal()));
+    return getCachedValue(
+        () -> {
+          PGSetting setting = internalGet(toKey("spanner", "log_slow_statement_threshold"), false);
+          if (setting == null) {
+            return DEFAULT_LOG_SLOW_STATEMENT_THRESHOLD;
+          }
+          return tryGetFirstNonNull(
+              DEFAULT_LOG_SLOW_STATEMENT_THRESHOLD,
+              () -> Duration.parse(setting.getSetting()),
+              () -> Duration.parse(setting.getResetVal()),
+              () -> Duration.parse(setting.getBootVal()));
+        },
+        cachedLogSlowStatementThreshold);
   }
 
   /**
@@ -641,11 +665,11 @@ public class SessionState {
         () -> {
           PGSetting setting = internalGet(toKey(null, "timezone"), false);
           if (setting == null) {
-            return ZoneId.systemDefault();
+            return ZoneId.of(OptionsMetadata.DEFAULT_TIME_ZONE);
           }
           String id =
               tryGetFirstNonNull(
-                  ZoneId.systemDefault().getId(),
+                  OptionsMetadata.DEFAULT_TIME_ZONE,
                   setting::getSetting,
                   setting::getResetVal,
                   setting::getBootVal);
@@ -656,9 +680,9 @@ public class SessionState {
 
   private ZoneId zoneIdFromString(String value) {
     try {
-      return ZoneId.of(value);
+      return ZoneId.of(PGSetting.convertToValidZoneId(value));
     } catch (Throwable ignore) {
-      return ZoneId.systemDefault();
+      return ZoneId.of(OptionsMetadata.DEFAULT_TIME_ZONE);
     }
   }
 

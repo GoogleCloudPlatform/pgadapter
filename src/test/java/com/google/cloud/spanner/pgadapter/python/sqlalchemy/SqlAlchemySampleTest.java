@@ -248,7 +248,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     String output =
         execute(SAMPLE_DIR, "test_print_concerts.py", "localhost", pgServer.getLocalPort());
     assertEquals(
-        "\nConcert 'Avenue Park Open' starting at 2023-02-02 02:00:00+01:00 with Pete Allison will be held at Avenue Park\n",
+        "\nConcert 'Avenue Park Open' starting at 2023-02-02 01:00:00+00:00 with Pete Allison will be held at Avenue Park\n",
         output);
   }
 
