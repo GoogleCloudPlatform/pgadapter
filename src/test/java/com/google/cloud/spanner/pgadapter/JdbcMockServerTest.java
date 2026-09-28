@@ -54,6 +54,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
@@ -78,7 +79,11 @@ import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.sql.BatchUpdateException;
 import java.sql.Connection;
@@ -1871,6 +1876,329 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
 
         mockSpanner.clearRequests();
+      }
+    }
+  }
+
+  @Test
+  public void testFailedAutoDescribeIsNotCached() throws SQLException {
+    String jdbcSql = "select col_date from all_types where col_date=?";
+    String pgSql = "select col_date from all_types where col_date=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(pgSql),
+            Status.DEADLINE_EXCEEDED.withDescription("Analyze timed out").asRuntimeException()));
+
+    try (Connection connection1 = DriverManager.getConnection(createUrl());
+        Connection connection2 = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection1.prepareStatement(jdbcSql)) {
+        preparedStatement.unwrap(PgStatement.class).setPrepareThreshold(1);
+        preparedStatement.setDate(1, new java.sql.Date(2022 - 1900, Calendar.MARCH, 29));
+        assertThrows(SQLException.class, preparedStatement::executeQuery);
+
+        // Now register a valid statement result and verify that both the same prepared statement
+        // on connection1 and a new statement on connection2 succeed without hitting a cached error.
+        ResultSetMetadata metadata =
+            ALL_TYPES_METADATA.toBuilder()
+                .setUndeclaredParameters(
+                    StructType.newBuilder()
+                        .addFields(
+                            Field.newBuilder()
+                                .setName("p1")
+                                .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                                .build())
+                        .build())
+                .build();
+        mockSpanner.putStatementResult(
+            StatementResult.query(
+                Statement.of(pgSql),
+                ALL_TYPES_RESULTSET.toBuilder().setMetadata(metadata).build()));
+        mockSpanner.putStatementResult(
+            StatementResult.query(
+                Statement.newBuilder(pgSql).bind("p1").to(Date.parseDate("2022-03-29")).build(),
+                ALL_TYPES_RESULTSET));
+
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(
+              new java.sql.Date(2022 - 1900, Calendar.MARCH, 29), resultSet.getDate("col_date"));
+          assertFalse(resultSet.next());
+        }
+      }
+
+      try (PreparedStatement preparedStatement2 = connection2.prepareStatement(jdbcSql)) {
+        preparedStatement2.unwrap(PgStatement.class).setPrepareThreshold(0);
+        preparedStatement2.setDate(1, new java.sql.Date(2022 - 1900, Calendar.MARCH, 29));
+        try (ResultSet resultSet = preparedStatement2.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(
+              new java.sql.Date(2022 - 1900, Calendar.MARCH, 29), resultSet.getDate("col_date"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testAbandonedAutoDescribeDoesNotHang() throws SQLException, IOException {
+    String jdbcSql = "select col_date from all_types where col_date=?";
+    String pgSql = "select col_date from all_types where col_date=$1";
+    ResultSetMetadata metadata =
+        ALL_TYPES_METADATA.toBuilder()
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgSql), ALL_TYPES_RESULTSET.toBuilder().setMetadata(metadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSql).bind("p1").to(Date.parseDate("2022-03-29")).build(),
+            ALL_TYPES_RESULTSET));
+
+    // Open a raw socket connection, send PARSE + BIND (which triggers autoDescribe), and leave it
+    // open WITHOUT sending SYNC while another connection executes the same statement.
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      outputStream.writeInt(29);
+      outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+      outputStream.writeBytes("user");
+      outputStream.writeByte(0);
+      outputStream.writeBytes("foo");
+      outputStream.writeByte(0);
+      outputStream.writeBytes("database");
+      outputStream.writeByte(0);
+      outputStream.writeBytes("d");
+      outputStream.writeByte(0);
+      outputStream.writeByte(0);
+      outputStream.flush();
+
+      while (true) {
+        byte message = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (message == 'Z') {
+          break;
+        }
+      }
+
+      // Parse("abandoned_stmt") and Sync to establish the prepared statement on the connection.
+      String statementName = "abandoned_stmt";
+      byte[] statementNameBytes = statementName.getBytes(StandardCharsets.UTF_8);
+      byte[] sqlBytes = pgSql.getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('P');
+      outputStream.writeInt(4 + statementNameBytes.length + 1 + sqlBytes.length + 1 + 2);
+      outputStream.write(statementNameBytes);
+      outputStream.writeByte(0);
+      outputStream.write(sqlBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+      while (true) {
+        byte message = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (message == 'Z') {
+          break;
+        }
+      }
+
+      // Send a failing Query/Execute before a Bind+Describe('S') on the same pipeline, so that
+      // BackendConnection.flush() fails on the first buffered statement and sets the exception on
+      // the remaining buffered AnalyzeSql statement, and then verify that re-binding and executing
+      // the statement on the same socket connection succeeds.
+      String failingStmtName = "failing_stmt";
+      byte[] failingStmtNameBytes = failingStmtName.getBytes(StandardCharsets.UTF_8);
+      String failingSql = "select * from non_existing_table";
+      byte[] failingSqlBytes = failingSql.getBytes(StandardCharsets.UTF_8);
+      mockSpanner.putStatementResult(
+          StatementResult.exception(
+              Statement.of(failingSql),
+              Status.NOT_FOUND.withDescription("Table not found").asRuntimeException()));
+      // Parse("failing_stmt")
+      outputStream.writeByte('P');
+      outputStream.writeInt(4 + failingStmtNameBytes.length + 1 + failingSqlBytes.length + 1 + 2);
+      outputStream.write(failingStmtNameBytes);
+      outputStream.writeByte(0);
+      outputStream.write(failingSqlBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+      // Bind("", "failing_stmt")
+      outputStream.writeByte('B');
+      outputStream.writeInt(4 + 1 + failingStmtNameBytes.length + 1 + 2 + 2 + 2);
+      outputStream.writeByte(0);
+      outputStream.write(failingStmtNameBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+      // Execute("", 0)
+      outputStream.writeByte('E');
+      outputStream.writeInt(4 + 1 + 4);
+      outputStream.writeByte(0);
+      outputStream.writeInt(0);
+
+      // Bind("", "abandoned_stmt", "2022-03-29") -> triggers autoDescribe
+      byte[] parameterValueBytes = "2022-03-29".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('B');
+      outputStream.writeInt(
+          4 + 1 + statementNameBytes.length + 1 + 2 + 2 + 4 + parameterValueBytes.length + 2);
+      outputStream.writeByte(0);
+      outputStream.write(statementNameBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(1);
+      outputStream.writeInt(parameterValueBytes.length);
+      outputStream.write(parameterValueBytes);
+      outputStream.writeShort(0);
+      // Describe('S', "abandoned_stmt") -> reuses the pending autoDescribe futureStatementResult
+      outputStream.writeByte('D');
+      outputStream.writeInt(4 + 1 + statementNameBytes.length + 1);
+      outputStream.writeByte('S');
+      outputStream.write(statementNameBytes);
+      outputStream.writeByte(0);
+      outputStream.flush();
+
+      // Verify that a second connection executing the same statement while the first connection's
+      // auto-describe is still un-synced does not hang.
+      try (Connection connection = DriverManager.getConnection(createUrl());
+          PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
+        preparedStatement.unwrap(PgStatement.class).setPrepareThreshold(0);
+        preparedStatement.setDate(1, new java.sql.Date(2022 - 1900, Calendar.MARCH, 29));
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(
+              new java.sql.Date(2022 - 1900, Calendar.MARCH, 29), resultSet.getDate("col_date"));
+          assertFalse(resultSet.next());
+        }
+      }
+
+      // Now send Sync on the first socket connection so that failing_stmt fails during flush()
+      // and marks the remaining buffered AnalyzeSql statement as failed.
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+      while (true) {
+        byte message = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (message == 'Z') {
+          break;
+        }
+      }
+
+      // Now Bind + Execute + Sync "abandoned_stmt" on the first socket connection and verify that
+      // its failed describe state was reset and it executes cleanly without hanging.
+      pgServer.autoDescribedStatementsCache.invalidateAll();
+      outputStream.writeByte('B');
+      outputStream.writeInt(
+          4 + 1 + statementNameBytes.length + 1 + 2 + 2 + 4 + parameterValueBytes.length + 2);
+      outputStream.writeByte(0);
+      outputStream.write(statementNameBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(1);
+      outputStream.writeInt(parameterValueBytes.length);
+      outputStream.write(parameterValueBytes);
+      outputStream.writeShort(0);
+      outputStream.writeByte('E');
+      outputStream.writeInt(4 + 1 + 4);
+      outputStream.writeByte(0);
+      outputStream.writeInt(0);
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+      boolean receivedDataRow = false;
+      while (true) {
+        byte message = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (message == 'D') {
+          receivedDataRow = true;
+        } else if (message == 'Z') {
+          break;
+        }
+      }
+      assertTrue(receivedDataRow);
+    }
+  }
+
+  @Test
+  public void testAutoDescribedStatementsRespectGivenParameterTypes() throws SQLException {
+    String jdbcSql = "select col_date from all_types where col_date=? and col_varchar=?";
+    String pgSql = "select col_date from all_types where col_date=$1 and col_varchar=$2";
+    ResultSetMetadata metadata =
+        ALL_TYPES_METADATA.toBuilder()
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p2")
+                            .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgSql), ALL_TYPES_RESULTSET.toBuilder().setMetadata(metadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSql)
+                .bind("p1")
+                .to("2022-03-29")
+                .bind("p2")
+                .to(Date.parseDate("2022-03-29"))
+                .build(),
+            ALL_TYPES_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSql)
+                .bind("p1")
+                .to(Date.parseDate("2022-03-29"))
+                .bind("p2")
+                .to("2022-03-29")
+                .build(),
+            ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // First execution specifies p1 as VARCHAR explicitly (setString) and p2 as untyped
+      // (setDate sends Oid.UNSPECIFIED in pgjdbc).
+      try (PreparedStatement preparedStatement1 = connection.prepareStatement(jdbcSql)) {
+        preparedStatement1.unwrap(PgStatement.class).setPrepareThreshold(0);
+        preparedStatement1.setString(1, "2022-03-29");
+        preparedStatement1.setDate(2, new java.sql.Date(2022 - 1900, Calendar.MARCH, 29));
+        try (ResultSet resultSet = preparedStatement1.executeQuery()) {
+          assertTrue(resultSet.next());
+        }
+      }
+
+      // Second execution sends p1 as untyped (setDate sends Oid.UNSPECIFIED) and p2 as VARCHAR.
+      // Even though the auto-describe cache entry was populated when p1 was given as VARCHAR,
+      // the second execution must still resolve p1 as DATE from the backend undeclaredParameters.
+      try (PreparedStatement preparedStatement2 = connection.prepareStatement(jdbcSql)) {
+        preparedStatement2.unwrap(PgStatement.class).setPrepareThreshold(0);
+        preparedStatement2.setDate(1, new java.sql.Date(2022 - 1900, Calendar.MARCH, 29));
+        preparedStatement2.setString(2, "2022-03-29");
+        try (ResultSet resultSet = preparedStatement2.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(
+              new java.sql.Date(2022 - 1900, Calendar.MARCH, 29), resultSet.getDate("col_date"));
+          assertFalse(resultSet.next());
+        }
       }
     }
   }

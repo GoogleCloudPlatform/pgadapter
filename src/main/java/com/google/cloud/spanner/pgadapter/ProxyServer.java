@@ -53,7 +53,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -76,7 +75,7 @@ public class ProxyServer extends AbstractApiService {
   @VisibleForTesting
   static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS = new ConcurrentHashMap<>();
 
-  final Cache<String, Future<DescribeResult>> autoDescribedStatementsCache;
+  final Cache<String, DescribeResult> autoDescribedStatementsCache;
 
   private final OptionsMetadata options;
   private final OpenTelemetry openTelemetry;
