@@ -36,6 +36,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.PartitionQueryResult;
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
+import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
@@ -203,11 +204,13 @@ public abstract class ControlMessage extends WireMessage {
    */
   SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
-    Tracer tracer = connection.getExtendedQueryProtocolHandler().getTracer();
+    ExtendedQueryProtocolHandler queryProtocolHandler =
+        connection.getExtendedQueryProtocolHandler();
+    Tracer tracer = queryProtocolHandler.getTracer();
     Span span =
         tracer
             .spanBuilder("send_result_set")
-            .setAttribute("pgadapter.connection_id", connection.getTraceConnectionId().toString())
+            .setAttribute("pgadapter.connection_id", queryProtocolHandler.getConnectionId())
             .setAttribute(DB_STATEMENT, describedResult.getSql())
             .startSpan();
     try (Scope ignore = span.makeCurrent()) {

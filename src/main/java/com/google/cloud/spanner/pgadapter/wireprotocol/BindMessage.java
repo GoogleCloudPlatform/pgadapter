@@ -35,6 +35,7 @@ import java.util.Arrays;
 @InternalApi
 public class BindMessage extends AbstractQueryProtocolMessage {
   protected static final char IDENTIFIER = 'B';
+  private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final String portalName;
   private final String statementName;
@@ -171,6 +172,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   @Override
   public String getIdentifier() {
     return String.valueOf(IDENTIFIER);
+  }
+
+  @Override
+  public String receivedEventDescription() {
+    return RECEIVED_EVENT_DESCRIPTION;
   }
 
   public String getPortalName() {

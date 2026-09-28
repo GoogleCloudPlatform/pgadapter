@@ -122,6 +122,10 @@ public class DeallocateStatement extends IntermediatePortalStatement {
             "invalid prepared statement name", SQLState.InvalidSqlStatementName);
       }
       statementName = unquoteOrFoldIdentifier(name.name);
+      if (statementName == null || statementName.isEmpty()) {
+        throw PGExceptionFactory.newPGException(
+            "zero-length delimited identifier", SQLState.InvalidSqlStatementName);
+      }
     }
     parser.skipWhitespaces();
     if (parser.getPos() < parser.getSql().length()) {

@@ -19,6 +19,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -574,8 +575,7 @@ public class SimpleParser {
       } else if (stopAtEndOfExpression && parens == 0 && stopAtComma && sql.charAt(pos) == ',') {
         break;
       }
-      if ((!sameParensLevelAsStart || parens == 0)
-          && keywords.stream().anyMatch(this::peekKeyword)) {
+      if ((!sameParensLevelAsStart || parens == 0) && peekAnyKeyword(keywords)) {
         break;
       }
       pos++;
@@ -584,6 +584,31 @@ public class SimpleParser {
       return null;
     }
     return sql.substring(start, pos).trim();
+  }
+
+  /** Returns true if any of the given keywords is found at the current position. */
+  @VisibleForTesting
+  boolean peekAnyKeyword(ImmutableList<String> keywords) {
+    if (keywords.isEmpty()) {
+      return false;
+    }
+    // This is called for every character of an expression, so skip whitespace once and use an
+    // indexed loop. Both a stream and an iterator would allocate.
+    int originalPosition = pos;
+    skipWhitespaces();
+    if (pos >= sql.length()) {
+      pos = originalPosition;
+      return false;
+    }
+    int size = keywords.size();
+    for (int index = 0; index < size; index++) {
+      if (peek(false, true, keywords.get(index))) {
+        pos = originalPosition;
+        return true;
+      }
+    }
+    pos = originalPosition;
+    return false;
   }
 
   List<TableOrIndexName> readTableList() {
@@ -892,7 +917,7 @@ public class SimpleParser {
       }
       return false;
     }
-    if (sql.substring(pos, pos + keyword.length()).equalsIgnoreCase(keyword)
+    if (sql.regionMatches(true, pos, keyword, 0, keyword.length())
         && (!requireWhitespaceAfter || isValidEndOfKeyword(pos + keyword.length()))) {
       if (updatePos) {
         pos = pos + keyword.length();
