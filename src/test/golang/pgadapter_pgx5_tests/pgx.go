@@ -317,6 +317,58 @@ func TestInsertUUIDArray(connString string) *C.char {
 	return nil
 }
 
+//export TestInsertEmptyArray
+func TestInsertEmptyArray(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	insertSql := "INSERT INTO my_test_table (id, bigint_arr) VALUES ($1, $2)"
+	id := int64(1)
+	bigintArr := []int64{}
+
+	tag, err := conn.Exec(ctx, insertSql, id, bigintArr)
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
+	}
+	if !tag.Insert() {
+		return C.CString("statement was not recognized as an insert")
+	}
+	if tag.RowsAffected() != 1 {
+		return C.CString(fmt.Sprintf("rows affected mismatch:\n Got: %v\nWant: 1", tag.RowsAffected()))
+	}
+
+	return nil
+}
+
+//export TestSelectEmptyArray
+func TestSelectEmptyArray(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	sql := "SELECT col_array_bigint FROM all_types WHERE col_bigint=1"
+	var arrayBigint []int64
+	err = conn.QueryRow(ctx, sql).Scan(&arrayBigint)
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to query empty array: %v", err))
+	}
+	if arrayBigint == nil {
+		return C.CString("expected non-nil empty array, got nil")
+	}
+	if len(arrayBigint) != 0 {
+		return C.CString(fmt.Sprintf("expected empty array, got %v", arrayBigint))
+	}
+
+	return nil
+}
+
 //export TestInsertNullsAllDataTypes
 func TestInsertNullsAllDataTypes(connString string) *C.char {
 	ctx := context.Background()

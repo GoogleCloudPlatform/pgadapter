@@ -15,8 +15,10 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -34,13 +36,16 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.core.Oid;
+import org.postgresql.util.ByteConverter;
 
 @RunWith(JUnit4.class)
 public class ArrayParserTest {
@@ -493,6 +498,260 @@ public class ArrayParserTest {
         ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), false));
     assertNull(
         ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, mock(SessionState.class), true));
+  }
+
+  @Test
+  public void testBinaryArrayToList_EmptyArray_ZeroDimensions() {
+    byte[] data = new byte[12];
+    ByteConverter.int4(data, 0, 0); // 0 dimensions
+    ByteConverter.int4(data, 4, 0); // null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+
+    List<?> resultWithoutConversion = ArrayParser.binaryArrayToList(data, false);
+    assertNotNull(resultWithoutConversion);
+    assertTrue(resultWithoutConversion.isEmpty());
+
+    List<?> resultWithConversion = ArrayParser.binaryArrayToList(data, true);
+    assertNotNull(resultWithConversion);
+    assertTrue(resultWithConversion.isEmpty());
+  }
+
+  @Test
+  public void testBinaryArrayToList_EmptyArray_OneDimension() {
+    byte[] data = new byte[20];
+    ByteConverter.int4(data, 0, 1); // 1 dimension
+    ByteConverter.int4(data, 4, 0); // null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+    ByteConverter.int4(data, 12, 0); // size = 0
+    ByteConverter.int4(data, 16, 1); // lower bound = 1
+
+    List<?> resultWithoutConversion = ArrayParser.binaryArrayToList(data, false);
+    assertNotNull(resultWithoutConversion);
+    assertTrue(resultWithoutConversion.isEmpty());
+
+    List<?> resultWithConversion = ArrayParser.binaryArrayToList(data, true);
+    assertNotNull(resultWithConversion);
+    assertTrue(resultWithConversion.isEmpty());
+  }
+
+  @Test
+  public void testBinaryArrayToList_SingleDimensionWithElements() {
+    byte[] data = new byte[20 + 4 + 8 + 4 + 4 + 8];
+    ByteConverter.int4(data, 0, 1); // 1 dimension
+    ByteConverter.int4(data, 4, 1); // null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+    ByteConverter.int4(data, 12, 3); // size = 3
+    ByteConverter.int4(data, 16, 1); // lower bound = 1
+
+    // element 1: length 8, value 100L
+    ByteConverter.int4(data, 20, 8);
+    ByteConverter.int8(data, 24, 100L);
+
+    // element 2: length -1 (null)
+    ByteConverter.int4(data, 32, -1);
+
+    // element 3: length 8, value 200L
+    ByteConverter.int4(data, 36, 8);
+    ByteConverter.int8(data, 40, 200L);
+
+    List<?> result = ArrayParser.binaryArrayToList(data, false);
+    assertNotNull(result);
+    assertEquals(Arrays.asList(100L, null, 200L), result);
+  }
+
+  @Test
+  public void testBinaryArrayToList_SingleDimensionWithInt4Conversion() {
+    byte[] data = new byte[20 + 4 + 4 + 4 + 4 + 4];
+    ByteConverter.int4(data, 0, 1); // 1 dimension
+    ByteConverter.int4(data, 4, 1); // null flag
+    ByteConverter.int4(data, 8, Oid.INT4); // oid
+    ByteConverter.int4(data, 12, 3); // size = 3
+    ByteConverter.int4(data, 16, 1); // lower bound = 1
+
+    // element 1: length 4, value 10
+    ByteConverter.int4(data, 20, 4);
+    ByteConverter.int4(data, 24, 10);
+
+    // element 2: length -1 (null)
+    ByteConverter.int4(data, 28, -1);
+
+    // element 3: length 4, value 20
+    ByteConverter.int4(data, 32, 4);
+    ByteConverter.int4(data, 36, 20);
+
+    List<?> resultWithoutConversion = ArrayParser.binaryArrayToList(data, false);
+    assertNotNull(resultWithoutConversion);
+    assertEquals(Arrays.asList(10, null, 20), resultWithoutConversion);
+
+    List<?> resultWithConversion = ArrayParser.binaryArrayToList(data, true);
+    assertNotNull(resultWithConversion);
+    assertEquals(Arrays.asList(10L, null, 20L), resultWithConversion);
+  }
+
+  @Test
+  public void testBinaryArrayToList_TooShort() {
+    byte[] data = new byte[11];
+    PGException exception =
+        assertThrows(PGException.class, () -> ArrayParser.binaryArrayToList(data, false));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("Invalid array value", exception.getMessage());
+  }
+
+  @Test
+  public void testBinaryArrayToList_TrailingDataOnZeroDimensions() {
+    byte[] data = new byte[13];
+    ByteConverter.int4(data, 0, 0); // 0 dimensions
+    ByteConverter.int4(data, 4, 0); // null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+    data[12] = 1; // trailing byte
+
+    PGException exception =
+        assertThrows(PGException.class, () -> ArrayParser.binaryArrayToList(data, false));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("Invalid array value", exception.getMessage());
+  }
+
+  @Test
+  public void testBinaryArrayToList_TrailingDataOnOneDimension() {
+    byte[] data = new byte[21];
+    ByteConverter.int4(data, 0, 1); // 1 dimension
+    ByteConverter.int4(data, 4, 0); // null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+    ByteConverter.int4(data, 12, 0); // size = 0
+    ByteConverter.int4(data, 16, 1); // lower bound = 1
+    data[20] = 1; // trailing byte
+
+    PGException exception =
+        assertThrows(PGException.class, () -> ArrayParser.binaryArrayToList(data, false));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("Invalid array value", exception.getMessage());
+  }
+
+  @Test
+  public void testBinaryArrayToList_NegativeDimensions() {
+    byte[] data = new byte[20];
+    ByteConverter.int4(data, 0, -1);
+    PGException exception =
+        assertThrows(PGException.class, () -> ArrayParser.binaryArrayToList(data, false));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("Only single-dimension arrays are supported", exception.getMessage());
+  }
+
+  @Test
+  public void testBinaryArrayToList_NegativeSize() {
+    byte[] data = new byte[20];
+    ByteConverter.int4(data, 0, 1);
+    ByteConverter.int4(data, 4, 0);
+    ByteConverter.int4(data, 8, Oid.INT8);
+    ByteConverter.int4(data, 12, -1);
+    ByteConverter.int4(data, 16, 1);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> ArrayParser.binaryArrayToList(data, false));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("Invalid array value", exception.getMessage());
+  }
+
+  @Test
+  public void testBinaryArrayToList_NegativeElementSize() {
+    byte[] data = new byte[24];
+    ByteConverter.int4(data, 0, 1);
+    ByteConverter.int4(data, 4, 0);
+    ByteConverter.int4(data, 8, Oid.INT8);
+    ByteConverter.int4(data, 12, 1);
+    ByteConverter.int4(data, 16, 1);
+    ByteConverter.int4(data, 20, -2); // invalid element size
+
+    PGException exception =
+        assertThrows(PGException.class, () -> ArrayParser.binaryArrayToList(data, false));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("Invalid array value", exception.getMessage());
+  }
+
+  @Test
+  public void testBinaryArrayToList_SizeExceedsStreamRemaining() {
+    byte[] data = new byte[20];
+    ByteConverter.int4(data, 0, 1);
+    ByteConverter.int4(data, 4, 0);
+    ByteConverter.int4(data, 8, Oid.INT8);
+    ByteConverter.int4(
+        data, 12, 1_000_000_000); // 1 billion elements declared, but 0 remaining bytes
+    ByteConverter.int4(data, 16, 1);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> ArrayParser.binaryArrayToList(data, false));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("Invalid array value", exception.getMessage());
+  }
+
+  @Test
+  public void testBinaryArrayToList_ElementSizeExceedsStreamRemaining() {
+    byte[] data = new byte[24];
+    ByteConverter.int4(data, 0, 1);
+    ByteConverter.int4(data, 4, 0);
+    ByteConverter.int4(data, 8, Oid.INT8);
+    ByteConverter.int4(data, 12, 1);
+    ByteConverter.int4(data, 16, 1);
+    ByteConverter.int4(data, 20, 1_000_000_000); // 1 GB element declared, but 0 remaining bytes
+
+    PGException exception =
+        assertThrows(PGException.class, () -> ArrayParser.binaryArrayToList(data, false));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("Invalid array value", exception.getMessage());
+  }
+
+  @Test
+  public void testBinaryParse_EmptyArray() {
+    ArrayParser parser =
+        new ArrayParser(
+            createArrayResultSet(Type.int64(), Value.int64Array(ImmutableList.of())),
+            0,
+            mock(SessionState.class));
+
+    byte[] binary = parser.binaryParse();
+    assertNotNull(binary);
+    assertEquals(12, binary.length);
+    assertEquals(0, ByteConverter.int4(binary, 0)); // dimensions = 0
+    assertEquals(0, ByteConverter.int4(binary, 4)); // null flag = 0
+    assertEquals(Oid.INT8, ByteConverter.int4(binary, 8)); // oid = INT8
+
+    List<?> roundTrip = ArrayParser.binaryArrayToList(binary, false);
+    assertNotNull(roundTrip);
+    assertTrue(roundTrip.isEmpty());
+  }
+
+  @Test
+  public void testBind_EmptyBinaryArray() {
+    byte[] data = new byte[12];
+    ByteConverter.int4(data, 0, 0); // 0 dimensions
+    ByteConverter.int4(data, 4, 0); // null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+
+    ImmutableMap.Builder<String, Value> builder = ImmutableMap.builder();
+    ArrayParser.bind(
+        builder, "p1", data, Oid.INT8_ARRAY, FormatCode.BINARY, mock(SessionState.class));
+    ImmutableMap<String, Value> parameters = builder.build();
+
+    assertEquals(Value.int64Array(ImmutableList.of()), parameters.get("p1"));
+  }
+
+  @Test
+  public void testArrayParser_BinaryConstructorWithEmptyArray() {
+    byte[] data = new byte[12];
+    ByteConverter.int4(data, 0, 0); // 0 dimensions
+    ByteConverter.int4(data, 4, 0); // null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+
+    ArrayParser parser =
+        new ArrayParser(data, FormatCode.BINARY, mock(SessionState.class), Type.int64(), Oid.INT8);
+
+    assertNotNull(parser.getItem());
+    assertTrue(parser.getItem().isEmpty());
+    assertEquals("{}", parser.stringParse());
+    assertEquals("[]", parser.spannerParse());
+    byte[] binary = parser.binaryParse();
+    assertEquals(12, binary.length);
+    assertEquals(0, ByteConverter.int4(binary, 0));
   }
 
   static ResultSet createArrayResultSet(Type arrayElementType, Value value) {
