@@ -284,7 +284,7 @@ public class ITPgClassTest implements IntegrationTest {
             assertEquals(0, types.getInt("typrelid"));
             count++;
           }
-          assertEquals(31, count);
+          assertEquals(35, count);
         }
       }
     }

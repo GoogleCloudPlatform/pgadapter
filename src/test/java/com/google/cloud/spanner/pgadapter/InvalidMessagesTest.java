@@ -657,4 +657,125 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
       }
     }
   }
+
+  @Test
+  public void testParseMessageDuplicateStatementName() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        // Request startup.
+        outputStream.writeInt(17);
+        outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+        outputStream.writeBytes("user");
+        outputStream.writeByte(0);
+        outputStream.writeBytes("foo");
+        outputStream.writeByte(0);
+        outputStream.flush();
+
+        // Verify that the server responds with auth OK.
+        assertEquals('R', inputStream.readByte());
+        assertEquals(8, inputStream.readInt());
+        assertEquals(0, inputStream.readInt()); // 0 == success
+
+        // Receive key data.
+        assertEquals('K', inputStream.readByte());
+        assertEquals(12, inputStream.readInt());
+        inputStream.readInt();
+        inputStream.readInt();
+
+        // Just skip parameter data and wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        // Send first PARSE for "my_stmt"
+        byte[] sqlBytes = "SELECT 1".getBytes(StandardCharsets.UTF_8);
+        byte[] nameBytes = "my_stmt".getBytes(StandardCharsets.UTF_8);
+        outputStream.writeByte('P');
+        outputStream.writeInt(4 + nameBytes.length + 1 + sqlBytes.length + 1 + 2);
+        outputStream.write(nameBytes);
+        outputStream.writeByte(0);
+        outputStream.write(sqlBytes);
+        outputStream.writeByte(0);
+        outputStream.writeShort(0);
+        // SYNC
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+        outputStream.flush();
+
+        // Wait for '1' (ParseComplete) and 'Z' (ReadyForQuery)
+        assertEquals('1', inputStream.readByte());
+        assertEquals(4, inputStream.readInt());
+        assertEquals('Z', inputStream.readByte());
+        assertEquals(5, inputStream.readInt());
+        inputStream.readByte();
+
+        // Now send duplicate PARSE for "my_stmt"
+        byte[] sql2Bytes = "SELECT 2".getBytes(StandardCharsets.UTF_8);
+        outputStream.writeByte('P');
+        outputStream.writeInt(4 + nameBytes.length + 1 + sql2Bytes.length + 1 + 2);
+        outputStream.write(nameBytes);
+        outputStream.writeByte(0);
+        outputStream.write(sql2Bytes);
+        outputStream.writeByte(0);
+        outputStream.writeShort(0);
+        // SYNC
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+        outputStream.flush();
+
+        // Verify that we receive 'E' (ErrorResponse) followed by 'Z' (ReadyForQuery)
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] errorBytes = new byte[length - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("prepared statement \"my_stmt\" already exists"));
+        assertTrue(errorPayload.contains("42P05"));
+
+        assertEquals('Z', inputStream.readByte());
+        assertEquals(5, inputStream.readInt());
+        inputStream.readByte();
+
+        // Bind and execute "my_stmt" to confirm the original statement is still valid.
+        outputStream.writeByte('B');
+        outputStream.writeInt(4 + 1 + nameBytes.length + 1 + 2 + 2 + 2);
+        outputStream.writeByte(0); // Unnamed portal
+        outputStream.write(nameBytes);
+        outputStream.writeByte(0); // Statement name "my_stmt"
+        outputStream.writeShort(0); // Zero parameter format codes
+        outputStream.writeShort(0); // Zero parameter values
+        outputStream.writeShort(0); // Zero result format codes
+
+        outputStream.writeByte('E');
+        outputStream.writeInt(4 + 1 + 4);
+        outputStream.writeByte(0); // Unnamed portal
+        outputStream.writeInt(0); // Return all rows
+
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+        outputStream.flush();
+
+        assertEquals('2', inputStream.readByte()); // BindComplete
+        assertEquals(4, inputStream.readInt());
+
+        assertEquals('D', inputStream.readByte()); // DataRow
+        int dataRowLength = inputStream.readInt();
+        inputStream.readFully(new byte[dataRowLength - 4]);
+
+        assertEquals('C', inputStream.readByte()); // CommandComplete
+        int commandCompleteLength = inputStream.readInt();
+        inputStream.readFully(new byte[commandCompleteLength - 4]);
+
+        assertEquals('Z', inputStream.readByte()); // ReadyForQuery
+        assertEquals(5, inputStream.readInt());
+        inputStream.readByte();
+      }
+    }
+  }
 }
