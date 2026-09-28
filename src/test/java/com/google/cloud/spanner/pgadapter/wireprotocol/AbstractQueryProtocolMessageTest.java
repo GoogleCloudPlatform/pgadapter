@@ -32,6 +32,7 @@ public class AbstractQueryProtocolMessageTest {
     assertEquals("Received message: 'B'", receivedEventDescription(BindMessage.class));
     assertEquals("Received message: 'D'", receivedEventDescription(DescribeMessage.class));
     assertEquals("Received message: 'E'", receivedEventDescription(ExecuteMessage.class));
+    assertEquals("Received message: 'C'", receivedEventDescription(CloseMessage.class));
   }
 
   @Test
@@ -48,6 +49,8 @@ public class AbstractQueryProtocolMessageTest {
     assertSame(
         receivedEventDescription(ExecuteMessage.class),
         receivedEventDescription(ExecuteMessage.class));
+    assertSame(
+        receivedEventDescription(CloseMessage.class), receivedEventDescription(CloseMessage.class));
   }
 
   /**
