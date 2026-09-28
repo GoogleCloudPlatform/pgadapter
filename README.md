@@ -294,6 +294,15 @@ The following list contains the most frequently used startup options for PGAdapt
     for more information about shutdown modes.
   * Note that `SHUTDOWN [SMART | FAST | IMMEDIATE]` only works on PGAdapter. This command is not
     supported by PostgreSQL.
+
+-z <default-time-zone>
+  * This option specifies the default timezone for new sessions in PGAdapter. If not specified,
+    it defaults to UTC.
+  * Use this option to set a specific default timezone (for example Europe/Berlin or America/New_York)
+    for applications that rely on a specific default timezone without explicitly setting it.
+    Specifying `localtime` (e.g. `-z localtime`) will use the JVM host system's default timezone.
+  * Long option: --default-time-zone <default-time-zone>.
+  * Can also be configured using the Java system property `-Dpgadapter.default_time_zone=<timezone>`.
 ```
 
 * See [command line arguments](docs/command_line_arguments.md) for a list of all supported arguments.

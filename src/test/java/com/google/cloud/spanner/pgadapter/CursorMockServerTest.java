@@ -291,6 +291,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
                   PSQLException.class,
                   () -> connection.createStatement().execute(operation + " " + dir + " from c1"));
           assertEquals(SQLState.FeatureNotSupported.toString(), exception.getSQLState());
+          connection.createStatement().execute("rollback");
         }
       }
     }
@@ -480,6 +481,7 @@ public class CursorMockServerTest extends AbstractMockServerTest {
         }
         assertThrows(
             PSQLException.class, () -> connection.createStatement().executeQuery("fetch 1 c1"));
+        connection.rollback();
       }
     }
   }

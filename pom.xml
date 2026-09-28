@@ -57,7 +57,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.21.0</version>
+    <version>1.22.0</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -80,33 +80,33 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.88.1</version>
+        <version>26.89.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-spanner-bom</artifactId>
-        <version>6.122.0</version>
+        <version>6.123.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-bom</artifactId>
-        <version>1.65.0</version>
+        <version>1.66.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk18on</artifactId>
-        <version>1.85.2</version>
+        <version>1.86</version>
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcutil-jdk18on</artifactId>
-        <version>1.85</version>
+        <version>1.86</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -231,7 +231,7 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.85</version>
+      <version>1.86</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.mojo</groupId>
@@ -351,6 +351,25 @@
           com.google.cloud.spanner.pgadapter.IntegrationTest
         </excludedTests>
       </properties>
+    </profile>
+
+    <!--
+      No-op SLF4J provider for the spanner-pg-connector distribution: the connector hands the
+      terminal to a client such as psql, and SLF4J 2.x warns on stderr when no provider is present.
+      Kept out of the 'assembly' profile, which also builds the published PGAdapter distribution,
+      where this would silently disable all SLF4J logging.
+      Build with: mvn -P assembly,connector -DskipTests clean package
+    -->
+    <profile>
+      <id>connector</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-nop</artifactId>
+          <version>2.0.20</version>
+          <scope>runtime</scope>
+        </dependency>
+      </dependencies>
     </profile>
 
     <profile>

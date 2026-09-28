@@ -104,6 +104,15 @@
     the value of this option could cause a client or driver to alter its behavior and cause unexpected
     errors when used with PGAdapter.
 
+-z <default-time-zone>
+  * This option specifies the default timezone for new sessions in PGAdapter. If not specified,
+    it defaults to UTC.
+  * Use this option to set a specific default timezone (for example Europe/Berlin or America/New_York)
+    for applications that rely on a specific default timezone without explicitly setting it.
+    Specifying `localtime` (e.g. `-z localtime`) will use the JVM host system's default timezone.
+  * Long option: --default-time-zone <default-time-zone> (also accepts --default_time_zone).
+  * Can also be configured using the Java system property `-Dpgadapter.default_time_zone=<timezone>`.
+
 -max_backlog <maximum number of backlog connections>
   * Maximum queue length of incoming pending connections. Defaults to 1000.
 

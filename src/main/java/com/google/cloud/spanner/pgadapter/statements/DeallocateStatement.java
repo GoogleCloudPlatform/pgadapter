@@ -83,6 +83,9 @@ public class DeallocateStatement extends IntermediatePortalStatement {
       }
     } catch (Exception exception) {
       setFutureStatementResult(Futures.immediateFailedFuture(exception));
+      backendConnection.execute(
+          new InvalidStatement(
+              connectionHandler, options, parsedStatement, originalStatement, exception));
       return;
     }
     setFutureStatementResult(Futures.immediateFuture(new NoResult()));
@@ -119,6 +122,10 @@ public class DeallocateStatement extends IntermediatePortalStatement {
             "invalid prepared statement name", SQLState.InvalidSqlStatementName);
       }
       statementName = unquoteOrFoldIdentifier(name.name);
+      if (statementName == null || statementName.isEmpty()) {
+        throw PGExceptionFactory.newPGException(
+            "zero-length delimited identifier", SQLState.InvalidSqlStatementName);
+      }
     }
     parser.skipWhitespaces();
     if (parser.getPos() < parser.getSql().length()) {

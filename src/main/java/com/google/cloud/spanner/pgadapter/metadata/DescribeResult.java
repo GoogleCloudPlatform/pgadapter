@@ -27,41 +27,61 @@ import javax.annotation.Nullable;
 
 @InternalApi
 public class DescribeResult {
+  private final int[] givenParameterTypes;
+  @Nullable private final StructType undeclaredParameters;
   @Nullable private final Type columns;
   private final int[] parameters;
 
-  public static DescribeResult of(int[] parameters, @Nullable Type columns) {
-    return new DescribeResult(parameters, columns);
+  public static DescribeResult of(int[] givenParameterTypes, @Nullable Type columns) {
+    return new DescribeResult(givenParameterTypes, columns);
   }
 
   public DescribeResult(int[] givenParameterTypes, @Nullable ResultSet resultMetadata) {
     this(
-        extractParameters(givenParameterTypes, resultMetadata),
+        givenParameterTypes,
+        resultMetadata == null || !resultMetadata.getMetadata().hasUndeclaredParameters()
+            ? null
+            : resultMetadata.getMetadata().getUndeclaredParameters(),
         resultMetadata == null ? null : resultMetadata.getType());
   }
 
-  public DescribeResult(int[] parameters, @Nullable Type columns) {
-    this.parameters = Preconditions.checkNotNull(parameters);
+  private DescribeResult(int[] givenParameterTypes, @Nullable Type columns) {
+    this(givenParameterTypes, null, columns);
+  }
+
+  private DescribeResult(
+      int[] givenParameterTypes,
+      @Nullable StructType undeclaredParameters,
+      @Nullable Type columns) {
+    this.givenParameterTypes = Preconditions.checkNotNull(givenParameterTypes);
+    this.undeclaredParameters = undeclaredParameters;
+    this.parameters = extractParameters(givenParameterTypes, undeclaredParameters);
     this.columns = columns;
   }
 
-  static int[] extractParameters(int[] givenParameterTypes, @Nullable ResultSet resultSet) {
-    if (resultSet == null || !resultSet.getMetadata().hasUndeclaredParameters()) {
+  /**
+   * Returns a {@link DescribeResult} that applies the specified {@code givenParameterTypes} on top
+   * of the backend's inferred {@code undeclaredParameters}.
+   */
+  public DescribeResult withGivenParameterTypes(int[] givenParameterTypes) {
+    if (Arrays.equals(this.givenParameterTypes, givenParameterTypes)) {
+      return this;
+    }
+    return new DescribeResult(givenParameterTypes, this.undeclaredParameters, this.columns);
+  }
+
+  static int[] extractParameters(
+      int[] givenParameterTypes, @Nullable StructType undeclaredParameters) {
+    if (undeclaredParameters == null) {
       return givenParameterTypes;
     }
-    return extractParameterTypes(
-        givenParameterTypes, resultSet.getMetadata().getUndeclaredParameters());
+    return extractParameterTypes(givenParameterTypes, undeclaredParameters);
   }
 
   static int[] extractParameterTypes(int[] givenParameterTypes, StructType parameters) {
-    int[] result;
     int maxParamIndex = maxParamNumber(parameters);
-    if (maxParamIndex == givenParameterTypes.length) {
-      result = givenParameterTypes;
-    } else {
-      result =
-          Arrays.copyOf(givenParameterTypes, Math.max(givenParameterTypes.length, maxParamIndex));
-    }
+    int[] result =
+        Arrays.copyOf(givenParameterTypes, Math.max(givenParameterTypes.length, maxParamIndex));
     for (int i = 0; i < parameters.getFieldsCount(); i++) {
       // Only override parameter types that were not specified by the frontend.
       int paramIndex = Integer.parseInt(parameters.getFields(i).getName().substring(1)) - 1;

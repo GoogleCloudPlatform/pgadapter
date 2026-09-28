@@ -18,8 +18,10 @@ import static com.google.cloud.spanner.pgadapter.parsers.Parser.getArrayElementO
 import static com.google.cloud.spanner.pgadapter.parsers.Parser.toOid;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +44,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -371,6 +374,44 @@ public class ParserTest {
     validate(parser, byteResult, stringResult, spannerResult);
   }
 
+  @Test
+  public void testEmptyLongArrayParsing() {
+    byte[] byteResult = {
+      0, 0, 0, 0, // 0 dimensions
+      0, 0, 0, 0, // 0 null flag
+      0, 0, 0, 20 // Oid.INT8
+    };
+    byte[] stringResult = {'{', '}'};
+    byte[] spannerResult = {'[', ']'};
+
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.int64()));
+    when(resultSet.getValue(0)).thenReturn(Value.int64Array(Collections.emptyList()));
+
+    ArrayParser parser = new ArrayParser(resultSet, 0, mock(SessionState.class));
+
+    validate(parser, byteResult, stringResult, spannerResult);
+  }
+
+  @Test
+  public void testEmptyStringArrayParsing() {
+    byte[] byteResult = {
+      0, 0, 0, 0, // 0 dimensions
+      0, 0, 0, 0, // 0 null flag
+      0, 0, 4, 19 // Oid.VARCHAR (1043)
+    };
+    byte[] stringResult = {'{', '}'};
+    byte[] spannerResult = {'[', ']'};
+
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.string()));
+    when(resultSet.getValue(0)).thenReturn(Value.stringArray(Collections.emptyList()));
+
+    ArrayParser parser = new ArrayParser(resultSet, 0, mock(SessionState.class));
+
+    validate(parser, byteResult, stringResult, spannerResult);
+  }
+
   @Test(expected = IllegalArgumentException.class)
   public void testArrayArrayParsingFails() {
     ResultSet resultSet = mock(ResultSet.class);
@@ -460,6 +501,18 @@ public class ParserTest {
     assertThrows(PGException.class, () -> toOid(createType(TypeCode.STRUCT)));
     assertThrows(PGException.class, () -> toOid(createArrayType(TypeCode.ARRAY)));
     assertThrows(PGException.class, () -> toOid(createArrayType(TypeCode.STRUCT)));
+  }
+
+  @Test
+  public void testParseEmptyTextArray() {
+    assertEquals(
+        Collections.emptyList(),
+        Parser.create(
+                mock(SessionState.class),
+                "{}".getBytes(StandardCharsets.UTF_8),
+                Oid.INT8_ARRAY,
+                FormatCode.TEXT)
+            .getItem());
   }
 
   @Test
@@ -749,6 +802,64 @@ public class ParserTest {
             PGException.class,
             () -> Parser.create(mock(SessionState.class), data, Oid.INT8_ARRAY, FormatCode.BINARY));
     assertEquals("Only single-dimension arrays are supported", exception.getMessage());
+  }
+
+  @Test
+  public void testParseBinaryArray_EmptyArray_ZeroDimensions() {
+    byte[] data = new byte[12];
+    ByteConverter.int4(data, 0, 0); // 0 dimensions
+    ByteConverter.int4(data, 4, 0); // Null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+
+    Parser<?> parser =
+        Parser.create(mock(SessionState.class), data, Oid.INT8_ARRAY, FormatCode.BINARY);
+    assertTrue(parser instanceof ArrayParser);
+    ArrayParser arrayParser = (ArrayParser) parser;
+    assertNotNull(arrayParser.getItem());
+    assertTrue(arrayParser.getItem().isEmpty());
+    assertEquals("{}", arrayParser.stringParse());
+    assertEquals("[]", arrayParser.spannerParse());
+  }
+
+  @Test
+  public void testParseBinaryArray_EmptyArray_OneDimension() {
+    byte[] data = new byte[20];
+    ByteConverter.int4(data, 0, 1); // 1 dimension
+    ByteConverter.int4(data, 4, 0); // Null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+    ByteConverter.int4(data, 12, 0); // length = 0
+    ByteConverter.int4(data, 16, 1); // base 1
+
+    Parser<?> parser =
+        Parser.create(mock(SessionState.class), data, Oid.INT8_ARRAY, FormatCode.BINARY);
+    assertTrue(parser instanceof ArrayParser);
+    ArrayParser arrayParser = (ArrayParser) parser;
+    assertNotNull(arrayParser.getItem());
+    assertTrue(arrayParser.getItem().isEmpty());
+    assertEquals("{}", arrayParser.stringParse());
+    assertEquals("[]", arrayParser.spannerParse());
+  }
+
+  @Test
+  public void testParseBinaryArray_SingleDimensionWithElements() {
+    byte[] data = new byte[20 + 4 + 8 + 4 + 8];
+    ByteConverter.int4(data, 0, 1); // 1 dimension
+    ByteConverter.int4(data, 4, 0); // Null flag
+    ByteConverter.int4(data, 8, Oid.INT8); // oid
+    ByteConverter.int4(data, 12, 2); // size = 2
+    ByteConverter.int4(data, 16, 1); // lower bound = 1
+    ByteConverter.int4(data, 20, 8); // element 1 size = 8
+    ByteConverter.int8(data, 24, 100L); // element 1 value = 100
+    ByteConverter.int4(data, 32, 8); // element 2 size = 8
+    ByteConverter.int8(data, 36, 200L); // element 2 value = 200
+
+    Parser<?> parser =
+        Parser.create(mock(SessionState.class), data, Oid.INT8_ARRAY, FormatCode.BINARY);
+    assertTrue(parser instanceof ArrayParser);
+    ArrayParser arrayParser = (ArrayParser) parser;
+    assertEquals(Arrays.asList(100L, 200L), arrayParser.getItem());
+    assertEquals("{100,200}", arrayParser.stringParse());
+    assertEquals("[100,200]", arrayParser.spannerParse());
   }
 
   @Test

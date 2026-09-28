@@ -41,6 +41,8 @@ import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CloseStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
@@ -72,9 +74,10 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'P';
+  private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final String name;
-  private final IntermediatePreparedStatement statement;
+  private IntermediatePreparedStatement statement;
   private final int[] parameterDataTypes;
 
   public ParseMessage(ConnectionHandler connection) throws Exception {
@@ -117,7 +120,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
         createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
   }
 
-  static IntermediatePreparedStatement createStatement(
+  public static IntermediatePreparedStatement createStatement(
       ConnectionHandler connectionHandler,
       String name,
       ParsedStatement parsedStatement,
@@ -274,30 +277,53 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   }
 
   @Override
-  void buffer(BackendConnection backendConnection) throws Exception {
+  void buffer(BackendConnection backendConnection) {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
-      throw new IllegalStateException("Must close statement before reusing name.");
+      this.statement =
+          new InvalidStatement(
+              this.connection,
+              this.connection.getServer().getOptions(),
+              this.name,
+              this.statement.getParsedStatement(),
+              this.statement.getOriginalStatement(),
+              PGExceptionFactory.newPGException(
+                  String.format("prepared statement \"%s\" already exists", this.name),
+                  SQLState.DuplicatePreparedStatement));
+      if (backendConnection != null) {
+        backendConnection.execute((InvalidStatement) this.statement);
+      }
+      return;
     }
-    if (this.statement.hasException()) {
-      handleError(statement.getException());
-    } else {
-      this.connection.registerStatement(this.name, this.statement);
+    if (this.statement instanceof InvalidStatement) {
+      if (backendConnection != null) {
+        backendConnection.execute((InvalidStatement) this.statement);
+      }
     }
+    this.connection.registerStatement(this.name, this.statement);
   }
 
   @Override
   public void flush() throws Exception {
     if (statement.hasException()) {
-      if (!Strings.isNullOrEmpty(this.name)) {
-        // Remove the statement again from the connection if it failed. Note that we cannot just
-        // wait with registering the statement on the connection until this flush call, as other
-        // incoming messages might depend on the statement before the response is flushed.
+      // Remove the statement again from the connection if it failed. Note that we cannot just
+      // wait with registering the statement on the connection until this flush call, as other
+      // incoming messages might depend on the statement before the response is flushed.
+      if (this.connection.hasStatement(this.name)
+          && this.connection.getStatement(this.name) == this.statement) {
         this.connection.closeStatement(this.name);
       }
       handleError(statement.getException());
     } else if (isExtendedProtocol()) {
       // The simple query protocol does not need the ParseComplete response.
       ParseCompleteResponse.send(this.outputStream);
+    }
+  }
+
+  @Override
+  public void abort() {
+    if (this.connection.hasStatement(this.name)
+        && this.connection.getStatement(this.name) == this.statement) {
+      this.connection.closeStatement(this.name);
     }
   }
 
@@ -318,6 +344,11 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   @Override
   public String getIdentifier() {
     return String.valueOf(IDENTIFIER);
+  }
+
+  @Override
+  public String receivedEventDescription() {
+    return RECEIVED_EVENT_DESCRIPTION;
   }
 
   @Override

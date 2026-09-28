@@ -102,7 +102,11 @@ public class SimpleQueryStatement {
             break;
           }
         }
-        new ParseMessage(connectionHandler, parsedStatement, statement).send();
+        ParseMessage parseMessage = new ParseMessage(connectionHandler, parsedStatement, statement);
+        parseMessage.send();
+        if (parseMessage.getStatement().hasException()) {
+          break;
+        }
         new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
         new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
         new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
@@ -135,12 +139,13 @@ public class SimpleQueryStatement {
   @VisibleForTesting
   static Statement translatePotentialMetadataCommand(
       Statement parsedStatement, ConnectionHandler connectionHandler) {
-    Tracer tracer = connectionHandler.getExtendedQueryProtocolHandler().getTracer();
+    ExtendedQueryProtocolHandler queryProtocolHandler =
+        connectionHandler.getExtendedQueryProtocolHandler();
+    Tracer tracer = queryProtocolHandler.getTracer();
     Span span =
         tracer
             .spanBuilder("translatePotentialMetadataCommand")
-            .setAttribute(
-                "pgadapter.connection_id", connectionHandler.getTraceConnectionId().toString())
+            .setAttribute("pgadapter.connection_id", queryProtocolHandler.getConnectionId())
             .setAttribute(DB_STATEMENT, parsedStatement.getSql())
             .startSpan();
     try (Scope ignore = span.makeCurrent()) {

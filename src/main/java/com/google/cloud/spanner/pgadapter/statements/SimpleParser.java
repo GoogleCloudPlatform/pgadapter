@@ -19,6 +19,8 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.parsers.ArrayLiteralParser;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -154,14 +156,10 @@ public class SimpleParser {
     }
 
     String getValue() {
-      return getValue(false);
-    }
-
-    String getValue(boolean returnRawHexValue) {
       if (this.value == null) {
         this.value =
             this.escaped
-                ? unescapeQuotedStringValue(this.rawValue, this.quote, returnRawHexValue)
+                ? unescapeQuotedStringValue(this.rawValue, this.quote)
                 : quotedStringValue(this.rawValue, this.quote);
       }
       return this.value;
@@ -182,18 +180,13 @@ public class SimpleParser {
     }
 
     static String unescapeQuotedStringValue(String quotedString, char quoteChar) {
-      return unescapeQuotedStringValue(quotedString, quoteChar, false);
-    }
-
-    static String unescapeQuotedStringValue(
-        String quotedString, char quoteChar, boolean returnRawHexValue) {
       if (quotedString.length() < 2
           || quotedString.charAt(0) != quoteChar
           || quotedString.charAt(quotedString.length() - 1) != quoteChar) {
         throw PGExceptionFactory.newPGException(
             quotedString + " is not a valid string", SQLState.SyntaxError);
       }
-      if (!returnRawHexValue && quotedString.startsWith(quoteChar + "\\x")) {
+      if (quotedString.startsWith(quoteChar + "\\x")) {
         throw PGExceptionFactory.newPGException(
             "PGAdapter does not support hexadecimal byte values in string literals",
             SQLState.SyntaxError);
@@ -410,43 +403,8 @@ public class SimpleParser {
     return true;
   }
 
-  public static List<String> readArrayLiteral(String expression, boolean returnRawHexValue) {
-    List<String> result = new ArrayList<>();
-    SimpleParser parser = new SimpleParser(expression);
-    if (!parser.eatToken("{")) {
-      throw PGExceptionFactory.newPGException(
-          "Missing '{' at start of array value: " + expression, SQLState.InvalidParameterValue);
-    }
-    do {
-      if (result.isEmpty() && parser.peekToken("}")) {
-        break;
-      } else if (parser.eatKeyword("null")) {
-        result.add(null);
-      } else if (parser.peekToken("\"")) {
-        QuotedString quotedString = parser.readQuotedString('"', true);
-        if (quotedString == null) {
-          throw PGExceptionFactory.newPGException(
-              "Invalid string in array: " + expression, SQLState.InvalidParameterValue);
-        }
-        result.add(quotedString.getValue(returnRawHexValue));
-      } else {
-        String unquotedString = parser.parseExpressionUntilKeyword(ImmutableList.of("}"));
-        if (unquotedString == null) {
-          throw PGExceptionFactory.newPGException(
-              "Invalid element in array: " + expression, SQLState.InvalidParameterValue);
-        }
-        result.add(unquotedString);
-      }
-    } while (parser.eatToken(","));
-    if (!parser.eatToken("}")) {
-      throw PGExceptionFactory.newPGException(
-          "Missing '}' at end of array value: " + expression, SQLState.InvalidParameterValue);
-    }
-    if (parser.hasMoreTokens()) {
-      throw PGExceptionFactory.newPGException(
-          "Unexpected characters after array value: " + expression, SQLState.InvalidParameterValue);
-    }
-    return result;
+  public static List<String> readArrayLiteral(String expression) {
+    return ArrayLiteralParser.readArrayLiteral(expression);
   }
 
   /**
@@ -574,8 +532,7 @@ public class SimpleParser {
       } else if (stopAtEndOfExpression && parens == 0 && stopAtComma && sql.charAt(pos) == ',') {
         break;
       }
-      if ((!sameParensLevelAsStart || parens == 0)
-          && keywords.stream().anyMatch(this::peekKeyword)) {
+      if ((!sameParensLevelAsStart || parens == 0) && peekAnyKeyword(keywords)) {
         break;
       }
       pos++;
@@ -584,6 +541,31 @@ public class SimpleParser {
       return null;
     }
     return sql.substring(start, pos).trim();
+  }
+
+  /** Returns true if any of the given keywords is found at the current position. */
+  @VisibleForTesting
+  boolean peekAnyKeyword(ImmutableList<String> keywords) {
+    if (keywords.isEmpty()) {
+      return false;
+    }
+    // This is called for every character of an expression, so skip whitespace once and use an
+    // indexed loop. Both a stream and an iterator would allocate.
+    int originalPosition = pos;
+    skipWhitespaces();
+    if (pos >= sql.length()) {
+      pos = originalPosition;
+      return false;
+    }
+    int size = keywords.size();
+    for (int index = 0; index < size; index++) {
+      if (peek(false, true, keywords.get(index))) {
+        pos = originalPosition;
+        return true;
+      }
+    }
+    pos = originalPosition;
+    return false;
   }
 
   List<TableOrIndexName> readTableList() {
@@ -892,7 +874,7 @@ public class SimpleParser {
       }
       return false;
     }
-    if (sql.substring(pos, pos + keyword.length()).equalsIgnoreCase(keyword)
+    if (sql.regionMatches(true, pos, keyword, 0, keyword.length())
         && (!requireWhitespaceAfter || isValidEndOfKeyword(pos + keyword.length()))) {
       if (updatePos) {
         pos = pos + keyword.length();

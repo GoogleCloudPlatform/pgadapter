@@ -70,6 +70,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import com.google.spanner.v1.TransactionOptions.IsolationLevel;
@@ -92,7 +96,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -715,6 +718,15 @@ public class ConnectionHandler implements Runnable {
     portal.close();
   }
 
+  /**
+   * Unregisters a portal from the connection map without closing it. Returns the unregistered
+   * portal, or null if no portal was registered with this name. Unlike {@link
+   * #closePortal(String)}, this method does not throw an exception if the portal is not found.
+   */
+  public IntermediatePortalStatement unregisterPortal(String portalName) {
+    return this.portalsMap.remove(portalName);
+  }
+
   public boolean hasPortal(String portalName) {
     return this.portalsMap.containsKey(portalName);
   }
@@ -810,19 +822,41 @@ public class ConnectionHandler implements Runnable {
    * Returns the parameter types of a cached auto-described statement, or null if none is available
    * in the cache.
    */
-  public Future<DescribeResult> getAutoDescribedStatement(String sql) {
+  public DescribeResult getAutoDescribedStatement(String sql) {
     if (this.databaseName == null) {
       return null;
     }
     return this.server.autoDescribedStatementsCache.getIfPresent(this.databaseName + sql);
   }
 
-  /** Stores the parameter types of an auto-described statement in the cache. */
-  public void registerAutoDescribedStatement(String sql, Future<DescribeResult> describeResult) {
+  /**
+   * Registers an auto-described statement to be stored in the server-wide cache once its {@link
+   * DescribeResult} completes successfully.
+   *
+   * <p>The statement is intentionally not added to the cache while the {@code AnalyzeSql} request
+   * is still in flight or if the request fails or is cancelled. This prevents an abandoned or
+   * failed auto-describe on one connection from blocking or poisoning other connections.
+   */
+  public void registerAutoDescribedStatement(
+      String sql, ListenableFuture<DescribeResult> describeResult) {
     if (this.databaseName == null) {
       return;
     }
-    this.server.autoDescribedStatementsCache.put(this.databaseName + sql, describeResult);
+    String key = this.databaseName + sql;
+    Futures.addCallback(
+        describeResult,
+        new FutureCallback<DescribeResult>() {
+          @Override
+          public void onSuccess(DescribeResult result) {
+            server.autoDescribedStatementsCache.put(key, result);
+          }
+
+          @Override
+          public void onFailure(Throwable throwable) {
+            // Do not cache failed or cancelled auto-describe results.
+          }
+        },
+        MoreExecutors.directExecutor());
   }
 
   private boolean shouldSkipForClientDetection(
@@ -846,6 +880,16 @@ public class ConnectionHandler implements Runnable {
           SQLState.InvalidSqlStatementName);
     }
     this.statementsMap.remove(statementName);
+  }
+
+  /**
+   * Unregisters a prepared statement from the connection map without closing it. Returns the
+   * unregistered statement, or null if no statement was registered with this name. Unlike {@link
+   * #closeStatement(String)}, this method does not throw an exception if the statement is not
+   * found.
+   */
+  public IntermediatePreparedStatement unregisterStatement(String statementName) {
+    return this.statementsMap.remove(statementName);
   }
 
   public void closeAllStatements() {

@@ -67,6 +67,15 @@ import org.w3c.dom.NodeList;
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
 
+  /** Exit code that is used when PGAdapter could not be started. */
+  private static final int EXIT_CODE_STARTUP_FAILED = 1;
+
+  /** Exit code that is used by POSIX shells for 'command not found'. */
+  private static final int EXIT_CODE_COMMAND_NOT_FOUND = 127;
+
+  /** Exit code that is used by POSIX shells for a process that was stopped by SIGINT (128 + 2). */
+  private static final int EXIT_CODE_INTERRUPTED = 130;
+
   private static volatile ShutdownHandler shutdownHandler;
 
   /**
@@ -74,6 +83,18 @@ public class Server {
    * application. Here we call for parameter parsing and start the Proxy Server.
    */
   public static void main(String[] args) {
+    int exitCode = run(args);
+    if (exitCode != 0) {
+      System.exit(exitCode);
+    }
+  }
+
+  /**
+   * Runs PGAdapter and returns the exit code that this process should use. Returns zero without
+   * blocking when PGAdapter is started in the background, as the proxy keeps the JVM alive.
+   */
+  @VisibleForTesting
+  static int run(String[] args) {
     try {
       DefaultLogConfiguration.configureLogging(args);
       OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
@@ -100,20 +121,36 @@ public class Server {
         Object previousIntHandler = ignoreInterruptSignal();
         try {
           // runCommand will block until the command has finished (e.g. when the user exits psql).
-          runCommand(proxyServer, database, optionsMetadata.getCommand());
+          return runCommand(proxyServer, database, optionsMetadata.getCommand());
+        } catch (IOException couldNotStart) {
+          System.err.printf(
+              "The command could not be started: %s%n",
+              couldNotStart.getMessage() == null
+                  ? couldNotStart.toString()
+                  : couldNotStart.getMessage());
+          return EXIT_CODE_COMMAND_NOT_FOUND;
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          return EXIT_CODE_INTERRUPTED;
         } finally {
           restoreSignalHandler("INT", previousIntHandler);
           // Shut down PGAdapter when the command has finished.
           stopServerQuietly(proxyServer);
         }
       }
+      return 0;
     } catch (Exception e) {
       printError(e, System.err, System.out);
+      return EXIT_CODE_STARTUP_FAILED;
     }
   }
 
+  /**
+   * Runs the given command and returns the exit code of the command. The exit code is {@code 128 +
+   * N} if the command was terminated by signal N.
+   */
   @VisibleForTesting
-  public static void runCommand(
+  public static int runCommand(
       ProxyServer proxyServer, @Nullable String database, String... command)
       throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
@@ -124,6 +161,17 @@ public class Server {
       builder.environment().put("PGDATABASE", database);
     }
     builder.inheritIO();
+    return startAndWait(builder, proxyServer);
+  }
+
+  /**
+   * Starts the process that is described by the given builder and waits for it to finish, returning
+   * its exit code. The process is stopped together with the given server if this JVM is terminated
+   * before the process has finished, or if the waiting thread is interrupted.
+   */
+  @VisibleForTesting
+  static int startAndWait(ProcessBuilder builder, ProxyServer proxyServer)
+      throws IOException, InterruptedException {
     Process process = builder.start();
     Thread shutdownHook =
         new Thread(() -> stopCommand(process, proxyServer), "pgadapter-cmd-shutdown-hook");
@@ -131,10 +179,10 @@ public class Server {
       Runtime.getRuntime().addShutdownHook(shutdownHook);
     } catch (IllegalStateException shutdownInProgress) {
       stopCommand(process, proxyServer);
-      return;
+      return process.waitFor();
     }
     try {
-      process.waitFor();
+      return process.waitFor();
     } catch (InterruptedException interrupted) {
       stopCommand(process, proxyServer);
       throw interrupted;
@@ -161,7 +209,7 @@ public class Server {
     stopServerQuietly(proxyServer);
   }
 
-  private static void stopServerQuietly(@Nullable ProxyServer proxyServer) {
+  static void stopServerQuietly(@Nullable ProxyServer proxyServer) {
     if (proxyServer == null) {
       return;
     }
@@ -172,7 +220,7 @@ public class Server {
     }
   }
 
-  private static void removeShutdownHook(Thread shutdownHook) {
+  static void removeShutdownHook(Thread shutdownHook) {
     try {
       Runtime.getRuntime().removeShutdownHook(shutdownHook);
     } catch (IllegalStateException ignore) {

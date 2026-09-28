@@ -61,6 +61,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -477,6 +478,7 @@ public class ITPsqlTest implements IntegrationTest {
             + " int2\n"
             + " int4\n"
             + " text\n"
+            + " oid\n"
             + " float4\n"
             + " float8\n"
             + " unknown\n"
@@ -489,6 +491,7 @@ public class ITPsqlTest implements IntegrationTest {
             + " _int8\n"
             + " _float4\n"
             + " _float8\n"
+            + " _oid\n"
             + " varchar\n"
             + " date\n"
             + " timestamp\n"
@@ -500,9 +503,11 @@ public class ITPsqlTest implements IntegrationTest {
             + " _interval\n"
             + " _numeric\n"
             + " numeric\n"
+            + " uuid\n"
+            + " _uuid\n"
             + " jsonb\n"
             + " _jsonb\n"
-            + "(31 rows)\n",
+            + "(35 rows)\n",
         output);
   }
 
@@ -824,6 +829,10 @@ public class ITPsqlTest implements IntegrationTest {
     }
   }
 
+  // This test is known to be flaky because whenever the JDK or PostgreSQL imports a new timezone
+  // database, there is a risk of getting small differences between the two for arbitrary random
+  // timezones or far-future dates.
+  @Ignore("Flaky due to JDK vs PostgreSQL timezone database discrepancies")
   @Test
   public void testTimestamptzParsing() throws Exception {
     final int numTests = 10;

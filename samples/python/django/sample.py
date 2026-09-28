@@ -21,6 +21,7 @@ import pytz
 import random
 import string
 import sys
+import traceback
 from django.db import connection
 from django.db import transaction
 from django.db.transaction import atomic
@@ -271,7 +272,7 @@ if __name__ == "__main__":
     print('Django Sample Completed Successfully')
 
   except Exception as e:
-    print(e)
+    traceback.print_exc()
     if tables_created:
       delete_all_data()
     sys.exit(1)

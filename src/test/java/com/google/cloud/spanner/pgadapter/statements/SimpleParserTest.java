@@ -113,6 +113,108 @@ public class SimpleParserTest {
   }
 
   @Test
+  public void testEatKeywordIgnoresCase() {
+    assertTrue(new SimpleParser("INSERT INTO foo").eatKeyword("insert", "into"));
+    assertTrue(new SimpleParser("InSeRt InTo foo").eatKeyword("insert", "into"));
+    assertTrue(new SimpleParser("insert into foo").eatKeyword("INSERT", "INTO"));
+
+    assertFalse(new SimpleParser("INSET INTO foo").eatKeyword("insert"));
+    assertFalse(new SimpleParser("INSERTINTO foo").eatKeyword("insert", "into"));
+
+    // The keyword is compared with the same case folding as String.equalsIgnoreCase, which maps
+    // U+0130 (LATIN CAPITAL LETTER I WITH DOT ABOVE) to 'i'.
+    assertTrue(new SimpleParser("\u0130NSERT INTO foo").eatKeyword("insert", "into"));
+  }
+
+  @Test
+  public void testEatKeywordAtEndOfInput() {
+    assertTrue(new SimpleParser("insert").eatKeyword("insert"));
+    assertFalse(new SimpleParser("ins").eatKeyword("insert"));
+    assertFalse(new SimpleParser("").eatKeyword("insert"));
+    assertFalse(new SimpleParser("insert into").eatKeyword("insert", "into", "foo"));
+  }
+
+  @Test
+  public void testPeekKeywordKeepsPosition() {
+    SimpleParser parser = new SimpleParser("  insert into foo");
+    assertTrue(parser.peekKeyword("insert"));
+    assertEquals(0, parser.getPos());
+
+    assertFalse(parser.peekKeyword("update"));
+    assertEquals(0, parser.getPos());
+
+    assertTrue(parser.eatKeyword("insert"));
+    assertEquals(8, parser.getPos());
+  }
+
+  @Test
+  public void testPeekAnyKeyword() {
+    // Empty keyword list returns false and preserves position.
+    SimpleParser emptyKeywordParser = new SimpleParser("select * from foo");
+    assertFalse(emptyKeywordParser.peekAnyKeyword(ImmutableList.of()));
+    assertEquals(0, emptyKeywordParser.getPos());
+
+    // Matches first keyword at the current position.
+    SimpleParser selectParser = new SimpleParser("select * from foo");
+    assertTrue(selectParser.peekAnyKeyword(ImmutableList.of("select", "insert", "update")));
+    assertEquals(0, selectParser.getPos());
+
+    // Matches later keyword in the list.
+    SimpleParser offsetParser = new SimpleParser("offset 10");
+    assertTrue(offsetParser.peekAnyKeyword(ImmutableList.of("limit", "order", "offset")));
+    assertEquals(0, offsetParser.getPos());
+
+    // Case-insensitive match.
+    SimpleParser upperCaseParser = new SimpleParser("SELECT * FROM foo");
+    assertTrue(upperCaseParser.peekAnyKeyword(ImmutableList.of("select")));
+    assertEquals(0, upperCaseParser.getPos());
+
+    // Skips leading whitespace before keyword and preserves position.
+    SimpleParser whitespaceParser = new SimpleParser("   \t\n  select * from foo");
+    assertTrue(whitespaceParser.peekAnyKeyword(ImmutableList.of("insert", "select", "update")));
+    assertEquals(0, whitespaceParser.getPos());
+
+    // Skips single-line comment before keyword.
+    SimpleParser singleLineCommentParser = new SimpleParser("-- comment\n select * from foo");
+    assertTrue(singleLineCommentParser.peekAnyKeyword(ImmutableList.of("select")));
+    assertEquals(0, singleLineCommentParser.getPos());
+
+    // Skips multi-line comment before keyword.
+    SimpleParser multiLineCommentParser =
+        new SimpleParser("/* multi\nline\ncomment */ select * from foo");
+    assertTrue(multiLineCommentParser.peekAnyKeyword(ImmutableList.of("select")));
+    assertEquals(0, multiLineCommentParser.getPos());
+
+    // No keyword matches.
+    SimpleParser deleteParser = new SimpleParser("delete from foo");
+    assertFalse(deleteParser.peekAnyKeyword(ImmutableList.of("select", "insert", "update")));
+    assertEquals(0, deleteParser.getPos());
+
+    // Partial keyword is not a match (boundary check).
+    SimpleParser partialKeywordParser = new SimpleParser("selection from foo");
+    assertFalse(partialKeywordParser.peekAnyKeyword(ImmutableList.of("select")));
+    assertEquals(0, partialKeywordParser.getPos());
+
+    // At end of input.
+    SimpleParser endOfInputParser = new SimpleParser("foo");
+    endOfInputParser.setPos(3);
+    assertFalse(endOfInputParser.peekAnyKeyword(ImmutableList.of("select", "from")));
+    assertEquals(3, endOfInputParser.getPos());
+
+    // Only whitespace remaining until end of input.
+    SimpleParser trailingWhitespaceParser = new SimpleParser("foo   \t\n  ");
+    trailingWhitespaceParser.setPos(3);
+    assertFalse(trailingWhitespaceParser.peekAnyKeyword(ImmutableList.of("select", "from")));
+    assertEquals(3, trailingWhitespaceParser.getPos());
+
+    // Only comments and whitespace remaining until end of input.
+    SimpleParser trailingCommentParser = new SimpleParser("foo /* comment */ -- line\n ");
+    trailingCommentParser.setPos(3);
+    assertFalse(trailingCommentParser.peekAnyKeyword(ImmutableList.of("select", "from")));
+    assertEquals(3, trailingCommentParser.getPos());
+  }
+
+  @Test
   public void testEatToken() {
     assertTrue(new SimpleParser("(foo").eatToken("("));
     assertTrue(new SimpleParser("(").eatToken("("));
@@ -371,6 +473,72 @@ public class SimpleParserTest {
   }
 
   @Test
+  public void testParseExpressionUntilOneOfSeveralKeywords() {
+    // The expression stops at whichever keyword occurs first, regardless of its position in the
+    // list.
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1 order by name")
+            .parseExpressionUntilKeyword(ImmutableList.of("order", "limit", "offset")));
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1 order by name")
+            .parseExpressionUntilKeyword(ImmutableList.of("limit", "offset", "order")));
+    assertEquals(
+        "select * from foo where id=1 limit 10",
+        new SimpleParser("select * from foo where id=1 limit 10 offset 5")
+            .parseExpressionUntilKeyword(ImmutableList.of("offset", "for")));
+
+    // No keyword matches, so the whole expression is returned.
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1")
+            .parseExpressionUntilKeyword(ImmutableList.of("limit", "offset")));
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1")
+            .parseExpressionUntilKeyword(ImmutableList.of()));
+
+    // Keywords are only checked at the start parentheses level if that is requested.
+    assertEquals(
+        "foo(order by)",
+        new SimpleParser("foo(order by) order by x")
+            .parseExpressionUntilKeyword(ImmutableList.of("limit", "order"), true, true));
+
+    // Whitespace and comments before keywords are handled properly.
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1   \t\n   order by name")
+            .parseExpressionUntilKeyword(ImmutableList.of("order", "limit", "offset")));
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1 /* comment */ order by name")
+            .parseExpressionUntilKeyword(ImmutableList.of("order", "limit", "offset")));
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1 -- comment\n order by name")
+            .parseExpressionUntilKeyword(ImmutableList.of("order", "limit", "offset")));
+
+    // Case-insensitivity in expression keywords.
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1 ORDER BY name")
+            .parseExpressionUntilKeyword(ImmutableList.of("order", "limit", "offset")));
+
+    // Keyword that appears as part of an identifier does not terminate prematurely.
+    assertEquals(
+        "select * from foo where order_id=1",
+        new SimpleParser("select * from foo where order_id=1 order by name")
+            .parseExpressionUntilKeyword(ImmutableList.of("order", "limit", "offset")));
+
+    // Expression with trailing whitespace when no keyword matches.
+    assertEquals(
+        "select * from foo where id=1",
+        new SimpleParser("select * from foo where id=1   ")
+            .parseExpressionUntilKeyword(ImmutableList.of("limit", "offset")));
+  }
+
+  @Test
   public void testParseCommand() {
     assertEquals("SELECT", parseCommand("select * from foo"));
     assertEquals("INSERT", parseCommand("insert into foo values (1, 'One')"));
@@ -499,28 +667,48 @@ public class SimpleParserTest {
 
   @Test
   public void testReadArrayLiteral() {
-    assertEquals(ImmutableList.of(), SimpleParser.readArrayLiteral("{}", true));
-    assertEquals(ImmutableList.of("foo"), SimpleParser.readArrayLiteral("{\"foo\"}", true));
+    assertEquals(ImmutableList.of(), SimpleParser.readArrayLiteral("{}"));
+    assertEquals(ImmutableList.of("foo"), SimpleParser.readArrayLiteral("{\"foo\"}"));
     assertEquals(
-        ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{\"foo\", \"bar\"}", true));
+        ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{\"foo\", \"bar\"}"));
     assertEquals(
         Arrays.asList("foo", "bar", null),
-        SimpleParser.readArrayLiteral("{\"foo\", \"bar\", null}", true));
-    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{1, 2}", true));
-    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{\"1\", \"2\"}", true));
+        SimpleParser.readArrayLiteral("{\"foo\", \"bar\", null}"));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{1, 2}"));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{\"1\", \"2\"}"));
     assertEquals(
         ImmutableList.of("{\"foo\": \"bar\"}"),
-        SimpleParser.readArrayLiteral("{\"{\\\"foo\\\": \\\"bar\\\"}\"}", true));
+        SimpleParser.readArrayLiteral("{\"{\\\"foo\\\": \\\"bar\\\"}\"}"));
 
-    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2", true));
-    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2", true));
-    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2}", true));
-    assertThrows(
-        PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2} extra token", true));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2} extra token"));
 
-    assertEquals(ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{foo, bar}", true));
+    assertEquals(ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{foo, bar}"));
     assertEquals(
-        ImmutableList.of("foo 1", "bar 2"), SimpleParser.readArrayLiteral("{foo 1, bar 2}", true));
+        ImmutableList.of("foo 1", "bar 2"), SimpleParser.readArrayLiteral("{foo 1, bar 2}"));
+    assertEquals(
+        ImmutableList.of("{\"k\":\"\"}"),
+        SimpleParser.readArrayLiteral("{\"{\\\"k\\\":\\\"\\\"}\"}"));
+    assertEquals(ImmutableList.of("--foo"), SimpleParser.readArrayLiteral("{--foo}"));
+    assertEquals(ImmutableList.of("a", "--", "b"), SimpleParser.readArrayLiteral("{a, --, b}"));
+    assertEquals(ImmutableList.of("/*comment*/"), SimpleParser.readArrayLiteral("{/*comment*/}"));
+    assertEquals(ImmutableList.of("C:\\user"), SimpleParser.readArrayLiteral("{\"C:\\\\user\"}"));
+    assertEquals(
+        ImmutableList.of("a\\n", "b\\u1234"),
+        SimpleParser.readArrayLiteral("{\"a\\\\n\", \"b\\\\u1234\"}"));
+    assertEquals(ImmutableList.of(",", "}"), SimpleParser.readArrayLiteral("{\\,, \\}}"));
+    assertEquals(
+        Arrays.asList("foo", "null", null),
+        SimpleParser.readArrayLiteral("{\"foo\", \\null, null}"));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("[1:2]={1, 2}"));
+
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1,}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{,1}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1,,2}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{\"foo\"bar}"));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{foo\"bar}"));
   }
 
   @Test

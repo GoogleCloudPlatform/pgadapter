@@ -35,7 +35,6 @@ import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -48,14 +47,17 @@ public class ExtendedQueryProtocolHandler {
   private static final Logger logger =
       Logger.getLogger(ExtendedQueryProtocolHandler.class.getName());
 
-  private final LinkedList<AbstractQueryProtocolMessage> messages = new LinkedList<>();
+  @VisibleForTesting static final int DEFAULT_BUFFER_CAPACITY = 32;
+  @VisibleForTesting static final int MAX_BUFFER_CAPACITY = 256;
+
+  private final ArrayList<AbstractQueryProtocolMessage> messages;
   private final ConnectionHandler connectionHandler;
   private final BackendConnection backendConnection;
 
   private final String connectionId;
-  private volatile Span span;
-  private volatile Scope scope;
-  private volatile Stopwatch stopwatch;
+  private Span span;
+  private Scope scope;
+  private Stopwatch stopwatch;
 
   /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
@@ -80,9 +82,18 @@ public class ExtendedQueryProtocolHandler {
   @VisibleForTesting
   public ExtendedQueryProtocolHandler(
       ConnectionHandler connectionHandler, BackendConnection backendConnection) {
+    this(connectionHandler, backendConnection, new ArrayList<>(DEFAULT_BUFFER_CAPACITY));
+  }
+
+  @VisibleForTesting
+  ExtendedQueryProtocolHandler(
+      ConnectionHandler connectionHandler,
+      BackendConnection backendConnection,
+      ArrayList<AbstractQueryProtocolMessage> messages) {
     this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
     this.connectionId = connectionHandler.getTraceConnectionId().toString();
     this.backendConnection = Preconditions.checkNotNull(backendConnection);
+    this.messages = Preconditions.checkNotNull(messages);
   }
 
   /** Returns the backend PG connection for this query handler. */
@@ -92,6 +103,11 @@ public class ExtendedQueryProtocolHandler {
 
   public Tracer getTracer() {
     return backendConnection.getTracer();
+  }
+
+  /** Returns the connection id that is used as a trace attribute. */
+  public String getConnectionId() {
+    return connectionId;
   }
 
   @VisibleForTesting
@@ -138,7 +154,13 @@ public class ExtendedQueryProtocolHandler {
    * received.
    */
   public void buffer(AbstractQueryProtocolMessage message) {
-    addEvent(message.receivedEventDescription(), Attributes.of(DB_STATEMENT, message.getSql()));
+    // Only build the event if the span actually records it. A null check is not enough: the span is
+    // a no-op span if tracing is disabled, and building an event that is then dropped would
+    // allocate for every message that is received. The span is only null if the message was not
+    // created by the wire protocol.
+    if (isRecordingEvents()) {
+      addEvent(message.receivedEventDescription(), Attributes.of(DB_STATEMENT, message.getSql()));
+    }
     messages.add(message);
   }
 
@@ -198,7 +220,8 @@ public class ExtendedQueryProtocolHandler {
     addEvent("Flushing messages");
     logger.log(Level.FINER, Logging.format("Flushing messages", Action.Starting));
     try {
-      for (AbstractQueryProtocolMessage message : messages) {
+      for (int i = 0; i < messages.size(); i++) {
+        AbstractQueryProtocolMessage message = messages.get(i);
         logger.log(
             Level.FINEST,
             Logging.format(
@@ -209,6 +232,21 @@ public class ExtendedQueryProtocolHandler {
             Logging.format(
                 "Flushing message", Action.Finished, () -> String.format("Message: %s", message)));
         if (message.isReturnedErrorResponse()) {
+          // Abort remaining messages in reverse (LIFO) order to correctly unwind state mutations in
+          // the opposite order that they were registered/buffered (e.g. if a pipeline contains a
+          // Close followed by a Parse/Bind reusing the same statement or portal name, or both
+          // creation and closure of a statement in the same aborted pipeline).
+          for (int j = messages.size() - 1; j > i; j--) {
+            AbstractQueryProtocolMessage messageToAbort = messages.get(j);
+            try {
+              messageToAbort.abort();
+            } catch (Exception exception) {
+              logger.log(
+                  Level.WARNING,
+                  exception,
+                  () -> String.format("Failed to abort message: %s", messageToAbort));
+            }
+          }
           break;
         }
       }
@@ -225,10 +263,23 @@ public class ExtendedQueryProtocolHandler {
       throw exception;
     } finally {
       connectionHandler.getConnectionMetadata().getOutputStream().flush();
+      boolean shouldTrimToSize = messages.size() > MAX_BUFFER_CAPACITY;
       messages.clear();
+      if (shouldTrimToSize) {
+        messages.trimToSize();
+        messages.ensureCapacity(DEFAULT_BUFFER_CAPACITY);
+      }
       logger.log(Level.FINER, Logging.format("Flushing messages", Action.Finished));
       endSpan();
     }
+  }
+
+  /**
+   * Returns true if the current span records the events that are added to it. Events that are added
+   * to a span that does not record them are dropped, so building them is a waste of time.
+   */
+  private boolean isRecordingEvents() {
+    return span != null && span.isRecording();
   }
 
   private void addEvent(String event) {
