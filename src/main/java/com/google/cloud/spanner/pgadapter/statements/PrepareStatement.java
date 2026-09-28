@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.unquoteOrFoldIdentifier;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
@@ -22,20 +24,21 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TypeDefinition;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
-import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
@@ -144,28 +147,74 @@ public class PrepareStatement extends IntermediatePortalStatement {
   public void executeAsync(BackendConnection backendConnection) {
     if (!this.executed) {
       this.executed = true;
-      try {
-        new ParseMessage(
-                connectionHandler,
-                preparedStatement.name,
-                preparedStatement.dataTypes,
-                preparedStatement.parsedPreparedStatement,
-                preparedStatement.originalPreparedStatement)
-            .send();
-        new DescribeMessage(
-                connectionHandler,
-                PreparedType.Statement,
-                preparedStatement.name,
-                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-            .send();
-      } catch (Exception exception) {
+      if (this.connectionHandler.hasStatement(this.preparedStatement.name)) {
+        PGException exception =
+            PGExceptionFactory.newPGException(
+                String.format(
+                    "prepared statement \"%s\" already exists", this.preparedStatement.name),
+                SQLState.DuplicatePreparedStatement);
         setFutureStatementResult(Futures.immediateFailedFuture(exception));
         backendConnection.execute(
             new InvalidStatement(
-                connectionHandler, options, parsedStatement, originalStatement, exception));
+                this.connectionHandler,
+                this.options,
+                this.parsedStatement,
+                this.originalStatement,
+                exception));
         return;
       }
-      setFutureStatementResult(Futures.immediateFuture(new NoResult(getCommandTag())));
+      IntermediatePreparedStatement statement =
+          ParseMessage.createStatement(
+              this.connectionHandler,
+              this.preparedStatement.name,
+              this.preparedStatement.parsedPreparedStatement,
+              this.preparedStatement.originalPreparedStatement,
+              this.preparedStatement.dataTypes);
+      if (statement instanceof InvalidStatement) {
+        setFutureStatementResult(Futures.immediateFailedFuture(statement.getException()));
+        backendConnection.execute((InvalidStatement) statement);
+        return;
+      }
+      ListenableFuture<StatementResult> analyzeResult;
+      try {
+        Future<StatementResult> describeFuture = statement.describeAsync(backendConnection);
+        Preconditions.checkState(
+            describeFuture instanceof ListenableFuture,
+            "describeAsync must return an instance of ListenableFuture");
+        analyzeResult = (ListenableFuture<StatementResult>) describeFuture;
+      } catch (Exception exception) {
+        PGException pgException = PGExceptionFactory.toPGException(exception);
+        setFutureStatementResult(Futures.immediateFailedFuture(pgException));
+        backendConnection.execute(
+            new InvalidStatement(
+                this.connectionHandler,
+                this.options,
+                this.parsedStatement,
+                this.originalStatement,
+                pgException));
+        return;
+      }
+      this.connectionHandler.registerStatement(this.preparedStatement.name, statement);
+      Futures.addCallback(
+          analyzeResult,
+          new FutureCallback<StatementResult>() {
+            @Override
+            public void onSuccess(StatementResult result) {}
+
+            @Override
+            public void onFailure(Throwable throwable) {
+              if (connectionHandler.hasStatement(preparedStatement.name)
+                  && connectionHandler.getStatement(preparedStatement.name) == statement) {
+                connectionHandler.closeStatement(preparedStatement.name);
+              }
+            }
+          },
+          MoreExecutors.directExecutor());
+      setFutureStatementResult(
+          Futures.transform(
+              analyzeResult,
+              ignored -> new NoResult(getCommandTag()),
+              MoreExecutors.directExecutor()));
     }
   }
 
@@ -196,6 +245,11 @@ public class PrepareStatement extends IntermediatePortalStatement {
       throw PGExceptionFactory.newPGException(
           "invalid prepared statement name", SQLState.InvalidSqlStatementName);
     }
+    String statementName = unquoteOrFoldIdentifier(name.name);
+    if (statementName == null || statementName.isEmpty()) {
+      throw PGExceptionFactory.newPGException(
+          "zero-length delimited identifier", SQLState.InvalidSqlStatementName);
+    }
     ImmutableList.Builder<Integer> dataTypesBuilder = ImmutableList.builder();
     if (parser.eatToken("(")) {
       List<String> dataTypesNames = parser.parseExpressionList();
@@ -216,7 +270,7 @@ public class PrepareStatement extends IntermediatePortalStatement {
           "missing 'AS' keyword in PREPARE statement: " + sql, SQLState.SyntaxError);
     }
     return new ParsedPreparedStatement(
-        name.name,
+        statementName,
         dataTypesBuilder.build().stream().mapToInt(i -> i).toArray(),
         parser.getSql().substring(parser.getPos()).trim());
   }
