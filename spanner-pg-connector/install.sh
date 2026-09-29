@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Google Cloud Spanner PG Connector - One-line Installer
-# Safely installs the PG Connector CLI bundle and optimizes its startup speed.
+# Safely installs the PG Connector CLI bundle.
 
 set -e
 
@@ -52,8 +52,10 @@ if [ -z "${VERSION}" ]; then
     | grep -oE '"name": "[^"]+"' \
     | cut -d'"' -f4 \
     | awk -F/ '{print $NF}' \
-    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+    | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' \
+    | awk '{v=$0; sub(/^v/, "", v); print v, $0}' \
     | sort -t. -k 1,1n -k 2,2n -k 3,3n \
+    | awk '{print $2}' \
     | tail -n 1)
 
   # If curl didn't find any version and gcloud is installed, try gcloud as fallback
@@ -64,8 +66,10 @@ if [ -z "${VERSION}" ]; then
       --location="${AR_LOCATION}" \
       --repository="${AR_REPOSITORY}" \
       --format="value(name)" 2>/dev/null \
-      | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+      | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' \
+      | awk '{v=$0; sub(/^v/, "", v); print v, $0}' \
       | sort -t. -k 1,1n -k 2,2n -k 3,3n \
+      | awk '{print $2}' \
       | tail -n 1 || true)
   fi
 
@@ -195,7 +199,6 @@ done
 # versions of the same dependency. INSTALL_DIR itself is left alone, so a shell sitting in it does
 # not block the upgrade and unmanaged files survive.
 mkdir -p "${INSTALL_DIR}"
-rm -f "${INSTALL_DIR}/pgadapter.jsa" "${INSTALL_DIR}/install_path.txt"
 for managed in lib custom-jre pgadapter.jar spanner-pg-connector spgc; do
   rm -rf "${INSTALL_DIR:?}/${managed}"
   if [ -e "${STAGING_DIR}/${managed}" ]; then
