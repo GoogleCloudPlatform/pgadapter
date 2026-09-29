@@ -366,7 +366,9 @@ public class SimpleParser {
   /** Returns the command tag of the given SQL string */
   public static String parseCommand(String sql) {
     SimpleParser parser = new SimpleParser(sql);
+    parser.skipOpeningParentheses();
     if (parser.eatKeyword("with")) {
+      parser.eatKeyword("recursive");
       do {
         if (!parser.skipCommonTableExpression()) {
           // Return WITH as the command tag if we encounter an invalid CTE. This is for safety, as
@@ -375,10 +377,12 @@ public class SimpleParser {
           return "WITH";
         }
       } while (parser.eatToken(","));
+      parser.skipOpeningParentheses();
     }
     CharSequence keyword = parser.readKeyword();
     if (keyword.length() == 0) {
       parser.setPos(0);
+      parser.skipOpeningParentheses();
       keyword = parser.readKeyword();
     }
     return keyword.toString().toUpperCase();
@@ -388,13 +392,16 @@ public class SimpleParser {
   public static boolean isCommand(String command, String query) {
     Preconditions.checkNotNull(command);
     Preconditions.checkNotNull(query);
-    return new SimpleParser(query).peekKeyword(command);
+    SimpleParser parser = new SimpleParser(query);
+    parser.skipOpeningParentheses();
+    return parser.peekKeyword(command);
   }
 
   public static boolean isCommand(ImmutableList<String> commands, String query) {
     Preconditions.checkNotNull(commands);
     Preconditions.checkNotNull(query);
     SimpleParser parser = new SimpleParser(query);
+    parser.skipOpeningParentheses();
     for (String command : commands) {
       if (!parser.eatKeyword(command)) {
         return false;
@@ -457,10 +464,18 @@ public class SimpleParser {
     if (!eatKeyword("as")) {
       return false;
     }
+    eatKeyword("not");
+    eatKeyword("materialized");
     if (!eatToken("(")) {
       return false;
     }
-    parseExpressionUntilKeyword(ImmutableList.of());
+    // Parse the CTE query expression until the matching closing parenthesis of 'AS (...)'.
+    // Do not stop at commas, as the CTE query may contain comma-separated expressions or columns.
+    parseExpressionUntilKeyword(
+        ImmutableList.of(),
+        /* sameParensLevelAsStart= */ false,
+        /* stopAtEndOfExpression= */ true,
+        /* stopAtComma= */ false);
     if (!eatToken(")")) {
       return false;
     }
@@ -761,6 +776,13 @@ public class SimpleParser {
 
   boolean eatToken(String token) {
     return eat(true, false, token);
+  }
+
+  /** Skips any opening parentheses at the current position. */
+  private void skipOpeningParentheses() {
+    while (eatToken("(")) {
+      // Opening parentheses are ignored when parsing the command.
+    }
   }
 
   /** Eats everything until an end parentheses at the same level as the current level. */
