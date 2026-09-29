@@ -46,7 +46,7 @@ import org.postgresql.util.ByteConverter;
 @InternalApi
 public class TimestampParser extends Parser<Timestamp> {
 
-  private static final int MICROSECONDS_IN_SECOND = 1000000;
+  private static final long MICROSECONDS_IN_SECOND = 1_000_000L;
   private static final long NANOSECONDS_IN_MICROSECONDS = 1000L;
   private static final char TIMESTAMP_SEPARATOR = 'T';
   private static final char EMPTY_SPACE = ' ';
@@ -122,11 +122,19 @@ public class TimestampParser extends Parser<Timestamp> {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid length for timestamptz: " + data.length);
     }
-    long pgMicros = ByteConverter.int8(data, 0);
-    com.google.cloud.Timestamp ts = com.google.cloud.Timestamp.ofTimeMicroseconds(pgMicros);
-    long javaSeconds = ts.getSeconds() + PG_EPOCH_SECONDS;
-    int javaNanos = ts.getNanos();
-    return Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanos);
+    long pgMicroseconds = ByteConverter.int8(data, 0);
+    // Use floor division and floor modulo so that negative microsecond offsets (timestamps before
+    // 2000-01-01) properly adjust whole seconds and produce a non-negative fractional remainder.
+    long pgSeconds = Math.floorDiv(pgMicroseconds, MICROSECONDS_IN_SECOND);
+    long remainingMicroseconds = Math.floorMod(pgMicroseconds, MICROSECONDS_IN_SECOND);
+    long javaSeconds = pgSeconds + PG_EPOCH_SECONDS;
+    int javaNanoseconds = (int) (remainingMicroseconds * NANOSECONDS_IN_MICROSECONDS);
+    try {
+      return Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanoseconds);
+    } catch (IllegalArgumentException illegalArgumentException) {
+      throw PGExceptionFactory.newPGException(
+          "timestamp out of range", SQLState.DatetimeFieldOverflow);
+    }
   }
 
   /**
