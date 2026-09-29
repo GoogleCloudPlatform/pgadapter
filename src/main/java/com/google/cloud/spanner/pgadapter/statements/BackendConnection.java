@@ -1231,6 +1231,7 @@ public class BackendConnection {
         }
       }
     } catch (Exception exception) {
+      failBufferedStatements(exception);
       // The connection should not transition to the ABORTED state if a COMMIT or ROLLBACK fails.
       if (isCommit(index) || isRollback(index)) {
         clearCurrentTransaction();
@@ -1246,13 +1247,8 @@ public class BackendConnection {
       } else if (spannerConnection.isDdlBatchActive()) {
         spannerConnection.abortBatch();
       }
-      if (index + 1 < bufferedStatements.size()) {
-        for (BufferedStatement<?> bufferedStatement :
-            bufferedStatements.subList(index + 1, bufferedStatements.size())) {
-          bufferedStatement.result.setException(exception);
-        }
-      }
     } finally {
+      failBufferedStatements(PGExceptionFactory.newQueryCancelledException());
       bufferedStatements.clear();
     }
   }
@@ -1273,6 +1269,20 @@ public class BackendConnection {
     } finally {
       if (timeoutUnit != null) {
         spannerConnection.setStatementTimeout(previousTimeout, timeoutUnit);
+      }
+    }
+  }
+
+  /** Closes this backend connection and cancels any buffered statements. */
+  public void close() {
+    failBufferedStatements(PGExceptionFactory.newQueryCancelledException());
+    bufferedStatements.clear();
+  }
+
+  private void failBufferedStatements(Exception exception) {
+    for (BufferedStatement<?> bufferedStatement : bufferedStatements) {
+      if (!bufferedStatement.result.isDone()) {
+        bufferedStatement.result.setException(exception);
       }
     }
   }
