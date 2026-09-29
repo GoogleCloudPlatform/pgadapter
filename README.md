@@ -188,6 +188,20 @@ class PGProxyRunner {
 See [samples/java/jdbc](samples/java/jdbc) for a small sample application that adds
 PGAdapter as a compile-time dependency and runs it together with the main application.
 
+### Spanner PG Connector (`spgc`)
+
+`spanner-pg-connector` (aliased as `spgc`) is a CLI tool designed to make working with existing
+PostgreSQL command-line tools (such as `psql` or `pg_dump`) against Cloud Spanner
+easier. It bundles PGAdapter and a minimal Java runtime—so you do not need Java or Docker installed
+locally—and automatically starts and stops PGAdapter in the background when running your tool.
+
+```shell
+spgc psql -d "projects/my-project/instances/my-instance/databases/my-database"
+```
+
+See [spanner-pg-connector/README.md](spanner-pg-connector/README.md) for installation instructions,
+authentication, environment variables, and more examples.
+
 ## Emulator
 A pre-built Docker image that contains both PGAdapter and the Spanner Emulator can be started with
 these commands:
