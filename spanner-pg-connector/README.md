@@ -30,11 +30,11 @@ to your `PATH`. You can customize the installation with `VERSION` and `INSTALL_D
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
 ```shell
 curl -fsSL https://raw.githubusercontent.com/GoogleCloudPlatform/pgadapter/postgresql-dialect/spanner-pg-connector/install.sh \
-  | VERSION=v0.56.0 INSTALL_DIR="$HOME/.spanner-pg-connector" sh
+  | VERSION=v0.56.1 INSTALL_DIR="$HOME/.spanner-pg-connector" sh
 ```
 
 ```powershell
-$env:VERSION = "v0.56.0"; $env:INSTALL_DIR = "$HOME\.spanner-pg-connector"; irm https://raw.githubusercontent.com/GoogleCloudPlatform/pgadapter/postgresql-dialect/spanner-pg-connector/install.ps1 | iex
+$env:VERSION = "v0.56.1"; $env:INSTALL_DIR = "$HOME\.spanner-pg-connector"; irm https://raw.githubusercontent.com/GoogleCloudPlatform/pgadapter/postgresql-dialect/spanner-pg-connector/install.ps1 | iex
 ```
 <!--- {x-version-update-end} -->
 
@@ -47,7 +47,7 @@ your `PATH` (both `spanner-pg-connector` and `spgc` are included in the archive)
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
 ```shell
-VERSION=v0.56.0
+VERSION=v0.56.1
 PLATFORM=linux-x64 # linux-x64, mac-aarch64, or mac-x64
 mkdir -p ~/.spanner-pg-connector
 curl -fsSL "https://artifactregistry.googleapis.com/v1/projects/cloud-spanner-pg-adapter/locations/us/repositories/spanner-pg-connector/files/spanner-pg-connector:${VERSION}:spanner-pg-connector-${PLATFORM}.tar.gz:download?alt=media" \
@@ -60,7 +60,7 @@ export PATH="$HOME/.spanner-pg-connector:$PATH"
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
 ```powershell
-$Version = "v0.56.0"
+$Version = "v0.56.1"
 $InstallDir = Join-Path $HOME ".spanner-pg-connector"
 $ZipPath = Join-Path $env:TEMP "spanner-pg-connector-windows-x64.zip"
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
