@@ -76,7 +76,7 @@ New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
 try {
     # 2. Download package
     Write-Host "Downloading package from Artifact Registry..."
-    $DownloadUrl = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/files/spanner-pg-connector:$Version:spanner-pg-connector-windows-x64.zip:download?alt=media"
+    $DownloadUrl = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/files/spanner-pg-connector:${Version}:spanner-pg-connector-windows-x64.zip:download?alt=media"
 
     $DownloadSuccess = $false
     try {
