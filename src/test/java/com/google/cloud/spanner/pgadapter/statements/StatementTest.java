@@ -261,6 +261,175 @@ public class StatementTest {
   }
 
   @Test
+  public void testGetResultFormatCode_NullOrEmpty() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String sql = "SELECT * FROM users";
+    IntermediatePreparedStatement preparedStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql));
+
+    IntermediatePortalStatement nullCodesPortal =
+        new IntermediatePortalStatement("", preparedStatement, NO_PARAMS, NO_FORMAT_CODES, null);
+    assertEquals(0, nullCodesPortal.getResultFormatCode(0));
+    assertEquals(0, nullCodesPortal.getResultFormatCode(5));
+
+    IntermediatePortalStatement emptyCodesPortal =
+        new IntermediatePortalStatement(
+            "", preparedStatement, NO_PARAMS, NO_FORMAT_CODES, NO_FORMAT_CODES);
+    assertEquals(0, emptyCodesPortal.getResultFormatCode(0));
+    assertEquals(0, emptyCodesPortal.getResultFormatCode(5));
+  }
+
+  @Test
+  public void testGetResultFormatCode_SingleCode() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String sql = "SELECT * FROM users";
+    IntermediatePreparedStatement preparedStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql));
+
+    short[] singleBinaryCode = new short[] {1};
+    IntermediatePortalStatement portal =
+        new IntermediatePortalStatement(
+            "", preparedStatement, NO_PARAMS, NO_FORMAT_CODES, singleBinaryCode);
+
+    assertEquals(1, portal.getResultFormatCode(0));
+    assertEquals(1, portal.getResultFormatCode(1));
+    assertEquals(1, portal.getResultFormatCode(7));
+    assertEquals(1, portal.getResultFormatCode(100));
+  }
+
+  @Test
+  public void testGetResultFormatCode_MultipleCodes_OutOfBoundsHandledSafely() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String sql = "UPDATE t SET v = $1 WHERE id = $2 RETURNING *";
+    IntermediatePreparedStatement preparedStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            "",
+            new int[] {Oid.VARCHAR, Oid.INT8},
+            parse(sql),
+            Statement.of(sql));
+
+    short[] formatCodes = new short[] {0, 1, 0, 1, 0, 1, 0}; // 7 codes
+    IntermediatePortalStatement portal =
+        new IntermediatePortalStatement(
+            "", preparedStatement, NO_PARAMS, NO_FORMAT_CODES, formatCodes);
+
+    // Within bounds
+    assertEquals(0, portal.getResultFormatCode(0));
+    assertEquals(1, portal.getResultFormatCode(1));
+    assertEquals(0, portal.getResultFormatCode(2));
+    assertEquals(1, portal.getResultFormatCode(3));
+    assertEquals(0, portal.getResultFormatCode(4));
+    assertEquals(1, portal.getResultFormatCode(5));
+    assertEquals(0, portal.getResultFormatCode(6));
+
+    // Out of bounds: 8th and 9th column (indexes 7 and 8) should safely default to 0 without
+    // throwing
+    assertEquals(0, portal.getResultFormatCode(7));
+    assertEquals(0, portal.getResultFormatCode(8));
+
+    // Negative index should also safely return 0 without throwing
+    assertEquals(0, portal.getResultFormatCode(-1));
+  }
+
+  @Test
+  public void testGetResultFormatCode_ContractingSchema_FewerColumnsThanCodes() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String sql = "SELECT * FROM users";
+    IntermediatePreparedStatement preparedStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql));
+
+    short[] formatCodes = new short[] {0, 1, 0, 1, 0, 1, 0, 1}; // 8 codes
+    IntermediatePortalStatement portal =
+        new IntermediatePortalStatement(
+            "", preparedStatement, NO_PARAMS, NO_FORMAT_CODES, formatCodes);
+
+    // Schema contracted: only first 6 columns needed
+    for (int index = 0; index < 6; index++) {
+      assertEquals(formatCodes[index], portal.getResultFormatCode(index));
+    }
+  }
+
+  @Test
+  public void testGetParameterFormatCode_NullOrEmpty() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String sql = "UPDATE t SET v = $1 WHERE id = $2";
+    IntermediatePreparedStatement preparedStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            "",
+            new int[] {Oid.VARCHAR, Oid.INT8},
+            parse(sql),
+            Statement.of(sql));
+
+    IntermediatePortalStatement nullCodesPortal =
+        new IntermediatePortalStatement("", preparedStatement, NO_PARAMS, null, NO_FORMAT_CODES);
+    assertEquals(0, nullCodesPortal.getParameterFormatCode(0));
+    assertEquals(0, nullCodesPortal.getParameterFormatCode(1));
+    assertEquals(0, nullCodesPortal.getParameterFormatCode(-1));
+
+    IntermediatePortalStatement emptyCodesPortal =
+        new IntermediatePortalStatement(
+            "", preparedStatement, NO_PARAMS, NO_FORMAT_CODES, NO_FORMAT_CODES);
+    assertEquals(0, emptyCodesPortal.getParameterFormatCode(0));
+    assertEquals(0, emptyCodesPortal.getParameterFormatCode(1));
+    assertEquals(0, emptyCodesPortal.getParameterFormatCode(-1));
+  }
+
+  @Test
+  public void testGetParameterFormatCode_SingleCode() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String sql = "UPDATE t SET v = $1 WHERE id = $2";
+    IntermediatePreparedStatement preparedStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            "",
+            new int[] {Oid.VARCHAR, Oid.INT8},
+            parse(sql),
+            Statement.of(sql));
+
+    short[] singleBinaryCode = new short[] {1};
+    IntermediatePortalStatement portal =
+        new IntermediatePortalStatement(
+            "", preparedStatement, NO_PARAMS, singleBinaryCode, NO_FORMAT_CODES);
+
+    assertEquals(1, portal.getParameterFormatCode(0));
+    assertEquals(1, portal.getParameterFormatCode(1));
+    assertEquals(1, portal.getParameterFormatCode(5));
+    assertEquals(1, portal.getParameterFormatCode(100));
+  }
+
+  @Test
+  public void testGetParameterFormatCode_MultipleCodes_OutOfBoundsHandledSafely() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String sql = "UPDATE t SET v = $1 WHERE id = $2";
+    IntermediatePreparedStatement preparedStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            "",
+            new int[] {Oid.VARCHAR, Oid.INT8},
+            parse(sql),
+            Statement.of(sql));
+
+    short[] parameterFormatCodes = new short[] {1, 0};
+    IntermediatePortalStatement portal =
+        new IntermediatePortalStatement(
+            "", preparedStatement, NO_PARAMS, parameterFormatCodes, NO_FORMAT_CODES);
+
+    assertEquals(1, portal.getParameterFormatCode(0));
+    assertEquals(0, portal.getParameterFormatCode(1));
+    assertEquals(0, portal.getParameterFormatCode(2));
+    assertEquals(0, portal.getParameterFormatCode(-1));
+  }
+
+  @Test
   public void testDescribeBasicStatementThrowsException() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sql = "SELECT * FROM users";

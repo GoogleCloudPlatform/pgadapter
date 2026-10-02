@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.metadata;
 import static com.google.cloud.spanner.pgadapter.metadata.DescribeResult.extractParameterTypes;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -117,6 +118,37 @@ public class DescribeResultTest {
   }
 
   @Test
+  public void testOf() {
+    com.google.cloud.spanner.Type columnsType =
+        com.google.cloud.spanner.Type.struct(
+            com.google.cloud.spanner.Type.StructField.of(
+                "c1", com.google.cloud.spanner.Type.int64()),
+            com.google.cloud.spanner.Type.StructField.of(
+                "c2", com.google.cloud.spanner.Type.string()));
+    int[] parameters = new int[] {Oid.INT8, Oid.VARCHAR};
+
+    DescribeResult describeResult = DescribeResult.of(parameters, columnsType);
+    assertArrayEquals(parameters, describeResult.getParameters());
+    assertEquals(columnsType, describeResult.getColumns());
+
+    DescribeResult nullColumnsResult = DescribeResult.of(parameters, null);
+    assertArrayEquals(parameters, nullColumnsResult.getParameters());
+    assertNull(nullColumnsResult.getColumns());
+  }
+
+  @Test
+  public void testNullParametersThrows() {
+    com.google.cloud.spanner.Type columnsType =
+        com.google.cloud.spanner.Type.struct(
+            com.google.cloud.spanner.Type.StructField.of(
+                "c1", com.google.cloud.spanner.Type.int64()));
+
+    assertThrows(NullPointerException.class, () -> DescribeResult.of(null, columnsType));
+    assertThrows(NullPointerException.class, () -> DescribeResult.of(null, null));
+    assertThrows(NullPointerException.class, () -> new DescribeResult(null, (ResultSet) null));
+  }
+
+  @Test
   public void testWithGivenParameterTypes() {
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
@@ -150,7 +182,7 @@ public class DescribeResultTest {
     DescribeResult updated = result.withGivenParameterTypes(new int[] {Oid.INT8, Oid.UNSPECIFIED});
     assertArrayEquals(new int[] {Oid.INT8, Oid.INT8}, updated.getParameters());
 
-    DescribeResult nullMetadataResult = new DescribeResult(initialGivenTypes, null);
+    DescribeResult nullMetadataResult = new DescribeResult(initialGivenTypes, (ResultSet) null);
     assertArrayEquals(
         new int[] {Oid.INT8, Oid.UNSPECIFIED},
         nullMetadataResult
