@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.56.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.0...v0.56.1) (2026-10-01)
+
+
+### Dependencies
+
+* bump base images for Docker (multiplatform) ([#4983](https://github.com/GoogleCloudPlatform/pgadapter/issues/4983)) ([360a6a8](https://github.com/GoogleCloudPlatform/pgadapter/commit/360a6a853276f452d1f4d1a8ff670207e37179e9))
+* update dependency nunit to v5 ([#4978](https://github.com/GoogleCloudPlatform/pgadapter/issues/4978)) ([746b0b0](https://github.com/GoogleCloudPlatform/pgadapter/commit/746b0b0185a64435208a38a333aff31c1d0334e7))
+
 ## [0.56.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.55.3...v0.56.0) (2026-10-01)
 
 
