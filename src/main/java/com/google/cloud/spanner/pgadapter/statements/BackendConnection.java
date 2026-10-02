@@ -242,6 +242,10 @@ public class BackendConnection {
 
     abstract boolean isUpdate();
 
+    boolean isClientSide() {
+      return false;
+    }
+
     void execute() {
       Span span = createSpan(toString(), statement);
       try (Scope ignore = span.makeCurrent()) {
@@ -272,6 +276,9 @@ public class BackendConnection {
     private final String command;
     private final Function<Statement, Statement> statementBinder;
     private final boolean analyze;
+    private final LocalStatement localStatement;
+    private final SessionStatement sessionStatement;
+    private final boolean clientSide;
 
     Execute(
         String command,
@@ -291,6 +298,19 @@ public class BackendConnection {
       this.command = command;
       this.statementBinder = statementBinder;
       this.analyze = analyze;
+      LocalStatement localStatement = getLocalStatement(this.statement);
+      if (localStatement != null && !localStatement.hasReplacementStatement()) {
+        this.localStatement = localStatement;
+        this.sessionStatement = null;
+        this.clientSide = true;
+      } else {
+        this.localStatement = null;
+        this.sessionStatement = getSessionManagementStatement(this.statement, this.parsedStatement);
+        this.clientSide =
+            !isTransactionStatement(this.parsedStatement)
+                && (this.parsedStatement.getType() == StatementType.CLIENT_SIDE
+                    || this.sessionStatement != null);
+      }
     }
 
     @Override
@@ -309,6 +329,11 @@ public class BackendConnection {
     }
 
     @Override
+    boolean isClientSide() {
+      return this.clientSide;
+    }
+
+    @Override
     void doExecute() {
       Statement updatedStatement = statement;
       try {
@@ -318,13 +343,10 @@ public class BackendConnection {
         //  SELECT statements, then we should create a read-only transaction. Also, if a transaction
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
-        SessionStatement sessionStatement =
-            getSessionManagementStatement(updatedStatement, parsedStatement);
-        LocalStatement localStatement = getLocalStatement(statement);
-        if (localStatement != null && !localStatement.hasReplacementStatement()) {
-          result.set(localStatement.execute(BackendConnection.this, statement));
-        } else if (sessionStatement != null) {
-          result.set(sessionStatement.execute(sessionState, spannerConnection));
+        if (this.localStatement != null) {
+          result.set(this.localStatement.execute(BackendConnection.this, statement));
+        } else if (this.sessionStatement != null) {
+          result.set(this.sessionStatement.execute(sessionState, spannerConnection));
         } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
@@ -538,20 +560,6 @@ public class BackendConnection {
               .getMessage()
               .startsWith(
                   "INVALID_ARGUMENT: io.grpc.StatusRuntimeException: INVALID_ARGUMENT: Unsupported concurrency mode in query using INFORMATION_SCHEMA.");
-    }
-
-    @Nullable
-    SessionStatement getSessionManagementStatement(
-        Statement statement, ParsedStatement parsedStatement) {
-      if (parsedStatement.getType() == StatementType.UNKNOWN
-          || (parsedStatement.getType() == StatementType.QUERY
-              && isCommand(SHOW, statement.getSql()))
-          || (parsedStatement.getType() == StatementType.CLIENT_SIDE
-              && parsedStatement.getClientSideStatementType()
-                  == ClientSideStatementType.RESET_ALL)) {
-        return SessionStatementParser.parse(parsedStatement, statement.getSql());
-      }
-      return null;
     }
   }
 
@@ -1299,9 +1307,10 @@ public class BackendConnection {
       return;
     }
 
-    // Only start an implicit transaction if we have more than one statement left. Otherwise, just
-    // let the Spanner connection execute the statement in auto-commit mode.
-    if (isSync && index == bufferedStatements.size() - 1) {
+    // Only start an implicit transaction if we have more than one statement left that can be
+    // executed in a transaction. Otherwise, just let the Spanner connection execute the statement
+    // in auto-commit mode.
+    if (isSync && hasOnlyClientSideStatementsAfter(index)) {
       return;
     }
     // Don't start an implicit transaction if this is already a transaction statement.
@@ -1310,7 +1319,7 @@ public class BackendConnection {
     }
     // No need to start a transaction for DDL or client side statements.
     if (bufferedStatements.get(index).parsedStatement.getType() == StatementType.DDL
-        || bufferedStatements.get(index).parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+        || bufferedStatements.get(index).isClientSide()) {
       return;
     }
     // If there are only DML statements left, those can be executed as an auto-commit dml batch.
@@ -1322,18 +1331,20 @@ public class BackendConnection {
       return;
     }
     // Do not start an implicit transaction if all that is in the buffer is a DESCRIBE and an
-    // EXECUTE message for the same statement.
+    // EXECUTE message for the same statement (optionally surrounded only by client-side
+    // statements).
     if (isSync
-        && bufferedStatements.size() == 2
-        && bufferedStatements.get(0) instanceof Execute
-        && bufferedStatements.get(1) instanceof Execute
-        && ((Execute) bufferedStatements.get(0)).analyze
-        && !((Execute) bufferedStatements.get(1)).analyze
+        && bufferedStatements.size() > index + 1
+        && bufferedStatements.get(index) instanceof Execute
+        && bufferedStatements.get(index + 1) instanceof Execute
+        && ((Execute) bufferedStatements.get(index)).analyze
+        && !((Execute) bufferedStatements.get(index + 1)).analyze
         && bufferedStatements
-            .get(0)
+            .get(index)
             .statement
             .getSql()
-            .equals(bufferedStatements.get(1).statement.getSql())) {
+            .equals(bufferedStatements.get(index + 1).statement.getSql())
+        && hasOnlyClientSideStatementsAfter(index + 1)) {
       return;
     }
 
@@ -1516,7 +1527,43 @@ public class BackendConnection {
         .anyMatch(BufferedStatement::isUpdate);
   }
 
-  private int getStatementCount() {
+  @Nullable
+  SessionStatement getSessionManagementStatement(
+      Statement statement, ParsedStatement parsedStatement) {
+    if (parsedStatement.getType() == StatementType.UNKNOWN
+        || (parsedStatement.getType() == StatementType.QUERY && isCommand(SHOW, statement.getSql()))
+        || (parsedStatement.getType() == StatementType.CLIENT_SIDE
+            && parsedStatement.getClientSideStatementType() == ClientSideStatementType.RESET_ALL)) {
+      return SessionStatementParser.parse(parsedStatement, statement.getSql());
+    }
+    return null;
+  }
+
+  @VisibleForTesting
+  boolean hasOnlyClientSideStatementsAfter(int index) {
+    if (index >= bufferedStatements.size() - 1) {
+      return true;
+    }
+    for (int i = index + 1; i < bufferedStatements.size(); i++) {
+      if (!bufferedStatements.get(i).isClientSide()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @VisibleForTesting
+  boolean isClientSide(BufferedStatement<?> statement) {
+    return statement.isClientSide();
+  }
+
+  @VisibleForTesting
+  BufferedStatement<?> getBufferedStatement(int index) {
+    return bufferedStatements.get(index);
+  }
+
+  @VisibleForTesting
+  int getStatementCount() {
     return bufferedStatements.size();
   }
 

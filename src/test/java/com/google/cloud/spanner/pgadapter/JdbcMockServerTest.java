@@ -7270,4 +7270,115 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
             .count());
   }
+
+  @Test
+  public void testQueryFollowedByClientSideStatement_doesNotStartTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("SET spanner.read_only_staleness = 'MAX_STALENESS 10s'");
+        mockSpanner.clearRequests();
+
+        // Executing a query followed by a client-side statement in a single batch (before Sync)
+        // should execute the query in auto-commit mode (single-use read) and not start an implicit
+        // read-only transaction. If an implicit transaction had started, the query would fail
+        // because MAX_STALENESS is only supported for single-use transactions.
+        assertTrue(statement.execute("SELECT 1; SHOW spanner.read_timestamp"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertNotNull(resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testMultipleQueriesFollowedByClientSideStatement_startsTransaction()
+      throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        mockSpanner.clearRequests();
+
+        assertTrue(statement.execute("SELECT 1;SELECT 2;SHOW spanner.read_timestamp"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(2L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertNotNull(resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+
+        assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testSetTimezoneFollowedByQuery_doesNotStartTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("SET spanner.read_only_staleness = 'MAX_STALENESS 10s'");
+        mockSpanner.clearRequests();
+
+        assertFalse(statement.execute("SET timezone = 'UTC';SELECT 1"));
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testQueryFollowedBySetTimezone_doesNotStartTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("SET spanner.read_only_staleness = 'MAX_STALENESS 10s'");
+        mockSpanner.clearRequests();
+
+        assertTrue(statement.execute("SELECT 1; SET timezone = 'UTC'"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
 }

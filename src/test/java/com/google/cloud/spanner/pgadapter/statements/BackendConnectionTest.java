@@ -383,6 +383,306 @@ public class BackendConnectionTest {
   }
 
   @Test
+  public void testHasOnlyClientSideStatementsAfter() {
+    Connection spannerConnection = mock(Connection.class);
+    String selectSql = "select * from foo";
+    Statement selectStatement = Statement.of(selectSql);
+    ParsedStatement parsedSelectStatement = PARSER.parse(selectStatement);
+    String clientSideSql = "set spanner.statement_tag='foo'";
+    Statement clientSideStatement = Statement.of(clientSideSql);
+    ParsedStatement parsedClientSideStatement = PARSER.parse(clientSideStatement);
+    String showSql = "show spanner.read_timestamp";
+    Statement showStatement = Statement.of(showSql);
+    ParsedStatement parsedShowStatement = PARSER.parse(showStatement);
+    String showTimezoneSql = "show timezone";
+    Statement showTimezoneStatement = Statement.of(showTimezoneSql);
+    ParsedStatement parsedShowTimezoneStatement = PARSER.parse(showTimezoneStatement);
+    String updateSql = "insert into foo values (1)";
+    Statement updateStatement = Statement.of(updateSql);
+    ParsedStatement parsedUpdateStatement = PARSER.parse(updateStatement);
+    String commitSql = "commit";
+    Statement commitStatement = Statement.of(commitSql);
+    ParsedStatement parsedCommitStatement = PARSER.parse(commitStatement);
+
+    BackendConnection singleSelect =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    singleSelect.execute("SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    assertTrue(singleSelect.hasOnlyClientSideStatementsAfter(0));
+
+    BackendConnection selectAndShow =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndShow.execute("SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndShow.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    assertTrue(selectAndShow.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndShow.hasOnlyClientSideStatementsAfter(1));
+
+    BackendConnection selectAndShowTimezone =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndShowTimezone.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndShowTimezone.execute(
+        "SHOW", parsedShowTimezoneStatement, showTimezoneStatement, Function.identity());
+    assertTrue(selectAndShowTimezone.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndShowTimezone.hasOnlyClientSideStatementsAfter(1));
+
+    BackendConnection selectAndSet =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndSet.execute("SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndSet.execute(
+        "SET", parsedClientSideStatement, clientSideStatement, Function.identity());
+    assertTrue(selectAndSet.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndSet.hasOnlyClientSideStatementsAfter(1));
+
+    String setTimezoneSql = "set timezone = 'UTC'";
+    Statement setTimezoneStatement = Statement.of(setTimezoneSql);
+    ParsedStatement parsedSetTimezoneStatement = PARSER.parse(setTimezoneStatement);
+
+    BackendConnection selectAndSetTimezone =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndSetTimezone.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndSetTimezone.execute(
+        "SET", parsedSetTimezoneStatement, setTimezoneStatement, Function.identity());
+    assertTrue(selectAndSetTimezone.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndSetTimezone.hasOnlyClientSideStatementsAfter(1));
+
+    BackendConnection selectAndMultipleClientSide =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndMultipleClientSide.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndMultipleClientSide.execute(
+        "SET", parsedClientSideStatement, clientSideStatement, Function.identity());
+    selectAndMultipleClientSide.execute(
+        "SHOW", parsedShowStatement, showStatement, Function.identity());
+    assertTrue(selectAndMultipleClientSide.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndMultipleClientSide.hasOnlyClientSideStatementsAfter(1));
+    assertTrue(selectAndMultipleClientSide.hasOnlyClientSideStatementsAfter(2));
+
+    BackendConnection selectAndSelect =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndSelect.execute("SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndSelect.execute("SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    assertFalse(selectAndSelect.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndSelect.hasOnlyClientSideStatementsAfter(1));
+
+    BackendConnection selectAndDml =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndDml.execute("SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndDml.execute("INSERT", parsedUpdateStatement, updateStatement, Function.identity());
+    assertFalse(selectAndDml.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndDml.hasOnlyClientSideStatementsAfter(1));
+
+    BackendConnection selectAndCommit =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndCommit.execute("SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndCommit.execute("COMMIT", parsedCommitStatement, commitStatement, Function.identity());
+    assertFalse(selectAndCommit.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndCommit.hasOnlyClientSideStatementsAfter(1));
+
+    BackendConnection selectAndShowAndSelect =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndShowAndSelect.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndShowAndSelect.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    selectAndShowAndSelect.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    assertFalse(selectAndShowAndSelect.hasOnlyClientSideStatementsAfter(0));
+    assertFalse(selectAndShowAndSelect.hasOnlyClientSideStatementsAfter(1));
+    assertTrue(selectAndShowAndSelect.hasOnlyClientSideStatementsAfter(2));
+
+    CopyDataReceiver receiver = mock(CopyDataReceiver.class);
+    MutationWriter writer = mock(MutationWriter.class);
+    ExecutorService executor = mock(ExecutorService.class);
+    Statement copyStatement = Statement.of("copy foo from stdin");
+    ParsedStatement parsedCopyStatement = PARSER.parse(copyStatement);
+
+    BackendConnection selectAndCopy =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+    selectAndCopy.execute("SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    selectAndCopy.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
+    assertFalse(selectAndCopy.hasOnlyClientSideStatementsAfter(0));
+    assertTrue(selectAndCopy.hasOnlyClientSideStatementsAfter(1));
+  }
+
+  @Test
+  public void testIsClientSide() {
+    Connection spannerConnection = mock(Connection.class);
+    LocalStatement localStatement = mock(LocalStatement.class);
+    when(localStatement.getSql()).thenReturn(new String[] {"\\l"});
+    when(localStatement.hasReplacementStatement()).thenReturn(false);
+    LocalStatement localStatementWithReplacement = mock(LocalStatement.class);
+    when(localStatementWithReplacement.getSql()).thenReturn(new String[] {"\\replacement"});
+    when(localStatementWithReplacement.hasReplacementStatement()).thenReturn(true);
+    when(localStatementWithReplacement.getReplacementStatement(any(Statement.class)))
+        .thenReturn(Statement.of("select 1"));
+    ImmutableList<LocalStatement> localStatements =
+        ImmutableList.of(localStatement, localStatementWithReplacement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> localStatements);
+
+    // Queries, DML, DDL, and transaction statements are not client side.
+    assertFalse(isClientSideForSql(backendConnection, "select 1"));
+    assertFalse(isClientSideForSql(backendConnection, "insert into foo values (1)"));
+    assertFalse(isClientSideForSql(backendConnection, "create table foo (id bigint primary key)"));
+    assertFalse(isClientSideForSql(backendConnection, "begin"));
+    assertFalse(isClientSideForSql(backendConnection, "commit"));
+    assertFalse(isClientSideForSql(backendConnection, "rollback"));
+
+    // Client-side and session statements are client side.
+    assertTrue(isClientSideForSql(backendConnection, "set spanner.statement_tag='foo'"));
+    assertTrue(isClientSideForSql(backendConnection, "set timezone = 'UTC'"));
+    assertTrue(isClientSideForSql(backendConnection, "show spanner.read_timestamp"));
+    assertTrue(isClientSideForSql(backendConnection, "show timezone"));
+    assertTrue(isClientSideForSql(backendConnection, "reset all"));
+
+    // Local statements without replacement are client side; with replacement are not.
+    assertTrue(isClientSideForSql(backendConnection, "\\l"));
+    assertFalse(isClientSideForSql(backendConnection, "\\replacement"));
+
+    // Non-Execute statements are not client side.
+    CopyDataReceiver receiver = mock(CopyDataReceiver.class);
+    MutationWriter writer = mock(MutationWriter.class);
+    ExecutorService executor = mock(ExecutorService.class);
+    Statement copyStatement = Statement.of("copy foo from stdin");
+    ParsedStatement parsedCopyStatement = PARSER.parse(copyStatement);
+    backendConnection.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
+    assertFalse(
+        backendConnection
+            .getBufferedStatement(backendConnection.getStatementCount() - 1)
+            .isClientSide());
+  }
+
+  private boolean isClientSideForSql(BackendConnection backendConnection, String sql) {
+    Statement statement = Statement.of(sql);
+    ParsedStatement parsedStatement = PARSER.parse(statement);
+    backendConnection.execute("", parsedStatement, statement, Function.identity());
+    return backendConnection
+        .getBufferedStatement(backendConnection.getStatementCount() - 1)
+        .isClientSide();
+  }
+
+  @Test
   public void testExecuteLocalStatement() throws ExecutionException, InterruptedException {
     Connection connection = mock(Connection.class);
     StatementResult listDatabasesResult = mock(StatementResult.class);
@@ -996,6 +1296,344 @@ public class BackendConnectionTest {
     verify(connection).execute(statement);
     verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
     verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testQueryAndClientSideStatement_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+    Statement showStatement = Statement.of("show spanner.read_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(selectStatement);
+    verify(connection).execute(showStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testQueryAndMultipleClientSideStatements_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+    Statement showStatement = Statement.of("show spanner.read_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+    Statement setStatement = Statement.of("set spanner.statement_tag='foo'");
+    ParsedStatement parsedSetStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(setStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.execute("SET", parsedSetStatement, setStatement, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(selectStatement);
+    verify(connection).execute(setStatement);
+    verify(connection).execute(showStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testMultipleQueriesAndClientSideStatement_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement selectStatement1 = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement1);
+    Statement selectStatement2 = Statement.of("select * from bar where id=$1");
+    ParsedStatement parsedSelectStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement2);
+    Statement showStatement = Statement.of("show spanner.read_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+    when(connection.isInTransaction()).thenReturn(true);
+
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement1, selectStatement1, Function.identity());
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement2, selectStatement2, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(selectStatement1);
+    verify(connection).execute(selectStatement2);
+    verify(connection).execute(showStatement);
+    verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).beginTransaction();
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testDmlAndClientSideStatement_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement insertStatement = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement);
+    Statement showStatement = Statement.of("show spanner.commit_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement, insertStatement, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(insertStatement);
+    verify(connection).execute(showStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testQueryAndSetTimezone_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+    Statement setTimezoneStatement = Statement.of("set timezone = 'UTC'");
+    ParsedStatement parsedSetTimezoneStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(setTimezoneStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.execute(
+        "SET", parsedSetTimezoneStatement, setTimezoneStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(selectStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testSetTimezoneAndQuery_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement setTimezoneStatement = Statement.of("set timezone = 'UTC'");
+    ParsedStatement parsedSetTimezoneStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(setTimezoneStatement);
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "SET", parsedSetTimezoneStatement, setTimezoneStatement, Function.identity());
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(selectStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testDescribeAndExecuteAndClientSideStatement_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    Statement showStatement = Statement.of("show spanner.read_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.analyze("SELECT", parsedStatement, statement);
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+    verify(connection).execute(statement);
+    verify(connection).execute(showStatement);
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testSetTimezoneAndDescribeAndExecute_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement setTimezoneStatement = Statement.of("set timezone = 'UTC'");
+    ParsedStatement parsedSetTimezoneStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(setTimezoneStatement);
+    Statement statement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "SET", parsedSetTimezoneStatement, setTimezoneStatement, Function.identity());
+    backendConnection.analyze("SELECT", parsedStatement, statement);
+    backendConnection.execute("SELECT", parsedStatement, statement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+    verify(connection).execute(statement);
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testQueryAndLocalStatement_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    ListDatabasesStatement listDatabasesStatement = mock(ListDatabasesStatement.class);
+    when(listDatabasesStatement.getSql())
+        .thenReturn(new String[] {ListDatabasesStatement.LIST_DATABASES_SQL});
+    StatementResult listDatabasesResult = mock(StatementResult.class);
+    when(listDatabasesResult.getResultType()).thenReturn(ResultType.RESULT_SET);
+    when(listDatabasesStatement.execute(
+            any(BackendConnection.class),
+            eq(Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL))))
+        .thenReturn(listDatabasesResult);
+    ImmutableList<LocalStatement> localStatements = ImmutableList.of(listDatabasesStatement);
+
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+    Statement listStatement = Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL);
+    ParsedStatement parsedListStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(listStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> localStatements);
+
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.execute("SELECT", parsedListStatement, listStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(selectStatement);
+    verify(listDatabasesStatement).execute(backendConnection, listStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
   }
 
   @Test
