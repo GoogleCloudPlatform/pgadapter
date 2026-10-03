@@ -25,6 +25,7 @@ import com.google.common.base.Stopwatch;
 import java.net.Socket;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -38,22 +39,21 @@ public class ProxyServerTest {
     // This test verifies that doing a simple TCP aliveness probe to check whether PGAdapter is
     // running can be done without any errors.
     ProxyServer server = new ProxyServer(OptionsMetadata.newBuilder().setPort(0).build());
-    server.startServer();
-    server.awaitRunning();
+    try {
+      server.startServer();
+      server.awaitRunning();
 
-    try (Socket ignore = new Socket("localhost", server.getLocalPort())) {
-      // Do nothing, just verify that we can connect without any errors.
-      Stopwatch stopwatch = Stopwatch.createStarted();
-      //noinspection StatementWithEmptyBody
-      while (stopwatch.elapsed(TimeUnit.SECONDS) < 3 && CONNECTION_HANDLERS.isEmpty()) {}
-      assertEquals(1, CONNECTION_HANDLERS.size());
+      try (Socket ignore = new Socket("localhost", server.getLocalPort())) {
+        // Do nothing, just verify that we can connect without any errors.
+        assertEventually(() -> CONNECTION_HANDLERS.size() == 1);
+      }
+      assertEventually(CONNECTION_HANDLERS::isEmpty);
+    } finally {
+      if (server.isRunning()) {
+        server.stopServer();
+        server.awaitTerminated();
+      }
     }
-    Stopwatch stopwatch = Stopwatch.createStarted();
-    //noinspection StatementWithEmptyBody
-    while (stopwatch.elapsed(TimeUnit.SECONDS) < 3 && !CONNECTION_HANDLERS.isEmpty()) {}
-    assertEquals(0, CONNECTION_HANDLERS.size());
-    server.stopServer();
-    server.awaitTerminated();
   }
 
   @Test
@@ -79,5 +79,16 @@ public class ProxyServerTest {
                 "Expected the service InnerService [FAILED] to be RUNNING, but the service has FAILED"));
 
     server.stopServer();
+  }
+
+  private static void assertEventually(BooleanSupplier condition) throws InterruptedException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    while (stopwatch.elapsed(TimeUnit.SECONDS) < 10) {
+      if (condition.getAsBoolean()) {
+        return;
+      }
+      TimeUnit.MILLISECONDS.sleep(10L);
+    }
+    assertTrue(condition.getAsBoolean());
   }
 }
