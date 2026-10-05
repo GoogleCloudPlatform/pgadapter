@@ -1,11 +1,11 @@
 module gorm
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.27.1
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.3
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.56.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgtype v1.14.4
 	github.com/shopspring/decimal v1.4.0
@@ -74,7 +74,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
