@@ -476,9 +476,6 @@ public class IntervalParserTest {
   @Test
   public void testFractionalCascading() {
     assertEquals(
-        Interval.fromMonthsDaysNanos(12, 0, BigInteger.valueOf(31_104_000_000_000L)),
-        IntervalParser.toInterval("1.001 years"));
-    assertEquals(
         Interval.fromMonthsDaysNanos(1, 7, BigInteger.valueOf(43_200_000_000_000L)),
         IntervalParser.toInterval("1.25 months"));
     assertEquals(
@@ -884,5 +881,92 @@ public class IntervalParserTest {
     assertEquals(
         Interval.fromMonthsDaysNanos(1, -5, BigInteger.ZERO),
         IntervalParser.toInterval("+1 month -5 days"));
+  }
+
+  @Test
+  public void testYearScaleUnitRounding() {
+    // Fractional years round to whole months using HALF_EVEN without cascading into days/seconds
+    assertEquals(Interval.ofMonths(12), IntervalParser.toInterval("1.001 years"));
+    assertEquals(Interval.ofMonths(13), IntervalParser.toInterval("1.1 years"));
+    assertEquals(
+        Interval.fromMonthsDaysNanos(0, 0, BigInteger.ZERO),
+        IntervalParser.toInterval("0.04 years"));
+    assertEquals(Interval.ofMonths(1), IntervalParser.toInterval("0.05 years"));
+    // Half-way ties round to even integer (rint in PostgreSQL)
+    assertEquals(Interval.ofMonths(2), IntervalParser.toInterval("0.125 years")); // 1.5 months -> 2
+    assertEquals(Interval.ofMonths(4), IntervalParser.toInterval("0.375 years")); // 4.5 months -> 4
+    assertEquals(Interval.ofMonths(-12), IntervalParser.toInterval("-1.001 years"));
+    assertEquals(Interval.ofMonths(-13), IntervalParser.toInterval("-1.1 years"));
+
+    // Decades, centuries, and millennia
+    assertEquals(Interval.ofMonths(180), IntervalParser.toInterval("1.5 decades"));
+    assertEquals(Interval.ofMonths(121), IntervalParser.toInterval("1.01 decades"));
+    assertEquals(Interval.ofMonths(1800), IntervalParser.toInterval("1.5 centuries"));
+    assertEquals(Interval.ofMonths(1201), IntervalParser.toInterval("1.001 centuries"));
+    assertEquals(Interval.ofMonths(18000), IntervalParser.toInterval("1.5 millennia"));
+    assertEquals(Interval.ofMonths(12001), IntervalParser.toInterval("1.0001 millennia"));
+
+    // ISO 8601 year rounding
+    assertEquals(Interval.ofMonths(12), IntervalParser.toInterval("P1.001Y"));
+    assertEquals(Interval.ofMonths(13), IntervalParser.toInterval("P1.1Y"));
+  }
+
+  @Test
+  public void testTimeFieldRangeValidation() {
+    // Valid time tokens
+    assertEquals(
+        Interval.fromMonthsDaysNanos(0, 0, BigInteger.valueOf(7140_000_000_000L)),
+        IntervalParser.toInterval("01:59:00"));
+    assertEquals(
+        Interval.fromMonthsDaysNanos(0, 0, BigInteger.valueOf(7140_000_000_000L)),
+        IntervalParser.toInterval("01:59"));
+    // 60 seconds is valid in PostgreSQL (leap second accommodation, rolls over to 60s)
+    assertEquals(
+        Interval.fromMonthsDaysNanos(0, 0, BigInteger.valueOf(3660_000_000_000L)),
+        IntervalParser.toInterval("01:00:60"));
+    assertEquals(
+        Interval.fromMonthsDaysNanos(0, 0, BigInteger.valueOf(3660_500_000_000L)),
+        IntervalParser.toInterval("01:00:60.5"));
+    // Arbitrary hours are allowed
+    assertEquals(
+        Interval.fromMonthsDaysNanos(0, 0, BigInteger.valueOf(360_000_000_000_000L)),
+        IntervalParser.toInterval("100:00:00"));
+    assertEquals(
+        Interval.fromMonthsDaysNanos(0, 0, BigInteger.valueOf(-360_000_000_000_000L)),
+        IntervalParser.toInterval("-100:00:00"));
+
+    // Out of range minutes (>= 60) and seconds (> 60) must be rejected
+    assertInvalidInterval("01:60:00");
+    assertInvalidInterval("01:60");
+    assertInvalidInterval("-01:60:00");
+    assertInvalidInterval("+01:60:00");
+    assertInvalidInterval("01:00:61");
+    assertInvalidInterval("01:00:65");
+    assertInvalidInterval("01:99:00");
+    assertInvalidInterval("-01:00:61");
+  }
+
+  @Test
+  public void testSqlStandardYearMonthRangeAndCombinations() {
+    // Valid SQL standard Y-M tokens
+    assertEquals(Interval.ofMonths(23), IntervalParser.toInterval("1-11"));
+    assertEquals(Interval.ofMonths(12), IntervalParser.toInterval("1-0"));
+    assertEquals(Interval.ofMonths(-14), IntervalParser.toInterval("-1-2"));
+    assertEquals(Interval.ofMonths(14), IntervalParser.toInterval("+1-2"));
+
+    // PostgreSQL permits YEAR units alongside Y-M (only MONTH mask is set for Y-M)
+    assertEquals(Interval.ofMonths(26), IntervalParser.toInterval("1 year 1-2"));
+    assertEquals(Interval.ofMonths(26), IntervalParser.toInterval("1-2 1 year"));
+    assertEquals(Interval.ofMonths(38), IntervalParser.toInterval("1-2 2 years"));
+
+    // Months out of range (>= 12) must be rejected
+    assertInvalidInterval("1-12");
+    assertInvalidInterval("-1-12");
+    assertInvalidInterval("+1-12");
+    assertInvalidInterval("1-15");
+    assertInvalidInterval("-1-15");
+
+    // Duplicate YEAR is rejected
+    assertInvalidInterval("1 year 1-2 1 year");
   }
 }

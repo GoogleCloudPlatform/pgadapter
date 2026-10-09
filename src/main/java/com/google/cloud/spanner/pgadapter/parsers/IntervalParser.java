@@ -29,6 +29,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -304,6 +305,9 @@ public class IntervalParser extends Parser<Interval> {
       String[] parts = timeString.split(":");
       long hours = Long.parseLong(parts[0]);
       long minutes = Long.parseLong(parts[1]);
+      if (minutes >= MINUTES_PER_HOUR) {
+        throw new IllegalArgumentException("Interval field value out of range: " + timeToken);
+      }
       long seconds = 0;
       long fractionNanos = 0;
       if (parts.length > 2) {
@@ -322,6 +326,9 @@ public class IntervalParser extends Parser<Interval> {
           fractionNanos = fractionValue;
         } else {
           seconds = Long.parseLong(secondPart);
+        }
+        if (seconds > SECONDS_PER_MINUTE) {
+          throw new IllegalArgumentException("Interval field value out of range: " + timeToken);
         }
       }
       BigInteger timeNanos =
@@ -365,6 +372,9 @@ public class IntervalParser extends Parser<Interval> {
       String[] parts = yearMonthString.split("-");
       long years = Long.parseLong(parts[0]);
       long months = Long.parseLong(parts[1]);
+      if (months < 0 || months >= MONTHS_PER_YEAR) {
+        throw new IllegalArgumentException("Interval field value out of range: " + yearMonthToken);
+      }
       long deltaMonths =
           Math.multiplyExact(
               (long) sign, Math.addExact(Math.multiplyExact(years, MONTHS_PER_YEAR), months));
@@ -409,22 +419,13 @@ public class IntervalParser extends Parser<Interval> {
     void applyUnit(UnitType unit, BigDecimal valueAmount) {
       switch (unit) {
         case MILLENNIUM:
-          totalMonths =
-              Math.addExact(
-                  totalMonths,
-                  valueAmount.multiply(BigDecimal.valueOf(12_000)).toBigInteger().longValueExact());
+          addYears(valueAmount.multiply(BigDecimal.valueOf(1_000)));
           break;
         case CENTURY:
-          totalMonths =
-              Math.addExact(
-                  totalMonths,
-                  valueAmount.multiply(BigDecimal.valueOf(1_200)).toBigInteger().longValueExact());
+          addYears(valueAmount.multiply(BigDecimal.valueOf(100)));
           break;
         case DECADE:
-          totalMonths =
-              Math.addExact(
-                  totalMonths,
-                  valueAmount.multiply(BigDecimal.valueOf(120)).toBigInteger().longValueExact());
+          addYears(valueAmount.multiply(BigDecimal.valueOf(10)));
           break;
         case YEAR:
           addYears(valueAmount);
@@ -468,12 +469,13 @@ public class IntervalParser extends Parser<Interval> {
     }
 
     void addYears(BigDecimal valueAmount) {
-      BigDecimal totalMonthsDecimal = valueAmount.multiply(BigDecimal.valueOf(MONTHS_PER_YEAR));
-      totalMonths = Math.addExact(totalMonths, totalMonthsDecimal.toBigInteger().longValueExact());
-      BigDecimal fractionalMonthsFromYear = totalMonthsDecimal.remainder(BigDecimal.ONE);
-      if (fractionalMonthsFromYear.signum() != 0) {
-        addMonths(fractionalMonthsFromYear);
-      }
+      long months =
+          valueAmount
+              .multiply(BigDecimal.valueOf(MONTHS_PER_YEAR))
+              .setScale(0, RoundingMode.HALF_EVEN)
+              .toBigInteger()
+              .longValueExact();
+      totalMonths = Math.addExact(totalMonths, months);
     }
 
     void addMonths(BigDecimal valueAmount) {
