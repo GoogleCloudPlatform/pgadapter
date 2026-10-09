@@ -45,7 +45,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.55.4-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.56.1</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -80,14 +80,14 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
-        <version>26.89.0</version>
+        <version>26.90.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-spanner-bom</artifactId>
-        <version>6.123.0</version>
+        <version>6.124.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -226,7 +226,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.9.16</version>
+      <version>3.10.0</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -437,7 +437,7 @@
               <dependency>
                 <groupId>com.google.googlejavaformat</groupId>
                 <artifactId>google-java-format</artifactId>
-                <version>1.36.1</version>
+                <version>1.37.0</version>
               </dependency>
             </dependencies>
           </plugin>

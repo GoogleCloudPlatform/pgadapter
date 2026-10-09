@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
@@ -53,6 +54,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
@@ -85,6 +87,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.postgresql.core.Oid;
+import org.postgresql.util.ByteConverter;
 
 @RunWith(JUnit4.class)
 public class StatementTest {
@@ -402,6 +405,55 @@ public class StatementTest {
     assertEquals(
         Value.untyped(com.google.protobuf.Value.newBuilder().setStringValue("{}").build()),
         boundStatement.getParameters().get("p1"));
+  }
+
+  @Test
+  public void testPreparedStatementBinaryTimestamptzParam() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    SessionState sessionState = mock(SessionState.class);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
+
+    String sqlStatement = "SELECT * FROM users WHERE created_at = $1";
+    int[] parameterDataTypes = new int[] {Oid.TIMESTAMPTZ};
+
+    IntermediatePreparedStatement intermediateStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            "",
+            parameterDataTypes,
+            parse(sqlStatement),
+            Statement.of(sqlStatement));
+
+    Timestamp earliestTimestamp = Timestamp.parseTimestamp("0001-01-01T00:00:00Z");
+    byte[] binaryData = new byte[8];
+    long pgMicroseconds = (earliestTimestamp.getSeconds() - Parser.PG_EPOCH_SECONDS) * 1_000_000L;
+    ByteConverter.int8(binaryData, 0, pgMicroseconds);
+
+    byte[][] parameters = new byte[][] {binaryData};
+    short[] formatCodes = new short[] {(short) 1};
+
+    IntermediatePortalStatement portalStatement =
+        intermediateStatement.createPortal("", parameters, formatCodes, NO_FORMAT_CODES);
+    Statement boundStatement = portalStatement.bind(Statement.of(sqlStatement));
+    assertEquals(Value.timestamp(earliestTimestamp), boundStatement.getParameters().get("p1"));
+
+    // Out of range value: 1 microsecond before 0001-01-01 00:00:00Z
+    byte[] outOfRangeData = new byte[8];
+    ByteConverter.int8(outOfRangeData, 0, pgMicroseconds - 1L);
+    IntermediatePortalStatement outOfRangePortalStatement =
+        intermediateStatement.createPortal(
+            "", new byte[][] {outOfRangeData}, formatCodes, NO_FORMAT_CODES);
+    PGException exception =
+        assertThrows(
+            PGException.class, () -> outOfRangePortalStatement.bind(Statement.of(sqlStatement)));
+    assertEquals(SQLState.DatetimeFieldOverflow, exception.getSQLState());
+    assertEquals("timestamp out of range", exception.getMessage());
   }
 
   @Test

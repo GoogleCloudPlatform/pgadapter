@@ -33,13 +33,13 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-pgadapter</artifactId>
-      <version>0.55.3</version>
+      <version>0.56.1</version>
     </dependency>
     <!-- Hibernate core dependency -->
     <dependency>
       <groupId>org.hibernate.orm</groupId>
       <artifactId>hibernate-core</artifactId>
-      <version>7.4.11.Final</version>
+      <version>7.4.12.Final</version>
     </dependency>
     <!-- Postgresql JDBC driver dependency -->
     <dependency>
@@ -99,7 +99,7 @@
           <dependency>
             <groupId>com.google.googlejavaformat</groupId>
             <artifactId>google-java-format</artifactId>
-            <version>1.36.1</version>
+            <version>1.37.0</version>
           </dependency>
         </dependencies>
       </plugin>

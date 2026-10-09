@@ -21,7 +21,7 @@ set -e
 # Configuration (Supports env overrides)
 VERSION="${VERSION:-}"
 PROJECT_ID="${PROJECT_ID:-cloud-spanner-pg-adapter}"
-AR_LOCATION="${AR_LOCATION:-us-central1}"
+AR_LOCATION="${AR_LOCATION:-us}"
 AR_REPOSITORY="${AR_REPOSITORY:-spanner-pg-connector}"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.spanner-pg-connector}"
 

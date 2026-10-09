@@ -16,7 +16,7 @@
 # PowerShell script to install Spanner PG Connector on Windows
 
 $Project = if ($env:PROJECT_ID) { $env:PROJECT_ID } else { "cloud-spanner-pg-adapter" }
-$Location = if ($env:AR_LOCATION) { $env:AR_LOCATION } else { "us-central1" }
+$Location = if ($env:AR_LOCATION) { $env:AR_LOCATION } else { "us" }
 $Repository = if ($env:AR_REPOSITORY) { $env:AR_REPOSITORY } else { "spanner-pg-connector" }
 $Package = "spanner-pg-connector"
 $Version = $env:VERSION
@@ -76,7 +76,7 @@ New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
 try {
     # 2. Download package
     Write-Host "Downloading package from Artifact Registry..."
-    $DownloadUrl = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/files/spanner-pg-connector:$Version:spanner-pg-connector-windows-x64.zip:download?alt=media"
+    $DownloadUrl = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/files/spanner-pg-connector:${Version}:spanner-pg-connector-windows-x64.zip:download?alt=media"
 
     $DownloadSuccess = $false
     try {
