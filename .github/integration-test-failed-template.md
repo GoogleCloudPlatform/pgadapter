@@ -1,5 +1,5 @@
 ---
-title: PGAdapter integration tests failed
+title: PGAdapter integration tests failed for {{ env.ENDPOINT }}
 assignees: olavloite, rayudu3745
 labels: integration-test-failure
 ---
