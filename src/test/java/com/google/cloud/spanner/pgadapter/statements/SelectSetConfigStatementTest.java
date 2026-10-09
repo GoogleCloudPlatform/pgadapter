@@ -48,6 +48,11 @@ public class SelectSetConfigStatementTest {
         parse("select set_config('spanner.autocommit_dml_mode', 'partitioned_non_atomic', false)")
             .value);
 
+    assertEquals("foo", parse("(select set_config('foo', 'bar', false))").name);
+    assertEquals("bar", parse("(select set_config('foo', 'bar', false))").value);
+    assertEquals("foo", parse("((select set_config('foo', 'bar', false)))").name);
+    assertEquals("foo", parse("/* comment */ (select set_config('foo', 'bar', false))").name);
+
     assertThrows(PGException.class, () -> parse("select"));
     assertThrows(PGException.class, () -> parse("select foo"));
     assertThrows(PGException.class, () -> parse("select set_config"));
@@ -59,5 +64,8 @@ public class SelectSetConfigStatementTest {
     assertThrows(PGException.class, () -> parse("select set_config ('foo', 'bar', true, 1)"));
     assertThrows(PGException.class, () -> parse("select set_config ('foo', 'bar', true), 1"));
     assertThrows(PGException.class, () -> parse("select set_config ('foo.bar.baz', 'bar', true)"));
+    assertThrows(PGException.class, () -> parse("(select set_config('foo', 'bar', false)"));
+    assertThrows(PGException.class, () -> parse("((select set_config('foo', 'bar', false))"));
+    assertThrows(PGException.class, () -> parse("(select set_config('foo', 'bar', false)) )"));
   }
 }

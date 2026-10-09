@@ -778,10 +778,21 @@ public class SimpleParser {
     return eat(true, false, token);
   }
 
-  /** Skips any opening parentheses at the current position. */
-  private void skipOpeningParentheses() {
+  /** Skips any opening parentheses at the current position and returns the number skipped. */
+  int skipOpeningParentheses() {
+    int count = 0;
     while (eatToken("(")) {
-      // Opening parentheses are ignored when parsing the command.
+      count++;
+    }
+    return count;
+  }
+
+  /** Eats the specified number of closing parentheses, or throws a syntax error if not found. */
+  void eatClosingParentheses(int count) {
+    for (int index = 0; index < count; index++) {
+      if (!eatToken(")")) {
+        throw PGExceptionFactory.newPGException("missing ')' for statement", SQLState.SyntaxError);
+      }
     }
   }
 

@@ -5349,13 +5349,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSelectSetConfigTimezone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (ResultSet resultSet =
-          connection
-              .createStatement()
-              .executeQuery("select set_config('timezone', 'ist', false)")) {
-        assertTrue(resultSet.next());
-        assertEquals("ist", resultSet.getString("set_config"));
-        assertFalse(resultSet.next());
+      for (String sql :
+          new String[] {
+            "select set_config('timezone', 'ist', false)",
+            "(select set_config('timezone', 'ist', false))",
+            "((select set_config('timezone', 'ist', false)))"
+          }) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("ist", resultSet.getString("set_config"));
+          assertFalse(resultSet.next());
+        }
       }
       verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
@@ -5382,11 +5386,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSelectCurrentSettingTimezone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'IST'");
-      try (ResultSet resultSet =
-          connection.createStatement().executeQuery("select current_setting('timezone')")) {
-        assertTrue(resultSet.next());
-        assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
-        assertFalse(resultSet.next());
+      for (String sql :
+          new String[] {
+            "select current_setting('timezone')",
+            "(select current_setting('timezone'))",
+            "((select current_setting('timezone')))"
+          }) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+          assertFalse(resultSet.next());
+        }
       }
     }
   }

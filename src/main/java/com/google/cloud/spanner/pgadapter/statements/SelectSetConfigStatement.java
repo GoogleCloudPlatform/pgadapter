@@ -69,6 +69,7 @@ public class SelectSetConfigStatement extends IntermediatePortalStatement {
 
     // SELECT SET_CONFIG(setting_name text, new_value text, is_local boolean)
     SimpleParser parser = new SimpleParser(sql);
+    int openingParentheses = parser.skipOpeningParentheses();
     if (!parser.eatKeyword("select", "set_config")) {
       throw PGExceptionFactory.newPGException(
           "not a valid SELECT SET_CONFIG statement: " + sql, SQLState.SyntaxError);
@@ -91,6 +92,7 @@ public class SelectSetConfigStatement extends IntermediatePortalStatement {
     if (!parser.eatToken(")")) {
       throw PGExceptionFactory.newPGException("missing ')' for set_config", SQLState.SyntaxError);
     }
+    parser.eatClosingParentheses(openingParentheses);
     parser.throwIfHasMoreTokens();
 
     try {

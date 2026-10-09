@@ -190,6 +190,40 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectCurrentSettingWithParentheses() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      for (String sql :
+          new String[] {
+            "(select current_setting('timezone'))", "((select current_setting('timezone')))"
+          }) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testSelectSetConfigWithParentheses() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (String sql :
+          new String[] {
+            "(select set_config('timezone', 'ist', false))",
+            "((select set_config('timezone', 'ist', false)))"
+          }) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("ist", resultSet.getString("set_config"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
   public void testQueryHint() throws SQLException {
     String sql = "/* @OPTIMIZER_VERSION=1 */ SELECT 1";
     mockSpanner.putStatementResult(
