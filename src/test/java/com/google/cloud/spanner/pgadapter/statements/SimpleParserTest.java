@@ -606,6 +606,74 @@ public class SimpleParserTest {
         "UPDATE", parseCommand("with my_cte as (select a * b from foo) update bar set col1='one'"));
     assertEquals(
         "UPDATE", parseCommand("with my_cte as (select a - b from foo) update bar set col1='one'"));
+
+    assertEquals("SELECT", parseCommand("(select * from foo)"));
+    assertEquals("SELECT", parseCommand("((select * from foo))"));
+    assertEquals("SELECT", parseCommand("(((select * from foo)))"));
+    assertEquals("SELECT", parseCommand("( ( ( select 1 ) ) )"));
+    assertEquals("SELECT", parseCommand("/* this is a comment */ (select * from foo)"));
+    assertEquals("SELECT", parseCommand("(/* this is a comment */ select * from foo)"));
+    assertEquals("SELECT", parseCommand("(select 1) union (select 2)"));
+    assertEquals("SELECT", parseCommand("(select 1) order by 1"));
+    assertEquals(
+        "SELECT", parseCommand("with my_cte as (select * from foo) (select * from my_cte)"));
+    assertEquals(
+        "SELECT", parseCommand("with my_cte as (select * from foo) ((select * from my_cte))"));
+    assertEquals(
+        "SELECT", parseCommand("(with my_cte as (select * from foo) select * from my_cte)"));
+    assertEquals(
+        "SELECT", parseCommand("((with my_cte as (select * from foo) ((select * from my_cte))))"));
+    assertEquals(
+        "SELECT", parseCommand("with recursive my_cte as (select 1) select * from my_cte"));
+    assertEquals(
+        "SELECT", parseCommand("(with recursive my_cte as (select 1) (select * from my_cte))"));
+    assertEquals("WITH", parseCommand("(with my_cte as (select * from foo))"));
+    assertEquals("UPDATE", parseCommand("with my_cte as (select 1, 2) update bar set col1='one'"));
+    assertEquals("SELECT", parseCommand("with my_cte as (select 1, 2) select * from my_cte"));
+    assertEquals(
+        "SELECT",
+        parseCommand(
+            "with my_cte as (select 1, 2), my_cte2 as (select 3, 4) select * from my_cte"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "(with my_cte as (select 1, 2), my_cte2 as (select 3, 4) update bar set col1='one')"));
+    assertEquals(
+        "UPDATE",
+        parseCommand("with my_cte as (select count(*) from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select (1) from foo) update bar set col1='one'"));
+    assertEquals(
+        "SELECT", parseCommand("with my_cte as materialized (select 1) select * from my_cte"));
+    assertEquals(
+        "SELECT", parseCommand("with my_cte as not materialized (select 1) select * from my_cte"));
+    assertEquals(
+        "SELECT", parseCommand("(with my_cte as materialized (select 1) select * from my_cte)"));
+    assertEquals("", parseCommand("()"));
+    assertEquals("", parseCommand("((  ))"));
+    assertEquals("", parseCommand("(/* only a comment */)"));
+  }
+
+  @Test
+  public void testIsCommand() {
+    assertTrue(SimpleParser.isCommand("select", "select 1"));
+    assertTrue(SimpleParser.isCommand("select", "(select 1)"));
+    assertTrue(SimpleParser.isCommand("select", "((select 1))"));
+    assertTrue(SimpleParser.isCommand("select", "/* comment */ (select 1)"));
+    assertFalse(SimpleParser.isCommand("update", "(select 1)"));
+
+    assertTrue(
+        SimpleParser.isCommand(
+            ImmutableList.of("select", "current_setting"), "select current_setting('foo')"));
+    assertTrue(
+        SimpleParser.isCommand(
+            ImmutableList.of("select", "current_setting"), "(select current_setting('foo'))"));
+    assertTrue(
+        SimpleParser.isCommand(
+            ImmutableList.of("select", "current_setting"), "((select current_setting('foo')))"));
+    assertFalse(
+        SimpleParser.isCommand(
+            ImmutableList.of("select", "current_setting"), "(select other_function('foo'))"));
   }
 
   @Test

@@ -68,6 +68,7 @@ public class SelectCurrentSettingStatement extends IntermediatePortalStatement {
 
     // SELECT CURRENT_SETTING('setting_name'[, missing_ok])
     SimpleParser parser = new SimpleParser(sql);
+    int openingParentheses = parser.skipOpeningParentheses();
     if (!parser.eatKeyword("select", "current_setting")) {
       throw PGExceptionFactory.newPGException(
           "not a valid SELECT CURRENT_SETTING statement: " + sql, SQLState.SyntaxError);
@@ -86,6 +87,7 @@ public class SelectCurrentSettingStatement extends IntermediatePortalStatement {
       throw PGExceptionFactory.newPGException(
           "missing ')' for current_setting", SQLState.SyntaxError);
     }
+    parser.eatClosingParentheses(openingParentheses);
     parser.throwIfHasMoreTokens();
 
     try {

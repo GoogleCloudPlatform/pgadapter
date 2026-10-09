@@ -170,4 +170,31 @@ public class IntermediateStatementTest {
     PGException pgException = statement.getException();
     assertEquals(SQLState.QueryCanceled, pgException.getSQLState());
   }
+
+  @Test
+  public void testCommandFallbackForQuery() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
+    ParsedStatement parsedQuery = mock(ParsedStatement.class);
+    when(parsedQuery.isQuery()).thenReturn(true);
+
+    IntermediateStatement statement =
+        new IntermediateStatement(
+            mock(OptionsMetadata.class), parsedQuery, Statement.of(""), connectionHandler);
+    assertEquals("SELECT", statement.getCommand());
+    assertEquals("SELECT", statement.getCommandTag());
+  }
+
+  @Test
+  public void testCommandWithNullParsedStatement() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
+    IntermediateStatement statement =
+        new IntermediateStatement(
+            mock(OptionsMetadata.class), null, Statement.of(""), connectionHandler);
+    assertEquals("", statement.getCommand());
+    assertEquals("", statement.getCommandTag());
+  }
 }

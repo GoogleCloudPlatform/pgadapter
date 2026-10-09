@@ -135,6 +135,95 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testQueryStartingWithParenthesis() throws SQLException {
+    String sql = "(SELECT 1)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(com.google.cloud.spanner.Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement();
+          ResultSet resultSet = statement.executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      try (Statement statement = connection.createStatement()) {
+        assertTrue(statement.execute(sql));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
+      assertEquals(QueryMode.NORMAL, request.getQueryMode());
+      assertEquals(sql, request.getSql());
+      assertTrue(request.getTransaction().hasSingleUse());
+      assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    }
+
+    // Verify multi-statement execution with parentheses.
+    String multiSql = "(SELECT 1); (SELECT 2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.of("(SELECT 2)"), SELECT2_RESULTSET));
+    try (Connection connection = DriverManager.getConnection(createUrl());
+        Statement statement = connection.createStatement()) {
+      assertTrue(statement.execute(multiSql));
+      try (ResultSet resultSet = statement.getResultSet()) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      assertTrue(statement.getMoreResults());
+      try (ResultSet resultSet = statement.getResultSet()) {
+        assertTrue(resultSet.next());
+        assertEquals(2L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      assertFalse(statement.getMoreResults());
+      assertEquals(-1, statement.getUpdateCount());
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSettingWithParentheses() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      for (String sql :
+          new String[] {
+            "(select current_setting('timezone'))", "((select current_setting('timezone')))"
+          }) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testSelectSetConfigWithParentheses() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (String sql :
+          new String[] {
+            "(select set_config('timezone', 'ist', false))",
+            "((select set_config('timezone', 'ist', false)))"
+          }) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("ist", resultSet.getString("set_config"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
   public void testQueryHint() throws SQLException {
     String sql = "/* @OPTIMIZER_VERSION=1 */ SELECT 1";
     mockSpanner.putStatementResult(

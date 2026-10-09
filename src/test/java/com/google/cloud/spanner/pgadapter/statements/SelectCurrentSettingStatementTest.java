@@ -40,6 +40,10 @@ public class SelectCurrentSettingStatementTest {
     assertEquals(
         "autocommit_dml_mode", parse("select current_setting('spanner.autocommit_dml_mode')").name);
 
+    assertEquals("foo", parse("(select current_setting('foo'))").name);
+    assertEquals("foo", parse("((select current_setting('foo')))").name);
+    assertEquals("foo", parse("/* comment */ (select current_setting('foo'))").name);
+
     assertThrows(PGException.class, () -> parse("select"));
     assertThrows(PGException.class, () -> parse("select foo"));
     assertThrows(PGException.class, () -> parse("select current_setting"));
@@ -51,5 +55,8 @@ public class SelectCurrentSettingStatementTest {
     assertThrows(PGException.class, () -> parse("select current_setting ('foo', true), 1"));
     assertThrows(PGException.class, () -> parse("select current_setting ('foo.bar.baz', true)"));
     assertThrows(PGException.class, () -> parse("select current_setting('foo-bar')"));
+    assertThrows(PGException.class, () -> parse("(select current_setting('foo')"));
+    assertThrows(PGException.class, () -> parse("((select current_setting('foo'))"));
+    assertThrows(PGException.class, () -> parse("(select current_setting('foo')) )"));
   }
 }

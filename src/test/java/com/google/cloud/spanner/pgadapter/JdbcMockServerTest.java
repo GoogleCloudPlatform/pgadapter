@@ -2619,6 +2619,60 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testQueryStartingWithParenthesis() throws SQLException {
+    String[] queries = new String[] {"(SELECT 1)", "((SELECT 1))", "/* comment */ (SELECT 1)"};
+    for (String sql : queries) {
+      mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+    }
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (String sql : queries) {
+        try (java.sql.Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        try (java.sql.Statement statement = connection.createStatement()) {
+          assertTrue(statement.execute(sql));
+          try (ResultSet resultSet = statement.getResultSet()) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+            assertFalse(resultSet.next());
+          }
+        }
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+            ResultSet resultSet = statement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+
+      // Also verify parameterized query starting with parenthesis.
+      String parameterizedSql = "(SELECT ?)";
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.newBuilder("(SELECT $1)").bind("p1").to(1L).build(), SELECT1_RESULTSET));
+      try (PreparedStatement statement = connection.prepareStatement(parameterizedSql)) {
+        statement.setLong(1, 1L);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    assertEquals(10, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
+      assertEquals(QueryMode.NORMAL, request.getQueryMode());
+      assertTrue(request.getTransaction().hasSingleUse());
+      assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    }
+  }
+
+  @Test
   public void testTransactionAbortedWithPreparedStatements() throws SQLException {
     String sql = "SELECT 1";
 
@@ -5295,13 +5349,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testSelectSetConfigTimezone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (ResultSet resultSet =
-          connection
-              .createStatement()
-              .executeQuery("select set_config('timezone', 'ist', false)")) {
-        assertTrue(resultSet.next());
-        assertEquals("ist", resultSet.getString("set_config"));
-        assertFalse(resultSet.next());
+      for (String sql :
+          new String[] {
+            "select set_config('timezone', 'ist', false)",
+            "(select set_config('timezone', 'ist', false))",
+            "((select set_config('timezone', 'ist', false)))"
+          }) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("ist", resultSet.getString("set_config"));
+          assertFalse(resultSet.next());
+        }
       }
       verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
@@ -5328,11 +5386,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSelectCurrentSettingTimezone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'IST'");
-      try (ResultSet resultSet =
-          connection.createStatement().executeQuery("select current_setting('timezone')")) {
-        assertTrue(resultSet.next());
-        assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
-        assertFalse(resultSet.next());
+      for (String sql :
+          new String[] {
+            "select current_setting('timezone')",
+            "(select current_setting('timezone'))",
+            "((select current_setting('timezone')))"
+          }) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("Asia/Kolkata", resultSet.getString("current_setting"));
+          assertFalse(resultSet.next());
+        }
       }
     }
   }

@@ -40,6 +40,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import java.io.DataOutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -114,7 +115,17 @@ public class IntermediateStatement {
       this.parsedStatement = parsedStatement;
     }
     this.connection = connectionHandler.getSpannerConnection();
-    this.command = parseCommand(this.originalStatement.getSql());
+    String parsedCommand = parseCommand(this.originalStatement.getSql());
+    // Fall back to "SELECT" if SimpleParser could not determine the command tag, but Spanner's
+    // statement parser identified this statement as a query. This ensures that any query that
+    // produces a result set is completed with a "SELECT" command tag rather than triggering an
+    // EmptyQueryResponse in ControlMessage.
+    this.command =
+        Strings.isNullOrEmpty(parsedCommand)
+                && this.parsedStatement != null
+                && this.parsedStatement.isQuery()
+            ? "SELECT"
+            : parsedCommand;
     this.commandTag = this.command;
     this.outputStream = connectionHandler.getConnectionMetadata().getOutputStream();
   }
