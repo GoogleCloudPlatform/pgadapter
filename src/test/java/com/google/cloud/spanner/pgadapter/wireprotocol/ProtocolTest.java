@@ -62,6 +62,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.Metrics;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -505,7 +506,12 @@ public class ProtocolTest {
     WireMessage message = server.getMessageReader().create(connectionHandler);
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(true);
-    assertThrows(IllegalStateException.class, message::send);
+    message.send();
+    assertTrue(((ParseMessage) message).getStatement().hasException());
+    assertEquals(
+        SQLState.DuplicatePreparedStatement,
+        ((InvalidStatement) ((ParseMessage) message).getStatement()).getException().getSQLState());
+    verify(connectionHandler, never()).registerStatement(anyString(), any());
   }
 
   @Test
@@ -552,7 +558,12 @@ public class ProtocolTest {
     WireMessage message = server.getMessageReader().create(connectionHandler);
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(true);
-    assertThrows(IllegalStateException.class, message::send);
+    message.send();
+    assertTrue(((ParseMessage) message).getStatement().hasException());
+    assertEquals(
+        SQLState.DuplicatePreparedStatement,
+        ((InvalidStatement) ((ParseMessage) message).getStatement()).getException().getSQLState());
+    verify(connectionHandler, never()).registerStatement(anyString(), any());
   }
 
   @Test
@@ -1063,6 +1074,8 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(server.getMessageReader()).thenReturn(new MessageReader(options));
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1077,8 +1090,11 @@ public class ProtocolTest {
     verify(connectionHandler).getPortal("some portal");
 
     message.send();
+    verify(connectionHandler).unregisterPortal(expectedStatementName);
+    verify(extendedQueryProtocolHandler).buffer((CloseMessage) message);
+
+    ((CloseMessage) message).flush();
     verify(intermediatePortalStatement).close();
-    verify(connectionHandler).closePortal(expectedStatementName);
 
     // CloseResponse
     DataInputStream outputResult = inputStreamFromOutputStream(result);
@@ -1104,6 +1120,8 @@ public class ProtocolTest {
 
     when(server.getMessageReader()).thenReturn(new MessageReader(options));
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1117,7 +1135,10 @@ public class ProtocolTest {
     verify(connectionHandler).getStatement("some statement");
 
     message.send();
-    verify(connectionHandler).closeStatement(expectedStatementName);
+    verify(connectionHandler).unregisterStatement(expectedStatementName);
+    verify(extendedQueryProtocolHandler).buffer((CloseMessage) message);
+
+    ((CloseMessage) message).flush();
 
     // CloseResponse
     DataInputStream outputResult = inputStreamFromOutputStream(result);

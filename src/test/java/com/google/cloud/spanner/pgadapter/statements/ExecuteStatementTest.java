@@ -27,6 +27,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.nio.charset.StandardCharsets;
@@ -81,6 +82,10 @@ public class ExecuteStatementTest {
     assertThrows(PGException.class, () -> parse("execute foo ()"));
     assertThrows(PGException.class, () -> parse("execute foo (1) bar"));
     assertThrows(PGException.class, () -> parse("execute foo (1"));
+
+    PGException exception = assertThrows(PGException.class, () -> parse("execute \"\""));
+    assertEquals(SQLState.InvalidSqlStatementName, exception.getSQLState());
+    assertEquals("zero-length delimited identifier", exception.getMessage());
   }
 
   static byte[] param(String value) {

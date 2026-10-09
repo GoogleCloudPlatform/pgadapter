@@ -16,7 +16,7 @@
 # PowerShell script to install Spanner PG Connector on Windows
 
 $Project = if ($env:PROJECT_ID) { $env:PROJECT_ID } else { "cloud-spanner-pg-adapter" }
-$Location = if ($env:AR_LOCATION) { $env:AR_LOCATION } else { "us-central1" }
+$Location = if ($env:AR_LOCATION) { $env:AR_LOCATION } else { "us" }
 $Repository = if ($env:AR_REPOSITORY) { $env:AR_REPOSITORY } else { "spanner-pg-connector" }
 $Package = "spanner-pg-connector"
 $Version = $env:VERSION
@@ -42,12 +42,12 @@ if ([string]::IsNullOrEmpty($Version)) {
     $Uri = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/packages/spanner-pg-connector/versions"
     try {
         $Result = Invoke-RestMethod -Uri $Uri -Headers $Headers -ErrorAction Stop
-        $Version = $Result.versions.name | ForEach-Object { Split-Path $_ -Leaf } | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | Sort-Object {[version]$_} | Select-Object -Last 1
+        $Version = $Result.versions.name | ForEach-Object { Split-Path $_ -Leaf } | Where-Object { $_ -match '^v?\d+\.\d+\.\d+$' } | Sort-Object { [version]($_ -replace '^v', '') } | Select-Object -Last 1
     } catch {
         # Fallback to gcloud if available
         if (Get-Command gcloud -ErrorAction SilentlyContinue) {
             $VersionsList = gcloud artifacts versions list --package=spanner-pg-connector --project=$Project --location=$Location --repository=$Repository --format="value(name)" 2>$null
-            $Version = $VersionsList | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | Sort-Object {[version]$_} | Select-Object -Last 1
+            $Version = $VersionsList | Where-Object { $_ -match '^v?\d+\.\d+\.\d+$' } | Sort-Object { [version]($_ -replace '^v', '') } | Select-Object -Last 1
         }
     }
 
@@ -76,7 +76,7 @@ New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
 try {
     # 2. Download package
     Write-Host "Downloading package from Artifact Registry..."
-    $DownloadUrl = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/files/spanner-pg-connector:$Version:spanner-pg-connector-windows-x64.zip:download?alt=media"
+    $DownloadUrl = "https://artifactregistry.googleapis.com/v1/projects/$Project/locations/$Location/repositories/$Repository/files/spanner-pg-connector:${Version}:spanner-pg-connector-windows-x64.zip:download?alt=media"
 
     $DownloadSuccess = $false
     try {

@@ -121,9 +121,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.55.3` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.56.1` with the version you want to download):
 ```shell
-VERSION=v0.55.3
+VERSION=v0.56.1
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -158,7 +158,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.55.3</version>
+  <version>0.56.1</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -187,6 +187,20 @@ class PGProxyRunner {
 
 See [samples/java/jdbc](samples/java/jdbc) for a small sample application that adds
 PGAdapter as a compile-time dependency and runs it together with the main application.
+
+### Spanner PG Connector (`spgc`)
+
+`spanner-pg-connector` (aliased as `spgc`) is a CLI tool designed to make working with existing
+PostgreSQL command-line tools (such as `psql` or `pg_dump`) against Spanner
+easier. It bundles PGAdapter and a minimal Java runtime—so you do not need Java or Docker installed
+locally—and automatically starts and stops PGAdapter in the background when running your tool.
+
+```shell
+spgc psql -d "projects/my-project/instances/my-instance/databases/my-database"
+```
+
+See [spanner-pg-connector/README.md](spanner-pg-connector/README.md) for installation instructions,
+authentication, environment variables, and more examples.
 
 ## Emulator
 A pre-built Docker image that contains both PGAdapter and the Spanner Emulator can be started with

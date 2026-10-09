@@ -461,6 +461,47 @@ public class BackendConnectionTest {
   }
 
   @Test
+  public void testLocalStatementWithReplacementIsReplaced()
+      throws ExecutionException, InterruptedException {
+    Connection connection = mock(Connection.class);
+    String sql = "start transaction isolation level repeatable read";
+    Statement replacement = Statement.of("select 1");
+    LocalStatement localStatement = mock(LocalStatement.class);
+    when(localStatement.getSql()).thenReturn(new String[] {sql});
+    when(localStatement.hasReplacementStatement()).thenReturn(true);
+    when(localStatement.getReplacementStatement(Statement.of(sql))).thenReturn(replacement);
+    ImmutableList<LocalStatement> localStatements = ImmutableList.of(localStatement);
+
+    StatementResult statementResult = mock(StatementResult.class);
+    when(statementResult.getResultType()).thenReturn(ResultType.RESULT_SET);
+    when(connection.execute(replacement)).thenReturn(statementResult);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> localStatements);
+    Future<StatementResult> resultFuture =
+        backendConnection.execute(
+            "SELECT", mock(ParsedStatement.class), Statement.of(sql), Function.identity());
+    backendConnection.flush();
+
+    // The statement is replaced when it is buffered, so Spanner receives the replacement and the
+    // local statement itself is never executed.
+    verify(connection).execute(replacement);
+    verify(localStatement, never()).execute(any(BackendConnection.class), any(Statement.class));
+    assertTrue(resultFuture.isDone());
+    assertEquals(statementResult, resultFuture.get());
+  }
+
+  @Test
   public void testQueryResult() {
     ResultSet resultSet = mock(ResultSet.class);
     QueryResult queryResult = new QueryResult(resultSet);
@@ -1171,5 +1212,52 @@ public class BackendConnectionTest {
     ExecutionException executionException = assertThrows(ExecutionException.class, result::get);
     assertTrue(executionException.getCause() instanceof PGException);
     assertEquals("Query failed", executionException.getCause().getMessage());
+  }
+
+  @Test
+  public void testFlushFailsRemainingStatementsWhenRollbackThrowsException() {
+    Connection spannerConnection = mock(Connection.class);
+    when(spannerConnection.isInTransaction()).thenReturn(true);
+    doThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "Rollback failed"))
+        .when(spannerConnection)
+        .rollback();
+
+    Statement statement1 = Statement.of("select 1");
+    ParsedStatement parsedStatement1 = PARSER.parse(statement1);
+    Statement statement2 = Statement.of("select 2");
+    ParsedStatement parsedStatement2 = PARSER.parse(statement2);
+
+    SpannerException spannerException =
+        SpannerExceptionFactory.newSpannerException(ErrorCode.FAILED_PRECONDITION, "Query failed");
+    when(spannerConnection.execute(statement1)).thenThrow(spannerException);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            spannerConnection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            ImmutableList::of);
+
+    Future<StatementResult> result1 =
+        backendConnection.execute("SELECT", parsedStatement1, statement1, Function.identity());
+    Future<StatementResult> result2 =
+        backendConnection.execute("SELECT", parsedStatement2, statement2, Function.identity());
+
+    assertThrows(SpannerException.class, backendConnection::flush);
+
+    assertTrue(result1.isDone());
+    ExecutionException executionException1 = assertThrows(ExecutionException.class, result1::get);
+    assertTrue(executionException1.getCause() instanceof PGException);
+    assertEquals("Query failed", executionException1.getCause().getMessage());
+
+    assertTrue(result2.isDone());
+    ExecutionException executionException2 = assertThrows(ExecutionException.class, result2::get);
+    assertSame(executionException1.getCause(), executionException2.getCause());
   }
 }

@@ -141,6 +141,10 @@ public class ExecuteStatement extends IntermediatePortalStatement {
           "invalid prepared statement name", SQLState.InvalidSqlStatementName);
     }
     String statementName = unquoteOrFoldIdentifier(name.name);
+    if (statementName == null || statementName.isEmpty()) {
+      throw PGExceptionFactory.newPGException(
+          "zero-length delimited identifier", SQLState.InvalidSqlStatementName);
+    }
 
     List<String> parameters;
     if (parser.eatToken("(")) {

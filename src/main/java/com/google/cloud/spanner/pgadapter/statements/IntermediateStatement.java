@@ -301,6 +301,14 @@ public class IntermediateStatement {
     return this.parsedStatement.getType();
   }
 
+  public ParsedStatement getParsedStatement() {
+    return this.parsedStatement;
+  }
+
+  public Statement getOriginalStatement() {
+    return this.originalStatement;
+  }
+
   public String getSql() {
     return this.originalStatement.getSql();
   }

@@ -31,9 +31,11 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.session.PGSetting.Context;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +50,53 @@ public class SessionStateTest {
   public void testShowInitialSetting() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     assertEquals("UTF8", state.get(null, "client_encoding").getSetting());
+  }
+
+  @Test
+  public void testForceAutocommit() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertFalse(state.isForceAutocommit());
+
+    state.set("spanner", "force_autocommit", "on");
+    assertTrue(state.isForceAutocommit());
+
+    state.set("spanner", "force_autocommit", "off");
+    assertFalse(state.isForceAutocommit());
+
+    state.setLocal("spanner", "force_autocommit", "on");
+    assertTrue(state.isForceAutocommit());
+  }
+
+  @Test
+  public void testLogSlowStatementThreshold() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    // The setting is not part of pg_settings.txt, so the hard-coded default is used.
+    assertEquals(Duration.ofSeconds(120L), state.getLogSlowStatementThreshold());
+
+    state.set("spanner", "log_slow_statement_threshold", "PT1S");
+    assertEquals(Duration.ofSeconds(1L), state.getLogSlowStatementThreshold());
+
+    state.set("spanner", "log_slow_statement_threshold", "PT30S");
+    assertEquals(Duration.ofSeconds(30L), state.getLogSlowStatementThreshold());
+
+    state.setLocal("spanner", "log_slow_statement_threshold", "PT2S");
+    assertEquals(Duration.ofSeconds(2L), state.getLogSlowStatementThreshold());
+  }
+
+  @Test
+  public void testHotSettingsAreCached() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+
+    // Duration.ofSeconds allocates a new instance every time, so the same instance can only be
+    // returned twice if the value is cached.
+    Duration threshold = state.getLogSlowStatementThreshold();
+    assertSame(threshold, state.getLogSlowStatementThreshold());
+
+    // Changing any setting invalidates the cache.
+    state.set("spanner", "log_slow_statement_threshold", "PT1S");
+    Duration updatedThreshold = state.getLogSlowStatementThreshold();
+    assertEquals(Duration.ofSeconds(1L), updatedThreshold);
+    assertSame(updatedThreshold, state.getLogSlowStatementThreshold());
   }
 
   @Test
@@ -156,6 +205,72 @@ public class SessionStateTest {
 
     state.commit();
     assertEquals("my-app", state.get(null, "application_name").getSetting());
+  }
+
+  @Test
+  public void testRollbackInvalidatesCachedValues() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    ZoneId zoneIdBeforeTransaction = state.getTimezone();
+    int bufferSizeBeforeTransaction = state.getBinaryConversionBufferSize();
+
+    state.set(null, "timezone", "America/New_York");
+    state.set("spanner", "binary_conversion_buffer_size", "1024");
+    // Read the values while the transaction is active, so they are cached.
+    assertEquals(ZoneId.of("America/New_York"), state.getTimezone());
+    assertEquals(1024, state.getBinaryConversionBufferSize());
+
+    state.rollback();
+
+    assertEquals(zoneIdBeforeTransaction, state.getTimezone());
+    assertEquals(bufferSizeBeforeTransaction, state.getBinaryConversionBufferSize());
+  }
+
+  @Test
+  public void testRollbackInvalidatesCachedLocalValues() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    ZoneId zoneIdBeforeTransaction = state.getTimezone();
+
+    state.setLocal(null, "timezone", "America/New_York");
+    assertEquals(ZoneId.of("America/New_York"), state.getTimezone());
+
+    state.rollback();
+
+    assertEquals(zoneIdBeforeTransaction, state.getTimezone());
+  }
+
+  @Test
+  public void testCommitInvalidatesCachedLocalValues() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    ZoneId zoneIdBeforeTransaction = state.getTimezone();
+
+    // A local setting is dropped by a commit, so the cached value must be dropped as well.
+    state.setLocal(null, "timezone", "America/New_York");
+    assertEquals(ZoneId.of("America/New_York"), state.getTimezone());
+
+    state.commit();
+
+    assertEquals(zoneIdBeforeTransaction, state.getTimezone());
+  }
+
+  @Test
+  public void testCommitAndRollbackKeepCachedValuesIfNothingChanged() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    ZoneId cachedZoneId = state.getTimezone();
+    assertEquals(ZoneId.of("UTC"), cachedZoneId);
+
+    // Modify the setting directly instead of through set(..). That bypasses the cache
+    // invalidation that set(..) does, which makes the cached value deliberately stale. Any read
+    // that still returns the stale value therefore proves that the cache was not invalidated.
+    state.get(null, "timezone").setSetting(Context.SUPERUSER, "America/New_York");
+    assertEquals(cachedZoneId, state.getTimezone());
+
+    // Neither of these changes any value that is visible to the session, so they must not throw
+    // away the cached values.
+    state.commit();
+    assertEquals(cachedZoneId, state.getTimezone());
+
+    state.rollback();
+    assertEquals(cachedZoneId, state.getTimezone());
   }
 
   @Test

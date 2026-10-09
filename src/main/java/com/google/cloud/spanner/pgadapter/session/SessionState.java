@@ -74,6 +74,9 @@ public class SessionState {
           "transaction_isolation",
           "transaction_read_only");
 
+  /** Default for `spanner.log_slow_statement_threshold`, which is not part of pg_settings.txt. */
+  private static final Duration DEFAULT_LOG_SLOW_STATEMENT_THRESHOLD = Duration.ofSeconds(120L);
+
   static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
   static {
@@ -133,6 +136,8 @@ public class SessionState {
   private final AtomicReference<Boolean> cachedReplaceForUpdateClause = new AtomicReference<>();
   private final AtomicReference<Boolean> cachedReplacePgCatalogTables = new AtomicReference<>();
   private final AtomicReference<Boolean> cachedEmulatePgClassTables = new AtomicReference<>();
+  private final AtomicReference<Boolean> cachedForceAutocommit = new AtomicReference<>();
+  private final AtomicReference<Duration> cachedLogSlowStatementThreshold = new AtomicReference<>();
   private final AtomicReference<Integer> cachedBinaryConversionBufferSize = new AtomicReference<>();
   private final AtomicReference<Integer> cachedStringConversionBufferSize = new AtomicReference<>();
 
@@ -143,6 +148,8 @@ public class SessionState {
     cachedReplaceForUpdateClause.set(null);
     cachedReplacePgCatalogTables.set(null);
     cachedEmulatePgClassTables.set(null);
+    cachedForceAutocommit.set(null);
+    cachedLogSlowStatementThreshold.set(null);
     cachedBinaryConversionBufferSize.set(null);
     cachedStringConversionBufferSize.set(null);
   }
@@ -427,16 +434,25 @@ public class SessionState {
         settings.put(toKey(setting.getExtension(), setting.getName()), setting);
       }
     }
+    // Dropping the local settings can uncover a different value, so the cache must go. Promoting
+    // the transaction settings cannot: internalGet(..) returns the same PGSetting instance either
+    // way. The distinction matters, as commit() runs for every statement in autocommit mode.
+    if (localSettings != null) {
+      invalidateCache();
+    }
     this.localSettings = null;
     this.transactionSettings = null;
-    invalidateCache();
   }
 
   /** Rolls back the current transaction and abandons any pending changes to the settings. */
   public void rollback() {
+    // Both maps are dropped here, so the cached values are only stale if the transaction changed
+    // something.
+    if (localSettings != null || transactionSettings != null) {
+      invalidateCache();
+    }
     this.localSettings = null;
     this.transactionSettings = null;
-    invalidateCache();
   }
 
   /** Returns the PostgreSQL version. */
@@ -470,7 +486,8 @@ public class SessionState {
    * in autocommit mode.
    */
   public boolean isForceAutocommit() {
-    return getBoolSetting("spanner", "force_autocommit", false);
+    return getCachedValue(
+        () -> getBoolSetting("spanner", "force_autocommit", false), cachedForceAutocommit);
   }
 
   /**
@@ -585,15 +602,19 @@ public class SessionState {
 
   /** Returns the threshold for when a query should be considered slow and should be logged. */
   public Duration getLogSlowStatementThreshold() {
-    PGSetting setting = internalGet(toKey("spanner", "log_slow_statement_threshold"), false);
-    if (setting == null) {
-      return Duration.ofSeconds(120L);
-    }
-    return tryGetFirstNonNull(
-        Duration.ofSeconds(120L),
-        () -> Duration.parse(setting.getSetting()),
-        () -> Duration.parse(setting.getResetVal()),
-        () -> Duration.parse(setting.getBootVal()));
+    return getCachedValue(
+        () -> {
+          PGSetting setting = internalGet(toKey("spanner", "log_slow_statement_threshold"), false);
+          if (setting == null) {
+            return DEFAULT_LOG_SLOW_STATEMENT_THRESHOLD;
+          }
+          return tryGetFirstNonNull(
+              DEFAULT_LOG_SLOW_STATEMENT_THRESHOLD,
+              () -> Duration.parse(setting.getSetting()),
+              () -> Duration.parse(setting.getResetVal()),
+              () -> Duration.parse(setting.getBootVal()));
+        },
+        cachedLogSlowStatementThreshold);
   }
 
   /**

@@ -18,6 +18,7 @@ import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.Interval;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
@@ -27,12 +28,12 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
-import com.google.cloud.spanner.pgadapter.statements.SimpleParser;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -42,9 +43,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.text.StringEscapeUtils;
 import org.postgresql.core.Oid;
-import org.postgresql.util.ByteConverter;
 
 /**
  * Translate wire protocol to array. Since arrays house any other specified types (including
@@ -147,7 +146,7 @@ public class ArrayParser extends Parser<List<?>> {
     if (value == null) {
       return null;
     }
-    List<String> values = SimpleParser.readArrayLiteral(value, elementOid == Oid.BYTEA);
+    List<String> values = ArrayLiteralParser.readArrayLiteral(value);
     ArrayList<Object> result = new ArrayList<>(values.size());
     for (String element : values) {
       if (element == null) {
@@ -175,35 +174,54 @@ public class ArrayParser extends Parser<List<?>> {
     if (value == null) {
       return null;
     }
-    byte[] buffer = new byte[20];
     try (DataInputStream dataStream = new DataInputStream(new ByteArrayInputStream(value))) {
-      dataStream.readFully(buffer);
-      int dimensions = ByteConverter.int4(buffer, 0);
+      int dimensions = dataStream.readInt();
+      // Null flag indicates whether there is at least one null element in the array. This is
+      // ignored by PGAdapter, as we check for null elements in the conversion function below.
+      dataStream.readInt();
+      int oid = dataStream.readInt();
+      if (dimensions == 0) {
+        if (dataStream.available() > 0) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid array value", SQLState.InvalidParameterValue);
+        }
+        return new ArrayList<>();
+      }
       if (dimensions != 1) {
         throw PGExceptionFactory.newPGException(
             "Only single-dimension arrays are supported", SQLState.InvalidParameterValue);
       }
-      // Null flag indicates whether there is at least one null element in the array. This is
-      // ignored by PGAdapter, as we check for null elements in the conversion function below.
-      int nullFlag = ByteConverter.int4(buffer, 4);
-      int oid = ByteConverter.int4(buffer, 8);
-      int size = ByteConverter.int4(buffer, 12);
+      int size = dataStream.readInt();
       // Lower bound indicates whether the lower bound of the array is 1 or 0. This is irrelevant
       // for Cloud Spanner.
-      int lowerBound = ByteConverter.int4(buffer, 16);
+      dataStream.readInt();
+      if (size < 0) {
+        throw PGExceptionFactory.newPGException(
+            "Invalid array value", SQLState.InvalidParameterValue);
+      }
+      if (size > dataStream.available() / 4) {
+        throw new EOFException();
+      }
       ArrayList<Object> result = new ArrayList<>(size);
       for (int i = 0; i < size; i++) {
-        buffer = new byte[4];
-        dataStream.readFully(buffer);
-        int elementSize = ByteConverter.int4(buffer, 0);
+        int elementSize = dataStream.readInt();
         if (elementSize == -1) {
           result.add(null);
+        } else if (elementSize < -1) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid array value", SQLState.InvalidParameterValue);
+        } else if (elementSize > dataStream.available()) {
+          throw new EOFException();
         } else {
-          buffer = new byte[elementSize];
-          dataStream.readFully(buffer);
-          Object element = Parser.create(null, buffer, oid, FormatCode.BINARY).item;
+          byte[] elementBuffer = new byte[elementSize];
+          dataStream.readFully(elementBuffer);
+          Object element = Parser.create(null, elementBuffer, oid, FormatCode.BINARY).item;
           result.add(convertToValidSpannerElements ? toValidSpannerElement(element, oid) : element);
         }
+      }
+      if (dataStream.available() > 0) {
+        throw PGExceptionFactory.newPGException(
+            "Invalid array value", SQLState.InvalidParameterValue);
       }
       return result;
     } catch (IOException exception) {
@@ -240,7 +258,8 @@ public class ArrayParser extends Parser<List<?>> {
         || arrayElementType == Code.DATE
         || arrayElementType == Code.STRING
         || arrayElementType == Code.TIMESTAMP
-        || arrayElementType == Code.PG_JSONB;
+        || arrayElementType == Code.PG_JSONB
+        || arrayElementType == Code.UUID;
   }
 
   /**
@@ -277,10 +296,48 @@ public class ArrayParser extends Parser<List<?>> {
       return "NULL";
     }
     if (this.isStringEquivalent) {
-      value = StringEscapeUtils.escapeJava(value);
+      value = escapeArrayElement(value);
       return STRING_TOGGLE + value + STRING_TOGGLE;
     }
     return value;
+  }
+
+  static String escapeArrayElement(String value) {
+    if (value == null) {
+      return null;
+    }
+    int nextQuote = value.indexOf('"');
+    int nextBackslash = value.indexOf('\\');
+    if (nextQuote == -1 && nextBackslash == -1) {
+      return value;
+    }
+    StringBuilder builder = new StringBuilder(value.length() + 32);
+    int current = 0;
+    while (true) {
+      int next;
+      if (nextQuote == -1) {
+        next = nextBackslash;
+      } else if (nextBackslash == -1) {
+        next = nextQuote;
+      } else {
+        next = Math.min(nextQuote, nextBackslash);
+      }
+      if (next == -1) {
+        builder.append(value, current, value.length());
+        break;
+      }
+      builder.append(value, current, next);
+      builder.append('\\');
+      builder.append(value.charAt(next));
+      current = next + 1;
+      if (nextQuote == next) {
+        nextQuote = value.indexOf('"', current);
+      }
+      if (nextBackslash == next) {
+        nextBackslash = value.indexOf('\\', current);
+      }
+    }
+    return builder.toString();
   }
 
   @Override
@@ -322,6 +379,13 @@ public class ArrayParser extends Parser<List<?>> {
     }
     ByteArrayOutputStream arrayStream = new ByteArrayOutputStream();
     try {
+      if (this.item.isEmpty()) {
+        arrayStream.write(IntegerParser.binaryParse(0)); // dimension
+        arrayStream.write(IntegerParser.binaryParse(0)); // Set null flag
+        arrayStream.write(
+            IntegerParser.binaryParse(Parser.toOid(this.arrayElementType))); // Set type
+        return arrayStream.toByteArray();
+      }
       arrayStream.write(IntegerParser.binaryParse(1)); // dimension
       arrayStream.write(IntegerParser.binaryParse(1)); // Set null flag
       arrayStream.write(IntegerParser.binaryParse(Parser.toOid(this.arrayElementType))); // Set type
@@ -445,6 +509,9 @@ public class ArrayParser extends Parser<List<?>> {
         break;
       case Oid.DATE:
         parametersBuilder.put(name, Value.dateArray((List<Date>) list));
+        break;
+      case Oid.INTERVAL:
+        parametersBuilder.put(name, Value.intervalArray((List<Interval>) list));
         break;
       default:
         throw PGExceptionFactory.newPGException(

@@ -26,6 +26,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import org.junit.Test;
@@ -54,6 +55,14 @@ public class DeallocateStatementTest {
     assertThrows(PGException.class, () -> parse("deallocate prepare"));
     assertThrows(PGException.class, () -> parse("deallocate foo bar"));
     assertThrows(PGException.class, () -> parse("deallocate foo.bar"));
+
+    PGException exception = assertThrows(PGException.class, () -> parse("deallocate \"\""));
+    assertEquals(SQLState.InvalidSqlStatementName, exception.getSQLState());
+    assertEquals("zero-length delimited identifier", exception.getMessage());
+
+    exception = assertThrows(PGException.class, () -> parse("deallocate prepare \"\""));
+    assertEquals(SQLState.InvalidSqlStatementName, exception.getSQLState());
+    assertEquals("zero-length delimited identifier", exception.getMessage());
   }
 
   @Test

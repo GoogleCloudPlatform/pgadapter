@@ -170,6 +170,7 @@ public class RowDescriptionResponse extends WireOutput {
       case Oid.INT2:
         return 2;
       case Oid.INT4:
+      case Oid.OID:
         return 4;
       case Oid.INT8:
         return 8;
@@ -181,6 +182,8 @@ public class RowDescriptionResponse extends WireOutput {
         return 1;
       case Oid.BOOL:
         return 1;
+      case Oid.UUID:
+        return 16;
       case Oid.DATE:
         return 8;
       case Oid.TIME:

@@ -198,13 +198,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
       // As this describe-request is an auto-describe request, we can safely try to look it up in a
       // cache.
-      DescribeResult cachedDescribeResult =
+      ListenableFuture<DescribeResult> cachedDescribeResult =
           getConnectionHandler().getAutoDescribedStatement(this.originalStatement.getSql());
       if (cachedDescribeResult != null) {
         this.described = true;
         this.describeResult =
-            Futures.immediateFuture(
-                cachedDescribeResult.withGivenParameterTypes(this.givenParameterDataTypes));
+            Futures.transform(
+                cachedDescribeResult,
+                describeResult ->
+                    describeResult.withGivenParameterTypes(this.givenParameterDataTypes),
+                MoreExecutors.directExecutor());
         return;
       }
       // No cached result found. Add a describe-statement message to the queue.
