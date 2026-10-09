@@ -30,11 +30,14 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -51,15 +54,17 @@ public class TimestampParserTest {
 
   @Test
   public void testToTimestamp() {
-    long micros = new Random().nextLong();
-    if (micros < -62135596800000L) {
-      micros = -62135596800000L;
-    } else if (micros > 253402300799000L) {
-      micros = 253402300799000L;
+    long minMicroseconds = -62135596800_000_000L;
+    long maxMicroseconds = 253402300799_999_999L;
+    long microseconds = new Random().nextLong();
+    if (microseconds < minMicroseconds) {
+      microseconds = minMicroseconds;
+    } else if (microseconds > maxMicroseconds) {
+      microseconds = maxMicroseconds;
     }
     byte[] data = new byte[8];
-    ByteConverter.int8(data, 0, micros - PG_EPOCH_SECONDS * 1000_000L);
-    assertEquals(Timestamp.ofTimeMicroseconds(micros), TimestampParser.toTimestamp(data));
+    ByteConverter.int8(data, 0, microseconds - PG_EPOCH_SECONDS * 1000_000L);
+    assertEquals(Timestamp.ofTimeMicroseconds(microseconds), TimestampParser.toTimestamp(data));
 
     SpannerException spannerException =
         assertThrows(SpannerException.class, () -> TimestampParser.toTimestamp(new byte[4]));
@@ -70,6 +75,139 @@ public class TimestampParserTest {
         new TimestampParser(TimestampParser.toTimestamp(data), mock(SessionState.class))
             .binaryParse());
     assertNull(new TimestampParser(null, mock(SessionState.class)).binaryParse());
+  }
+
+  @Test
+  public void testToTimestamp_earliestTimestampAcceptedBySpanner() {
+    Timestamp minTimestamp = Timestamp.parseTimestamp("0001-01-01T00:00:00Z");
+    byte[] data = new byte[8];
+    long pgMicroseconds = (minTimestamp.getSeconds() - PG_EPOCH_SECONDS) * 1_000_000L;
+    ByteConverter.int8(data, 0, pgMicroseconds);
+
+    assertEquals(minTimestamp, TimestampParser.toTimestamp(data));
+    assertArrayEquals(
+        data,
+        new TimestampParser(TimestampParser.toTimestamp(data), mock(SessionState.class))
+            .binaryParse());
+  }
+
+  @Test
+  public void testToTimestamp_yearsBefore0031() {
+    String[] timestampStrings =
+        new String[] {
+          "0001-01-01T00:00:00Z",
+          "0001-06-15T12:30:45.123456Z",
+          "0005-11-20T08:15:00.654321Z",
+          "0010-03-01T00:00:00Z",
+          "0020-02-29T10:20:30.999999Z",
+          "0030-12-31T23:59:59.999999Z",
+        };
+    for (String timestampString : timestampStrings) {
+      Timestamp expectedTimestamp = Timestamp.parseTimestamp(timestampString);
+      byte[] data = new byte[8];
+      long pgMicroseconds =
+          ((expectedTimestamp.getSeconds() - PG_EPOCH_SECONDS) * 1_000_000L)
+              + (expectedTimestamp.getNanos() / 1_000L);
+      ByteConverter.int8(data, 0, pgMicroseconds);
+
+      assertEquals(expectedTimestamp, TimestampParser.toTimestamp(data));
+      assertEquals(
+          expectedTimestamp,
+          TimestampParser.toTimestamp(data, FormatCode.BINARY, mock(SessionState.class)));
+
+      ImmutableMap.Builder<String, Value> parametersBuilder = ImmutableMap.builder();
+      TimestampParser.bind(
+          parametersBuilder, "p1", data, FormatCode.BINARY, mock(SessionState.class));
+      assertEquals(Value.timestamp(expectedTimestamp), parametersBuilder.build().get("p1"));
+
+      assertArrayEquals(
+          data, new TimestampParser(expectedTimestamp, mock(SessionState.class)).binaryParse());
+    }
+  }
+
+  @Test
+  public void testToTimestamp_latestTimestampAcceptedBySpanner() {
+    Timestamp maxTimestamp = Timestamp.parseTimestamp("9999-12-31T23:59:59.999999Z");
+    byte[] data = new byte[8];
+    long pgMicroseconds =
+        ((maxTimestamp.getSeconds() - PG_EPOCH_SECONDS) * 1_000_000L)
+            + (maxTimestamp.getNanos() / 1_000L);
+    ByteConverter.int8(data, 0, pgMicroseconds);
+
+    assertEquals(maxTimestamp, TimestampParser.toTimestamp(data));
+    assertArrayEquals(
+        data,
+        new TimestampParser(TimestampParser.toTimestamp(data), mock(SessionState.class))
+            .binaryParse());
+  }
+
+  @Test
+  public void testToTimestamp_outOfRange() {
+    // 1 microsecond before 0001-01-01 00:00:00Z
+    Timestamp minTimestamp = Timestamp.parseTimestamp("0001-01-01T00:00:00Z");
+    long beforeMinMicroseconds = (minTimestamp.getSeconds() - PG_EPOCH_SECONDS) * 1_000_000L - 1L;
+    byte[] beforeMinData = new byte[8];
+    ByteConverter.int8(beforeMinData, 0, beforeMinMicroseconds);
+
+    PGException beforeMinException =
+        assertThrows(PGException.class, () -> TimestampParser.toTimestamp(beforeMinData));
+    assertEquals(SQLState.DatetimeFieldOverflow, beforeMinException.getSQLState());
+    assertEquals("timestamp out of range", beforeMinException.getMessage());
+
+    // 1 microsecond after 9999-12-31 23:59:59.999999Z
+    Timestamp maxTimestamp = Timestamp.parseTimestamp("9999-12-31T23:59:59.999999Z");
+    long afterMaxMicroseconds =
+        ((maxTimestamp.getSeconds() - PG_EPOCH_SECONDS) * 1_000_000L)
+            + (maxTimestamp.getNanos() / 1_000L)
+            + 1L;
+    byte[] afterMaxData = new byte[8];
+    ByteConverter.int8(afterMaxData, 0, afterMaxMicroseconds);
+
+    PGException afterMaxException =
+        assertThrows(PGException.class, () -> TimestampParser.toTimestamp(afterMaxData));
+    assertEquals(SQLState.DatetimeFieldOverflow, afterMaxException.getSQLState());
+    assertEquals("timestamp out of range", afterMaxException.getMessage());
+
+    // Long.MIN_VALUE
+    byte[] minimumLongData = new byte[8];
+    ByteConverter.int8(minimumLongData, 0, Long.MIN_VALUE);
+    PGException minimumLongException =
+        assertThrows(PGException.class, () -> TimestampParser.toTimestamp(minimumLongData));
+    assertEquals(SQLState.DatetimeFieldOverflow, minimumLongException.getSQLState());
+    assertEquals("timestamp out of range", minimumLongException.getMessage());
+
+    // Long.MAX_VALUE
+    byte[] maximumLongData = new byte[8];
+    ByteConverter.int8(maximumLongData, 0, Long.MAX_VALUE);
+    PGException maximumLongException =
+        assertThrows(PGException.class, () -> TimestampParser.toTimestamp(maximumLongData));
+    assertEquals(SQLState.DatetimeFieldOverflow, maximumLongException.getSQLState());
+    assertEquals("timestamp out of range", maximumLongException.getMessage());
+
+    // FormatCode.BINARY via toTimestamp(data, formatCode, sessionState)
+    PGException binaryFormatException =
+        assertThrows(
+            PGException.class,
+            () ->
+                TimestampParser.toTimestamp(
+                    beforeMinData, FormatCode.BINARY, mock(SessionState.class)));
+    assertEquals(SQLState.DatetimeFieldOverflow, binaryFormatException.getSQLState());
+    assertEquals("timestamp out of range", binaryFormatException.getMessage());
+
+    // FormatCode.BINARY via bind(...)
+    ImmutableMap.Builder<String, Value> parametersBuilder = ImmutableMap.builder();
+    PGException bindException =
+        assertThrows(
+            PGException.class,
+            () ->
+                TimestampParser.bind(
+                    parametersBuilder,
+                    "p1",
+                    beforeMinData,
+                    FormatCode.BINARY,
+                    mock(SessionState.class)));
+    assertEquals(SQLState.DatetimeFieldOverflow, bindException.getSQLState());
+    assertEquals("timestamp out of range", bindException.getMessage());
   }
 
   @Test
