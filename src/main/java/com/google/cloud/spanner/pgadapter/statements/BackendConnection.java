@@ -278,6 +278,7 @@ public class BackendConnection {
     private final boolean analyze;
     private final LocalStatement localStatement;
     private final SessionStatement sessionStatement;
+    private final Exception parseException;
     private final boolean clientSide;
 
     Execute(
@@ -302,14 +303,24 @@ public class BackendConnection {
       if (localStatement != null && !localStatement.hasReplacementStatement()) {
         this.localStatement = localStatement;
         this.sessionStatement = null;
+        this.parseException = null;
         this.clientSide = true;
       } else {
         this.localStatement = null;
-        this.sessionStatement = getSessionManagementStatement(this.statement, this.parsedStatement);
+        SessionStatement sessionStatement = null;
+        Exception parseException = null;
+        try {
+          sessionStatement = getSessionManagementStatement(this.statement, this.parsedStatement);
+        } catch (Exception exception) {
+          parseException = exception;
+        }
+        this.sessionStatement = sessionStatement;
+        this.parseException = parseException;
         this.clientSide =
             !isTransactionStatement(this.parsedStatement)
                 && (this.parsedStatement.getType() == StatementType.CLIENT_SIDE
-                    || this.sessionStatement != null);
+                    || this.sessionStatement != null
+                    || this.parseException != null);
       }
     }
 
@@ -338,6 +349,9 @@ public class BackendConnection {
       Statement updatedStatement = statement;
       try {
         checkConnectionState();
+        if (this.parseException != null) {
+          throw SpannerExceptionFactory.asSpannerException(this.parseException);
+        }
         // TODO(b/235719478): If the statement is a BEGIN statement and there is a COMMIT statement
         //  at a later point in the batch, and all the statements in the transaction block are
         //  SELECT statements, then we should create a read-only transaction. Also, if a transaction
@@ -1516,9 +1530,36 @@ public class BackendConnection {
     return isBegin(index) || isCommit(index) || isRollback(index);
   }
 
-  private boolean hasOnlyDmlStatementsAfter(int index) {
-    return bufferedStatements.subList(index, bufferedStatements.size()).stream()
-        .allMatch(statement -> statement.parsedStatement.getType() == StatementType.UPDATE);
+  @VisibleForTesting
+  boolean hasOnlyDmlStatementsAfter(int index) {
+    boolean seenExecute = false;
+    boolean seenClientSide = false;
+    for (int i = index; i < bufferedStatements.size(); i++) {
+      BufferedStatement<?> statement = bufferedStatements.get(i);
+      if (statement.isClientSide()) {
+        seenClientSide = true;
+      } else if (statement.isUpdate() && !statement.parsedStatement.hasReturningClause()) {
+        if (seenClientSide) {
+          // A DML statement appeared after a client-side statement.
+          // These cannot be batched together in a single auto-commit DML batch.
+          return false;
+        }
+        boolean isAnalyze = statement instanceof Execute && ((Execute) statement).analyze;
+        if (isAnalyze) {
+          if (seenExecute || i > index) {
+            // An analyze/describe statement appeared after an execute statement,
+            // or there are multiple analyze statements. These cannot be executed
+            // in a single auto-commit DML batch.
+            return false;
+          }
+        } else {
+          seenExecute = true;
+        }
+      } else {
+        return false;
+      }
+    }
+    return true;
   }
 
   @VisibleForTesting

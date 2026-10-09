@@ -20,6 +20,7 @@ import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -655,6 +656,10 @@ public class BackendConnectionTest {
     assertTrue(isClientSideForSql(backendConnection, "show spanner.read_timestamp"));
     assertTrue(isClientSideForSql(backendConnection, "show timezone"));
     assertTrue(isClientSideForSql(backendConnection, "reset all"));
+    assertTrue(isClientSideForSql(backendConnection, "set foo"));
+    assertTrue(isClientSideForSql(backendConnection, "show"));
+    assertTrue(isClientSideForSql(backendConnection, "show foo bar"));
+    assertTrue(isClientSideForSql(backendConnection, "reset foo bar"));
 
     // Local statements without replacement are client side; with replacement are not.
     assertTrue(isClientSideForSql(backendConnection, "\\l"));
@@ -671,6 +676,77 @@ public class BackendConnectionTest {
         backendConnection
             .getBufferedStatement(backendConnection.getStatementCount() - 1)
             .isClientSide());
+  }
+
+  @Test
+  public void testInvalidSessionStatement_defersExceptionToExecution() {
+    Connection connection = mock(Connection.class);
+    Statement setStatement = Statement.of("set foo");
+    ParsedStatement parsedSetStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(setStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    // Buffering must not throw.
+    Future<StatementResult> future =
+        backendConnection.execute("SET", parsedSetStatement, setStatement, Function.identity());
+    assertNotNull(future);
+    assertFalse(future.isDone());
+
+    // Execution during sync fails the future with PGException.
+    backendConnection.sync();
+    assertTrue(future.isDone());
+    ExecutionException executionException = assertThrows(ExecutionException.class, future::get);
+    assertTrue(executionException.getCause() instanceof PGException);
+    PGException pgException = (PGException) executionException.getCause();
+    assertEquals(SQLState.RaiseException, pgException.getSQLState());
+    assertTrue(pgException.getMessage().contains("Expected TO or ="));
+  }
+
+  @Test
+  public void testInvalidShowAndResetStatements_deferExceptionToExecution() {
+    for (String sql : new String[] {"show", "show foo bar", "reset foo bar"}) {
+      Connection connection = mock(Connection.class);
+      Statement statement = Statement.of(sql);
+      ParsedStatement parsedStatement =
+          AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+
+      BackendConnection backendConnection =
+          new BackendConnection(
+              NOOP_OTEL,
+              NOOP_OTEL_METER,
+              METRIC_ATTRIBUTES,
+              UUID.randomUUID().toString(),
+              DO_NOTHING,
+              DATABASE_ID,
+              connection,
+              () -> WellKnownClient.UNSPECIFIED,
+              mock(OptionsMetadata.class),
+              () -> EMPTY_LOCAL_STATEMENTS);
+
+      Future<StatementResult> future =
+          backendConnection.execute(sql, parsedStatement, statement, Function.identity());
+      assertNotNull(future);
+      assertFalse(future.isDone());
+
+      backendConnection.sync();
+      assertTrue(future.isDone());
+      ExecutionException executionException = assertThrows(ExecutionException.class, future::get);
+      assertTrue(executionException.getCause() instanceof PGException);
+      PGException pgException = (PGException) executionException.getCause();
+      assertEquals(SQLState.RaiseException, pgException.getSQLState());
+    }
   }
 
   private boolean isClientSideForSql(BackendConnection backendConnection, String sql) {
@@ -1448,6 +1524,609 @@ public class BackendConnectionTest {
     verify(connection, never()).setTransactionMode(any());
     verify(connection, never()).beginTransaction();
     verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testMultipleDmlAndClientSideStatement_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2)");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+    Statement showStatement = Statement.of("show spanner.commit_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    when(connection.runBatch()).thenReturn(new long[] {1L, 1L});
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).startBatchDml();
+    verify(connection).execute(insertStatement1);
+    verify(connection).execute(insertStatement2);
+    verify(connection).runBatch();
+    verify(connection).execute(showStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testClientSideAndMultipleDmlAndClientSideStatement_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.runBatch()).thenReturn(new long[] {1L, 1L});
+    Statement setStatement = Statement.of("set timezone = 'UTC'");
+    ParsedStatement parsedSetStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(setStatement);
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2)");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+    Statement showStatement = Statement.of("show spanner.commit_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute("SET", parsedSetStatement, setStatement, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).startBatchDml();
+    verify(connection).execute(insertStatement1);
+    verify(connection).execute(insertStatement2);
+    verify(connection).runBatch();
+    verify(connection).execute(showStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testMultipleDmlAndQuery_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    when(connection.runBatch()).thenReturn(new long[] {1L, 1L});
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2)");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testQueryAndMultipleDml_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    when(connection.runBatch()).thenReturn(new long[] {1L, 1L});
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2)");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testDmlAndQueryAndClientSideStatement_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    Statement insertStatement = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement);
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+    Statement showStatement = Statement.of("show spanner.commit_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement, insertStatement, Function.identity());
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testQueryAndDmlAndClientSideStatement_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+    Statement insertStatement = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement);
+    Statement showStatement = Statement.of("show spanner.commit_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement, insertStatement, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testDescribeAndExecuteDmlAndClientSideStatement_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    Statement showStatement = Statement.of("show spanner.commit_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.analyze("INSERT", parsedStatement, statement);
+    backendConnection.execute("INSERT", parsedStatement, statement, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(statement);
+    verify(connection).execute(showStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testDmlAndClientSideAndDml_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement setStatement = Statement.of("set timezone = 'UTC'");
+    ParsedStatement parsedSetStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(setStatement);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2)");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.execute("SET", parsedSetStatement, setStatement, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testMultipleDmlWithReturning_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1) returning *");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2) returning *");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testDescribeAndMultipleExecuteDml_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.runBatch()).thenReturn(new long[] {1L, 1L});
+    Statement statement = Statement.of("insert into foo (id) values ($1)");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    Statement statement1 = Statement.of("insert into foo (id) values (1)");
+    Statement statement2 = Statement.of("insert into foo (id) values (2)");
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.analyze("INSERT", parsedStatement, statement);
+    backendConnection.execute("INSERT", parsedStatement, statement1, Function.identity());
+    backendConnection.execute("INSERT", parsedStatement, statement2, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).startBatchDml();
+    verify(connection).execute(statement1);
+    verify(connection).execute(statement2);
+    verify(connection).runBatch();
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testDescribeAndMultipleExecuteDmlAndClientSideStatement_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.runBatch()).thenReturn(new long[] {1L, 1L});
+    Statement statement = Statement.of("insert into foo (id) values ($1)");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    Statement statement1 = Statement.of("insert into foo (id) values (1)");
+    Statement statement2 = Statement.of("insert into foo (id) values (2)");
+    Statement showStatement = Statement.of("show spanner.commit_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.analyze("INSERT", parsedStatement, statement);
+    backendConnection.execute("INSERT", parsedStatement, statement1, Function.identity());
+    backendConnection.execute("INSERT", parsedStatement, statement2, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).startBatchDml();
+    verify(connection).execute(statement1);
+    verify(connection).execute(statement2);
+    verify(connection).runBatch();
+    verify(connection).execute(showStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testDescribeAndExecuteDmlAndDescribeAndExecuteDml_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    when(connection.runBatch()).thenReturn(new long[] {1L});
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2)");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.analyze("INSERT", parsedInsertStatement1, insertStatement1);
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.analyze("INSERT", parsedInsertStatement2, insertStatement2);
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testDescribeAndMultipleExecuteDmlWithReturning_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    Statement insertStatement = Statement.of("insert into foo (id) values ($1) returning *");
+    ParsedStatement parsedInsertStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement);
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1) returning *");
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2) returning *");
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.analyze("INSERT", parsedInsertStatement, insertStatement);
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement, insertStatement1, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement, insertStatement2, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
+  }
+
+  @Test
+  public void testMultipleDmlAndMultipleClientSideStatements_doesNotStartTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.runBatch()).thenReturn(new long[] {1L, 1L});
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2)");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+    Statement setStatement = Statement.of("set timezone = 'UTC'");
+    ParsedStatement parsedSetStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(setStatement);
+    Statement showStatement = Statement.of("show spanner.commit_timestamp");
+    ParsedStatement parsedShowStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(showStatement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.execute("SET", parsedSetStatement, setStatement, Function.identity());
+    backendConnection.execute("SHOW", parsedShowStatement, showStatement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).startBatchDml();
+    verify(connection).execute(insertStatement1);
+    verify(connection).execute(insertStatement2);
+    verify(connection).runBatch();
+    verify(connection).execute(showStatement);
+    verify(connection, never()).setTransactionMode(any());
+    verify(connection, never()).beginTransaction();
+    verify(connection, never()).commit();
+  }
+
+  @Test
+  public void testDescribeQueryAndMultipleDml_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    when(connection.isInTransaction()).thenReturn(true);
+    when(connection.runBatch()).thenReturn(new long[] {1L, 1L});
+    Statement selectStatement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedSelectStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(selectStatement);
+    Statement insertStatement1 = Statement.of("insert into foo (id) values (1)");
+    ParsedStatement parsedInsertStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement1);
+    Statement insertStatement2 = Statement.of("insert into foo (id) values (2)");
+    ParsedStatement parsedInsertStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(insertStatement2);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            NOOP_OTEL,
+            NOOP_OTEL_METER,
+            METRIC_ATTRIBUTES,
+            UUID.randomUUID().toString(),
+            DO_NOTHING,
+            DATABASE_ID,
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.analyze("SELECT", parsedSelectStatement, selectStatement);
+    backendConnection.execute(
+        "SELECT", parsedSelectStatement, selectStatement, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement1, insertStatement1, Function.identity());
+    backendConnection.execute(
+        "INSERT", parsedInsertStatement2, insertStatement2, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).beginTransaction();
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).commit();
   }
 
   @Test
