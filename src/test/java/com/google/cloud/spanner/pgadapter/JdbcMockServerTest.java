@@ -7456,4 +7456,319 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             .filter(request -> request.getSql().equals(INSERT_STATEMENT.getSql()))
             .count());
   }
+
+  @Test
+  public void testQueryFollowedByClientSideStatement_doesNotStartTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("SET spanner.read_only_staleness = 'MAX_STALENESS 10s'");
+        mockSpanner.clearRequests();
+
+        // Executing a query followed by a client-side statement in a single batch (before Sync)
+        // should execute the query in auto-commit mode (single-use read) and not start an implicit
+        // read-only transaction. If an implicit transaction had started, the query would fail
+        // because MAX_STALENESS is only supported for single-use transactions.
+        assertTrue(statement.execute("SELECT 1; SHOW spanner.read_timestamp"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertNotNull(resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testMultipleQueriesFollowedByClientSideStatement_startsTransaction()
+      throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        mockSpanner.clearRequests();
+
+        assertTrue(statement.execute("SELECT 1;SELECT 2;SHOW spanner.read_timestamp"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(2L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertNotNull(resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+
+        assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testSetTimezoneFollowedByQuery_doesNotStartTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("SET spanner.read_only_staleness = 'MAX_STALENESS 10s'");
+        mockSpanner.clearRequests();
+
+        assertFalse(statement.execute("SET timezone = 'UTC';SELECT 1"));
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testQueryFollowedBySetTimezone_doesNotStartTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("SET spanner.read_only_staleness = 'MAX_STALENESS 10s'");
+        mockSpanner.clearRequests();
+
+        assertTrue(statement.execute("SELECT 1; SET timezone = 'UTC'"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testMultipleDmlFollowedByClientSideStatement_doesNotStartTransaction()
+      throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        mockSpanner.clearRequests();
+
+        assertFalse(
+            statement.execute(
+                String.format(
+                    "%s;%s;SHOW spanner.commit_timestamp",
+                    INSERT_STATEMENT.getSql(), UPDATE_STATEMENT.getSql())));
+        assertEquals(1, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(2, statement.getUpdateCount());
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertNotNull(resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testMultipleDmlAndQuery_startsTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        mockSpanner.clearRequests();
+
+        assertFalse(
+            statement.execute(
+                String.format(
+                    "%s;%s;SELECT 1", INSERT_STATEMENT.getSql(), UPDATE_STATEMENT.getSql())));
+        assertEquals(1, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(2, statement.getUpdateCount());
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+        assertTrue(
+            mockSpanner
+                .getRequestsOfType(ExecuteBatchDmlRequest.class)
+                .get(0)
+                .getTransaction()
+                .hasBegin());
+        assertTrue(
+            mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getTransaction().hasId());
+      }
+    }
+  }
+
+  @Test
+  public void testDmlAndQueryFollowedByClientSideStatement_startsTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        mockSpanner.clearRequests();
+
+        assertFalse(
+            statement.execute(
+                String.format(
+                    "%s;SELECT 1;SHOW spanner.commit_timestamp", INSERT_STATEMENT.getSql())));
+        assertEquals(1, statement.getUpdateCount());
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          // Since an implicit transaction was started, the commit timestamp is null until
+          // committed.
+          assertNull(resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+        assertTrue(
+            mockSpanner
+                .getRequestsOfType(ExecuteSqlRequest.class)
+                .get(0)
+                .getTransaction()
+                .hasBegin());
+        assertTrue(
+            mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1).getTransaction().hasId());
+      }
+    }
+  }
+
+  @Test
+  public void testQueryFollowedByMultipleDml_startsTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        mockSpanner.clearRequests();
+
+        assertTrue(
+            statement.execute(
+                String.format(
+                    "SELECT 1;%s;%s", INSERT_STATEMENT.getSql(), UPDATE_STATEMENT.getSql())));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+        assertEquals(1, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(2, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+        assertTrue(
+            mockSpanner
+                .getRequestsOfType(ExecuteSqlRequest.class)
+                .get(0)
+                .getTransaction()
+                .hasBegin());
+        assertTrue(
+            mockSpanner
+                .getRequestsOfType(ExecuteBatchDmlRequest.class)
+                .get(0)
+                .getTransaction()
+                .hasId());
+      }
+    }
+  }
+
+  @Test
+  public void testInvalidSessionStatements_failWithError() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        for (String sql : new String[] {"SET foo", "SHOW", "SHOW foo bar", "RESET foo bar"}) {
+          assertThrows(PSQLException.class, () -> statement.execute(sql));
+        }
+      }
+      try (java.sql.PreparedStatement statement = connection.prepareStatement("SET foo")) {
+        assertThrows(PSQLException.class, statement::execute);
+      }
+      try (java.sql.PreparedStatement statement = connection.prepareStatement("SHOW")) {
+        assertThrows(PSQLException.class, statement::execute);
+      }
+    }
+  }
+
+  @Test
+  public void testMultipleDmlFollowedByMultipleClientSideStatements_doesNotStartTransaction()
+      throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        mockSpanner.clearRequests();
+
+        assertFalse(
+            statement.execute(
+                String.format(
+                    "%s;%s;SET timezone = 'UTC';SHOW spanner.commit_timestamp",
+                    INSERT_STATEMENT.getSql(), UPDATE_STATEMENT.getSql())));
+        assertEquals(1, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(2, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(0, statement.getUpdateCount());
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertNotNull(resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
 }
