@@ -159,3 +159,6 @@ jobs:
         with:
           filename: .github/integration-test-failed-template.md
           assignees: olavloite, rayudu3745
+          update_existing: true
+          search_existing: open
+
