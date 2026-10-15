@@ -15,6 +15,7 @@ package com.google.cloud.pgadapter.tpcc;
 
 import com.google.cloud.opentelemetry.metric.GoogleCloudMetricExporter;
 import com.google.cloud.opentelemetry.metric.MetricConfiguration;
+import com.google.cloud.pgadapter.tpcc.config.HibernateConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.PGAdapterConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.SpannerConfiguration;
 import com.google.cloud.pgadapter.tpcc.config.TpccConfiguration;
@@ -41,6 +42,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.hibernate.SessionFactory;
+import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.StandardServiceRegistry;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -65,13 +70,17 @@ public class BenchmarkApplication implements CommandLineRunner {
 
   private final TpccConfiguration tpccConfiguration;
 
+  private final HibernateConfiguration hibernateConfiguration;
+
   public BenchmarkApplication(
       SpannerConfiguration spannerConfiguration,
       PGAdapterConfiguration pgAdapterConfiguration,
-      TpccConfiguration tpccConfiguration) {
+      TpccConfiguration tpccConfiguration,
+      HibernateConfiguration hibernateConfiguration) {
     this.spannerConfiguration = spannerConfiguration;
     this.pgAdapterConfiguration = pgAdapterConfiguration;
     this.tpccConfiguration = tpccConfiguration;
+    this.hibernateConfiguration = hibernateConfiguration;
   }
 
   @Override
@@ -95,6 +104,8 @@ public class BenchmarkApplication implements CommandLineRunner {
                 pgAdapterConfiguration.getMinSessions(), tpccConfiguration.getBenchmarkThreads()),
             Math.max(
                 pgAdapterConfiguration.getMaxSessions(), tpccConfiguration.getBenchmarkThreads()));
+    StandardServiceRegistry registry = null;
+    SessionFactory sessionFactory = null;
     try {
       if (tpccConfiguration.isLoadData()) {
         boolean isClientLibGSQLRunner =
@@ -133,6 +144,11 @@ public class BenchmarkApplication implements CommandLineRunner {
         Statistics statistics = new Statistics(tpccConfiguration);
         ExecutorService executor =
             Executors.newFixedThreadPool(tpccConfiguration.getBenchmarkThreads());
+
+        if (tpccConfiguration.getBenchmarkRunner().equals(TpccConfiguration.HIBERNATE_RUNNER)) {
+          registry = buildHibernateConfiguration();
+          sessionFactory = new MetadataSources(registry).buildMetadata().buildSessionFactory();
+        }
         for (int i = 0; i < tpccConfiguration.getBenchmarkThreads(); i++) {
           if (tpccConfiguration
               .getBenchmarkRunner()
@@ -186,6 +202,20 @@ public class BenchmarkApplication implements CommandLineRunner {
                     spannerConfiguration,
                     metrics,
                     Dialect.GOOGLE_STANDARD_SQL));
+          } else if (tpccConfiguration
+              .getBenchmarkRunner()
+              .equals(TpccConfiguration.HIBERNATE_RUNNER)) {
+            statistics.setRunnerName("Hibernate benchmark");
+            executor.submit(
+                new HibernateBenchmarkRunner(
+                    statistics,
+                    new SessionHelper(sessionFactory),
+                    tpccConfiguration,
+                    pgAdapterConfiguration,
+                    spannerConfiguration,
+                    hibernateConfiguration,
+                    metrics,
+                    Dialect.GOOGLE_STANDARD_SQL));
           }
         }
 
@@ -209,6 +239,10 @@ public class BenchmarkApplication implements CommandLineRunner {
       if (server != null) {
         server.stopServer();
         server.awaitTerminated();
+      }
+      if (sessionFactory != null) {
+        sessionFactory.close();
+        registry.close();
       }
     }
   }
@@ -281,5 +315,18 @@ public class BenchmarkApplication implements CommandLineRunner {
     server.awaitRunning();
 
     return server;
+  }
+
+  private StandardServiceRegistry buildHibernateConfiguration() {
+    return new StandardServiceRegistryBuilder()
+        .configure()
+        .applySetting("hibernate.show_sql", hibernateConfiguration.isShowSql())
+        .applySetting("hibernate.jdbc.batch_size", hibernateConfiguration.getBatchSize())
+        .applySetting("hibernate.connection.pool_size", hibernateConfiguration.getPoolSize())
+        .applySetting("hibernate.order_inserts", hibernateConfiguration.isOrderInserts())
+        .applySetting("hibernate.order_updates", hibernateConfiguration.isOrderUpdates())
+        .applySetting(
+            "hibernate.jdbc.batch_versioned_data", hibernateConfiguration.isBatchVersionedData())
+        .build();
   }
 }
