@@ -18,6 +18,7 @@ import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
@@ -26,6 +27,8 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
@@ -34,6 +37,7 @@ import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SetS
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -106,7 +110,38 @@ public class SessionStatementParser {
 
     @Override
     public StatementResult execute(SessionState sessionState, Connection connection) {
-      if (local) {
+      if (extension == null && "default_transaction_isolation".equalsIgnoreCase(name)) {
+        IsolationLevel isolationLevel =
+            value == null
+                ? sessionState.getInitialIsolationLevel()
+                : SessionState.toSpannerIsolationLevel(value);
+        if (local) {
+          sessionState.setLocal(extension, name, sessionState.toPgIsolationLevel(isolationLevel));
+        } else {
+          sessionState.setDefaultIsolationLevel(isolationLevel, connection.isInTransaction());
+          BackendConnection.syncConnectionDefaultIsolationLevel(sessionState, connection);
+        }
+      } else if (extension == null && "transaction_isolation".equalsIgnoreCase(name)) {
+        if (value == null) {
+          throw PGExceptionFactory.newPGException(
+              "parameter \"transaction_isolation\" cannot be reset", SQLState.FeatureNotSupported);
+        }
+        IsolationLevel isolationLevel =
+            SessionState.toSpannerIsolationLevel("transaction_isolation", value);
+        if (isolationLevel == IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED) {
+          throw SessionState.invalidIsolationLevelError("transaction_isolation", value);
+        }
+        if (connection.isInTransaction()) {
+          connection.execute(
+              Statement.of(
+                  "SET TRANSACTION ISOLATION LEVEL "
+                      + BackendConnection.toSqlIsolationClause(isolationLevel)));
+          sessionState.setTransactionIsolationLevel(isolationLevel);
+        } else {
+          sessionState.setLocal(
+              null, "transaction_isolation", sessionState.toPgIsolationLevel(isolationLevel));
+        }
+      } else if (local) {
         sessionState.setLocal(extension, name, value);
       } else {
         sessionState.set(extension, name, value);
@@ -149,13 +184,21 @@ public class SessionStatementParser {
     @Override
     public StatementResult execute(SessionState sessionState, Connection connection) {
       if (extension == null && name != null) {
-        PGSetting setting = sessionState.get(null, name);
-        sessionState.set(null, name, setting.getResetVal());
+        if ("default_transaction_isolation".equalsIgnoreCase(name)) {
+          sessionState.setDefaultIsolationLevel(
+              sessionState.getInitialIsolationLevel(), connection.isInTransaction());
+          BackendConnection.syncConnectionDefaultIsolationLevel(sessionState, connection);
+        } else if ("transaction_isolation".equalsIgnoreCase(name)) {
+          throw PGExceptionFactory.newPGException(
+              "parameter \"transaction_isolation\" cannot be reset", SQLState.FeatureNotSupported);
+        } else {
+          PGSetting setting = sessionState.get(null, name);
+          sessionState.set(null, name, setting.getResetVal());
+        }
       } else if (extension != null && name != null) {
         sessionState.set(extension, name, null);
       } else {
-        sessionState.resetAll();
-        connection.reset();
+        BackendConnection.resetConnection(sessionState, connection);
       }
       return RESET_RESULT;
     }
@@ -266,13 +309,34 @@ public class SessionStatementParser {
   }
 
   public static @Nullable SessionStatement parse(ParsedStatement parsedStatement, String sql) {
-    if (parsedStatement.getType() == StatementType.CLIENT_SIDE
-        && parsedStatement.getClientSideStatementType() != ClientSideStatementType.RESET_ALL) {
-      // This statement is handled by the Connection API.
-      return null;
+    if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+      ClientSideStatementType clientSideType = parsedStatement.getClientSideStatementType();
+      if (clientSideType == ClientSideStatementType.SHOW_TRANSACTION_ISOLATION_LEVEL) {
+        return new ShowStatement(new TableOrIndexName("transaction_isolation"));
+      }
+      if (clientSideType == ClientSideStatementType.SHOW_DEFAULT_TRANSACTION_ISOLATION) {
+        return new ShowStatement(new TableOrIndexName("default_transaction_isolation"));
+      }
+      if (clientSideType != ClientSideStatementType.RESET_ALL
+          && clientSideType != ClientSideStatementType.SET_DEFAULT_TRANSACTION_ISOLATION
+          && clientSideType != ClientSideStatementType.SET_READONLY) {
+        // This statement is handled by the Connection API.
+        return null;
+      }
     }
     SimpleParser parser = new SimpleParser(sql);
     if (parser.eatKeyword("set")) {
+      if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+        try {
+          SetStatement statement = parseSetStatement(parser);
+          return statement.extension == null
+                  && "default_transaction_isolation".equalsIgnoreCase(statement.name)
+              ? statement
+              : null;
+        } catch (Throwable ignore) {
+          return null;
+        }
+      }
       return parseSetStatement(parser);
     }
     if (parser.eatKeyword("reset")) {
@@ -287,17 +351,56 @@ public class SessionStatementParser {
 
   static SetStatement parseSetStatement(SimpleParser parser) {
     SetStatement.Builder builder = new Builder();
+    boolean ateSession = false;
     if (parser.eatKeyword("local")) {
       builder.setLocal();
     } else {
-      // Ignore, this is the default.
-      parser.eatKeyword("session");
+      ateSession = parser.eatKeyword("session");
+    }
+    if (!builder.local
+        && ateSession
+        && eatKeywordsAtomically(
+            parser, "characteristics", "as", "transaction", "isolation", "level")) {
+      String isolationValue;
+      if (eatKeywordsAtomically(parser, "repeatable", "read")
+          || parser.eatKeyword("repeatable_read")) {
+        isolationValue = "repeatable read";
+      } else if (parser.eatKeyword("serializable")) {
+        isolationValue = "serializable";
+      } else if (parser.eatKeyword("default")) {
+        isolationValue = null;
+      } else {
+        String expr = parser.parseExpression();
+        if (expr == null) {
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT,
+              "Invalid SET statement: " + parser.getSql() + ". Expected value.");
+        }
+        isolationValue = expr;
+      }
+      while (parser.eatToken(";")) {
+        // Skip optional trailing semicolons.
+      }
+      if (parser.hasMoreTokens()) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Invalid SET statement: "
+                + parser.getSql()
+                + ". Expected end of statement after "
+                + (isolationValue == null ? "default" : isolationValue));
+      }
+      return builder
+          .setName(new TableOrIndexName("default_transaction_isolation"))
+          .setValue(isolationValue)
+          .build();
     }
     TableOrIndexName name;
     boolean isAliasStatement = false;
+    boolean isTimeZoneAlias = false;
     if (parser.eatKeyword("time", "zone")) {
       name = new TableOrIndexName("TIMEZONE");
       isAliasStatement = true;
+      isTimeZoneAlias = true;
     } else if (parser.eatKeyword("names")) {
       name = new TableOrIndexName("CLIENT_ENCODING");
       isAliasStatement = true;
@@ -321,8 +424,7 @@ public class SessionStatementParser {
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected value.");
     }
-    if ("default".equalsIgnoreCase(value)
-        || (isAliasStatement && "local".equalsIgnoreCase(value))) {
+    if ("default".equalsIgnoreCase(value) || (isTimeZoneAlias && "local".equalsIgnoreCase(value))) {
       builder.setValue(null);
     } else {
       builder.setValue(value);
@@ -385,8 +487,10 @@ public class SessionStatementParser {
       return ShowStatement.createShowAll();
     }
     TableOrIndexName name = null;
-    if (parser.eatKeyword("time", "zone")) {
+    if (eatKeywordsAtomically(parser, "time", "zone")) {
       name = new TableOrIndexName("TIMEZONE");
+    } else if (eatKeywordsAtomically(parser, "transaction", "isolation", "level")) {
+      name = new TableOrIndexName("transaction_isolation");
     } else {
       name = parser.readTableOrIndexName();
     }
@@ -407,5 +511,14 @@ public class SessionStatementParser {
               + name);
     }
     return new ShowStatement(name);
+  }
+
+  private static boolean eatKeywordsAtomically(SimpleParser parser, String... keywords) {
+    int pos = parser.getPos();
+    if (parser.eatKeyword(keywords)) {
+      return true;
+    }
+    parser.setPos(pos);
+    return false;
   }
 }

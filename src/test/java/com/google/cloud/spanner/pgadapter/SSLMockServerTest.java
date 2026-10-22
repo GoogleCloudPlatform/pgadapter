@@ -21,7 +21,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
-import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import io.opentelemetry.api.OpenTelemetry;
@@ -62,7 +61,7 @@ public class SSLMockServerTest extends AbstractMockServerTest {
     System.setProperty("javax.net.ssl.keyStorePassword", "password");
 
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(),
+        new PGAdapterMockSpannerServiceImpl(),
         "d",
         builder -> builder.setSslMode(SslMode.Require),
         OpenTelemetry.noop());

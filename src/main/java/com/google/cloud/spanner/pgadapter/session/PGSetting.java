@@ -214,7 +214,7 @@ public class PGSetting {
             ? null
             : ImmutableList.copyOf(
                 Arrays.stream(enumVals)
-                    .map(v -> v.toUpperCase(Locale.ENGLISH))
+                    .map(v -> unquote(v).toUpperCase(Locale.ENGLISH))
                     .collect(Collectors.toList()));
     this.setting = setting;
     this.unit = unit;
@@ -247,6 +247,17 @@ public class PGSetting {
         sourcefile,
         sourceline,
         pendingRestart);
+  }
+
+  static String unquote(String value) {
+    if (value != null && value.length() >= 2) {
+      char first = value.charAt(0);
+      char last = value.charAt(value.length() - 1);
+      if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+        return value.substring(1, value.length() - 1);
+      }
+    }
+    return value;
   }
 
   static Context tryParseContext(String value) {

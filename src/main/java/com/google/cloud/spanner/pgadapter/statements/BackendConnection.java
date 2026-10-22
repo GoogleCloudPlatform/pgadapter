@@ -70,6 +70,7 @@ import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Suppliers;
@@ -82,6 +83,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -125,6 +127,12 @@ public class BackendConnection {
   private static final Logger logger = Logger.getLogger(BackendConnection.class.getName());
 
   public static final AttributeKey<String> DB_STATEMENT = AttributeKey.stringKey("db.statement");
+
+  public static final Statement SELECT_DEFAULT_TRANSACTION_ISOLATION =
+      Statement.of(
+          "select option_value "
+              + "from information_schema.database_options "
+              + "where option_name='default_transaction_isolation'");
 
   private final Tracer tracer;
 
@@ -360,7 +368,10 @@ public class BackendConnection {
         if (this.localStatement != null) {
           result.set(this.localStatement.execute(BackendConnection.this, statement));
         } else if (this.sessionStatement != null) {
-          result.set(this.sessionStatement.execute(sessionState, spannerConnection));
+          result.set(
+              analyze && !(this.sessionStatement instanceof SessionStatementParser.ShowStatement)
+                  ? NO_RESULT
+                  : this.sessionStatement.execute(sessionState, spannerConnection));
         } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
@@ -535,6 +546,9 @@ public class BackendConnection {
                 () -> String.format("Statement: %s", statement.getSql())));
         Stopwatch stopwatch = Stopwatch.createStarted();
         StatementResult result = spannerConnection.execute(statement);
+        if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+          syncSessionStateWithClientSideStatement();
+        }
         Duration executionDuration = stopwatch.elapsed();
         metrics.recordClientLibLatency(executionDuration.toMillis(), metricAttributes);
         logger.log(
@@ -561,6 +575,36 @@ public class BackendConnection {
       } finally {
         span.end();
         statementContext.pop();
+      }
+    }
+
+    private void syncSessionStateWithClientSideStatement() {
+      ClientSideStatementType type = parsedStatement.getClientSideStatementType();
+      if (type == ClientSideStatementType.SET_DEFAULT_TRANSACTION_ISOLATION) {
+        if (spannerConnection.getDefaultIsolationLevel() != null) {
+          sessionState.setDefaultIsolationLevel(
+              spannerConnection.getDefaultIsolationLevel(), spannerConnection.isInTransaction());
+          syncConnectionDefaultIsolationLevel(sessionState, spannerConnection);
+        }
+      } else if (type == ClientSideStatementType.SET_READONLY) {
+        IsolationLevel isolationLevel = parseIsolationLevelClause(statement.getSql());
+        if (isolationLevel != null) {
+          sessionState.setDefaultIsolationLevel(
+              isolationLevel, spannerConnection.isInTransaction());
+          syncConnectionDefaultIsolationLevel(sessionState, spannerConnection);
+        }
+      } else if (type == ClientSideStatementType.BEGIN
+          || type == ClientSideStatementType.SET_TRANSACTION_MODE) {
+        IsolationLevel isolationLevel = parseIsolationLevelClause(statement.getSql());
+        if (isolationLevel != null && spannerConnection.isInTransaction()) {
+          sessionState.setTransactionIsolationLevel(isolationLevel);
+        }
+      } else if (type == ClientSideStatementType.RUN_BATCH
+          || type == ClientSideStatementType.ABORT_BATCH) {
+        if (!spannerConnection.isInTransaction()) {
+          sessionState.commit();
+        }
+        syncConnectionDefaultIsolationLevel(sessionState, spannerConnection);
       }
     }
 
@@ -922,6 +966,9 @@ public class BackendConnection {
     this.connectionId = connectionId;
     this.closeAllPortals = closeAllPortals;
     this.sessionState = new SessionState(optionsMetadata);
+    this.sessionState.setDatabaseDefaultIsolationLevel(
+        queryDatabaseDefaultIsolationLevel(spannerConnection, databaseId));
+    this.sessionState.setInitialIsolationLevel(spannerConnection.getDefaultIsolationLevel());
     this.pgCatalog =
         Suppliers.memoize(
             () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
@@ -1120,6 +1167,53 @@ public class BackendConnection {
     }
   }
 
+  static IsolationLevel queryDatabaseDefaultIsolationLevel(
+      Connection spannerConnection, DatabaseId databaseId) {
+    if (spannerConnection.getSpanner() != null && databaseId != null) {
+      try (ResultSet resultSet =
+          spannerConnection
+              .getSpanner()
+              .getDatabaseClient(databaseId)
+              .singleUse()
+              .executeQuery(SELECT_DEFAULT_TRANSACTION_ISOLATION)) {
+        if (resultSet.next() && !resultSet.isNull(0)) {
+          return SessionState.toSpannerIsolationLevel(resultSet.getString(0));
+        }
+      } catch (Throwable exception) {
+        logger.log(
+            Level.FINE,
+            "Failed to query default_transaction_isolation from information_schema.database_options",
+            exception);
+      }
+    }
+    return IsolationLevel.SERIALIZABLE;
+  }
+
+  @Nullable
+  static IsolationLevel parseIsolationLevelClause(String sql) {
+    if (!sql.toLowerCase(Locale.ENGLISH).contains("isolation")) {
+      return null;
+    }
+    SimpleParser parser = new SimpleParser(sql);
+    IsolationLevel result = null;
+    while (parser.getPos() < parser.getSql().length()) {
+      parser.parseExpressionUntilKeyword(ImmutableList.of("isolation"), true, false, false);
+      if (!parser.eatKeyword("isolation")) {
+        break;
+      }
+      if (parser.eatKeyword("level")) {
+        if (parser.eatKeyword("repeatable", "read") || parser.eatKeyword("repeatable_read")) {
+          result = IsolationLevel.REPEATABLE_READ;
+        } else if (parser.eatKeyword("serializable")) {
+          result = IsolationLevel.SERIALIZABLE;
+        } else if (parser.eatKeyword("default")) {
+          result = IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED;
+        }
+      }
+    }
+    return result;
+  }
+
   /**
    * Sets the initial value of a pg_settings setting for this connection. This method should only be
    * called during startup with values that come from the connection request.
@@ -1131,27 +1225,31 @@ public class BackendConnection {
       // Some drivers encode spaces as '+'.
       String[] commands = value.split("-c[\\s+]+");
       for (String command : commands) {
+        String[] keyValue = command.split("=", 2);
+        if (keyValue.length == 2
+            && "default_transaction_isolation".equalsIgnoreCase(keyValue[0].trim())) {
+          initSessionSetting(keyValue[0].trim(), keyValue[1].replace('+', ' ').trim(), true);
+          continue;
+        }
         // Special case: If the setting is one that is handled by the Connection API, then we need
-        // to execute the statement on the connection instead.
+        // to execute the statement on the connection instead. Note that SET
+        // DEFAULT_TRANSACTION_ISOLATION has ClientSideStatementType.SET_READONLY in
+        // PG_ClientSideStatements.json and is handled above.
         try {
           Statement statement = Statement.of("set " + command);
           ParsedStatement parsedStatement = statementParser.parse(statement);
           if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
             this.spannerConnection.execute(Statement.of(statement.getSql()));
+            this.sessionState.setInitialIsolationLevel(
+                this.spannerConnection.getDefaultIsolationLevel());
             continue;
           }
         } catch (Throwable ignore) {
           // Ignore any exceptions during the potential execution of the SET command on the
           // connection and continue with just setting it as session state.
         }
-        String[] keyValue = command.split("=", 2);
         if (keyValue.length == 2) {
-          SimpleParser parser = new SimpleParser(keyValue[0]);
-          TableOrIndexName key = parser.readTableOrIndexName();
-          if (key == null) {
-            continue;
-          }
-          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1].trim());
+          initSessionSetting(keyValue[0], keyValue[1].trim(), true);
         }
       }
     } else {
@@ -1165,8 +1263,27 @@ public class BackendConnection {
     if (key == null) {
       return;
     }
+    if (key.schema == null && "transaction_isolation".equalsIgnoreCase(key.name)) {
+      return;
+    }
     if (overwrite || this.sessionState.tryGet(key.schema, key.name) == null) {
-      this.sessionState.setConnectionStartupValue(key.schema, key.name, value);
+      if (key.schema == null && "default_transaction_isolation".equalsIgnoreCase(key.name)) {
+        try {
+          String unquoted = value != null ? value.trim() : null;
+          if (unquoted != null
+              && unquoted.length() >= 2
+              && unquoted.startsWith("'")
+              && unquoted.endsWith("'")) {
+            unquoted = unquoted.substring(1, unquoted.length() - 1);
+          }
+          IsolationLevel level = SessionState.toSpannerIsolationLevel(unquoted);
+          this.spannerConnection.setDefaultIsolationLevel(level);
+          this.sessionState.setInitialIsolationLevel(level);
+        } catch (Throwable ignore) {
+        }
+      } else {
+        this.sessionState.setConnectionStartupValue(key.schema, key.name, value);
+      }
     }
   }
 
@@ -1234,6 +1351,9 @@ public class BackendConnection {
         if (canUseBatch) {
           index += executeStatementsInBatch(index);
         } else {
+          if (isBegin(index) && !spannerConnection.isInTransaction()) {
+            sessionState.commit();
+          }
           bufferedStatement.execute();
 
           if (isBegin(index)) {
@@ -1246,6 +1366,7 @@ public class BackendConnection {
             } else {
               sessionState.rollback();
             }
+            syncConnectionDefaultIsolationLevel(sessionState, spannerConnection);
             closeAllPortals.run();
             clearCurrentTransaction();
           }
@@ -1269,6 +1390,7 @@ public class BackendConnection {
       } else if (spannerConnection.isDdlBatchActive()) {
         spannerConnection.abortBatch();
       }
+      syncConnectionDefaultIsolationLevel(sessionState, spannerConnection);
     } finally {
       failBufferedStatements(PGExceptionFactory.newQueryCancelledException());
       bufferedStatements.clear();
@@ -1388,11 +1510,71 @@ public class BackendConnection {
           spannerConnection.setStatementTag(null);
           spannerConnection.commit();
         }
+        syncConnectionDefaultIsolationLevel(sessionState, spannerConnection);
       }
     } finally {
       connectionState = ConnectionState.IDLE;
       currentTransactionId = null;
     }
+  }
+
+  static void syncConnectionDefaultIsolationLevel(
+      SessionState sessionState, Connection spannerConnection) {
+    if (!spannerConnection.isInTransaction()
+        && !spannerConnection.isTransactionStarted()
+        && !spannerConnection.isDdlBatchActive()
+        && !spannerConnection.isDmlBatchActive()) {
+      IsolationLevel target = sessionState.getDefaultIsolationLevel();
+      IsolationLevel current =
+          MoreObjects.firstNonNull(
+              spannerConnection.getDefaultIsolationLevel(),
+              IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+      if (current != target) {
+        spannerConnection.setDefaultIsolationLevel(target);
+      }
+    }
+  }
+
+  static void resetConnection(SessionState sessionState, @Nullable Connection connection) {
+    if (connection == null) {
+      sessionState.resetAll(false);
+      return;
+    }
+    boolean inTransaction = connection.isInTransaction();
+    boolean restoreUnstartedTransaction =
+        inTransaction
+            && !connection.isTransactionStarted()
+            && !connection.isDdlBatchActive()
+            && !connection.isDmlBatchActive();
+    com.google.cloud.spanner.connection.TransactionMode currentTxMode =
+        restoreUnstartedTransaction ? connection.getTransactionMode() : null;
+    IsolationLevel currentTxIsolation =
+        restoreUnstartedTransaction ? sessionState.getActiveTransactionIsolationLevel() : null;
+
+    sessionState.resetAll(inTransaction);
+    connection.reset();
+    syncConnectionDefaultIsolationLevel(sessionState, connection);
+
+    if (restoreUnstartedTransaction) {
+      if (currentTxMode != null) {
+        connection.setTransactionMode(currentTxMode);
+      }
+      if (currentTxIsolation != null) {
+        connection.execute(
+            Statement.of(
+                "SET TRANSACTION ISOLATION LEVEL " + toSqlIsolationClause(currentTxIsolation)));
+      }
+    }
+  }
+
+  static String toSqlIsolationClause(IsolationLevel isolationLevel) {
+    if (isolationLevel == IsolationLevel.REPEATABLE_READ) {
+      return "REPEATABLE READ";
+    }
+    if (isolationLevel == IsolationLevel.SERIALIZABLE) {
+      return "SERIALIZABLE";
+    }
+    return "DEFAULT";
   }
 
   /**
@@ -1428,6 +1610,7 @@ public class BackendConnection {
             if (spannerConnection.isInTransaction()) {
               spannerConnection.commit();
               sessionState.commit();
+              syncConnectionDefaultIsolationLevel(sessionState, spannerConnection);
               if (transactionMode == TransactionMode.EXPLICIT) {
                 // Convert the explicit transaction to a DDL batch.
                 transactionMode = TransactionMode.DDL_BATCH;
@@ -1469,6 +1652,7 @@ public class BackendConnection {
           if (spannerConnection.isInTransaction()) {
             spannerConnection.commit();
             sessionState.commit();
+            syncConnectionDefaultIsolationLevel(sessionState, spannerConnection);
             if (transactionMode == TransactionMode.EXPLICIT) {
               // Convert the explicit transaction to a DDL batch.
               transactionMode = TransactionMode.DDL_BATCH;
@@ -1573,8 +1757,7 @@ public class BackendConnection {
       Statement statement, ParsedStatement parsedStatement) {
     if (parsedStatement.getType() == StatementType.UNKNOWN
         || (parsedStatement.getType() == StatementType.QUERY && isCommand(SHOW, statement.getSql()))
-        || (parsedStatement.getType() == StatementType.CLIENT_SIDE
-            && parsedStatement.getClientSideStatementType() == ClientSideStatementType.RESET_ALL)) {
+        || parsedStatement.getType() == StatementType.CLIENT_SIDE) {
       return SessionStatementParser.parse(parsedStatement, statement.getSql());
     }
     return null;

@@ -35,6 +35,7 @@ import com.google.cloud.spanner.pgadapter.session.PGSetting.Context;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableMap;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
@@ -458,6 +459,11 @@ public class SessionStateTest {
 
     state.set(null, "bytea_output", "escape");
     assertEquals("escape", state.get(null, "bytea_output").getSetting());
+
+    state.set(null, "default_transaction_isolation", "repeatable read");
+    assertEquals("repeatable read", state.get(null, "default_transaction_isolation").getSetting());
+    state.set(null, "default_transaction_isolation", "serializable");
+    assertEquals("serializable", state.get(null, "default_transaction_isolation").getSetting());
   }
 
   @Test
@@ -1179,5 +1185,31 @@ public class SessionStateTest {
     assertEquals(ZoneId.of("America/New_York"), state.getTimezone());
     state.commit();
     assertEquals(ZoneId.of("UTC"), state.getTimezone());
+  }
+
+  @Test
+  public void testDatabaseDefaultIsolationLevel() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    SessionState state = new SessionState(optionsMetadata);
+    assertEquals(IsolationLevel.SERIALIZABLE, state.getDatabaseDefaultIsolationLevel());
+    assertEquals(
+        "serializable", state.toPgIsolationLevel(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED));
+
+    state.setDatabaseDefaultIsolationLevel(IsolationLevel.REPEATABLE_READ);
+    state.setInitialIsolationLevel(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+    assertEquals("repeatable read", state.get(null, "default_transaction_isolation").getSetting());
+    assertEquals("repeatable read", state.get(null, "default_transaction_isolation").getResetVal());
+    assertEquals("repeatable read", state.get(null, "transaction_isolation").getSetting());
+    assertEquals("repeatable read", state.get(null, "transaction_isolation").getResetVal());
+
+    state.setDefaultIsolationLevel(IsolationLevel.SERIALIZABLE, false);
+    assertEquals("serializable", state.get(null, "default_transaction_isolation").getSetting());
+    assertEquals("repeatable read", state.get(null, "default_transaction_isolation").getResetVal());
+    assertEquals("serializable", state.get(null, "transaction_isolation").getSetting());
+    assertEquals("repeatable read", state.get(null, "transaction_isolation").getResetVal());
+
+    state.setDefaultIsolationLevel(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED, false);
+    assertEquals("repeatable read", state.get(null, "default_transaction_isolation").getSetting());
+    assertEquals("repeatable read", state.get(null, "transaction_isolation").getSetting());
   }
 }

@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.spanner.Dialect;
@@ -138,5 +139,51 @@ public class SessionStatementParserTest {
   public void testShowTimeZone() {
     assertEquals(new ShowStatement(new TableOrIndexName("timezone")), parse("show time zone"));
     assertEquals(new ShowStatement(new TableOrIndexName("timezone")), parse("show TIME ZONE"));
+  }
+
+  @Test
+  public void testShowTransactionIsolation() {
+    assertEquals(
+        new ShowStatement(new TableOrIndexName("transaction_isolation")),
+        parse("show transaction isolation level"));
+    assertEquals(
+        new ShowStatement(new TableOrIndexName("transaction_isolation")),
+        parse("SHOW TRANSACTION ISOLATION LEVEL"));
+    assertEquals(
+        new ShowStatement(new TableOrIndexName("transaction_isolation")),
+        parse("show transaction_isolation"));
+    assertEquals(
+        new ShowStatement(new TableOrIndexName("default_transaction_isolation")),
+        parse("show default_transaction_isolation"));
+  }
+
+  @Test
+  public void testSetDefaultTransactionIsolation() {
+    assertEquals(
+        new SetStatement(
+            false, new TableOrIndexName("default_transaction_isolation"), "repeatable read"),
+        parse("set default_transaction_isolation = 'repeatable read'"));
+    assertEquals(
+        new SetStatement(
+            false, new TableOrIndexName("default_transaction_isolation"), "repeatable read"),
+        parse("set session default_transaction_isolation = 'repeatable read'"));
+    assertEquals(
+        new SetStatement(false, new TableOrIndexName("default_transaction_isolation"), null),
+        parse("set default_transaction_isolation = default"));
+    assertEquals(
+        new SetStatement(false, new TableOrIndexName("default_transaction_isolation"), null),
+        parse("set session default_transaction_isolation = default"));
+    assertEquals(
+        new SetStatement(
+            false, new TableOrIndexName("default_transaction_isolation"), "repeatable read"),
+        parse("set session characteristics as transaction isolation level repeatable read"));
+    assertEquals(
+        new SetStatement(false, new TableOrIndexName("default_transaction_isolation"), null),
+        parse("set session characteristics as transaction isolation level default"));
+    assertNull(
+        parse(
+            "set session characteristics as transaction isolation level repeatable read read only"));
+    assertNull(parse("set default_transaction_read_only = true"));
+    assertNull(parse("set spanner.readonly = true"));
   }
 }

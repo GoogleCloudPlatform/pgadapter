@@ -102,7 +102,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   }
 
   private static MockSpannerServiceImpl createMockSpannerServiceWithQueryPartitions() {
-    return new MockSpannerServiceImpl() {
+    return new PGAdapterMockSpannerServiceImpl() {
       @Override
       public void partitionQuery(
           PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {

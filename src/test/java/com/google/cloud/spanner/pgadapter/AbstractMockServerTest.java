@@ -33,6 +33,7 @@ import com.google.cloud.spanner.admin.database.v1.MockDatabaseAdminImpl;
 import com.google.cloud.spanner.admin.instance.v1.MockInstanceAdminImpl;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.metadata.TestOptionsMetadataBuilder;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgClass;
@@ -49,6 +50,8 @@ import com.google.protobuf.Value;
 import com.google.rpc.Help;
 import com.google.rpc.Help.Link;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
+import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.PartialResultSet;
 import com.google.spanner.v1.Partition;
 import com.google.spanner.v1.PartitionQueryRequest;
 import com.google.spanner.v1.PartitionResponse;
@@ -1236,18 +1239,70 @@ public abstract class AbstractMockServerTest {
         .build();
   }
 
-  static MockSpannerServiceImpl createMockSpannerThatReturnsOneQueryPartition() {
-    return new MockSpannerServiceImpl() {
-      @Override
-      public void partitionQuery(
-          PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
-        responseObserver.onNext(
-            PartitionResponse.newBuilder()
-                .addPartitions(Partition.newBuilder().setPartitionToken(ByteString.EMPTY).build())
-                .build());
+  private static volatile ResultSet defaultTransactionIsolationResultSet =
+      createDefaultTransactionIsolationResultSet(null);
+
+  protected static ResultSet createDefaultTransactionIsolationResultSet(String isolationLevel) {
+    ResultSet.Builder builder =
+        ResultSet.newBuilder()
+            .setMetadata(
+                ResultSetMetadata.newBuilder()
+                    .setRowType(
+                        StructType.newBuilder()
+                            .addFields(
+                                Field.newBuilder()
+                                    .setName("option_value")
+                                    .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                    .build())
+                            .build())
+                    .build());
+    if (isolationLevel != null) {
+      builder.addRows(
+          ListValue.newBuilder()
+              .addValues(Value.newBuilder().setStringValue(isolationLevel).build())
+              .build());
+    }
+    return builder.build();
+  }
+
+  protected static void setDefaultTransactionIsolation(String isolationLevel) {
+    defaultTransactionIsolationResultSet =
+        createDefaultTransactionIsolationResultSet(isolationLevel);
+  }
+
+  static class PGAdapterMockSpannerServiceImpl extends MockSpannerServiceImpl {
+    @Override
+    public void executeStreamingSql(
+        ExecuteSqlRequest request, StreamObserver<PartialResultSet> responseObserver) {
+      if (request
+          .getSql()
+          .equals(BackendConnection.SELECT_DEFAULT_TRANSACTION_ISOLATION.getSql())) {
+        ResultSet resultSet = defaultTransactionIsolationResultSet;
+        PartialResultSet.Builder builder =
+            PartialResultSet.newBuilder().setMetadata(resultSet.getMetadata());
+        for (ListValue row : resultSet.getRowsList()) {
+          builder.addAllValues(row.getValuesList());
+        }
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+        return;
       }
-    };
+      super.executeStreamingSql(request, responseObserver);
+    }
+
+    @Override
+    public void partitionQuery(
+        PartitionQueryRequest request, StreamObserver<PartitionResponse> responseObserver) {
+      responseObserver.onNext(
+          PartitionResponse.newBuilder()
+              .addPartitions(Partition.newBuilder().setPartitionToken(ByteString.EMPTY).build())
+              .build());
+      responseObserver.onCompleted();
+    }
+  }
+
+  static MockSpannerServiceImpl createMockSpannerThatReturnsOneQueryPartition() {
+    return new PGAdapterMockSpannerServiceImpl();
   }
 
   @BeforeClass
@@ -1313,6 +1368,10 @@ public abstract class AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
     mockSpanner.putStatementResult(
         MockSpannerServiceImpl.StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            BackendConnection.SELECT_DEFAULT_TRANSACTION_ISOLATION,
+            createDefaultTransactionIsolationResultSet(null)));
     mockSpanner.putStatementResult(StatementResult.exception(INVALID_SELECT, EXCEPTION));
     mockSpanner.putStatementResult(StatementResult.exception(INVALID_DML, EXCEPTION));
     mockSpanner.putStatementResult(StatementResult.exception(INVALID_DDL, EXCEPTION));
@@ -1460,6 +1519,7 @@ public abstract class AbstractMockServerTest {
 
   @Before
   public void clearRequests() {
+    defaultTransactionIsolationResultSet = createDefaultTransactionIsolationResultSet(null);
     mockSpanner.clearRequests();
     mockDatabaseAdmin.reset();
     mockInstanceAdmin.reset();

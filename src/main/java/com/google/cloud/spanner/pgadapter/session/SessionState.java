@@ -20,6 +20,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
@@ -30,6 +31,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.spanner.v1.TransactionOptions.IsolationLevel;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -93,6 +95,12 @@ public class SessionState {
   /** localSettings are the modified local settings during a transaction. */
   private Map<String, PGSetting> localSettings;
 
+  private IsolationLevel databaseDefaultIsolationLevel = IsolationLevel.SERIALIZABLE;
+  private IsolationLevel initialIsolationLevel = IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED;
+  private IsolationLevel defaultIsolationLevel = IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED;
+  private IsolationLevel transactionDefaultIsolationLevel;
+  private IsolationLevel activeTransactionIsolationLevel;
+
   public SessionState(OptionsMetadata options) {
     this(ImmutableMap.of(), options);
   }
@@ -122,6 +130,112 @@ public class SessionState {
     }
 
     initCopySettings(this.settings);
+  }
+
+  public void setDatabaseDefaultIsolationLevel(
+      @Nullable IsolationLevel databaseDefaultIsolationLevel) {
+    this.databaseDefaultIsolationLevel =
+        databaseDefaultIsolationLevel == IsolationLevel.REPEATABLE_READ
+            ? IsolationLevel.REPEATABLE_READ
+            : IsolationLevel.SERIALIZABLE;
+    String pgIsolationLevel = toPgIsolationLevel(this.initialIsolationLevel);
+    setConnectionStartupValue(null, "default_transaction_isolation", pgIsolationLevel);
+    setConnectionStartupValue(null, "transaction_isolation", pgIsolationLevel);
+  }
+
+  public IsolationLevel getDatabaseDefaultIsolationLevel() {
+    return this.databaseDefaultIsolationLevel;
+  }
+
+  public void setInitialIsolationLevel(@Nullable IsolationLevel initialIsolationLevel) {
+    this.initialIsolationLevel =
+        MoreObjects.firstNonNull(initialIsolationLevel, IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+    this.defaultIsolationLevel = this.initialIsolationLevel;
+    this.transactionDefaultIsolationLevel = null;
+    String pgIsolationLevel = toPgIsolationLevel(this.initialIsolationLevel);
+    setConnectionStartupValue(null, "default_transaction_isolation", pgIsolationLevel);
+    setConnectionStartupValue(null, "transaction_isolation", pgIsolationLevel);
+  }
+
+  public IsolationLevel getInitialIsolationLevel() {
+    return this.initialIsolationLevel;
+  }
+
+  public IsolationLevel getDefaultIsolationLevel() {
+    return this.transactionDefaultIsolationLevel != null
+        ? this.transactionDefaultIsolationLevel
+        : this.defaultIsolationLevel;
+  }
+
+  public void setDefaultIsolationLevel(
+      @Nullable IsolationLevel isolationLevel, boolean inTransaction) {
+    IsolationLevel effectiveLevel =
+        isolationLevel == null || isolationLevel == IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED
+            ? this.initialIsolationLevel
+            : isolationLevel;
+    this.transactionDefaultIsolationLevel = effectiveLevel;
+    String pgIsolationLevel = toPgIsolationLevel(effectiveLevel);
+    String currentTxIsolation =
+        inTransaction ? get(null, "transaction_isolation").getSetting() : null;
+    set(null, "default_transaction_isolation", pgIsolationLevel);
+    set(null, "transaction_isolation", pgIsolationLevel);
+    if (inTransaction && !Objects.equals(currentTxIsolation, pgIsolationLevel)) {
+      setLocal(null, "transaction_isolation", currentTxIsolation);
+    }
+  }
+
+  public IsolationLevel getActiveTransactionIsolationLevel() {
+    return this.activeTransactionIsolationLevel != null
+        ? this.activeTransactionIsolationLevel
+        : this.defaultIsolationLevel;
+  }
+
+  public void setTransactionIsolationLevel(IsolationLevel isolationLevel) {
+    this.activeTransactionIsolationLevel = isolationLevel;
+    String pgIsolationLevel = toPgIsolationLevel(isolationLevel);
+    if (!Objects.equals(pgIsolationLevel, get(null, "transaction_isolation").getSetting())) {
+      setLocal(null, "transaction_isolation", pgIsolationLevel);
+    }
+  }
+
+  public static IsolationLevel toSpannerIsolationLevel(@Nullable String value) {
+    return toSpannerIsolationLevel("default_transaction_isolation", value);
+  }
+
+  public static IsolationLevel toSpannerIsolationLevel(
+      String parameterName, @Nullable String value) {
+    if (value == null) {
+      return IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED;
+    }
+    String unquoted = PGSetting.unquote(value.trim()).trim().replaceAll("\\s+", " ");
+    if ("default".equalsIgnoreCase(unquoted)) {
+      return IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED;
+    }
+    if ("repeatable read".equalsIgnoreCase(unquoted)
+        || "repeatable_read".equalsIgnoreCase(unquoted)) {
+      return IsolationLevel.REPEATABLE_READ;
+    }
+    if ("serializable".equalsIgnoreCase(unquoted)) {
+      return IsolationLevel.SERIALIZABLE;
+    }
+    throw PGSetting.invalidEnumError(
+        parameterName, value, new String[] {"serializable", "\"repeatable read\""});
+  }
+
+  public static PGException invalidIsolationLevelError(String parameterName, String value) {
+    return PGSetting.invalidEnumError(
+        parameterName, value, new String[] {"serializable", "\"repeatable read\""});
+  }
+
+  public String toPgIsolationLevel(@Nullable IsolationLevel isolationLevel) {
+    IsolationLevel effectiveLevel =
+        isolationLevel == null || isolationLevel == IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED
+            ? this.databaseDefaultIsolationLevel
+            : isolationLevel;
+    if (effectiveLevel == IsolationLevel.REPEATABLE_READ) {
+      return "repeatable read";
+    }
+    return "serializable";
   }
 
   /**
@@ -410,12 +524,23 @@ public class SessionState {
 
   /** Resets all values to their 'reset' value. */
   public void resetAll() {
+    resetAll(false);
+  }
+
+  /** Resets all values to their 'reset' value. */
+  public void resetAll(boolean inTransaction) {
     for (PGSetting setting : getAll()) {
+      if (setting.getExtension() == null
+          && ("transaction_isolation".equalsIgnoreCase(setting.getName())
+              || "default_transaction_isolation".equalsIgnoreCase(setting.getName()))) {
+        continue;
+      }
       if (setting.isSettable(Context.SUPERUSER)
           && !Objects.equals(setting.getSetting(), setting.getResetVal())) {
         set(setting.getExtension(), setting.getName(), setting.getResetVal());
       }
     }
+    setDefaultIsolationLevel(this.initialIsolationLevel, inTransaction);
   }
 
   static SpannerException unknownParamError(String key) {
@@ -434,6 +559,11 @@ public class SessionState {
         settings.put(toKey(setting.getExtension(), setting.getName()), setting);
       }
     }
+    if (this.transactionDefaultIsolationLevel != null) {
+      this.defaultIsolationLevel = this.transactionDefaultIsolationLevel;
+      this.transactionDefaultIsolationLevel = null;
+    }
+    this.activeTransactionIsolationLevel = null;
     // Dropping the local settings can uncover a different value, so the cache must go. Promoting
     // the transaction settings cannot: internalGet(..) returns the same PGSetting instance either
     // way. The distinction matters, as commit() runs for every statement in autocommit mode.
@@ -451,6 +581,8 @@ public class SessionState {
     if (localSettings != null || transactionSettings != null) {
       invalidateCache();
     }
+    this.transactionDefaultIsolationLevel = null;
+    this.activeTransactionIsolationLevel = null;
     this.localSettings = null;
     this.transactionSettings = null;
   }

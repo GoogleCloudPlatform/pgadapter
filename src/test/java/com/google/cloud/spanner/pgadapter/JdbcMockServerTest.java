@@ -7140,7 +7140,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertTrue(request.hasTransaction());
         assertTrue(request.getTransaction().hasBegin());
         assertEquals(
-            IsolationLevel.SERIALIZABLE, request.getTransaction().getBegin().getIsolationLevel());
+            IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED,
+            request.getTransaction().getBegin().getIsolationLevel());
       }
     }
   }
