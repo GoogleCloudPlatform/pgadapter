@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.56.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.1...v0.56.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* avoid implicit transaction when query is pipelined with client-side statements ([#4976](https://github.com/GoogleCloudPlatform/pgadapter/issues/4976)) ([6611262](https://github.com/GoogleCloudPlatform/pgadapter/commit/66112624161618d5bf7fe77ba18b1cffce173cfe))
+* improve PostgreSQL interval text parsing and test coverage ([#4967](https://github.com/GoogleCloudPlatform/pgadapter/issues/4967)) ([65ecc1f](https://github.com/GoogleCloudPlatform/pgadapter/commit/65ecc1faa6c0957a7f0eaf7c54bfe3c253cf0c8c))
+* safely handle schema expansion on prepared statements with results ([#4929](https://github.com/GoogleCloudPlatform/pgadapter/issues/4929)) ([7cf8bee](https://github.com/GoogleCloudPlatform/pgadapter/commit/7cf8beea92807a15907875ec55c7c281c6fc11b5))
+* support binary timestamps before year 0031 ([#4972](https://github.com/GoogleCloudPlatform/pgadapter/issues/4972)) ([02b9f5b](https://github.com/GoogleCloudPlatform/pgadapter/commit/02b9f5b9217fb9484595ac3f6e00f0e51b540992))
+* support queries starting with parentheses ([#4973](https://github.com/GoogleCloudPlatform/pgadapter/issues/4973)) ([e1db4d8](https://github.com/GoogleCloudPlatform/pgadapter/commit/e1db4d86a1b1a6b46c9cbdf8f16c51f5afcd9d81))
+
+
+### Dependencies
+
+* update dependency org.hibernate.orm:hibernate-core to v7.4.12.final ([#4991](https://github.com/GoogleCloudPlatform/pgadapter/issues/4991)) ([a8b2576](https://github.com/GoogleCloudPlatform/pgadapter/commit/a8b2576b59f583c9be4b04144ac5fedf09daa122))
+* update module github.com/moby/go-archive to v0.3.0 [security] ([#5014](https://github.com/GoogleCloudPlatform/pgadapter/issues/5014)) ([3ad9628](https://github.com/GoogleCloudPlatform/pgadapter/commit/3ad962829a6432b8b6b48a0a012a34d999f45c06))
+* update module github.com/moby/moby/api to v1.56.1 ([#4986](https://github.com/GoogleCloudPlatform/pgadapter/issues/4986)) ([b423354](https://github.com/GoogleCloudPlatform/pgadapter/commit/b42335426bd4ba2d7b815c56319aaa30991d42e3))
+
 ## [0.56.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.0...v0.56.1) (2026-10-01)
 
 
