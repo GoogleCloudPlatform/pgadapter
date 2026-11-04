@@ -62,10 +62,10 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
   @Test
   public void testDeleteAlbum() throws Exception {
     String sql =
-        "SELECT albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, "
-            + "albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, "
-            + "albums.singer_id AS albums_singer_id, albums.id AS albums_id, albums.version_id AS albums_version_id, "
-            + "albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at \n"
+        "SELECT albums.title, albums.marketing_budget, "
+            + "albums.release_date, albums.cover_picture, "
+            + "albums.singer_id, albums.id, albums.version_id, "
+            + "albums.created_at, albums.updated_at \n"
             + "FROM albums \n"
             + "WHERE albums.id = $1::VARCHAR";
     mockSpanner.putStatementResult(
@@ -73,7 +73,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_").toBuilder()
+                    createAlbumsMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -83,7 +83,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(sql).bind("p1").to("123-456-789").build(),
             ResultSet.newBuilder()
-                .setMetadata(createAlbumsMetadata("albums_"))
+                .setMetadata(createAlbumsMetadata(""))
                 .addRows(
                     createAlbumRow(
                         "123-456-789",
@@ -342,14 +342,14 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                         .build())
                 .build()));
     String ticketSalesSql =
-        "SELECT ticket_sales.concert_id AS ticket_sales_concert_id, ticket_sales.customer_name AS ticket_sales_customer_name, ticket_sales.price AS ticket_sales_price, ticket_sales.seats AS ticket_sales_seats, ticket_sales.id AS ticket_sales_id, ticket_sales.version_id AS ticket_sales_version_id, ticket_sales.created_at AS ticket_sales_created_at, ticket_sales.updated_at AS ticket_sales_updated_at \n"
+        "SELECT ticket_sales.concert_id, ticket_sales.customer_name, ticket_sales.price, ticket_sales.seats, ticket_sales.id, ticket_sales.version_id, ticket_sales.created_at, ticket_sales.updated_at \n"
             + "FROM ticket_sales \n"
             + "WHERE $1::VARCHAR = ticket_sales.concert_id";
     mockSpanner.putPartialStatementResult(
         StatementResult.query(
             Statement.of(ticketSalesSql),
             ResultSet.newBuilder()
-                .setMetadata(createTicketSalesMetadata("ticket_sales_"))
+                .setMetadata(createTicketSalesMetadata(""))
                 .addRows(
                     createTicketSaleRow(
                         1L,
@@ -720,7 +720,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                         Timestamp.parseTimestamp("2022-12-01T15:12:00Z")))
                 .build()));
     String getAlbumsSql =
-        "SELECT albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id, albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at \n"
+        "SELECT albums.title, albums.marketing_budget, albums.release_date, albums.cover_picture, albums.singer_id, albums.id, albums.version_id, albums.created_at, albums.updated_at \n"
             + "FROM albums \n"
             + "WHERE $1::VARCHAR = albums.singer_id";
     mockSpanner.putStatementResult(
@@ -728,7 +728,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getAlbumsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_").toBuilder()
+                    createAlbumsMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters()))
@@ -737,7 +737,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(getAlbumsSql).bind("p1").to("b2").build(),
             ResultSet.newBuilder()
-                .setMetadata(createAlbumsMetadata("albums_"))
+                .setMetadata(createAlbumsMetadata(""))
                 .addRows(
                     createAlbumRow(
                         "a1",
@@ -753,7 +753,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(getAlbumsSql).bind("p1").to("a1").build(),
             ResultSet.newBuilder()
-                .setMetadata(createAlbumsMetadata("albums_"))
+                .setMetadata(createAlbumsMetadata(""))
                 .addRows(
                     createAlbumRow(
                         "a2",
@@ -778,7 +778,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(getAlbumsSql).bind("p1").to("c3").build(),
-            ResultSet.newBuilder().setMetadata(createAlbumsMetadata("albums_")).build()));
+            ResultSet.newBuilder().setMetadata(createAlbumsMetadata("")).build()));
 
     String output =
         execute(
@@ -803,7 +803,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
   @Test
   public void testGetSinger() throws Exception {
     String getSingerSql =
-        "SELECT singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active, singers.id AS singers_id, singers.version_id AS singers_version_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at \n"
+        "SELECT singers.first_name, singers.last_name, singers.full_name, singers.active, singers.id, singers.version_id, singers.created_at, singers.updated_at \n"
             + "FROM singers \n"
             + "WHERE singers.id = $1::VARCHAR";
     mockSpanner.putStatementResult(
@@ -811,7 +811,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getSingerSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createSingersMetadata("singers_").toBuilder()
+                    createSingersMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters()))
@@ -820,7 +820,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(getSingerSql).bind("p1").to("123-456-789").build(),
             ResultSet.newBuilder()
-                .setMetadata(createSingersMetadata("singers_"))
+                .setMetadata(createSingersMetadata(""))
                 .addRows(
                     createSingerRow(
                         "123-456-789",
@@ -831,7 +831,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                         Timestamp.parseTimestamp("2022-02-21T10:19:18Z")))
                 .build()));
     String getAlbumsSql =
-        "SELECT albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id, albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at \n"
+        "SELECT albums.title, albums.marketing_budget, albums.release_date, albums.cover_picture, albums.singer_id, albums.id, albums.version_id, albums.created_at, albums.updated_at \n"
             + "FROM albums \n"
             + "WHERE $1::VARCHAR = albums.singer_id";
     mockSpanner.putStatementResult(
@@ -839,7 +839,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getAlbumsSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_").toBuilder()
+                    createAlbumsMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -849,7 +849,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(getAlbumsSql).bind("p1").to("123-456-789").build(),
             ResultSet.newBuilder()
-                .setMetadata(createAlbumsMetadata("albums_"))
+                .setMetadata(createAlbumsMetadata(""))
                 .addRows(
                     createAlbumRow(
                         "987-654-321",
@@ -936,7 +936,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
   @Test
   public void testUpdateSinger() throws Exception {
     String getSingerSql =
-        "SELECT singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active, singers.id AS singers_id, singers.version_id AS singers_version_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at \n"
+        "SELECT singers.first_name, singers.last_name, singers.full_name, singers.active, singers.id, singers.version_id, singers.created_at, singers.updated_at \n"
             + "FROM singers \n"
             + "WHERE singers.id = $1::VARCHAR";
     mockSpanner.putStatementResult(
@@ -944,7 +944,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getSingerSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createSingersMetadata("singers_").toBuilder()
+                    createSingersMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -954,7 +954,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(getSingerSql).bind("p1").to("123-456-789").build(),
             ResultSet.newBuilder()
-                .setMetadata(createSingersMetadata("singers_"))
+                .setMetadata(createSingersMetadata(""))
                 .addRows(
                     createSingerRow(
                         "123-456-789",
@@ -1018,7 +1018,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
   @Test
   public void testGetAlbum() throws Exception {
     String getAlbumSql =
-        "SELECT albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id, albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at \n"
+        "SELECT albums.title, albums.marketing_budget, albums.release_date, albums.cover_picture, albums.singer_id, albums.id, albums.version_id, albums.created_at, albums.updated_at \n"
             + "FROM albums \n"
             + "WHERE albums.id = $1::VARCHAR";
     mockSpanner.putStatementResult(
@@ -1026,7 +1026,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getAlbumSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_").toBuilder()
+                    createAlbumsMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -1036,7 +1036,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(getAlbumSql).bind("p1").to("987-654-321").build(),
             ResultSet.newBuilder()
-                .setMetadata(createAlbumsMetadata("albums_"))
+                .setMetadata(createAlbumsMetadata(""))
                 .addRows(
                     createAlbumRow(
                         "123-456-789",
@@ -1049,7 +1049,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                         Timestamp.parseTimestamp("2022-02-21T10:19:18Z")))
                 .build()));
     String getTrackSql =
-        "SELECT tracks.id AS tracks_id, tracks.track_number AS tracks_track_number, tracks.title AS tracks_title, tracks.sample_rate AS tracks_sample_rate, tracks.version_id AS tracks_version_id, tracks.created_at AS tracks_created_at, tracks.updated_at AS tracks_updated_at \n"
+        "SELECT tracks.id, tracks.track_number, tracks.title, tracks.sample_rate, tracks.version_id, tracks.created_at, tracks.updated_at \n"
             + "FROM tracks \n"
             + "WHERE $1::VARCHAR = tracks.id";
     mockSpanner.putStatementResult(
@@ -1057,7 +1057,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getTrackSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createTracksMetadata("tracks_").toBuilder()
+                    createTracksMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -1067,7 +1067,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(getTrackSql).bind("p1").to("123-456-789").build(),
             ResultSet.newBuilder()
-                .setMetadata(createTracksMetadata("tracks_"))
+                .setMetadata(createTracksMetadata(""))
                 .addRows(
                     createTrackRow(
                         "123-456-789",
@@ -1098,7 +1098,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
   @Test
   public void testGetAlbumWithStaleEngine() throws Exception {
     String getAlbumSql =
-        "SELECT albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id, albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at \n"
+        "SELECT albums.title, albums.marketing_budget, albums.release_date, albums.cover_picture, albums.singer_id, albums.id, albums.version_id, albums.created_at, albums.updated_at \n"
             + "FROM albums \n"
             + "WHERE albums.id = $1::VARCHAR";
     mockSpanner.putStatementResult(
@@ -1106,7 +1106,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(getAlbumSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createAlbumsMetadata("albums_").toBuilder()
+                    createAlbumsMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters())
@@ -1116,7 +1116,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(getAlbumSql).bind("p1").to("987-654-321").build(),
             ResultSet.newBuilder()
-                .setMetadata(createAlbumsMetadata("albums_"))
+                .setMetadata(createAlbumsMetadata(""))
                 .addRows(
                     createAlbumRow(
                         "123-456-789",
@@ -1152,7 +1152,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
   @Test
   public void testGetTrack() throws Exception {
     String sql =
-        "SELECT tracks.id AS tracks_id, tracks.track_number AS tracks_track_number, tracks.title AS tracks_title, tracks.sample_rate AS tracks_sample_rate, tracks.version_id AS tracks_version_id, tracks.created_at AS tracks_created_at, tracks.updated_at AS tracks_updated_at \n"
+        "SELECT tracks.id, tracks.track_number, tracks.title, tracks.sample_rate, tracks.version_id, tracks.created_at, tracks.updated_at \n"
             + "FROM tracks \n"
             + "WHERE tracks.id = $1::VARCHAR AND tracks.track_number = $2::INTEGER";
     mockSpanner.putStatementResult(
@@ -1160,7 +1160,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createTracksMetadata("tracks_").toBuilder()
+                    createTracksMetadata("").toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(TypeCode.STRING, TypeCode.INT64))
@@ -1171,7 +1171,7 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.newBuilder(sql).bind("p1").to("987-654-321").bind("p2").to(1L).build(),
             ResultSet.newBuilder()
-                .setMetadata(createTracksMetadata("tracks_"))
+                .setMetadata(createTracksMetadata(""))
                 .addRows(
                     createTrackRow(
                         "987-654-321",
