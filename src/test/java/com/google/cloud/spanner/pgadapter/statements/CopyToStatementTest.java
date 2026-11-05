@@ -16,6 +16,8 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
@@ -101,5 +103,26 @@ public class CopyToStatementTest {
         CopyStatement.parse(String.format("copy (%s) to stdout\n", query));
     assertNotNull(parsedCopyStatement);
     assertEquals(parsedCopyStatement.query, query);
+  }
+
+  @Test
+  public void testCreatePortal() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ParsedCopyStatement parsedCopyStatement =
+        CopyStatement.parse("copy t to stdout (format binary)");
+
+    CopyToStatement statement =
+        new CopyToStatement(connectionHandler, options, "S1", parsedCopyStatement);
+    IntermediatePortalStatement portal1 =
+        statement.createPortal("P1", new byte[0][0], new short[0], new short[0]);
+    IntermediatePortalStatement portal2 =
+        statement.createPortal("P2", new byte[0][0], new short[0], new short[0]);
+
+    assertNotNull(portal1);
+    assertNotNull(portal2);
+    assertNotSame(portal1, portal2);
+    assertNotSame(statement, portal1);
+    assertSame(statement, portal1.getPreparedStatement());
+    assertSame(statement, portal2.getPreparedStatement());
   }
 }

@@ -43,9 +43,11 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.QuoteMode;
 
 /**
- * {@link CopyStatement} models a `COPY table TO STDOUT` statement. The same class is used both as
- * an {@link IntermediatePreparedStatement} and {@link IntermediatePortalStatement}, as COPY does
- * not support any statement parameters, which means that there is no difference between the two.
+ * {@link CopyToStatement} models a `COPY table TO STDOUT` statement. The same class is used both as
+ * an {@link IntermediatePreparedStatement} and {@link IntermediatePortalStatement}. Although COPY
+ * does not support any query parameters, separate portal instances are created to ensure that
+ * execution lifecycle state (such as {@link #hasReturnedData}) is isolated across executions of the
+ * prepared statement.
  */
 @InternalApi
 public class CopyToStatement extends IntermediatePortalStatement {
@@ -189,6 +191,21 @@ public class CopyToStatement extends IntermediatePortalStatement {
     return StatementType.QUERY;
   }
 
+  private CopyToStatement(
+      String name,
+      IntermediatePreparedStatement preparedStatement,
+      byte[][] parameters,
+      short[] parameterFormatCodes,
+      short[] resultFormatCodes,
+      ParsedCopyStatement parsedCopyStatement,
+      CSVFormat csvFormat,
+      CSVFormat headerCsvFormat) {
+    super(name, preparedStatement, parameters, parameterFormatCodes, resultFormatCodes);
+    this.parsedCopyStatement = parsedCopyStatement;
+    this.csvFormat = csvFormat;
+    this.headerCsvFormat = headerCsvFormat;
+  }
+
   @Override
   public boolean containsResultSet() {
     return true;
@@ -210,8 +227,17 @@ public class CopyToStatement extends IntermediatePortalStatement {
   @Override
   public IntermediatePortalStatement createPortal(
       String name, byte[][] parameters, short[] parameterFormatCodes, short[] resultFormatCodes) {
-    // COPY does not support binding any parameters, so we just return the same statement.
-    return this;
+    // Create a new portal instance to prevent execution state (such as hasReturnedData) from
+    // leaking from one execution of the prepared statement to another.
+    return new CopyToStatement(
+        name,
+        this,
+        parameters,
+        parameterFormatCodes,
+        resultFormatCodes,
+        this.parsedCopyStatement,
+        this.csvFormat,
+        this.headerCsvFormat);
   }
 
   @Override
