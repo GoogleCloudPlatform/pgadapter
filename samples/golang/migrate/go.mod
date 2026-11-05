@@ -1,11 +1,11 @@
 module migrate
 
-go 1.25.11
+go 1.26.0
 
 toolchain go1.27.1
 
 require (
-	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.55.3
+	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.56.2
 	github.com/golang-migrate/migrate/v4 v4.20.1
 )
 
@@ -37,7 +37,7 @@ require (
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.0 // indirect
-	github.com/moby/moby/api v1.56.0 // indirect
+	github.com/moby/moby/api v1.56.1 // indirect
 	github.com/moby/moby/client v0.5.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
@@ -61,7 +61,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
