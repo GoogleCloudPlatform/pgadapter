@@ -31,7 +31,8 @@ import org.springframework.web.bind.annotation.RestController;
  * Sample application for connecting to Cloud Spanner using the PostgreSQL JDBC driver on Cloud Run.
  * This sample application runs PGAdapter as a sidecar container on Cloud Run.
  *
- * <p>Modify service.yaml to match your Cloud Run project and region, and your Cloud Spanner database.
+ * <p>Modify service.yaml to match your Cloud Run project and region, and your Cloud Spanner
+ * database.
  */
 @SpringBootApplication
 public class SampleApplication {
@@ -53,7 +54,8 @@ public class SampleApplication {
       // We need to URL-encode the fully qualified database name before we can use it in a JDBC
       // connection URL. Otherwise, the JDBC driver will complain about the connection string
       // containing too many '/' characters.
-      urlEncodedDatabaseName = URLEncoder.encode(qualifiedDatabaseName, StandardCharsets.UTF_8.name());
+      urlEncodedDatabaseName =
+          URLEncoder.encode(qualifiedDatabaseName, StandardCharsets.UTF_8.name());
     } catch (UnsupportedEncodingException exception) {
       throw new RuntimeException(exception);
     }
@@ -72,13 +74,17 @@ public class SampleApplication {
         // Connect to PGAdapter using Unix Domain Sockets. This gives you the lowest possible
         // latency. The PGAdapter sidecar container and the main container both share the /sockets
         // directory, and PGAdapter is instructed to use this directory for Unix domain sockets.
-        connectionUrl = String.format("jdbc:postgresql://localhost/%s?"
-            + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
-            + "&socketFactoryArg=%s/.s.PGSQL.%s", urlEncodedDatabaseName, pgadapterHost, pgadapterPort);
+        connectionUrl =
+            String.format(
+                "jdbc:postgresql://localhost/%s?"
+                    + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+                    + "&socketFactoryArg=%s/.s.PGSQL.%s",
+                urlEncodedDatabaseName, pgadapterHost, pgadapterPort);
       } else {
         // Use a TCP connection.
-        connectionUrl = String.format("jdbc:postgresql://%s:%s/%s",
-            pgadapterHost, pgadapterPort, urlEncodedDatabaseName);
+        connectionUrl =
+            String.format(
+                "jdbc:postgresql://%s:%s/%s", pgadapterHost, pgadapterPort, urlEncodedDatabaseName);
       }
       // NOTE: You should use a JDBC connection pool for a production application.
       try (Connection connection = DriverManager.getConnection(connectionUrl)) {

@@ -32,17 +32,16 @@ public class StaleReadService {
   public OffsetDateTime getCurrentTimestamp() {
     return entityManager
         .unwrap(Session.class)
-        .doReturningWork(
-            connection -> {
-              try (ResultSet resultSet =
-                  connection.createStatement().executeQuery("select current_timestamp")) {
-                if (resultSet.next()) {
-                  return resultSet.getObject(1, OffsetDateTime.class);
-                }
-                // This should not happen.
-                throw new IllegalStateException("No timestamp returned by the server");
-              }
-            });
+        .doReturningWork(connection -> {
+          try (ResultSet resultSet =
+              connection.createStatement().executeQuery("select current_timestamp")) {
+            if (resultSet.next()) {
+              return resultSet.getObject(1, OffsetDateTime.class);
+            }
+            // This should not happen.
+            throw new IllegalStateException("No timestamp returned by the server");
+          }
+        });
   }
 
   @Transactional(readOnly = true)
@@ -56,25 +55,23 @@ public class StaleReadService {
   public <T> T executeReadOnlyTransactionWithStaleness(String staleness, Supplier<T> transaction) {
     return entityManager
         .unwrap(Session.class)
-        .doReturningWork(
-            connection -> {
-              try (Statement statement = connection.createStatement()) {
-                try {
-                  statement.execute(
-                      String.format("set spanner.read_only_staleness='%s'", staleness));
-                  return transaction.get();
-                } catch (Throwable t) {
-                  statement.execute("rollback");
-                  throw t;
-                } finally {
-                  // NOTE: Calling 'commit' if there is no active transaction is a no-op. That means
-                  // that if the transaction was rolled back in case of an exception, this commit
-                  // will be a no-op.
-                  statement.execute("commit");
-                  // Reset the read_only_staleness of the connection.
-                  connection.createStatement().execute("set spanner.read_only_staleness='strong'");
-                }
-              }
-            });
+        .doReturningWork(connection -> {
+          try (Statement statement = connection.createStatement()) {
+            try {
+              statement.execute(String.format("set spanner.read_only_staleness='%s'", staleness));
+              return transaction.get();
+            } catch (Throwable t) {
+              statement.execute("rollback");
+              throw t;
+            } finally {
+              // NOTE: Calling 'commit' if there is no active transaction is a no-op. That means
+              // that if the transaction was rolled back in case of an exception, this commit
+              // will be a no-op.
+              statement.execute("commit");
+              // Reset the read_only_staleness of the connection.
+              connection.createStatement().execute("set spanner.read_only_staleness='strong'");
+            }
+          }
+        });
   }
 }

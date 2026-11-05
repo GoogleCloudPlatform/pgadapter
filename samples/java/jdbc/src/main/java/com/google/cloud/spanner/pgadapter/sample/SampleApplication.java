@@ -139,6 +139,7 @@ public class SampleApplication {
 
     return new PGAdapter(server);
   }
+
   // [END start_pgadapter_in_process]
 
   /** Starts a Docker container that contains both PGAdapter and the Cloud Spanner Emulator. */

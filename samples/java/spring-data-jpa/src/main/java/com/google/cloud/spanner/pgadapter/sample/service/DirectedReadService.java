@@ -38,30 +38,29 @@ public class DirectedReadService {
       DirectedReadOptions directedReadOptions, Supplier<T> transaction) {
     return entityManager
         .unwrap(Session.class)
-        .doReturningWork(
-            connection -> {
-              try (Statement statement = connection.createStatement()) {
-                try {
-                  statement.execute(
-                      String.format(
-                          "set spanner.directed_read='%s'",
-                          DirectedReadOptionsUtil.toString(directedReadOptions)));
-                  return transaction.get();
-                } catch (Throwable t) {
-                  // Note: Rolling back or committing a read-only transaction is semantically the
-                  // same, as no changes to the database can be made in a read-only transaction.
-                  // This method chooses to rollback in case of an error for readability.
-                  statement.execute("rollback");
-                  throw t;
-                } finally {
-                  // NOTE: Calling 'commit' if there is no active transaction is a no-op. That means
-                  // that if the transaction was rolled back in case of an exception, this commit
-                  // will be a no-op.
-                  statement.execute("commit");
-                  // Reset the read_only_staleness of the connection.
-                  statement.execute("set spanner.directed_read=''");
-                }
-              }
-            });
+        .doReturningWork(connection -> {
+          try (Statement statement = connection.createStatement()) {
+            try {
+              statement.execute(
+                  String.format(
+                      "set spanner.directed_read='%s'",
+                      DirectedReadOptionsUtil.toString(directedReadOptions)));
+              return transaction.get();
+            } catch (Throwable t) {
+              // Note: Rolling back or committing a read-only transaction is semantically the
+              // same, as no changes to the database can be made in a read-only transaction.
+              // This method chooses to rollback in case of an error for readability.
+              statement.execute("rollback");
+              throw t;
+            } finally {
+              // NOTE: Calling 'commit' if there is no active transaction is a no-op. That means
+              // that if the transaction was rolled back in case of an exception, this commit
+              // will be a no-op.
+              statement.execute("commit");
+              // Reset the read_only_staleness of the connection.
+              statement.execute("set spanner.directed_read=''");
+            }
+          }
+        });
   }
 }

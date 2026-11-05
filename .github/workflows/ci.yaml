@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-    - main
+    - postgresql-dialect
   pull_request:
 name: ci
 permissions:
@@ -33,7 +33,22 @@ jobs:
         java-version: 21
         distribution: 'zulu'
     - run: java -version
-    - run: mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp
+    - name: Check code formatting (root)
+      run: mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp
+    - name: Check code formatting (benchmarks)
+      run: |
+        mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f benchmarks/tpcc/pom.xml
+        mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f benchmarks/latency-comparison/java/pom.xml
+    - name: Check code formatting (snippets)
+      run: mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f samples/snippets/java-snippets/pom.xml
+    - name: Check code formatting (samples)
+      run: |
+        mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f samples/java/cloud-run/pom.xml
+        mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f samples/java/hibernate/pom.xml
+        mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f samples/java/jdbc/pom.xml
+        mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f samples/java/r2dbc/pom.xml
+        mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f samples/java/spring-data-jpa/pom.xml
+        mvn com.spotify.fmt:fmt-maven-plugin:check -B -ntp -f samples/cloud-run/java/pom.xml
   e2e-psql-v12-v14:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
