@@ -174,6 +174,23 @@ public class PgCatalogTest {
     assertEquals(ReplacementStatus.CONTINUE, result.y());
 
     result =
+        catalog.replaceKnownUnsupportedFunctions(
+            Statement.of("select pg_get_partkeydef(c.oid) as part_by"));
+    assertEquals("select ''::varchar AS part_by", result.x());
+    assertEquals(ReplacementStatus.CONTINUE, result.y());
+
+    result =
+        catalog.replaceKnownUnsupportedFunctions(
+            Statement.of("select pg_catalog.pg_get_partkeydef(c.oid)"));
+    assertEquals("select ''::varchar AS pg_get_partkeydef", result.x());
+    assertEquals(ReplacementStatus.CONTINUE, result.y());
+
+    result =
+        catalog.replaceKnownUnsupportedFunctions(Statement.of("select pg_get_partkeydef(c.oid)"));
+    assertEquals("select ''::varchar AS pg_get_partkeydef", result.x());
+    assertEquals(ReplacementStatus.CONTINUE, result.y());
+
+    result =
         catalog.replaceKnownUnsupportedFunctions(Statement.of("select * from replace_and_stop"));
     assertEquals("select * from replaced", result.x());
     assertEquals(ReplacementStatus.STOP, result.y());
@@ -182,5 +199,35 @@ public class PgCatalogTest {
         Statement.of("select * from replaced"),
         catalog.addCommonTableExpressions(
             Statement.of("select * from replace_and_stop"), ImmutableList.of("replace_and_stop")));
+  }
+
+  @Test
+  public void testReplacePgPartitionedTable() {
+    SessionState sessionState = mock(SessionState.class);
+    when(sessionState.getServerVersion()).thenReturn("14.1");
+    PgCatalog catalog = new PgCatalog(sessionState, WellKnownClient.UNSPECIFIED);
+
+    Statement statement =
+        Statement.of(
+            "SELECT ns.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME, pg_get_partkeydef(c.oid) AS PARTITION_BY "
+                + "FROM pg_class c "
+                + "JOIN pg_namespace ns ON ns.oid = c.relnamespace "
+                + "JOIN pg_partitioned_table pt ON pt.partrelid = c.oid "
+                + "WHERE c.relkind = 'p' AND ns.nspname = 'public'");
+    Statement replaced = catalog.replacePgCatalogTables(statement, statement.getSql());
+    assertTrue(replaced.getSql().contains("with "));
+    assertTrue(replaced.getSql().contains("pg_partitioned_table as ("));
+    assertTrue(replaced.getSql().contains("pg_class as ("));
+    assertTrue(replaced.getSql().contains("pg_namespace as ("));
+    assertTrue(replaced.getSql().contains("''::varchar AS PARTITION_BY"));
+    assertTrue(
+        replaced
+            .getSql()
+            .endsWith(
+                "SELECT ns.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME, ''::varchar AS PARTITION_BY "
+                    + "FROM pg_class c "
+                    + "JOIN pg_namespace ns ON ns.oid = c.relnamespace "
+                    + "JOIN pg_partitioned_table pt ON pt.partrelid = c.oid "
+                    + "WHERE c.relkind = 'p' AND ns.nspname = 'public'"));
   }
 }
