@@ -124,6 +124,12 @@ public class PgCatalog {
               new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"))
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_partitioned_table"),
+              new TableOrIndexName(null, "pg_partitioned_table"))
+          .put(
+              new TableOrIndexName(null, "pg_partitioned_table"),
+              new TableOrIndexName(null, "pg_partitioned_table"))
           .build();
 
   private static final ImmutableList<QueryPartReplacer> DEFAULT_FUNCTION_REPLACEMENTS =
@@ -152,7 +158,23 @@ public class PgCatalog {
               "''::varchar AS "),
           RegexQueryPartReplacer.replace(
               Pattern.compile("obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
-              "''::varchar AS obj_description"));
+              "''::varchar AS obj_description"),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_catalog\\.pg_get_partkeydef\\s*\\([^)]+\\)\\s*AS\\s+",
+                  Pattern.CASE_INSENSITIVE),
+              "''::varchar AS "),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_catalog\\.pg_get_partkeydef\\s*\\([^)]+\\)", Pattern.CASE_INSENSITIVE),
+              "''::varchar AS pg_get_partkeydef"),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile(
+                  "pg_get_partkeydef\\s*\\([^)]+\\)\\s*AS\\s+", Pattern.CASE_INSENSITIVE),
+              "''::varchar AS "),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("pg_get_partkeydef\\s*\\([^)]+\\)", Pattern.CASE_INSENSITIVE),
+              "''::varchar AS pg_get_partkeydef"));
 
   private final ImmutableList<String> checkPrefixes;
 
@@ -176,6 +198,7 @@ public class PgCatalog {
               new TableOrIndexName(null, "pg_information_schema_sequences"),
               new InformationSchemaSequences())
           .put(new TableOrIndexName(null, "pg_extension"), new PgExtension())
+          .put(new TableOrIndexName(null, "pg_partitioned_table"), new EmptyPgPartitionedTable())
           .build();
   private final SessionState sessionState;
 
@@ -965,6 +988,22 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_LANGUAGE_CTE;
+    }
+  }
+
+  @InternalApi
+  public static class EmptyPgPartitionedTable implements PgCatalogTable {
+    private static final String PG_PARTITIONED_TABLE_CTE =
+        "pg_partitioned_table as (\n"
+            + "select * from ("
+            + "select 0::bigint as partrelid, ''::varchar as partstrat, 0::bigint as partnatts, "
+            + "0::bigint as partdefid, null::bigint[] as partattrs, null::bigint[] as partclass, "
+            + "null::bigint[] as partcollation, ''::varchar as partexprs\n"
+            + ") pt where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_PARTITIONED_TABLE_CTE;
     }
   }
 
