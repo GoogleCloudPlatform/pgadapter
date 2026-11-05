@@ -118,14 +118,13 @@ public class JavaClientRunner extends AbstractRunner {
   private void executeReadWriteTransaction(DatabaseClient client, String sql) {
     client
         .readWriteTransaction()
-        .run(
-            transaction ->
-                transaction.executeUpdate(
-                    Statement.newBuilder(sql)
-                        .bind("p1")
-                        .to(generateRandomString())
-                        .bind("p2")
-                        .to(ThreadLocalRandom.current().nextInt(100000))
-                        .build()));
+        .run(transaction ->
+            transaction.executeUpdate(
+                Statement.newBuilder(sql)
+                    .bind("p1")
+                    .to(generateRandomString())
+                    .bind("p2")
+                    .to(ThreadLocalRandom.current().nextInt(100000))
+                    .build()));
   }
 }

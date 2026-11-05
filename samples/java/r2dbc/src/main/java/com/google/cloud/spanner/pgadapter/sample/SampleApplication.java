@@ -110,25 +110,24 @@ public class SampleApplication {
     options.put("lock_timeout", "10s");
     options.put("statement_timeout", "5m");
 
-    ConnectionFactory connectionFactory = ConnectionFactories.get(ConnectionFactoryOptions.builder()
-        .option(DRIVER, "postgresql")
-        .option(HOST, "localhost")
-        .option(PORT, port) 
-        .option(USER, "")
-        .option(PASSWORD, "")
-        .option(DATABASE, database)
-        .option(OPTIONS, options)
-        .build());
+    ConnectionFactory connectionFactory =
+        ConnectionFactories.get(
+            ConnectionFactoryOptions.builder()
+                .option(DRIVER, "postgresql")
+                .option(HOST, "localhost")
+                .option(PORT, port)
+                .option(USER, "")
+                .option(PASSWORD, "")
+                .option(DATABASE, database)
+                .option(OPTIONS, options)
+                .build());
 
     CountDownLatch finished = new CountDownLatch(1);
     Flux.usingWhen(
             connectionFactory.create(),
             connection ->
-                Flux.from(connection.createStatement(
-                            "select 'Hello World!' as greeting")
-                        .execute())
-                    .flatMap(result ->
-                        result.map(row -> row.get("greeting", String.class))),
+                Flux.from(connection.createStatement("select 'Hello World!' as greeting").execute())
+                    .flatMap(result -> result.map(row -> row.get("greeting", String.class))),
             Connection::close)
         .doOnNext(greeting -> System.out.printf("\nGreeting: %s\n\n", greeting))
         .doOnError(Throwable::printStackTrace)
@@ -137,7 +136,7 @@ public class SampleApplication {
 
     finished.await();
   }
-  
+
   /**
    * Starts PGAdapter in-process and returns a reference to the server. Use this reference to
    * gracefully shut down the server when your application shuts down.
@@ -207,10 +206,7 @@ public class SampleApplication {
         true,
         "The id of the Cloud Spanner instance that PGAdapter should connect to.");
     options.addOption(
-        "d",
-        "database",
-        true,
-        "The id of the database that the R2DBC driver should connect to.");
+        "d", "database", true, "The id of the database that the R2DBC driver should connect to.");
     options.addOption(
         "c",
         "credentials",
