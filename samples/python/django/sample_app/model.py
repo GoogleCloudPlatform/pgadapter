@@ -78,7 +78,7 @@ class Concert(BaseModel):
   class Meta:
     db_table = 'concerts'
     constraints = [models.CheckConstraint(
-      check=Q(end_time__gte=F('start_time')),
+      condition=Q(end_time__gte=F('start_time')),
       name='chk_end_time_after_start_time')]
   id = models.CharField(primary_key=True, null=False)
   venue = models.ForeignKey(Venue, on_delete=models.DO_NOTHING)
