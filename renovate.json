@@ -71,6 +71,12 @@
       ],
       "matchPackageNames": ["sqlalchemy"],
       "allowedVersions": "<2.0.0"
+    },
+    {
+      "matchPackageNames": [
+        "org.mockito:mockito-core"
+      ],
+      "allowedVersions": "<5.0.0"
     }
   ],
   "semanticCommits": "enabled",
