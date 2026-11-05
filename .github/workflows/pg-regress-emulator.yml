@@ -4,11 +4,13 @@ on:
     # Run at 08:36UTC every day.
     - cron: '36 8 * * *'
 name: pg_regress_emulator
+permissions:
+  contents: read
 jobs:
   pg-regress-emulator:
     services:
       emulator:
-        image: gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+        image: gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator # zizmor: ignore[unpinned-images]
         ports:
           - 5432:5432
     timeout-minutes: 60
@@ -19,32 +21,32 @@ jobs:
       TARGET_ENV: "emulator"
     steps:
       - name: Checkout PGAdapter repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: pgadapter
       - name: Checkout OSS PG repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: postgres/postgres
           path: postgres
           ref: REL_16_0
       - id: 'auth'
-        uses: 'google-github-actions/auth@v3'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
           export_environment_variables: true
       - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v3'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
-      - uses: actions/setup-python@v7.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.14'
       - name: 'Install python dependencies'
         run: |
           pip install google-cloud-bigquery
       - name: Install jq
-        uses: dcarbone/install-jq-action@v4.0.1
+        uses: dcarbone/install-jq-action@4fcb5062d7ce9bc4382d1a352d19ba3ba2c317c1 # v4.0.1
         with:
           version: '1.7.1'
       - name: Setup psql
@@ -72,8 +74,8 @@ jobs:
         name: Download the previous latest result
         working-directory: ./postgres/src/test/regress/
         run: |
-          if gcloud storage ls ${{env.GCS_BUCKET_PATH}}/results_latest.json; then
-            gcloud storage cp ${{env.GCS_BUCKET_PATH}}/results_latest.json results_latest.json
+          if gcloud storage ls "$GCS_BUCKET_PATH/results_latest.json"; then
+            gcloud storage cp "$GCS_BUCKET_PATH/results_latest.json" results_latest.json
             echo "has_latest_file=true" >> $GITHUB_OUTPUT
           else
             echo "has_latest_file=false" >> $GITHUB_OUTPUT
@@ -82,10 +84,10 @@ jobs:
         working-directory: ./postgres/src/test/regress/
         run: |
           ts=$(date +%s)
-          python upload_bigquery.py results.json ${{env.BQ_TABLE}} ${{env.TARGET_ENV}} $ts
-          gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_$ts.json
-          gcloud storage cp results/*.out ${{env.GCS_BUCKET_PATH}}/latest-run-results/
-          gcloud storage cp regression.diffs ${{env.GCS_BUCKET_PATH}}/regression_$ts.diffs
+          python upload_bigquery.py results.json "$BQ_TABLE" "$TARGET_ENV" $ts
+          gcloud storage cp results.json "$GCS_BUCKET_PATH/results_$ts.json"
+          gcloud storage cp results/*.out "$GCS_BUCKET_PATH/latest-run-results/"
+          gcloud storage cp regression.diffs "$GCS_BUCKET_PATH/regression_$ts.diffs"
       - name: Compare json results
         working-directory: ./postgres/src/test/regress/
         if: steps.latest_gcs_file.outputs.has_latest_file == 'true'
@@ -96,4 +98,4 @@ jobs:
             echo "Fail: $curr_passed is less than $prev_passed. Please check!"
             exit 1
           fi
-          gcloud storage cp results.json ${{env.GCS_BUCKET_PATH}}/results_latest.json
+          gcloud storage cp results.json "$GCS_BUCKET_PATH/results_latest.json"
