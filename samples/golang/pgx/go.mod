@@ -6,7 +6,7 @@ toolchain go1.27.1
 
 require (
 	github.com/GoogleCloudPlatform/pgadapter/wrappers/golang v0.56.1
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/jackc/pgx/v5 v5.12.0
 )
 
 require (
@@ -64,6 +64,6 @@ require (
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
