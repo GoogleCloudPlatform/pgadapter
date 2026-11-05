@@ -4,6 +4,8 @@ on:
     # Run at 09:36UTC every day.
     - cron: '36 9 * * *'
 name: pg_regress_prod
+permissions:
+  contents: read
 jobs:
   pg-regress-prod:
     timeout-minutes: 600
@@ -17,37 +19,37 @@ jobs:
       GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
     steps:
       - name: Checkout PGAdapter repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: pgadapter
       - name: Checkout OSS PG repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: postgres/postgres
           path: postgres
           ref: REL_16_0
       - id: 'auth'
-        uses: 'google-github-actions/auth@v3'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
           export_environment_variables: true
       - name: Randomize database name
-        run: echo GOOGLE_CLOUD_DATABASE=${GOOGLE_CLOUD_DATABASE}_$(date +%s) >> $GITHUB_ENV
+        run: echo "GOOGLE_CLOUD_DATABASE=${GOOGLE_CLOUD_DATABASE}_$(date +%s)" >> "$GITHUB_ENV"
       - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v3'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.14'
       - name: Start PGAdapter container
         run: |
           docker run \
                 -d -p 5432:5432 \
-                -v ${{env.GOOGLE_APPLICATION_CREDENTIALS}}:/credentials.json:ro \
+                -v "$GOOGLE_APPLICATION_CREDENTIALS:/credentials.json:ro" \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/credentials.json \
-                gcr.io/cloud-spanner-pg-adapter/pgadapter \
-                -p ${{env.GOOGLE_CLOUD_PROJECT}} -i ${{env.GOOGLE_CLOUD_INSTANCE}} -d ${{env.GOOGLE_CLOUD_DATABASE}} \
+                gcr.io/cloud-spanner-pg-adapter/pgadapter # zizmor: ignore[unpinned-images] \
+                -p "$GOOGLE_CLOUD_PROJECT" -i "$GOOGLE_CLOUD_INSTANCE" -d "$GOOGLE_CLOUD_DATABASE" \
                 -x
       - name: Setup psql
         run: |
@@ -70,7 +72,7 @@ jobs:
         working-directory: ./postgres/src/test/regress/
         run: |
           python start_test.py spanner_prod --skip-container \
-                --project ${{env.GOOGLE_CLOUD_PROJECT}} \
-                --instance ${{env.GOOGLE_CLOUD_INSTANCE}} \
-                --database ${{env.GOOGLE_CLOUD_DATABASE}}
+                --project "$GOOGLE_CLOUD_PROJECT" \
+                --instance "$GOOGLE_CLOUD_INSTANCE" \
+                --database "$GOOGLE_CLOUD_DATABASE"
           python compare_results.py expected/ results/
