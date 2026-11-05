@@ -37,7 +37,10 @@ in_process_pgadapter_port = None
 def start_pgadapter(project: str,
                     instance: str,
                     emulator: bool = False,
-                    credentials: str = None) -> (DockerContainer, str):
+                    credentials: str = None,
+                    # Django 6 requires PostgreSQL 15 or later. PGAdapter by default claims
+                    # to be PostgreSQL 14.1, so we instruct it to report version 15.0.
+                    options: str = "-v 15.0") -> (DockerContainer, str):
   """Starts PGAdapter in an embedded Docker container
 
   Starts PGAdapter in an embedded Docker container and returns the TCP port
@@ -56,6 +59,10 @@ def start_pgadapter(project: str,
   credentials : str or None
       The credentials file that PGAdapter should use. If None, then this
       function will try to load the default credentials from the environment.
+  options : str or None
+      Additional command-line options to pass to PGAdapter. Defaults to
+      "-v 15.0" because Django 6 requires PostgreSQL 15 or later, whereas
+      PGAdapter defaults to claiming version 14.1.
 
   Returns
   -------
@@ -65,19 +72,22 @@ def start_pgadapter(project: str,
       with a standard PostgreSQL driver to connect to Cloud Spanner.
   """
 
+  command = "-p " + project + " -i " + instance
+  if options:
+    command += " " + options
+
   if emulator:
     # Start PGAdapter with the Cloud Spanner emulator in a Docker container
     container =(
       DockerContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator")
       .with_exposed_ports(5432)
-      .with_command("-p " + project + " -i " + instance))
+      .with_command(command))
     container.start()
   else:
     # Start PGAdapter in a Docker container
     container = DockerContainer("gcr.io/cloud-spanner-pg-adapter/pgadapter") \
       .with_exposed_ports(5432) \
-      .with_command("   -p " + project
-                    + " -i " + instance
+      .with_command(command
                     + " -x -c /credentials.json")
     container.start()
     # Determine the credentials that should be used by PGAdapter and write these
