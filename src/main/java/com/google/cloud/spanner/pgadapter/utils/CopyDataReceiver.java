@@ -26,6 +26,8 @@ import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.Callable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * This message receiver is activated when the COPY sub-protocol is activated by a COPY statement.
@@ -34,6 +36,8 @@ import java.util.concurrent.Callable;
  */
 @InternalApi
 public class CopyDataReceiver implements Callable<Void> {
+  private static final Logger logger = Logger.getLogger(CopyDataReceiver.class.getName());
+
   private final CopyStatement copyStatement;
   private final ConnectionHandler connectionHandler;
 
@@ -91,7 +95,8 @@ public class CopyDataReceiver implements Callable<Void> {
         // Throw an exception if the COPY failed. This ensures that the BackendConnection receives
         // an error and marks the current (implicit) transaction as aborted.
         if (copyStatement.hasException(ResultNotReadyBehavior.BLOCK)
-            || this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
+            || this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED
+            || this.connectionHandler.getStatus() == ConnectionStatus.TERMINATED) {
           if (copyStatement.hasException(ResultNotReadyBehavior.BLOCK)) {
             throw copyStatement.getException();
           } else {
@@ -101,8 +106,19 @@ public class CopyDataReceiver implements Callable<Void> {
         }
       } finally {
         this.connectionHandler.clearActiveCopyStatement();
-        this.copyStatement.close();
-        this.connectionHandler.setStatus(initialConnectionStatus);
+        try {
+          this.copyStatement.close();
+        } catch (Exception exception) {
+          logger.log(
+              Level.FINEST,
+              exception,
+              () -> String.format("Exception while closing copy statement: %s", exception));
+        }
+        synchronized (this.connectionHandler) {
+          if (this.connectionHandler.getStatus() != ConnectionStatus.TERMINATED) {
+            this.connectionHandler.setStatus(initialConnectionStatus);
+          }
+        }
       }
     }
   }
