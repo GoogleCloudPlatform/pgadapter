@@ -17,7 +17,10 @@ package com.google.cloud.spanner.pgadapter.utils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ErrorCode;
@@ -69,5 +72,41 @@ public class CopyDataReceiverTest {
 
     assertEquals(ErrorCode.INTERNAL, spannerException.getErrorCode());
     assertEquals("INTERNAL: Copy failed with unknown reason", spannerException.getMessage());
+  }
+
+  @Test
+  public void testCopyDataReceiverDoesNotResurrectTerminatedStatus() {
+    DataOutputStream outputStream = new DataOutputStream(new ByteArrayOutputStream());
+    CopyStatement statement = mock(CopyStatement.class);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    when(connectionHandler.getStatus())
+        .thenReturn(ConnectionStatus.AUTHENTICATED, ConnectionStatus.TERMINATED);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
+    CopyDataReceiver receiver = new CopyDataReceiver(statement, connectionHandler);
+    assertThrows(SpannerException.class, receiver::handleCopy);
+
+    verify(connectionHandler, never()).setStatus(ConnectionStatus.AUTHENTICATED);
+  }
+
+  @Test
+  public void testCopyDataReceiver_CloseThrowsException_StillDoesNotResurrectTerminated()
+      throws Exception {
+    DataOutputStream outputStream = new DataOutputStream(new ByteArrayOutputStream());
+    CopyStatement statement = mock(CopyStatement.class);
+    doThrow(new RuntimeException("close failed")).when(statement).close();
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    when(connectionHandler.getStatus())
+        .thenReturn(ConnectionStatus.AUTHENTICATED, ConnectionStatus.TERMINATED);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
+    CopyDataReceiver receiver = new CopyDataReceiver(statement, connectionHandler);
+    assertThrows(SpannerException.class, receiver::handleCopy);
+
+    verify(connectionHandler, never()).setStatus(ConnectionStatus.AUTHENTICATED);
   }
 }

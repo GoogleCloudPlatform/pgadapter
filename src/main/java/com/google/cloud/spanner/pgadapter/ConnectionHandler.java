@@ -101,6 +101,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSocketFactory;
 
 /**
@@ -585,28 +586,57 @@ public class ConnectionHandler implements Runnable {
       if (this.status != ConnectionStatus.COPY_IN) {
         terminate();
       }
-    } catch (EOFException eofException) {
-      // Handle an EOFException as a normal connection termination. The TCP connection can break
-      // without the server receiving a Terminate (X) message if for example the application does
-      // not try-catch all exceptions.
-      // We only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode, this
-      // exception will cause the connection to leave COPY_IN mode, and return to normal operation.
-      if (this.status != ConnectionStatus.COPY_IN) {
-        terminate();
+    } catch (EOFException | SocketException | SSLException disconnectException) {
+      // Handle an unexpected disconnect (EOF, socket reset, or TLS disconnect) as a normal
+      // connection termination. The TCP connection can break without the server receiving a
+      // Terminate (X) message.
+      handleUnexpectedDisconnect(disconnectException);
+    } catch (IOException ioException) {
+      if (this.status == ConnectionStatus.COPY_IN) {
+        handleUnexpectedDisconnect(ioException);
       } else {
-        handleFatalException(eofException);
-      }
-    } catch (SocketException socketException) {
-      // Handle a SocketException when the socket has been closed as a normal connection
-      // termination. The TCP connection can break without the server receiving a Terminate (X)
-      // message if for example the application does not try-catch all exceptions.
-      if (socket.isClosed()) {
-        terminate();
-      } else {
-        this.handleError(PGExceptionFactory.toPGException(socketException));
+        this.handleError(PGExceptionFactory.toPGException(ioException));
       }
     } catch (Exception exception) {
       this.handleError(PGExceptionFactory.toPGException(exception));
+    }
+  }
+
+  private void handleUnexpectedDisconnect(Exception disconnectException) {
+    try {
+      if (this.status == ConnectionStatus.COPY_IN && this.activeCopyStatement != null) {
+        try {
+          if (this.activeCopyStatement.getMutationWriter() != null) {
+            this.activeCopyStatement.getMutationWriter().rollback();
+          }
+        } catch (Exception exception) {
+          logger.log(
+              Level.WARNING,
+              exception,
+              () ->
+                  String.format(
+                      "Failed to rollback mutation writer for connection %d: %s",
+                      this.connectionId, exception.getMessage()));
+        }
+        try {
+          this.activeCopyStatement.handleExecutionException(
+              PGException.newBuilder("Connection terminated unexpectedly")
+                  .setSeverity(Severity.FATAL)
+                  .setSQLState(SQLState.ConnectionFailure)
+                  .setCause(disconnectException)
+                  .build());
+        } catch (Exception exception) {
+          logger.log(
+              Level.WARNING,
+              exception,
+              () ->
+                  String.format(
+                      "Failed to handle execution exception for connection %d: %s",
+                      this.connectionId, exception.getMessage()));
+        }
+      }
+    } finally {
+      terminate();
     }
   }
 
@@ -621,18 +651,61 @@ public class ConnectionHandler implements Runnable {
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
   public void handleTerminate() {
     synchronized (this) {
-      if (this.extendedQueryProtocolHandler != null
-          && this.extendedQueryProtocolHandler.getBackendConnection() != null) {
-        this.extendedQueryProtocolHandler.getBackendConnection().close();
+      try {
+        if (this.extendedQueryProtocolHandler != null
+            && this.extendedQueryProtocolHandler.getBackendConnection() != null) {
+          try {
+            this.extendedQueryProtocolHandler.getBackendConnection().close();
+          } catch (Exception exception) {
+            logger.log(
+                Level.WARNING,
+                exception,
+                () ->
+                    String.format(
+                        "Exception while closing backend connection during termination for connection %d: %s",
+                        this.connectionId, exception));
+          }
+        }
+        try {
+          closeAllPortals();
+        } catch (Exception exception) {
+          logger.log(
+              Level.WARNING,
+              exception,
+              () ->
+                  String.format(
+                      "Exception while closing portals during termination for connection %d: %s",
+                      this.connectionId, exception));
+        }
+        try {
+          closeAllStatements();
+        } catch (Exception exception) {
+          logger.log(
+              Level.WARNING,
+              exception,
+              () ->
+                  String.format(
+                      "Exception while closing statements during termination for connection %d: %s",
+                      this.connectionId, exception));
+        }
+        this.inFlightAutoDescribedStatements.clear();
+        if (this.spannerConnection != null) {
+          try {
+            this.spannerConnection.close();
+          } catch (Exception exception) {
+            logger.log(
+                Level.WARNING,
+                exception,
+                () ->
+                    String.format(
+                        "Exception while closing Spanner connection during termination for connection %d: %s",
+                        this.connectionId, exception));
+          }
+        }
+      } finally {
+        this.status = ConnectionStatus.TERMINATED;
+        CONNECTION_HANDLERS.remove(this.connectionId);
       }
-      closeAllPortals();
-      closeAllStatements();
-      this.inFlightAutoDescribedStatements.clear();
-      if (this.spannerConnection != null) {
-        this.spannerConnection.close();
-      }
-      this.status = ConnectionStatus.TERMINATED;
-      CONNECTION_HANDLERS.remove(this.connectionId);
     }
   }
 
@@ -989,12 +1062,19 @@ public class ConnectionHandler implements Runnable {
     return extendedQueryProtocolHandler;
   }
 
+  @VisibleForTesting
+  void setExtendedQueryProtocolHandler(ExtendedQueryProtocolHandler extendedQueryProtocolHandler) {
+    this.extendedQueryProtocolHandler = extendedQueryProtocolHandler;
+  }
+
   public synchronized ConnectionStatus getStatus() {
     return status;
   }
 
   public synchronized void setStatus(ConnectionStatus status) {
-    this.status = status;
+    if (this.status != ConnectionStatus.TERMINATED) {
+      this.status = status;
+    }
   }
 
   public WellKnownClient getWellKnownClient() {

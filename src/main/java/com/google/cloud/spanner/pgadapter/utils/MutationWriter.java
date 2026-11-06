@@ -224,6 +224,10 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
    */
   public void rollback() {
     this.rollback.set(true);
+    // Unblock the worker thread if it is waiting for initial data, allowing it to exit early.
+    // Unlike commit(), which is called after data has arrived and is followed by close(),
+    // rollback() can be invoked on client disconnect before any data was ever sent.
+    this.dataReceivedLatch.countDown();
   }
 
   @Override

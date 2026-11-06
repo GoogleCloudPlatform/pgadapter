@@ -27,6 +27,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -52,9 +53,13 @@ import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -71,11 +76,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.net.ssl.SSLException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -315,6 +322,283 @@ public class ConnectionHandlerTest {
     connection.handleMessages();
 
     assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+  }
+
+  private void verifyUnexpectedDisconnectInCopyInMode(Exception disconnectException)
+      throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(disconnectException).when(message).send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.COPY_IN);
+    CopyStatement copyStatement = mock(CopyStatement.class);
+    MutationWriter mutationWriter = mock(MutationWriter.class);
+    when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
+    connection.setActiveCopyStatement(copyStatement);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    verify(mutationWriter).rollback();
+    verify(copyStatement).handleExecutionException(any(PGException.class));
+  }
+
+  @Test
+  public void testHandleMessages_EOFException_InCopyInMode() throws Exception {
+    verifyUnexpectedDisconnectInCopyInMode(new EOFException("eof test exception"));
+  }
+
+  @Test
+  public void testHandleMessages_EOFException_InCopyInMode_NullCopyStatement() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(new EOFException("eof test exception")).when(message).send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.COPY_IN);
+    connection.setActiveCopyStatement(null);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+  }
+
+  @Test
+  public void testHandleMessages_SocketException_InCopyInMode() throws Exception {
+    verifyUnexpectedDisconnectInCopyInMode(new SocketException("Connection reset"));
+  }
+
+  @Test
+  public void testHandleMessages_SSLException_InCopyInMode() throws Exception {
+    verifyUnexpectedDisconnectInCopyInMode(new SSLException("Connection reset by peer"));
+  }
+
+  @Test
+  public void testHandleMessages_GenericIOException_InCopyInMode() throws Exception {
+    verifyUnexpectedDisconnectInCopyInMode(new IOException("Broken pipe"));
+  }
+
+  @Test
+  public void testHandleUnexpectedDisconnect_RollbackThrows_StillTerminates() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(new EOFException("disconnect")).when(message).send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.COPY_IN);
+    CopyStatement copyStatement = mock(CopyStatement.class);
+    MutationWriter mutationWriter = mock(MutationWriter.class);
+    doThrow(new RuntimeException("rollback failed")).when(mutationWriter).rollback();
+    when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
+    connection.setActiveCopyStatement(copyStatement);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    verify(mutationWriter).rollback();
+    verify(copyStatement).handleExecutionException(any(PGException.class));
+  }
+
+  @Test
+  public void testHandleUnexpectedDisconnect_HandleExecutionExceptionThrows_StillTerminates()
+      throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(new EOFException("disconnect")).when(message).send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.COPY_IN);
+    CopyStatement copyStatement = mock(CopyStatement.class);
+    MutationWriter mutationWriter = mock(MutationWriter.class);
+    when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
+    doThrow(new RuntimeException("handleExecutionException failed"))
+        .when(copyStatement)
+        .handleExecutionException(any(PGException.class));
+    connection.setActiveCopyStatement(copyStatement);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    verify(mutationWriter).rollback();
+    verify(copyStatement).handleExecutionException(any(PGException.class));
+  }
+
+  @Test
+  public void testHandleMessages_IOException_NotInCopyInMode() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(new IOException("simulated read error")).when(message).send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.AUTHENTICATED);
+
+    connection.handleMessages();
+
+    // When not in COPY_IN mode, a general IOException delegates to handleError and does not
+    // terminate.
+    assertEquals(ConnectionStatus.AUTHENTICATED, connection.getStatus());
+  }
+
+  @Test
+  public void testHandleMessages_SocketException_NotInCopyInMode() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(new SocketException("Connection reset")).when(message).send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.AUTHENTICATED);
+
+    connection.handleMessages();
+
+    // SocketException indicates broken TCP connection, terminating immediately without sending
+    // error responses to broken socket.
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+  }
+
+  @Test
+  public void testHandleTerminate_SpannerExceptionDoesNotPreventTerminatedStatus() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    Connection spannerConnection = mock(Connection.class);
+    doThrow(new RuntimeException("spanner close failed")).when(spannerConnection).close();
+    ConnectionHandler connection = new ConnectionHandler(server, socket, spannerConnection);
+    CONNECTION_HANDLERS.put(connection.getConnectionId(), connection);
+
+    connection.handleTerminate();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    assertFalse(CONNECTION_HANDLERS.containsKey(connection.getConnectionId()));
+  }
+
+  @Test
+  public void testSetStatus_CannotOverwriteTerminatedStatus() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    Connection spannerConnection = mock(Connection.class);
+    ConnectionHandler connection = new ConnectionHandler(server, socket, spannerConnection);
+
+    connection.setStatus(ConnectionStatus.AUTHENTICATED);
+    assertEquals(ConnectionStatus.AUTHENTICATED, connection.getStatus());
+
+    connection.setStatus(ConnectionStatus.TERMINATED);
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+
+    // Once TERMINATED, it cannot be changed back to any other status.
+    connection.setStatus(ConnectionStatus.AUTHENTICATED);
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    connection.setStatus(ConnectionStatus.COPY_IN);
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+  }
+
+  @Test
+  public void
+      testHandleTerminate_BackendConnectionExceptionDoesNotPreventClosingSpannerConnection() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    Connection spannerConnection = mock(Connection.class);
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    doThrow(new RuntimeException("backend close failed")).when(backendConnection).close();
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket, spannerConnection);
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connection, backendConnection);
+    connection.setExtendedQueryProtocolHandler(handler);
+    CONNECTION_HANDLERS.put(connection.getConnectionId(), connection);
+
+    connection.handleTerminate();
+
+    verify(backendConnection).close();
+    verify(spannerConnection).close();
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    assertFalse(CONNECTION_HANDLERS.containsKey(connection.getConnectionId()));
   }
 
   @Test
