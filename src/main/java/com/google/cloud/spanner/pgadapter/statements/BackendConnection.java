@@ -362,8 +362,10 @@ public class BackendConnection {
         } else if (this.sessionStatement != null) {
           result.set(this.sessionStatement.execute(sessionState, spannerConnection));
         } else if (connectionState == ConnectionState.ABORTED
-            && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
+          if (spannerConnection.isInTransaction()) {
+            rollbackWithoutTimeout();
+          }
           result.set(ROLLBACK_RESULT);
         } else if (isTransactionStatement(parsedStatement) && sessionState.isForceAutocommit()) {
           result.set(NO_RESULT);
@@ -801,7 +803,11 @@ public class BackendConnection {
       try {
         checkConnectionState();
         spannerConnection.savepoint(savepointStatement.getSavepointName());
+        savepoints.add(savepointStatement.getSavepointName());
         result.set(NO_RESULT);
+      } catch (PGException exception) {
+        result.setException(exception);
+        throw exception;
       } catch (Exception exception) {
         PGException pgException =
             PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
@@ -829,7 +835,14 @@ public class BackendConnection {
       try {
         checkConnectionState();
         spannerConnection.releaseSavepoint(releaseStatement.getSavepointName());
+        int savepointIndex = savepoints.lastIndexOf(releaseStatement.getSavepointName());
+        if (savepointIndex >= 0) {
+          savepoints.subList(savepointIndex, savepoints.size()).clear();
+        }
         result.set(NO_RESULT);
+      } catch (PGException exception) {
+        result.setException(exception);
+        throw exception;
       } catch (Exception exception) {
         PGException pgException =
             PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
@@ -856,7 +869,14 @@ public class BackendConnection {
     void doExecute() {
       try {
         spannerConnection.rollbackToSavepoint(rollbackToStatement.getSavepointName());
+        int savepointIndex = savepoints.lastIndexOf(rollbackToStatement.getSavepointName());
+        if (savepointIndex >= 0 && savepointIndex < savepoints.size() - 1) {
+          savepoints.subList(savepointIndex + 1, savepoints.size()).clear();
+        }
         result.set(NO_RESULT);
+      } catch (PGException exception) {
+        result.setException(exception);
+        throw exception;
       } catch (Exception exception) {
         PGException pgException =
             PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
@@ -900,6 +920,11 @@ public class BackendConnection {
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final String currentSchema = "public";
   private final List<BufferedStatement<?>> bufferedStatements = new ArrayList<>();
+  // TODO: Move savepoint tracking, transaction error handling, and session state management to the
+  // Spanner Connection API. Tracking savepoints here is a temporary stop-gap in PGAdapter to allow
+  // ROLLBACK TO SAVEPOINT after an error without eagerly rolling back the underlying Spanner
+  // transaction.
+  private final ArrayList<String> savepoints = new ArrayList<>();
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
@@ -1237,11 +1262,16 @@ public class BackendConnection {
           bufferedStatement.execute();
 
           if (isBegin(index)) {
-            transactionMode = TransactionMode.EXPLICIT;
+            if (transactionMode != TransactionMode.EXPLICIT) {
+              transactionMode = TransactionMode.EXPLICIT;
+              connectionState = ConnectionState.TRANSACTION;
+              currentTransactionId = UUID.randomUUID();
+              clearSavepoints();
+            }
+          } else if (isRollbackTo(index)) {
             connectionState = ConnectionState.TRANSACTION;
-            currentTransactionId = UUID.randomUUID();
           } else if (isCommit(index) || isRollback(index)) {
-            if (isCommit(index)) {
+            if (isCommit(index) && connectionState != ConnectionState.ABORTED) {
               sessionState.commit();
             } else {
               sessionState.rollback();
@@ -1261,12 +1291,22 @@ public class BackendConnection {
         connectionState = ConnectionState.ABORTED;
       }
       closeAllPortals.run();
-      sessionState.rollback();
-      if (spannerConnection.isInTransaction()) {
-        if (!isRollback(index)) {
-          rollbackWithoutTimeout();
+      // If the transaction has active savepoints, keep the Spanner transaction open so that the
+      // client can issue a ROLLBACK TO SAVEPOINT to recover from the error.
+      // TODO: Move PostgreSQL transaction error handling to the Spanner Connection API so that
+      // PGAdapter does not need to distinguish between transactions with and without savepoints.
+      if (!hasSavepoints()) {
+        sessionState.rollback();
+        if (spannerConnection.isInTransaction()) {
+          if (!isRollback(index)) {
+            rollbackWithoutTimeout();
+          }
         }
-      } else if (spannerConnection.isDdlBatchActive()) {
+      }
+      if (spannerConnection.isDmlBatchActive()) {
+        spannerConnection.abortBatch();
+      }
+      if (spannerConnection.isDdlBatchActive()) {
         spannerConnection.abortBatch();
       }
     } finally {
@@ -1299,6 +1339,7 @@ public class BackendConnection {
   public void close() {
     failBufferedStatements(PGExceptionFactory.newQueryCancelledException());
     bufferedStatements.clear();
+    clearSavepoints();
   }
 
   private void failBufferedStatements(Exception exception) {
@@ -1313,6 +1354,20 @@ public class BackendConnection {
     transactionMode = TransactionMode.IMPLICIT;
     connectionState = ConnectionState.IDLE;
     currentTransactionId = null;
+    clearSavepoints();
+  }
+
+  private void clearSavepoints() {
+    if (savepoints.size() > 16) {
+      savepoints.clear();
+      savepoints.trimToSize();
+    } else {
+      savepoints.clear();
+    }
+  }
+
+  private boolean hasSavepoints() {
+    return !savepoints.isEmpty();
   }
 
   /** Starts an implicit transaction if that is necessary. */
@@ -1388,10 +1443,16 @@ public class BackendConnection {
           spannerConnection.setStatementTag(null);
           spannerConnection.commit();
         }
+      } else {
+        sessionState.rollback();
+        if (spannerConnection.isInTransaction()) {
+          rollbackWithoutTimeout();
+        }
       }
     } finally {
       connectionState = ConnectionState.IDLE;
       currentTransactionId = null;
+      clearSavepoints();
     }
   }
 
@@ -1428,6 +1489,7 @@ public class BackendConnection {
             if (spannerConnection.isInTransaction()) {
               spannerConnection.commit();
               sessionState.commit();
+              clearSavepoints();
               if (transactionMode == TransactionMode.EXPLICIT) {
                 // Convert the explicit transaction to a DDL batch.
                 transactionMode = TransactionMode.DDL_BATCH;
@@ -1469,6 +1531,7 @@ public class BackendConnection {
           if (spannerConnection.isInTransaction()) {
             spannerConnection.commit();
             sessionState.commit();
+            clearSavepoints();
             if (transactionMode == TransactionMode.EXPLICIT) {
               // Convert the explicit transaction to a DDL batch.
               transactionMode = TransactionMode.DDL_BATCH;
@@ -1524,6 +1587,10 @@ public class BackendConnection {
   private boolean isRollback(ParsedStatement parsedStatement) {
     return parsedStatement.getType() == StatementType.CLIENT_SIDE
         && parsedStatement.getClientSideStatementType() == ClientSideStatementType.ROLLBACK;
+  }
+
+  private boolean isRollbackTo(int index) {
+    return bufferedStatements.get(index) instanceof RollbackTo;
   }
 
   private boolean isTransactionStatement(int index) {
