@@ -35,6 +35,7 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
@@ -150,11 +151,27 @@ public class CopyStatement extends IntermediatePortalStatement {
 
   @Override
   public void close() throws Exception {
-    if (this.mutationWriter != null) {
-      this.mutationWriter.close();
+    try {
+      if (this.mutationWriter != null) {
+        this.mutationWriter.close();
+      }
+    } finally {
+      try {
+        this.executor.shutdown();
+      } finally {
+        super.close();
+      }
     }
-    this.executor.shutdown();
-    super.close();
+  }
+
+  @VisibleForTesting
+  void setMutationWriter(MutationWriter mutationWriter) {
+    this.mutationWriter = mutationWriter;
+  }
+
+  @VisibleForTesting
+  ExecutorService getExecutor() {
+    return this.executor;
   }
 
   @Override

@@ -22,16 +22,29 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement.Direction;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.common.collect.ImmutableList;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -1198,5 +1211,55 @@ public class CopyStatementTest {
   static ImmutableList<TableOrIndexName> identifierList(String... identifiers) {
     return ImmutableList.copyOf(
         Arrays.stream(identifiers).map(TableOrIndexName::new).collect(Collectors.toList()));
+  }
+
+  @Test
+  public void testClose_Success() throws Exception {
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream())
+        .thenReturn(new DataOutputStream(new ByteArrayOutputStream()));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    Statement originalStatement = Statement.of("copy my_table from stdin");
+    CopyStatement copyStatement =
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, options, "copy", parsedStatement, originalStatement);
+    MutationWriter mutationWriter = mock(MutationWriter.class);
+    copyStatement.setMutationWriter(mutationWriter);
+
+    assertFalse(copyStatement.getExecutor().isShutdown());
+    copyStatement.close();
+
+    verify(mutationWriter).close();
+    assertTrue(copyStatement.getExecutor().isShutdown());
+  }
+
+  @Test
+  public void testClose_MutationWriterThrows_ExecutorStillShutsDown() throws Exception {
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream())
+        .thenReturn(new DataOutputStream(new ByteArrayOutputStream()));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    Statement originalStatement = Statement.of("copy my_table from stdin");
+    CopyStatement copyStatement =
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, options, "copy", parsedStatement, originalStatement);
+    MutationWriter mutationWriter = mock(MutationWriter.class);
+    doThrow(new IOException("pipe closed")).when(mutationWriter).close();
+    copyStatement.setMutationWriter(mutationWriter);
+
+    assertFalse(copyStatement.getExecutor().isShutdown());
+    IOException thrown = assertThrows(IOException.class, copyStatement::close);
+    assertEquals("pipe closed", thrown.getMessage());
+
+    verify(mutationWriter).close();
+    assertTrue(copyStatement.getExecutor().isShutdown());
   }
 }

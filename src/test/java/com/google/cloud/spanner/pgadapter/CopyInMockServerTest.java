@@ -19,11 +19,13 @@ import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_HOST;
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_PASSWORD;
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_PORT;
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_USER;
+import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
@@ -32,6 +34,8 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
@@ -54,11 +58,15 @@ import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.StringReader;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -2515,5 +2523,166 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                 .to("col_array_jsonb")
                 .build(),
             allTypesIndexedColumnsCountResultSet));
+  }
+
+  private Socket connectAndStartup() throws IOException {
+    Socket socket = new Socket("localhost", pgServer.getLocalPort());
+    DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+    DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+
+    ByteArrayOutputStream payload = new ByteArrayOutputStream();
+    try (DataOutputStream payloadStream = new DataOutputStream(payload)) {
+      payloadStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+      payloadStream.writeBytes("user\0foo\0database\0bar\0\0");
+    }
+    outputStream.writeInt(payload.size() + 4);
+    outputStream.write(payload.toByteArray());
+    outputStream.flush();
+
+    byte firstByte = inputStream.readByte();
+    if (firstByte == 'E') {
+      int len = inputStream.readInt();
+      byte[] errBytes = new byte[len - 4];
+      inputStream.readFully(errBytes);
+      fail("Server returned ErrorResponse: " + new String(errBytes, StandardCharsets.UTF_8));
+    }
+    assertEquals('R', firstByte);
+    int authLength = inputStream.readInt();
+    inputStream.skipBytes(authLength - 4);
+
+    assertEquals('K', inputStream.readByte());
+    int keyLength = inputStream.readInt();
+    inputStream.skipBytes(keyLength - 4);
+
+    while (true) {
+      byte messageType = inputStream.readByte();
+      int length = inputStream.readInt();
+      inputStream.skipBytes(length - 4);
+      if (messageType == 'Z') {
+        break;
+      }
+    }
+    return socket;
+  }
+
+  private void waitForActiveConnectionHandlersToClose() throws Exception {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    while (stopwatch.elapsed(TimeUnit.SECONDS) < 5 && !CONNECTION_HANDLERS.isEmpty()) {
+      Thread.sleep(10L);
+    }
+    assertEquals(0, CONNECTION_HANDLERS.size());
+  }
+
+  @Test
+  public void testCopyIn_ClientDisconnectBeforeCopyInResponseDoesNotHang() throws Exception {
+    assumeFalse(useDomainSocket);
+    setupCopyInformationSchemaResults();
+
+    try (Socket socket = connectAndStartup();
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      // 1. Send Simple Query: COPY users FROM STDIN;
+      byte[] sqlBytes = "COPY users FROM STDIN;\0".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('Q');
+      outputStream.writeInt(4 + sqlBytes.length);
+      outputStream.write(sqlBytes);
+      outputStream.flush();
+
+      // 2. Client immediately disconnects before reading CopyInResponse ('G')
+      socket.close();
+    }
+
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_ClientDisconnectDoesNotHang() throws Exception {
+    assumeFalse(useDomainSocket);
+    setupCopyInformationSchemaResults();
+
+    try (Socket socket = connectAndStartup();
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+      // 1. Send Simple Query: COPY users FROM STDIN;
+      byte[] sqlBytes = "COPY users FROM STDIN;\0".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('Q');
+      outputStream.writeInt(4 + sqlBytes.length);
+      outputStream.write(sqlBytes);
+      outputStream.flush();
+
+      // 2. Read CopyInResponse ('G')
+      char responseType = (char) inputStream.readByte();
+      assertEquals('G', responseType);
+      int length = inputStream.readInt();
+      inputStream.skipBytes(length - 4);
+
+      // 3. Client disconnects abruptly mid-stream without CopyDone ('c') or CopyFail ('f')
+      socket.close();
+    }
+
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_ClientDisconnectMidStreamDoesNotHang() throws Exception {
+    assumeFalse(useDomainSocket);
+    setupCopyInformationSchemaResults();
+
+    try (Socket socket = connectAndStartup();
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+      // 1. Send Simple Query: COPY users FROM STDIN;
+      byte[] sqlBytes = "COPY users FROM STDIN;\0".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('Q');
+      outputStream.writeInt(4 + sqlBytes.length);
+      outputStream.write(sqlBytes);
+      outputStream.flush();
+
+      // 2. Read CopyInResponse ('G')
+      char responseType = (char) inputStream.readByte();
+      assertEquals('G', responseType);
+      int length = inputStream.readInt();
+      inputStream.skipBytes(length - 4);
+
+      // 3. Send partial CopyData ('d')
+      byte[] rowData = "5\t5\t5\n".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('d');
+      outputStream.writeInt(4 + rowData.length);
+      outputStream.write(rowData);
+      outputStream.flush();
+
+      // 4. Client disconnects abruptly mid-stream after sending data
+      socket.close();
+    }
+
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_ClientResetDoesNotHang() throws Exception {
+    assumeFalse(useDomainSocket);
+    setupCopyInformationSchemaResults();
+
+    try (Socket socket = connectAndStartup();
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+      // 1. Send Simple Query: COPY users FROM STDIN;
+      byte[] sqlBytes = "COPY users FROM STDIN;\0".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('Q');
+      outputStream.writeInt(4 + sqlBytes.length);
+      outputStream.write(sqlBytes);
+      outputStream.flush();
+
+      // 2. Read CopyInResponse ('G')
+      char responseType = (char) inputStream.readByte();
+      assertEquals('G', responseType);
+      int length = inputStream.readInt();
+      inputStream.skipBytes(length - 4);
+
+      // 3. Force TCP RST via SO_LINGER=0 and close
+      socket.setSoLinger(true, 0);
+      socket.close();
+    }
+
+    waitForActiveConnectionHandlersToClose();
   }
 }
