@@ -32,8 +32,10 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.RollbackRequest;
+import io.grpc.Status;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Savepoint;
@@ -593,6 +595,855 @@ public class SavepointMockServerTest extends AbstractMockServerTest {
         }
         assertEquals(numRows, count);
       }
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointAfterStatementError() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testMultipleSavepointsAfterStatementError() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint2 = connection.setSavepoint("s2");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Rollback to savepoint2 only rolls back the failed statement, keeping the statements before
+      // savepoint2.
+      connection.rollback(savepoint2);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointAfterStatementErrorThenRollback() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.setSavepoint("s1");
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Aborting the transaction instead of rolling back to savepoint.
+      connection.rollback();
+
+      assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointAfterStatementErrorThenCommit() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.setSavepoint("s1");
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // In PostgreSQL, committing an aborted transaction rolls it back.
+      connection.commit();
+
+      assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointFailsThenRecoversWithValidSavepoint() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Rolling back to a non-existent savepoint fails and keeps the transaction in ABORTED state.
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().execute("rollback to savepoint non_existent"));
+      assertEquals(SQLState.SavepointException.toString(), exception.getSQLState());
+
+      // Rolling back to the valid savepoint savepoint1 recovers the transaction.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointPreservesSessionSettings() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set timezone = 'UTC'");
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      connection.rollback(savepoint1);
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show time zone")) {
+        assertTrue(resultSet.next());
+        assertEquals("UTC", resultSet.getString(1));
+      }
+      connection.commit();
+    }
+  }
+
+  @Test
+  public void testSavepointsDoNotLeakAcrossTransactionsAfterCommit() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      // Create > 16 savepoints in transaction 1 to test both isolation and the resize threshold.
+      Savepoint lastSavepoint = null;
+      for (int index = 0; index < 25; index++) {
+        lastSavepoint = connection.setSavepoint("savepoint_" + index);
+      }
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+      mockSpanner.clearRequests();
+
+      // Transaction 2 starts with no savepoints.
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Because transaction 2 has no savepoints, Spanner should be rolled back eagerly.
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+
+      // Attempting to rollback to a savepoint from transaction 1 should fail.
+      final Savepoint savepointFromTransaction1 = lastSavepoint;
+      SQLException exception =
+          assertThrows(SQLException.class, () -> connection.rollback(savepointFromTransaction1));
+      assertEquals(SQLState.SavepointException.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testSavepointsDoNotLeakAcrossTransactionsAfterRollback() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      Savepoint savepointFromTransaction1 = connection.setSavepoint("s1");
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.rollback();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+      mockSpanner.clearRequests();
+
+      // Transaction 2 starts with no savepoints.
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Because transaction 2 has no savepoints, Spanner should be rolled back eagerly.
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+
+      // Attempting to rollback to savepoint from transaction 1 should fail.
+      SQLException exception =
+          assertThrows(SQLException.class, () -> connection.rollback(savepointFromTransaction1));
+      assertEquals(SQLState.SavepointException.toString(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointThenImmediateCommit() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      connection.rollback(savepoint1);
+      // Immediately commit without executing further statements.
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testMultipleRollbacksToSameSavepointAfterErrors() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      // First error and rollback to savepoint1.
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+      connection.rollback(savepoint1);
+
+      // Second error and rollback to savepoint1 again.
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testHierarchicalSavepointsAfterErrors() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint2 = connection.setSavepoint("s2");
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint3 = connection.setSavepoint("s3");
+
+      // Error after s3, rollback to s2. This invalidates s3.
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+      connection.rollback(savepoint2);
+
+      // s3 is no longer valid.
+      SQLException exception =
+          assertThrows(SQLException.class, () -> connection.rollback(savepoint3));
+      assertEquals(SQLState.SavepointException.toString(), exception.getSQLState());
+
+      // Another error, rollback to s1. This invalidates s2.
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+      connection.rollback(savepoint1);
+
+      // s2 is no longer valid.
+      exception = assertThrows(SQLException.class, () -> connection.rollback(savepoint2));
+      assertEquals(SQLState.SavepointException.toString(), exception.getSQLState());
+
+      // Rollback to valid savepoint s1 recovers from the aborted state.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testStatementsRejectedWhileAbortedBeforeSavepointRollback() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // In the aborted state, regular queries and savepoint definitions are rejected.
+      SQLException queryException =
+          assertThrows(
+              SQLException.class, () -> connection.createStatement().executeQuery("select 1"));
+      assertEquals(SQLState.InFailedSqlTransaction.toString(), queryException.getSQLState());
+
+      SQLException savepointException =
+          assertThrows(SQLException.class, () -> connection.setSavepoint("s2"));
+      assertEquals(SQLState.InFailedSqlTransaction.toString(), savepointException.getSQLState());
+
+      SQLException releaseException =
+          assertThrows(SQLException.class, () -> connection.releaseSavepoint(savepoint1));
+      assertEquals(SQLState.InFailedSqlTransaction.toString(), releaseException.getSQLState());
+
+      // Rollback to savepoint1 recovers the transaction.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testReleaseSavepointBeforeError() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      Savepoint savepoint2 = connection.setSavepoint("s2");
+      connection.releaseSavepoint(savepoint2);
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Rolling back to the released savepoint2 fails.
+      SQLException exception =
+          assertThrows(SQLException.class, () -> connection.rollback(savepoint2));
+      assertEquals(SQLState.SavepointException.toString(), exception.getSQLState());
+
+      // Rolling back to savepoint1 succeeds.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testReleaseAllSavepointsBeforeErrorEagerlyRollsBack() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      connection.releaseSavepoint(savepoint1);
+
+      // When the statement fails, because all savepoints were released, Spanner rolls back eagerly.
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
+
+  @Test
+  public void testIdenticalNameSavepointsAfterError() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint outerSavepoint = connection.setSavepoint("s1");
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint innerSavepoint = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Rolling back to s1 should roll back to the innermost s1.
+      connection.rollback(innerSavepoint);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testRedundantBeginDoesNotClearSavepoints() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      // Redundant BEGIN should not clear active savepoints.
+      connection.createStatement().execute("begin");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Rolling back to savepoint1 should still succeed.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointSimpleQueryProtocol() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?preferQueryMode=simple")) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Rolling back to savepoint1 in simple query mode recovers the transaction.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointAfterErrorInReadOnlyTransaction() throws SQLException {
+    String invalidSql = "select * from non_existing_table";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.NOT_FOUND.withDescription("Table not found").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setReadOnly(true);
+      connection.setAutoCommit(false);
+
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery(SELECT_RANDOM_STATEMENT.getSql())) {
+        int count = 0;
+        while (resultSet.next()) {
+          count++;
+        }
+        assertEquals(RANDOM_RESULT_SET_ROW_COUNT, count);
+      }
+
+      assertThrows(SQLException.class, () -> connection.createStatement().executeQuery(invalidSql));
+
+      // Rolling back to savepoint1 recovers the read-only transaction.
+      connection.rollback(savepoint1);
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery(SELECT_RANDOM_STATEMENT.getSql())) {
+        int count = 0;
+        while (resultSet.next()) {
+          count++;
+        }
+        assertEquals(RANDOM_RESULT_SET_ROW_COUNT, count);
+      }
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+      assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
+
+  @Test
+  public void testDdlBatchAbortedOnErrorWithActiveSavepoint() throws SQLException {
+    String invalidDdl = "create table invalid_table (id bigint primary key)";
+    addDdlExceptionToSpannerAdmin();
+
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.setSavepoint("s1");
+
+      // Executing DDL commits the active transaction and starts a DDL batch.
+      connection.createStatement().execute(invalidDdl);
+
+      // The DDL error is surfaced when the batch is committed.
+      SQLException exception = assertThrows(SQLException.class, connection::commit);
+      assertTrue(exception.getMessage(), exception.getMessage().contains("Statement is invalid"));
+
+      // The transaction was committed before starting the DDL batch.
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testPreparedStatementErrorRecoveryWithSavepoint() throws SQLException {
+    Statement validInsert =
+        Statement.newBuilder("INSERT INTO FOO VALUES ($1)").bind("p1").to(1L).build();
+    Statement invalidInsert =
+        Statement.newBuilder("INSERT INTO FOO VALUES ($1)").bind("p1").to(2L).build();
+    mockSpanner.putStatementResult(StatementResult.update(validInsert, 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            invalidInsert,
+            Status.INVALID_ARGUMENT.withDescription("Value 2 is invalid").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      try (PreparedStatement statement =
+          connection.prepareStatement("INSERT INTO FOO VALUES (?)")) {
+        statement.setLong(1, 2L);
+        assertThrows(SQLException.class, statement::executeUpdate);
+
+        connection.rollback(savepoint1);
+
+        statement.setLong(1, 1L);
+        assertEquals(1, statement.executeUpdate());
+      }
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepointThenFullRollback() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Rollback to savepoint1 recovers the transaction from aborted state.
+      connection.rollback(savepoint1);
+
+      // Now rollback the entire transaction.
+      connection.rollback();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+      assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testDmlBatchErrorRecoveryWithSavepoint() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      // Execute a DML batch where one of the statements fails.
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.addBatch(INSERT_STATEMENT.getSql());
+        statement.addBatch(invalidSql);
+        assertThrows(SQLException.class, statement::executeBatch);
+      }
+
+      // Aborting the failed DML batch allows rollback to savepoint1 to succeed.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testCompoundQueryWithRollbackToSavepointSimpleQueryProtocol() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?preferQueryMode=simple")) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // In simple query mode, execute a compound query containing both ROLLBACK TO SAVEPOINT and
+      // the next statement in a single roundtrip while in aborted state.
+      connection
+          .createStatement()
+          .execute(String.format("rollback to savepoint s1; %s;", INSERT_STATEMENT.getSql()));
+
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testQueryErrorRecoveryInReadWriteTransaction() throws SQLException {
+    String invalidSql = "select * from non_existing_table";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.NOT_FOUND.withDescription("Table not found").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(SQLException.class, () -> connection.createStatement().executeQuery(invalidSql));
+
+      // Rollback to savepoint1 recovers from query failure in read-write transaction.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testLocalSyntaxErrorRecoveryWithSavepoint() throws SQLException {
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().execute("select * from;"));
+
+      // Rollback to savepoint1 recovers from local syntax error.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testDefineNewSavepointAfterRecovery() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      connection.rollback(savepoint1);
+
+      // Define a new savepoint s2 after recovering.
+      Savepoint savepoint2 = connection.setSavepoint("s2");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      connection.rollback(savepoint2);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    }
+  }
+
+  @Test
+  public void testCascadingSavepointReleaseInvalidatesInnerSavepoints() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+      connection.setSavepoint("s2");
+
+      // Releasing s1 releases both s1 and s2 (cascading).
+      connection.releaseSavepoint(savepoint1);
+
+      // Now both s1 and s2 are gone. An error here should eagerly roll back the transaction on
+      // Spanner.
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
+
+  @Test
+  public void testReleaseDuplicateNamedSavepointPreservesOuterSavepoint() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint outerSavepoint = connection.setSavepoint("s1");
+      Savepoint innerSavepoint = connection.setSavepoint("s1");
+
+      // Releasing s1 should release only the inner s1.
+      connection.releaseSavepoint(innerSavepoint);
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Rolling back to outer s1 should succeed because outer s1 is still active.
+      connection.rollback(outerSavepoint);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     }
   }
 }
