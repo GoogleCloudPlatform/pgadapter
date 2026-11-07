@@ -292,7 +292,7 @@ public abstract class ControlMessage extends WireMessage {
     CountDownLatch binaryCopyHeaderSentLatch =
         describedResult instanceof CopyToStatement && ((CopyToStatement) describedResult).isBinary()
             ? new CountDownLatch(1)
-            : new CountDownLatch(0);
+            : null;
     for (Partition partition : partitions) {
       futures.add(
           executorService.submit(
@@ -342,7 +342,7 @@ public abstract class ControlMessage extends WireMessage {
         long maxRows,
         QueryMode mode,
         boolean hasData) {
-      return new SendResultSetRunnable(describedResult, resultSet, maxRows, mode, true, hasData);
+      return new SendResultSetRunnable(describedResult, resultSet, maxRows, mode, hasData);
     }
 
     static SendResultSetRunnable forPartition(
@@ -360,7 +360,6 @@ public abstract class ControlMessage extends WireMessage {
         ResultSet resultSet,
         long maxRows,
         QueryMode mode,
-        boolean includePrefix,
         boolean hasData) {
       this.describedResult = describedResult;
       this.resultSet = resultSet;
@@ -370,14 +369,12 @@ public abstract class ControlMessage extends WireMessage {
               mode,
               describedResult.getConnectionHandler().getServer().getOptions(),
               resultSet,
-              includePrefix
-                  && describedResult instanceof CopyToStatement
-                  && ((CopyToStatement) describedResult).isBinary());
+              /* includeBinaryCopyHeaderInFirstRow= */ false);
       this.batchReadOnlyTransaction = null;
       this.partition = null;
       this.maxRows = maxRows;
       this.mode = mode;
-      this.binaryCopyHeaderSentLatch = new CountDownLatch(0);
+      this.binaryCopyHeaderSentLatch = null;
       this.hasData = hasData;
     }
 
@@ -411,19 +408,27 @@ public abstract class ControlMessage extends WireMessage {
                   mode,
                   describedResult.getConnectionHandler().getServer().getOptions(),
                   resultSet,
-                  false);
+                  /* includeBinaryCopyHeaderInFirstRow= */ false);
         }
         long rows = 0L;
+        boolean binaryCopyHeaderSent = false;
         while (hasData) {
           WireOutput wireOutput = describedResult.createDataRowResponse(converter);
           if (wireOutput != null) {
-            if (!converter.isIncludeBinaryCopyHeaderInFirstRow()) {
-              binaryCopyHeaderSentLatch.await();
+            if (binaryCopyHeaderSentLatch != null && !binaryCopyHeaderSent) {
+              if (!converter.isIncludeBinaryCopyHeaderInFirstRow()) {
+                binaryCopyHeaderSentLatch.await();
+              }
+              binaryCopyHeaderSent = true;
             }
             synchronized (describedResult) {
               wireOutput.send(false);
             }
-            binaryCopyHeaderSentLatch.countDown();
+            if (binaryCopyHeaderSentLatch != null
+                && converter.isIncludeBinaryCopyHeaderInFirstRow()
+                && binaryCopyHeaderSentLatch.getCount() > 0) {
+              binaryCopyHeaderSentLatch.countDown();
+            }
           }
           if (Thread.interrupted()) {
             throw PGExceptionFactory.newQueryCancelledException();
@@ -440,6 +445,11 @@ public abstract class ControlMessage extends WireMessage {
           }
         }
         return rows;
+      } catch (Throwable t) {
+        if (binaryCopyHeaderSentLatch != null) {
+          binaryCopyHeaderSentLatch.countDown();
+        }
+        throw t;
       } finally {
         if (converter != null) {
           converter.close();

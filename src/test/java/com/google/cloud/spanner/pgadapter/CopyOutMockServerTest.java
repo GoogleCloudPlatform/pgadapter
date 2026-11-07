@@ -38,6 +38,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
+import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyInParser;
 import com.google.cloud.spanner.pgadapter.utils.CopyRecord;
 import com.google.protobuf.ByteString;
@@ -46,11 +47,14 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import io.opentelemetry.api.OpenTelemetry;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.StringWriter;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -988,5 +992,643 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       }
     }
     return -1;
+  }
+
+  private static boolean startsWithBinaryHeader(byte[] payload) {
+    if (payload.length < CopyToStatement.COPY_BINARY_HEADER.length) {
+      return false;
+    }
+    for (int index = 0; index < CopyToStatement.COPY_BINARY_HEADER.length; index++) {
+      if (payload[index] != CopyToStatement.COPY_BINARY_HEADER[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Test
+  public void testExecutePreparedCopyToBinaryTwice() throws Exception {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      socket.setSoTimeout(5000);
+
+      // Startup
+      outputStream.writeInt(17);
+      outputStream.writeInt(196608);
+      outputStream.writeBytes("user\0foo\0");
+      outputStream.flush();
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (messageType == 'Z') {
+          break;
+        }
+      }
+
+      // 1. Parse S1
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+      byte[] sqlBytes = "COPY all_types TO STDOUT (FORMAT BINARY)".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('P');
+      outputStream.writeInt(4 + 2 + 1 + sqlBytes.length + 1 + 2);
+      outputStream.writeBytes("S1\0");
+      outputStream.write(sqlBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+
+      // 2. Bind P1
+      outputStream.writeByte('B');
+      outputStream.writeInt(4 + 2 + 1 + 2 + 1 + 2 + 2 + 2);
+      outputStream.writeBytes("P1\0S1\0");
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+
+      // 3. Execute P1
+      outputStream.writeByte('E');
+      outputStream.writeInt(4 + 2 + 1 + 4);
+      outputStream.writeBytes("P1\0");
+      outputStream.writeInt(0);
+
+      // 4. Sync
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+
+      // Read responses for first execution
+      assertEquals('1', inputStream.readByte()); // ParseComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('2', inputStream.readByte()); // BindComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('H', inputStream.readByte()); // CopyOutResponse
+      int copyOutLength = inputStream.readInt();
+      inputStream.readFully(new byte[copyOutLength - 4]);
+
+      // CopyData rows for first execution (1 row + 1 trailer)
+      int rowsReceived = 0;
+      boolean headerFound = false;
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        byte[] payload = new byte[length - 4];
+        inputStream.readFully(payload);
+        if (messageType == 'c') { // CopyDone
+          break;
+        }
+        assertEquals('d', messageType);
+        if (startsWithBinaryHeader(payload)) {
+          assertFalse(headerFound);
+          headerFound = true;
+        }
+        rowsReceived++;
+      }
+      assertTrue(headerFound);
+      assertEquals(2, rowsReceived); // 1 data row + 1 trailer row
+      assertEquals('C', inputStream.readByte()); // CommandComplete
+      int commandLength = inputStream.readInt();
+      byte[] commandBytes = new byte[commandLength - 4];
+      inputStream.readFully(commandBytes);
+      assertEquals("COPY 1\0", new String(commandBytes, StandardCharsets.UTF_8));
+      assertEquals('Z', inputStream.readByte()); // ReadyForQuery
+      assertEquals(5, inputStream.readInt());
+      assertEquals('I', inputStream.readByte());
+
+      // Update mock to return empty resultset for second execution:
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("select * from all_types"),
+              ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+
+      // Second execution of the same prepared statement S1:
+      outputStream.writeByte('B');
+      outputStream.writeInt(4 + 2 + 1 + 2 + 1 + 2 + 2 + 2);
+      outputStream.writeBytes("P2\0S1\0");
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+
+      outputStream.writeByte('E');
+      outputStream.writeInt(4 + 2 + 1 + 4);
+      outputStream.writeBytes("P2\0");
+      outputStream.writeInt(0);
+
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+
+      // Read responses for second execution
+      assertEquals('2', inputStream.readByte()); // BindComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('H', inputStream.readByte()); // CopyOutResponse
+      copyOutLength = inputStream.readInt();
+      inputStream.readFully(new byte[copyOutLength - 4]);
+
+      // For empty table in binary format, exactly one CopyData ('d') trailer must be sent,
+      // and it MUST include the 19-byte binary header + 2-byte trailer (-1) = 21 bytes.
+      assertEquals('d', inputStream.readByte());
+      int trailerLength = inputStream.readInt();
+      byte[] trailerPayload = new byte[trailerLength - 4];
+      inputStream.readFully(trailerPayload);
+      assertEquals(21, trailerPayload.length);
+      assertTrue(startsWithBinaryHeader(trailerPayload));
+      assertEquals('c', inputStream.readByte()); // CopyDone
+      assertEquals(4, inputStream.readInt());
+      assertEquals('C', inputStream.readByte()); // CommandComplete
+      commandLength = inputStream.readInt();
+      commandBytes = new byte[commandLength - 4];
+      inputStream.readFully(commandBytes);
+      assertEquals("COPY 0\0", new String(commandBytes, StandardCharsets.UTF_8));
+      assertEquals('Z', inputStream.readByte()); // ReadyForQuery
+      assertEquals(5, inputStream.readInt());
+      assertEquals('I', inputStream.readByte());
+    }
+  }
+
+  @Test
+  public void testExecutePreparedCopyToBinaryTwice_WithRows() throws Exception {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      socket.setSoTimeout(5000);
+
+      // Startup
+      outputStream.writeInt(17);
+      outputStream.writeInt(196608);
+      outputStream.writeBytes("user\0foo\0");
+      outputStream.flush();
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (messageType == 'Z') {
+          break;
+        }
+      }
+
+      // 1. Parse S1
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+      byte[] sqlBytes = "COPY all_types TO STDOUT (FORMAT BINARY)".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('P');
+      outputStream.writeInt(4 + 2 + 1 + sqlBytes.length + 1 + 2);
+      outputStream.writeBytes("S1\0");
+      outputStream.write(sqlBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+
+      // Execute twice where both executions return data rows
+      for (String portalName : new String[] {"P1", "P2"}) {
+        outputStream.writeByte('B');
+        outputStream.writeInt(4 + 2 + 1 + 2 + 1 + 2 + 2 + 2);
+        outputStream.writeBytes(portalName + "\0S1\0");
+        outputStream.writeShort(0);
+        outputStream.writeShort(0);
+        outputStream.writeShort(0);
+
+        outputStream.writeByte('E');
+        outputStream.writeInt(4 + 2 + 1 + 4);
+        outputStream.writeBytes(portalName + "\0");
+        outputStream.writeInt(0);
+
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+        outputStream.flush();
+
+        if ("P1".equals(portalName)) {
+          assertEquals('1', inputStream.readByte()); // ParseComplete
+          assertEquals(4, inputStream.readInt());
+        }
+        assertEquals('2', inputStream.readByte()); // BindComplete
+        assertEquals(4, inputStream.readInt());
+        assertEquals('H', inputStream.readByte()); // CopyOutResponse
+        int copyOutLength = inputStream.readInt();
+        inputStream.readFully(new byte[copyOutLength - 4]);
+
+        int rowsReceived = 0;
+        boolean headerFound = false;
+        while (true) {
+          byte messageType = inputStream.readByte();
+          int length = inputStream.readInt();
+          byte[] payload = new byte[length - 4];
+          inputStream.readFully(payload);
+          if (messageType == 'c') { // CopyDone
+            break;
+          }
+          assertEquals('d', messageType);
+          if (startsWithBinaryHeader(payload)) {
+            assertFalse(headerFound);
+            headerFound = true;
+          }
+          rowsReceived++;
+        }
+        assertTrue(headerFound);
+        assertEquals(2, rowsReceived); // 1 data row + 1 trailer row
+        assertEquals('C', inputStream.readByte()); // CommandComplete
+        int commandLength = inputStream.readInt();
+        byte[] commandBytes = new byte[commandLength - 4];
+        inputStream.readFully(commandBytes);
+        assertEquals("COPY 1\0", new String(commandBytes, StandardCharsets.UTF_8));
+        assertEquals('Z', inputStream.readByte()); // ReadyForQuery
+        assertEquals(5, inputStream.readInt());
+        assertEquals('I', inputStream.readByte());
+      }
+    }
+  }
+
+  @Test
+  public void testExecutePreparedCopyToBinaryTwice_Partitioned() throws Exception {
+    RandomResultSetGenerator randomResultSetGenerator =
+        new RandomResultSetGenerator(10, Dialect.POSTGRESQL);
+    com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from random"), resultSet));
+
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      socket.setSoTimeout(5000);
+
+      // Startup
+      outputStream.writeInt(17);
+      outputStream.writeInt(196608);
+      outputStream.writeBytes("user\0foo\0");
+      outputStream.flush();
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (messageType == 'Z') {
+          break;
+        }
+      }
+
+      // 1. Parse S1
+      byte[] sqlBytes = "COPY random TO STDOUT (FORMAT BINARY)".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('P');
+      outputStream.writeInt(4 + 2 + 1 + sqlBytes.length + 1 + 2);
+      outputStream.writeBytes("S1\0");
+      outputStream.write(sqlBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+
+      // 2. Bind P1
+      outputStream.writeByte('B');
+      outputStream.writeInt(4 + 2 + 1 + 2 + 1 + 2 + 2 + 2);
+      outputStream.writeBytes("P1\0S1\0");
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+
+      // 3. Execute P1
+      outputStream.writeByte('E');
+      outputStream.writeInt(4 + 2 + 1 + 4);
+      outputStream.writeBytes("P1\0");
+      outputStream.writeInt(0);
+
+      // 4. Sync
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+
+      // Read responses for first execution
+      assertEquals('1', inputStream.readByte()); // ParseComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('2', inputStream.readByte()); // BindComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('H', inputStream.readByte()); // CopyOutResponse
+      int copyOutLength = inputStream.readInt();
+      inputStream.readFully(new byte[copyOutLength - 4]);
+
+      // CopyData rows (10 data rows + 1 trailer)
+      int rowsReceived = 0;
+      boolean headerFound = false;
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        byte[] payload = new byte[length - 4];
+        inputStream.readFully(payload);
+        if (messageType == 'c') { // CopyDone
+          break;
+        }
+        assertEquals('d', messageType);
+        if (startsWithBinaryHeader(payload)) {
+          assertFalse(headerFound);
+          headerFound = true;
+        }
+        rowsReceived++;
+      }
+      assertTrue(headerFound);
+      assertEquals(11, rowsReceived); // 10 data rows + 1 trailer row
+      assertEquals('C', inputStream.readByte()); // CommandComplete
+      int commandLength = inputStream.readInt();
+      byte[] commandBytes = new byte[commandLength - 4];
+      inputStream.readFully(commandBytes);
+      assertEquals("COPY 10\0", new String(commandBytes, StandardCharsets.UTF_8));
+      assertEquals('Z', inputStream.readByte()); // ReadyForQuery
+      assertEquals(5, inputStream.readInt());
+      assertEquals('I', inputStream.readByte());
+
+      // Second execution of the same prepared statement S1 in partitioned mode:
+      outputStream.writeByte('B');
+      outputStream.writeInt(4 + 2 + 1 + 2 + 1 + 2 + 2 + 2);
+      outputStream.writeBytes("P2\0S1\0");
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+
+      outputStream.writeByte('E');
+      outputStream.writeInt(4 + 2 + 1 + 4);
+      outputStream.writeBytes("P2\0");
+      outputStream.writeInt(0);
+
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+
+      // Read responses for second execution
+      assertEquals('2', inputStream.readByte()); // BindComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('H', inputStream.readByte()); // CopyOutResponse
+      copyOutLength = inputStream.readInt();
+      inputStream.readFully(new byte[copyOutLength - 4]);
+
+      // CopyData rows (10 data rows + 1 trailer)
+      rowsReceived = 0;
+      headerFound = false;
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        byte[] payload = new byte[length - 4];
+        inputStream.readFully(payload);
+        if (messageType == 'c') { // CopyDone
+          break;
+        }
+        assertEquals('d', messageType);
+        if (startsWithBinaryHeader(payload)) {
+          assertFalse(headerFound);
+          headerFound = true;
+        }
+        rowsReceived++;
+      }
+      assertTrue(headerFound);
+      assertEquals(11, rowsReceived); // 10 data rows + 1 trailer row
+      assertEquals('C', inputStream.readByte()); // CommandComplete
+      commandLength = inputStream.readInt();
+      commandBytes = new byte[commandLength - 4];
+      inputStream.readFully(commandBytes);
+      assertEquals("COPY 10\0", new String(commandBytes, StandardCharsets.UTF_8));
+      assertEquals('Z', inputStream.readByte()); // ReadyForQuery
+      assertEquals(5, inputStream.readInt());
+      assertEquals('I', inputStream.readByte());
+    }
+  }
+
+  @Test
+  public void testExecutePreparedCopyToBinaryTwice_EmptyThenRows() throws Exception {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      socket.setSoTimeout(5000);
+
+      // Startup
+      outputStream.writeInt(17);
+      outputStream.writeInt(196608);
+      outputStream.writeBytes("user\0foo\0");
+      outputStream.flush();
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (messageType == 'Z') {
+          break;
+        }
+      }
+
+      // First execution is empty
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("select * from all_types"),
+              ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+      byte[] sqlBytes = "COPY all_types TO STDOUT (FORMAT BINARY)".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('P');
+      outputStream.writeInt(4 + 2 + 1 + sqlBytes.length + 1 + 2);
+      outputStream.writeBytes("S1\0");
+      outputStream.write(sqlBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+
+      // Bind P1
+      outputStream.writeByte('B');
+      outputStream.writeInt(4 + 2 + 1 + 2 + 1 + 2 + 2 + 2);
+      outputStream.writeBytes("P1\0S1\0");
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+
+      // Execute P1
+      outputStream.writeByte('E');
+      outputStream.writeInt(4 + 2 + 1 + 4);
+      outputStream.writeBytes("P1\0");
+      outputStream.writeInt(0);
+
+      // Sync
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+
+      // Read responses for first execution
+      assertEquals('1', inputStream.readByte()); // ParseComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('2', inputStream.readByte()); // BindComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('H', inputStream.readByte()); // CopyOutResponse
+      int copyOutLength = inputStream.readInt();
+      inputStream.readFully(new byte[copyOutLength - 4]);
+
+      // CopyData rows for first execution (0 data rows + 1 trailer row with header)
+      int rowsReceived = 0;
+      boolean headerFound = false;
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        byte[] payload = new byte[length - 4];
+        inputStream.readFully(payload);
+        if (messageType == 'c') { // CopyDone
+          break;
+        }
+        assertEquals('d', messageType);
+        if (startsWithBinaryHeader(payload)) {
+          assertFalse(headerFound);
+          headerFound = true;
+        }
+        rowsReceived++;
+      }
+      assertTrue(headerFound);
+      assertEquals(1, rowsReceived); // 0 data rows + 1 trailer row
+      assertEquals('C', inputStream.readByte()); // CommandComplete
+      int commandLength = inputStream.readInt();
+      byte[] commandBytes = new byte[commandLength - 4];
+      inputStream.readFully(commandBytes);
+      assertEquals("COPY 0\0", new String(commandBytes, StandardCharsets.UTF_8));
+      assertEquals('Z', inputStream.readByte()); // ReadyForQuery
+      assertEquals(5, inputStream.readInt());
+      assertEquals('I', inputStream.readByte());
+
+      // Update mock to return rows for second execution
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+      // Second execution of the same prepared statement S1:
+      outputStream.writeByte('B');
+      outputStream.writeInt(4 + 2 + 1 + 2 + 1 + 2 + 2 + 2);
+      outputStream.writeBytes("P2\0S1\0");
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(0);
+
+      outputStream.writeByte('E');
+      outputStream.writeInt(4 + 2 + 1 + 4);
+      outputStream.writeBytes("P2\0");
+      outputStream.writeInt(0);
+
+      outputStream.writeByte('S');
+      outputStream.writeInt(4);
+      outputStream.flush();
+
+      // Read responses for second execution
+      assertEquals('2', inputStream.readByte()); // BindComplete
+      assertEquals(4, inputStream.readInt());
+      assertEquals('H', inputStream.readByte()); // CopyOutResponse
+      copyOutLength = inputStream.readInt();
+      inputStream.readFully(new byte[copyOutLength - 4]);
+
+      // CopyData rows for second execution (1 data row + 1 trailer row)
+      rowsReceived = 0;
+      headerFound = false;
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        byte[] payload = new byte[length - 4];
+        inputStream.readFully(payload);
+        if (messageType == 'c') { // CopyDone
+          break;
+        }
+        assertEquals('d', messageType);
+        if (startsWithBinaryHeader(payload)) {
+          assertFalse(headerFound);
+          headerFound = true;
+        }
+        rowsReceived++;
+      }
+      assertTrue(headerFound);
+      assertEquals(2, rowsReceived); // 1 data row + 1 trailer row
+      assertEquals('C', inputStream.readByte()); // CommandComplete
+      commandLength = inputStream.readInt();
+      commandBytes = new byte[commandLength - 4];
+      inputStream.readFully(commandBytes);
+      assertEquals("COPY 1\0", new String(commandBytes, StandardCharsets.UTF_8));
+      assertEquals('Z', inputStream.readByte()); // ReadyForQuery
+      assertEquals(5, inputStream.readInt());
+      assertEquals('I', inputStream.readByte());
+    }
+  }
+
+  @Test
+  public void testExecutePreparedCopyToCsvTwice_WithHeader() throws Exception {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      socket.setSoTimeout(5000);
+
+      // Startup
+      outputStream.writeInt(17);
+      outputStream.writeInt(196608);
+      outputStream.writeBytes("user\0foo\0");
+      outputStream.flush();
+      while (true) {
+        byte messageType = inputStream.readByte();
+        int length = inputStream.readInt();
+        inputStream.readFully(new byte[length - 4]);
+        if (messageType == 'Z') {
+          break;
+        }
+      }
+
+      // 1. Parse S1
+      byte[] sqlBytes =
+          "COPY all_types TO STDOUT (FORMAT CSV, HEADER)".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('P');
+      outputStream.writeInt(4 + 2 + 1 + sqlBytes.length + 1 + 2);
+      outputStream.writeBytes("S1\0");
+      outputStream.write(sqlBytes);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+
+      // Execute twice
+      for (String portalName : new String[] {"P1", "P2"}) {
+        outputStream.writeByte('B');
+        outputStream.writeInt(4 + 2 + 1 + 2 + 1 + 2 + 2 + 2);
+        outputStream.writeBytes(portalName + "\0S1\0");
+        outputStream.writeShort(0);
+        outputStream.writeShort(0);
+        outputStream.writeShort(0);
+
+        outputStream.writeByte('E');
+        outputStream.writeInt(4 + 2 + 1 + 4);
+        outputStream.writeBytes(portalName + "\0");
+        outputStream.writeInt(0);
+
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+        outputStream.flush();
+
+        if ("P1".equals(portalName)) {
+          assertEquals('1', inputStream.readByte()); // ParseComplete
+          assertEquals(4, inputStream.readInt());
+        }
+        assertEquals('2', inputStream.readByte()); // BindComplete
+        assertEquals(4, inputStream.readInt());
+        assertEquals('H', inputStream.readByte()); // CopyOutResponse
+        int copyOutLength = inputStream.readInt();
+        inputStream.readFully(new byte[copyOutLength - 4]);
+
+        // Row 1: CSV Header row
+        assertEquals('d', inputStream.readByte());
+        int headerLength = inputStream.readInt();
+        byte[] headerPayload = new byte[headerLength - 4];
+        inputStream.readFully(headerPayload);
+        String headerString = new String(headerPayload, StandardCharsets.UTF_8);
+        assertTrue(headerString.startsWith("col_bigint,col_bool,col_bytea"));
+
+        // Row 2: CSV Data row
+        assertEquals('d', inputStream.readByte());
+        int dataLength = inputStream.readInt();
+        byte[] dataPayload = new byte[dataLength - 4];
+        inputStream.readFully(dataPayload);
+        String dataString = new String(dataPayload, StandardCharsets.UTF_8);
+        assertTrue(dataString.startsWith("1,t,"));
+
+        // CopyDone
+        assertEquals('c', inputStream.readByte());
+        assertEquals(4, inputStream.readInt());
+
+        // CommandComplete
+        assertEquals('C', inputStream.readByte());
+        int commandLength = inputStream.readInt();
+        byte[] commandBytes = new byte[commandLength - 4];
+        inputStream.readFully(commandBytes);
+        assertEquals("COPY 1\0", new String(commandBytes, StandardCharsets.UTF_8));
+
+        // ReadyForQuery
+        assertEquals('Z', inputStream.readByte());
+        assertEquals(5, inputStream.readInt());
+        assertEquals('I', inputStream.readByte());
+      }
+    }
   }
 }
