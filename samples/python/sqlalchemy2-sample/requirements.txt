@@ -1,5 +1,5 @@
 psycopg[binary]==3.3.8
-pytz==2026.4
+pytz==2026.6
 sqlalchemy==2.1.8
 google~=3.0.0
 google.auth~=2.62.1
