@@ -98,6 +98,19 @@ public class AuthMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testConnectFailsWithJsonPasswordThatIsNotACredentialsObject() {
+    for (String password :
+        new String[] {"123456", "\"ya29.a0AfB_byC-1234_abcd\"", "true", "[1]", "{\"type\":1}"}) {
+      PSQLException exception =
+          assertThrows(
+              password,
+              PSQLException.class,
+              () -> DriverManager.getConnection(createUrl(), "unused", password));
+      assertEquals(password, CREDENTIALS_ERROR, exception.getMessage());
+    }
+  }
+
+  @Test
   public void testConnectFailsWithEmptyPassword() {
     PSQLException exception =
         assertThrows(
