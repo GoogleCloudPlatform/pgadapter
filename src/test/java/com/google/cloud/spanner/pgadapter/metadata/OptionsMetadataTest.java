@@ -662,6 +662,114 @@ public class OptionsMetadataTest {
   }
 
   @Test
+  public void testSecurityDatabaseNameValidation() {
+    OptionsMetadata pinnedOptions =
+        OptionsMetadata.newBuilder()
+            .setProject("pinned-project")
+            .setInstance("pinned-instance")
+            .setCredentials(NoCredentials.getInstance())
+            .build();
+
+    // Null or empty database name is rejected.
+    SpannerException nullException =
+        assertThrows(SpannerException.class, () -> pinnedOptions.buildConnectionURL(null));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, nullException.getErrorCode());
+
+    SpannerException emptyException =
+        assertThrows(SpannerException.class, () -> pinnedOptions.buildConnectionURL(""));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, emptyException.getErrorCode());
+
+    // Semicolon / query injection in database name is rejected.
+    SpannerException semicolonException =
+        assertThrows(
+            SpannerException.class,
+            () -> pinnedOptions.buildConnectionURL("test_db;endpoint=attacker.com:443"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, semicolonException.getErrorCode());
+
+    SpannerException questionMarkException =
+        assertThrows(
+            SpannerException.class,
+            () -> pinnedOptions.buildConnectionURL("test_db?endpoint=attacker.com:443"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, questionMarkException.getErrorCode());
+
+    // Control character injection in database name is rejected.
+    SpannerException newlineException =
+        assertThrows(SpannerException.class, () -> pinnedOptions.buildConnectionURL("test_db\n"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, newlineException.getErrorCode());
+
+    SpannerException carriageReturnException =
+        assertThrows(SpannerException.class, () -> pinnedOptions.buildConnectionURL("test_db\r"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, carriageReturnException.getErrorCode());
+
+    SpannerException nullByteException =
+        assertThrows(SpannerException.class, () -> pinnedOptions.buildConnectionURL("test_db\0"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, nullByteException.getErrorCode());
+
+    // Semicolon injection in fully qualified database name is rejected.
+    SpannerException fqSemicolonException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                pinnedOptions.buildConnectionURL(
+                    "projects/pinned-project/instances/pinned-instance/databases/test_db;endpoint=attacker.com:443"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, fqSemicolonException.getErrorCode());
+
+    // Invalid characters in database name are rejected.
+    SpannerException invalidCharsException =
+        assertThrows(SpannerException.class, () -> pinnedOptions.buildConnectionURL("../test_db"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, invalidCharsException.getErrorCode());
+
+    // Invalid characters in fully qualified database name are rejected.
+    SpannerException invalidFqProjectException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                pinnedOptions.buildConnectionURL(
+                    "projects/invalid*project/instances/pinned-instance/databases/test_db"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, invalidFqProjectException.getErrorCode());
+
+    SpannerException invalidFqInstanceException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                pinnedOptions.buildConnectionURL(
+                    "projects/pinned-project/instances/invalid*instance/databases/test_db"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, invalidFqInstanceException.getErrorCode());
+
+    SpannerException invalidFqDatabaseException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                pinnedOptions.buildConnectionURL(
+                    "projects/pinned-project/instances/pinned-instance/databases/test*db"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, invalidFqDatabaseException.getErrorCode());
+
+    // Fully qualified database name on another project/instance succeeds (as documented in
+    // OptionsMetadata and tested in EmulatedPsqlMockServerTest).
+    assertEquals(
+        "cloudspanner:/projects/other-project/instances/other-instance/databases/test_db;userAgent=pg-adapter",
+        pinnedOptions.buildConnectionURL(
+            "projects/other-project/instances/other-instance/databases/test_db"));
+
+    // Domain-scoped GCP projects succeed.
+    assertEquals(
+        "cloudspanner:/projects/example.com:custom-project/instances/pinned-instance/databases/test_db;userAgent=pg-adapter",
+        pinnedOptions.buildConnectionURL(
+            "projects/example.com:custom-project/instances/pinned-instance/databases/test_db"));
+
+    // Matching project and instance succeed.
+    assertEquals(
+        "cloudspanner:/projects/pinned-project/instances/pinned-instance/databases/test_db;userAgent=pg-adapter",
+        pinnedOptions.buildConnectionURL(
+            "projects/pinned-project/instances/pinned-instance/databases/test_db"));
+
+    // Simple database name using default project/instance options succeeds.
+    assertEquals(
+        "cloudspanner:/projects/pinned-project/instances/pinned-instance/databases/test_db;userAgent=pg-adapter",
+        pinnedOptions.buildConnectionURL("test_db"));
+  }
+
+  @Test
   public void testUseClientCertParameters() {
     OptionsMetadata options =
         OptionsMetadata.newBuilder().useClientCert("client.crt", "client.key").build();

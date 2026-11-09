@@ -40,6 +40,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionProperties;
+import com.google.cloud.spanner.connection.ConnectionProperty;
 import com.google.cloud.spanner.connection.PGAdapterConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.SavepointSupport;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -70,6 +71,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -345,9 +348,77 @@ public class ConnectionHandler implements Runnable {
     return result.toString();
   }
 
+  @VisibleForTesting
+  static final ImmutableSet<String> DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES =
+      ImmutableSet.of(
+          "endpoint",
+          "universedomain",
+          "universe_domain",
+          "isexperimentalhost",
+          "is_experimental_host",
+          "autoconfigemulator",
+          "auto_config_emulator",
+          "useplaintext",
+          "use_plain_text",
+          "credentials",
+          "encodedcredentials",
+          "encoded_credentials",
+          "oauthtoken",
+          "oauth_token",
+          "credentialsprovider",
+          "credentials_provider",
+          "clientcertificate",
+          "client_certificate",
+          "clientkey",
+          "client_key",
+          "cacertificate",
+          "ca_certificate",
+          "channelprovider",
+          "channel_provider",
+          "grpcinterceptorprovider",
+          "grpc_interceptor_provider",
+          "dialect",
+          "connectionstatetype",
+          "connection_state_type",
+          "type",
+          "useragent",
+          "user_agent",
+          "lenient",
+          "username",
+          "password",
+          "host",
+          "credentialsurl",
+          "credentials_url");
+
+  static boolean isDisallowedConnectionProperty(String name) {
+    if (Strings.isNullOrEmpty(name)) {
+      return true;
+    }
+    String lower = name.toLowerCase(Locale.ENGLISH);
+    String stripped = lower.replace("_", "").replace("-", "");
+    return DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES.contains(lower)
+        || DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES.contains(stripped);
+  }
+
+  static final ImmutableMap<String, ConnectionProperty<?>> SUPPORTED_STARTUP_CONNECTION_PROPERTIES =
+      initSupportedStartupConnectionProperties();
+
+  private static ImmutableMap<String, ConnectionProperty<?>>
+      initSupportedStartupConnectionProperties() {
+    ImmutableMap.Builder<String, ConnectionProperty<?>> builder = ImmutableMap.builder();
+    for (ConnectionProperty<?> property : ConnectionProperties.VALID_CONNECTION_PROPERTIES) {
+      if (!isDisallowedConnectionProperty(property.getKey())) {
+        builder.put(property.getKey().toLowerCase(Locale.ENGLISH), property);
+      }
+    }
+    return builder.build();
+  }
+
   /**
    * Adds parameters to the connection URL that have been added as 'options=-c ...' to the
-   * PostgreSQL connection string.
+   * PostgreSQL connection string. Disallowed startup connection properties (such as network
+   * endpoints, credentials, or class loaders) are ignored to prevent credential exfiltration,
+   * arbitrary class instantiation, or security configuration tampering.
    */
   static String appendStartupParametersToUrl(String url, Map<String, String> startupParameters) {
     if (startupParameters == null || startupParameters.isEmpty()) {
@@ -356,27 +427,75 @@ public class ConnectionHandler implements Runnable {
     StringBuilder result = new StringBuilder(url);
     for (Map.Entry<String, String> entry : startupParameters.entrySet()) {
       if ("options".equalsIgnoreCase(entry.getKey()) && entry.getValue() != null) {
-        String[] commands = entry.getValue().split("-c[\\s+]+");
-        for (String command : commands) {
-          String[] keyValue = command.split("=", 2);
-          if (keyValue.length == 2
-              && isValidConnectionProperty(keyValue[0])
-              && keyValue[1] != null) {
-            result.append(";").append(keyValue[0]).append("=").append(keyValue[1].trim());
-          }
-        }
+        appendOptionsToUrl(result, entry.getValue());
       }
     }
     return result.toString();
+  }
+
+  private static void appendOptionsToUrl(StringBuilder result, String options) {
+    String[] commands = options.split("-c[\\s+]+");
+    for (String command : commands) {
+      appendOptionCommandToUrl(result, command);
+    }
+  }
+
+  private static void appendOptionCommandToUrl(StringBuilder result, String command) {
+    String[] keyValue = command.split("=", 2);
+    if (keyValue.length == 2 && keyValue[0] != null && keyValue[1] != null) {
+      String propertyKey = keyValue[0].trim();
+      String propertyValue = keyValue[1].trim();
+      appendStartupPropertyIfValid(result, propertyKey, propertyValue);
+    }
+  }
+
+  private static void appendStartupPropertyIfValid(
+      StringBuilder result, String propertyKey, String propertyValue) {
+    if (isDisallowedConnectionProperty(propertyKey)) {
+      logger.log(
+          Level.WARNING,
+          () ->
+              String.format(
+                  "Ignoring disallowed Spanner connection property in startup options: %s",
+                  propertyKey));
+      return;
+    }
+    ConnectionProperty<?> property =
+        SUPPORTED_STARTUP_CONNECTION_PROPERTIES.get(propertyKey.toLowerCase(Locale.ENGLISH));
+    if (property == null) {
+      return;
+    }
+    if (isValidStartupPropertyValue(property, propertyValue)) {
+      result.append(";").append(propertyKey).append("=").append(propertyValue);
+    } else {
+      logger.log(
+          Level.WARNING,
+          () ->
+              String.format(
+                  "Ignoring invalid value for Spanner connection property '%s' in startup options",
+                  propertyKey));
+    }
   }
 
   static boolean isValidConnectionProperty(String name) {
     if (Strings.isNullOrEmpty(name)) {
       return false;
     }
-    String key = name.toLowerCase();
-    return ConnectionProperties.VALID_CONNECTION_PROPERTIES.stream()
-        .anyMatch(property -> property.getKey().equals(key));
+    return !isDisallowedConnectionProperty(name)
+        && SUPPORTED_STARTUP_CONNECTION_PROPERTIES.containsKey(name.toLowerCase(Locale.ENGLISH));
+  }
+
+  static boolean isValidStartupPropertyValue(ConnectionProperty<?> property, String value) {
+    if (value == null
+        || value.indexOf(';') >= 0
+        || value.indexOf('?') >= 0
+        || value.indexOf('%') >= 0
+        || value.indexOf('\n') >= 0
+        || value.indexOf('\r') >= 0
+        || value.indexOf('\0') >= 0) {
+      return false;
+    }
+    return PGAdapterConnectionOptionsHelper.isValidPropertyValue(property, value);
   }
 
   /**

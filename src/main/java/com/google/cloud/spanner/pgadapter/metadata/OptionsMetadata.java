@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -1178,7 +1179,6 @@ public class OptionsMetadata {
    * @return The parsed JDBC connection string.
    */
   public String buildConnectionURL(String database) {
-    Preconditions.checkNotNull(database);
     // Check if it is a full database name, or only a database ID.
     DatabaseName databaseName = getDatabaseName(database);
     String host = commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT, "");
@@ -1257,12 +1257,60 @@ public class OptionsMetadata {
                 || SPANNER_OMNI_TYPE.equalsIgnoreCase(propertyMap.get(TYPE_PROPERTY_NAME))));
   }
 
+  private static final Pattern DATABASE_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+$");
+  private static final Pattern PROJECT_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9.:-]+$");
+  private static final Pattern INSTANCE_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+$");
+
+  private static void validateRawDatabaseName(String database) {
+    if (Strings.isNullOrEmpty(database)) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "The database name must not be empty.");
+    }
+    if (database.indexOf(';') >= 0
+        || database.indexOf('?') >= 0
+        || database.indexOf('\n') >= 0
+        || database.indexOf('\r') >= 0
+        || database.indexOf('\0') >= 0) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          String.format("The database name contains invalid characters: %s", database));
+    }
+  }
+
+  private static void validateParsedDatabaseName(DatabaseName databaseName) {
+    if (!PROJECT_ID_PATTERN.matcher(databaseName.getProject()).matches()) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          String.format("Invalid project ID in database name: %s", databaseName.getProject()));
+    }
+    if (!INSTANCE_ID_PATTERN.matcher(databaseName.getInstance()).matches()) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          String.format("Invalid instance ID in database name: %s", databaseName.getInstance()));
+    }
+    if (!DATABASE_ID_PATTERN.matcher(databaseName.getDatabase()).matches()) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          String.format("Invalid database ID in database name: %s", databaseName.getDatabase()));
+    }
+  }
+
+  private static void validateDatabaseId(String databaseId) {
+    if (!DATABASE_ID_PATTERN.matcher(databaseId).matches()) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, String.format("Invalid database name: %s", databaseId));
+    }
+  }
+
   /** Returns the fully qualified database name based on the given database id or name. */
   public DatabaseName getDatabaseName(String database) {
+    validateRawDatabaseName(database);
     DatabaseName databaseName;
     if (DatabaseName.isParsableFrom(database)) {
       databaseName = DatabaseName.parse(database);
+      validateParsedDatabaseName(databaseName);
     } else {
+      validateDatabaseId(database);
       String projectId;
       if (commandLine.hasOption(OPTION_PROJECT_ID)) {
         projectId = commandLine.getOptionValue(OPTION_PROJECT_ID);
