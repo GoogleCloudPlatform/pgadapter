@@ -14,13 +14,18 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
-import static junit.framework.TestCase.assertEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.DataInputStream;
@@ -28,6 +33,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.List;
+import java.util.Map;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -74,6 +81,39 @@ public class BoostrapMessageTest {
   }
 
   @Test
+  public void testCreate_lengthTooSmall() throws IOException {
+    dataOutputStream.writeInt(7);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> BootstrapMessage.create(connection));
+    assertEquals(SQLState.ProtocolViolation, exception.getSQLState());
+    assertEquals(Severity.FATAL, exception.getSeverity());
+    assertTrue(exception.getMessage().contains("invalid length of startup packet"));
+  }
+
+  @Test
+  public void testCreate_lengthTooLarge() throws IOException {
+    dataOutputStream.writeInt(10_001);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> BootstrapMessage.create(connection));
+    assertEquals(SQLState.ProtocolViolation, exception.getSQLState());
+    assertEquals(Severity.FATAL, exception.getSeverity());
+    assertTrue(exception.getMessage().contains("invalid length of startup packet"));
+  }
+
+  @Test
+  public void testCreate_lengthExtreme() throws IOException {
+    dataOutputStream.writeInt(2_000_000_000);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> BootstrapMessage.create(connection));
+    assertEquals(SQLState.ProtocolViolation, exception.getSQLState());
+    assertEquals(Severity.FATAL, exception.getSeverity());
+    assertTrue(exception.getMessage().contains("invalid length of startup packet"));
+  }
+
+  @Test
   public void testCreateSsl() throws Exception {
     // length
     dataOutputStream.writeInt(8);
@@ -84,6 +124,40 @@ public class BoostrapMessageTest {
     BootstrapMessage message = BootstrapMessage.create(connection);
     assertEquals(SSLMessage.class, message.getClass());
     assertEquals(8, message.length);
+  }
+
+  @Test
+  public void testCreateSsl_invalidLength() throws IOException {
+    dataOutputStream.writeInt(12);
+    dataOutputStream.writeInt(SSLMessage.IDENTIFIER);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> BootstrapMessage.create(connection));
+    assertEquals(SQLState.ProtocolViolation, exception.getSQLState());
+    assertEquals(Severity.FATAL, exception.getSeverity());
+    assertTrue(exception.getMessage().contains("invalid length of SSL request"));
+  }
+
+  @Test
+  public void testCreateGssenc() throws Exception {
+    dataOutputStream.writeInt(8);
+    dataOutputStream.writeInt(GSSENCRequestMessage.IDENTIFIER);
+
+    BootstrapMessage message = BootstrapMessage.create(connection);
+    assertEquals(GSSENCRequestMessage.class, message.getClass());
+    assertEquals(8, message.length);
+  }
+
+  @Test
+  public void testCreateGssenc_invalidLength() throws IOException {
+    dataOutputStream.writeInt(12);
+    dataOutputStream.writeInt(GSSENCRequestMessage.IDENTIFIER);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> BootstrapMessage.create(connection));
+    assertEquals(SQLState.ProtocolViolation, exception.getSQLState());
+    assertEquals(Severity.FATAL, exception.getSeverity());
+    assertTrue(exception.getMessage().contains("invalid length of GSSAPI request"));
   }
 
   @Test
@@ -100,6 +174,29 @@ public class BoostrapMessageTest {
   }
 
   @Test
+  public void testCreateCancel_protocolVersion32() throws Exception {
+    dataOutputStream.writeInt(44);
+    dataOutputStream.writeInt(CancelMessage.IDENTIFIER);
+    dataOutputStream.write(new byte[44]);
+
+    BootstrapMessage message = BootstrapMessage.create(connection);
+    assertEquals(CancelMessage.class, message.getClass());
+    assertEquals(44, message.length);
+  }
+
+  @Test
+  public void testCreateCancel_invalidLength() throws IOException {
+    dataOutputStream.writeInt(20);
+    dataOutputStream.writeInt(CancelMessage.IDENTIFIER);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> BootstrapMessage.create(connection));
+    assertEquals(SQLState.ProtocolViolation, exception.getSQLState());
+    assertEquals(Severity.FATAL, exception.getSeverity());
+    assertTrue(exception.getMessage().contains("invalid length of cancel request"));
+  }
+
+  @Test
   public void testCreateUnknown() throws IOException {
     // length
     dataOutputStream.writeInt(1024);
@@ -108,5 +205,87 @@ public class BoostrapMessageTest {
     dataOutputStream.write(new byte[1024]);
 
     assertThrows(IllegalStateException.class, () -> BootstrapMessage.create(connection));
+  }
+
+  @Test
+  public void testParseParameters_empty() {
+    BootstrapMessage message = new SSLMessage(connection);
+    Map<String, String> parameters = message.parseParameters("");
+    assertNotNull(parameters);
+    assertTrue(parameters.isEmpty());
+
+    parameters = message.parseParameters(null);
+    assertNotNull(parameters);
+    assertTrue(parameters.isEmpty());
+  }
+
+  @Test
+  public void testParseParameters_oddTokens() {
+    BootstrapMessage message = new SSLMessage(connection);
+    Map<String, String> parameters =
+        message.parseParameters("user\0postgres\0oddTokenWithoutValue");
+    assertNotNull(parameters);
+    assertEquals(1, parameters.size());
+    assertEquals("postgres", parameters.get("user"));
+  }
+
+  @Test
+  public void testParseParameterKeys_empty() {
+    BootstrapMessage message = new SSLMessage(connection);
+    List<String> keys = message.parseParameterKeys("");
+    assertNotNull(keys);
+    assertTrue(keys.isEmpty());
+
+    keys = message.parseParameterKeys(null);
+    assertNotNull(keys);
+    assertTrue(keys.isEmpty());
+  }
+
+  @Test
+  public void testParseParameterKeys_oddTokens() {
+    BootstrapMessage message = new SSLMessage(connection);
+    List<String> keys = message.parseParameterKeys("user\0postgres\0oddTokenWithoutValue");
+    assertNotNull(keys);
+    assertEquals(1, keys.size());
+    assertEquals("user", keys.get(0));
+  }
+
+  @Test
+  public void testParseParameters_emptyValue() {
+    BootstrapMessage message = new SSLMessage(connection);
+    Map<String, String> parameters =
+        message.parseParameters("user\0postgres\0application_name\0\0");
+    assertNotNull(parameters);
+    assertEquals(2, parameters.size());
+    assertEquals("postgres", parameters.get("user"));
+    assertEquals("", parameters.get("application_name"));
+  }
+
+  @Test
+  public void testParseParameterKeys_emptyValue() {
+    BootstrapMessage message = new SSLMessage(connection);
+    List<String> keys = message.parseParameterKeys("user\0postgres\0application_name\0\0");
+    assertNotNull(keys);
+    assertEquals(2, keys.size());
+    assertEquals("user", keys.get(0));
+    assertEquals("application_name", keys.get(1));
+  }
+
+  @Test
+  public void testParseParameters_emptyKey() {
+    BootstrapMessage message = new SSLMessage(connection);
+    Map<String, String> parameters = message.parseParameters("\0someValue\0user\0postgres\0");
+    assertNotNull(parameters);
+    assertEquals(1, parameters.size());
+    assertEquals("postgres", parameters.get("user"));
+  }
+
+  @Test
+  public void testParseParameterKeys_emptyKey() {
+    BootstrapMessage message = new SSLMessage(connection);
+    List<String> keys = message.parseParameterKeys("\0someValue\0user\0postgres\0");
+    assertNotNull(keys);
+    assertEquals(1, keys.size());
+    assertEquals("user", keys.get(0));
   }
 }

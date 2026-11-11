@@ -19,6 +19,8 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.wireprotocol.CancelMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.GSSENCRequestMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -77,6 +79,148 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
         outputStream.writeInt(8); // length == 8
         outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
         outputStream.flush();
+      }
+    }
+  }
+
+  @Test
+  public void testStartupMessageLengthTooLarge() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        outputStream.writeInt(2_000_000_000);
+        outputStream.flush();
+
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] errorBytes = new byte[length - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("08P01"));
+        assertTrue(errorPayload.contains("invalid length of startup packet"));
+      }
+    }
+  }
+
+  @Test
+  public void testStartupMessageLengthTooSmall() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        outputStream.writeInt(4);
+        outputStream.flush();
+
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] errorBytes = new byte[length - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("08P01"));
+        assertTrue(errorPayload.contains("invalid length of startup packet"));
+      }
+    }
+  }
+
+  @Test
+  public void testSslMessageInvalidLength() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        outputStream.writeInt(12);
+        outputStream.writeInt(SSLMessage.IDENTIFIER);
+        outputStream.writeInt(0);
+        outputStream.flush();
+
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] errorBytes = new byte[length - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("08P01"));
+        assertTrue(errorPayload.contains("invalid length of SSL request"));
+      }
+    }
+  }
+
+  @Test
+  public void testCancelMessageInvalidLength() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        outputStream.writeInt(20);
+        outputStream.writeInt(CancelMessage.IDENTIFIER);
+        outputStream.writeInt(1);
+        outputStream.writeInt(2);
+        outputStream.writeInt(3);
+        outputStream.flush();
+
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] errorBytes = new byte[length - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("08P01"));
+        assertTrue(errorPayload.contains("invalid length of cancel request"));
+      }
+    }
+  }
+
+  @Test
+  public void testStartupMessageLengthBoundary() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        outputStream.writeInt(10_001);
+        outputStream.flush();
+
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] errorBytes = new byte[length - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("08P01"));
+        assertTrue(errorPayload.contains("invalid length of startup packet: 10001"));
+      }
+    }
+  }
+
+  @Test
+  public void testGssencInvalidLength() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        outputStream.writeInt(12);
+        outputStream.writeInt(GSSENCRequestMessage.IDENTIFIER);
+        outputStream.writeInt(0);
+        outputStream.flush();
+
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] errorBytes = new byte[length - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("08P01"));
+        assertTrue(errorPayload.contains("invalid length of GSSAPI request: 12"));
+      }
+    }
+  }
+
+  @Test
+  public void testUnknownProtocolVersion() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        outputStream.writeInt(8);
+        outputStream.writeInt(999);
+        outputStream.flush();
+
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] errorBytes = new byte[length - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("XX000"));
+        assertTrue(errorPayload.contains("Unknown message"));
       }
     }
   }

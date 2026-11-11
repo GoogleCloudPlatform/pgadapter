@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.text.MessageFormat;
 
@@ -52,7 +53,20 @@ public class SkipMessage extends ControlMessage {
       skipInvalid(input, skipLength);
     } else {
       while (skipped < skipLength) {
-        skipped += input.skip(skipLength - skipped);
+        long currentSkipped = input.skip(skipLength - skipped);
+        if (currentSkipped <= 0) {
+          // InputStream.skip(n) may return 0 for two reasons:
+          // 1. The stream reached EOF (e.g. client disconnected). In this case, input.read()
+          //    returns -1 and we throw EOFException to prevent an infinite spin loop.
+          // 2. No bytes were immediately available to skip without blocking. In this case,
+          //    input.read() blocks until at least 1 byte arrives, consuming it to make forward
+          //    progress rather than busy-waiting.
+          if (input.read() == -1) {
+            throw new EOFException();
+          }
+          currentSkipped = 1;
+        }
+        skipped += currentSkipped;
       }
     }
   }

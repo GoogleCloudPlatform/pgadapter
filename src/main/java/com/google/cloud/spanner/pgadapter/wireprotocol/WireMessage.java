@@ -16,6 +16,9 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
 import com.google.common.base.Preconditions;
 import java.io.DataInputStream;
@@ -126,7 +129,17 @@ public abstract class WireMessage {
    * @throws Exception If reading fails in any way.
    */
   protected String readAll() throws Exception {
-    return read(this.length - this.getHeaderLength());
+    int remaining = this.length - this.getHeaderLength();
+    if (remaining < 0) {
+      throw new IOException(
+          String.format(
+              "Invalid message length: %d is smaller than header length %d",
+              this.length, this.getHeaderLength()));
+    }
+    if (remaining == 0) {
+      return "";
+    }
+    return read(remaining);
   }
 
   /**
@@ -140,6 +153,16 @@ public abstract class WireMessage {
    *     is found at the end of the string.
    */
   public String read(int length) throws IOException {
+    if (length < 1) {
+      throw new IOException("Invalid message length: " + length);
+    }
+    if (length == 1) {
+      byte zero = inputStream.readByte();
+      if (zero != (byte) 0) {
+        throw new IOException("String was not null-terminated");
+      }
+      return "";
+    }
     byte[] buffer = new byte[length - 1];
     this.inputStream.readFully(buffer);
     byte zero = inputStream.readByte();
@@ -186,9 +209,8 @@ public abstract class WireMessage {
       this.inputStream.reset();
       byte[] result = new byte[index];
       this.inputStream.readFully(result);
-      // Skip the null-terminator.
-      //noinspection StatementWithEmptyBody
-      while (this.inputStream.skip(1) < 1) {}
+      // Read the null-terminator.
+      this.inputStream.readByte();
       return new String(result, StandardCharsets.UTF_8);
     } finally {
       // Drop the mark.
@@ -213,5 +235,60 @@ public abstract class WireMessage {
    */
   public void nextHandler() throws Exception {
     this.connection.setMessageState(this.messageReader.create(this.connection));
+  }
+
+  /**
+   * Validates that the message length is within the expected range [min, max], inclusive.
+   *
+   * @param length The message length to check.
+   * @param messageType The description of the message type for the error message.
+   * @param min The minimum allowed length.
+   * @param max The maximum allowed length.
+   * @throws PGException If the length is outside the range.
+   */
+  protected static void checkLengthRange(int length, String messageType, int min, int max) {
+    if (length < min || length > max) {
+      throw PGException.newBuilder(String.format("invalid length of %s: %d", messageType, length))
+          .setSeverity(Severity.FATAL)
+          .setSQLState(SQLState.ProtocolViolation)
+          .build();
+    }
+  }
+
+  /**
+   * Validates that the message length matches the expected length.
+   *
+   * @param length The message length to check.
+   * @param messageType The description of the message type for the error message.
+   * @param expectedLength The exact required length.
+   * @throws PGException If the length does not match.
+   */
+  protected static void checkLengthEquals(int length, String messageType, int expectedLength) {
+    if (length != expectedLength) {
+      throw PGException.newBuilder(String.format("invalid length of %s: %d", messageType, length))
+          .setSeverity(Severity.FATAL)
+          .setSQLState(SQLState.ProtocolViolation)
+          .build();
+    }
+  }
+
+  /**
+   * Validates that the message length matches one of the allowed lengths.
+   *
+   * @param length The message length to check.
+   * @param messageType The description of the message type for the error message.
+   * @param allowedLengths The allowed lengths.
+   * @throws PGException If the length does not match any allowed length.
+   */
+  protected static void checkLengthIn(int length, String messageType, int... allowedLengths) {
+    for (int allowedLength : allowedLengths) {
+      if (length == allowedLength) {
+        return;
+      }
+    }
+    throw PGException.newBuilder(String.format("invalid length of %s: %d", messageType, length))
+        .setSeverity(Severity.FATAL)
+        .setSQLState(SQLState.ProtocolViolation)
+        .build();
   }
 }
