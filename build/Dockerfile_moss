@@ -3,7 +3,7 @@
 ################################################################################
 
 # maven:3-eclipse-temurin-21
-FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/maven@sha256:9673eef9ed503146591667ffb92eaaa22f1b8899ed60d9df0df4da3f3a1214a6 AS build
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/maven@sha256:25d3ec9a193045ff370c5749e9f08c48d5a2b71d69d8e8ebb96b6b70c8d56be7 AS build
 
 
 # Copy over build files to docker image.
@@ -34,7 +34,7 @@ RUN mvn -B -s /root/.m2/settings.xml package -Passembly -Dmaven.test.skip=true
 ################################################################################
 
 #eclipse-temurin:25-jre
-FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/eclipse-temurin@sha256:ecdc0adb37bde1a281c4d245a3cd535004b1fc8322d560f5b09463b248c81df0
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/eclipse-temurin@sha256:a640968ae55027b322cedd5f8228b01a84baff0b9e9360e47601c6a111ba1699
 
 COPY --from=build target/pgadapter /home/pgadapter
 COPY --from=build LICENSE /home/pgadapter/
