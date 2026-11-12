@@ -5,15 +5,19 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node test.js"
   },
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=18.0.0"
   },
   "author": "Google LLC",
   "license": "Apache-2.0",
   "dependencies": {
     "express": "^5.0.0",
     "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "testcontainers": "^12.0.2"
   }
 }
