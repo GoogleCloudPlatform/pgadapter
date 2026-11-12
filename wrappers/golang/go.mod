@@ -2,7 +2,7 @@ module github.com/GoogleCloudPlatform/pgadapter/wrappers/golang
 
 go 1.26.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/moby/moby/api v1.56.1
