@@ -54,4 +54,15 @@ public class PGAdapterConnectionOptionsHelper {
     }
     return connectionOptionsBuilder;
   }
+
+  /**
+   * Validates whether the given value can be converted to a valid value for the specified property.
+   */
+  public static boolean isValidPropertyValue(ConnectionProperty<?> property, String value) {
+    try {
+      return property.convert(value) != null;
+    } catch (Exception exception) {
+      return false;
+    }
+  }
 }

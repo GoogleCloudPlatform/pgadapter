@@ -5550,6 +5550,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testDisallowedConnectionOptionInStartupMessageIsIgnored() throws SQLException {
+    String url =
+        String.format(
+            "jdbc:postgresql://localhost:%d/d?options=-c%%20endpoint=attacker.com:443%%20-c%%20numChannels=2",
+            pgServer.getLocalPort());
+    try (Connection connection = DriverManager.getConnection(url)) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testDatabaseNameWithDelimiterInjectionIsRejected() {
+    String url =
+        String.format(
+            "jdbc:postgresql://localhost:%d/d;endpoint=attacker.com:443", pgServer.getLocalPort());
+    SQLException exception =
+        assertThrows(SQLException.class, () -> DriverManager.getConnection(url));
+    assertTrue(exception.getMessage().contains("The database name contains invalid characters"));
+  }
+
+  @Test
   public void testSelectPgType() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(

@@ -72,6 +72,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -814,6 +815,137 @@ public class ConnectionHandlerTest {
             options,
             buildProperties(ImmutableMap.of()),
             ImmutableMap.of("options", "-c invalid_option=some-value -c numChannels=2")));
+
+    // Security: Disallowed connection properties (endpoint, credentials, providers, etc.) are
+    // ignored.
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;numChannels=2;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of(
+                "options",
+                "-c endpoint=attacker.com:443 -c credentialsProvider=com.example.Evil -c credentials=/path/to/key.json -c universeDomain=attacker.com -c usePlainText=true -c channelProvider=com.example.ChannelProvider -c grpc_interceptor_provider=com.example.Evil -c connection_state_type=TRANSACTIONAL -c numChannels=2")));
+
+    // Safe options specified in options are preserved.
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;optimizerVersion=1;autoPartitionMode=true;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c optimizerVersion=1 -c autoPartitionMode=true")));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;optimizerVersion=2;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c optimizerVersion=2")));
+
+    // Security: Delimiter injection in allowed property value is rejected.
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c numChannels=2;endpoint=attacker.com:443")));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c numChannels=2?endpoint=attacker.com:443")));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c numChannels=2%3Bendpoint=attacker.com:443")));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c numChannels=2\nendpoint=attacker.com:443")));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c numChannels=2\rendpoint=attacker.com:443")));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c numChannels=2\0endpoint=attacker.com:443")));
+
+    // Security: Invalid property value conversion is rejected.
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
+        buildConnectionURL(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of("options", "-c minSessions=-1")));
+
+    // Security: Null or delimiter/percent-containing property values are rejected.
+    assertFalse(
+        ConnectionHandler.isValidStartupPropertyValue(
+            ConnectionHandler.SUPPORTED_STARTUP_CONNECTION_PROPERTIES.get("numchannels"), null));
+    assertFalse(
+        ConnectionHandler.isValidStartupPropertyValue(
+            ConnectionHandler.SUPPORTED_STARTUP_CONNECTION_PROPERTIES.get("numchannels"),
+            "2%3Bendpoint=foo"));
+
+    // All disallowed startup connection property names must be rejected.
+    for (String disallowedProperty :
+        ConnectionHandler.DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES) {
+      assertTrue(
+          "Expected " + disallowedProperty + " to be disallowed",
+          ConnectionHandler.isDisallowedConnectionProperty(disallowedProperty));
+      assertFalse(
+          "Expected " + disallowedProperty + " to not be valid",
+          ConnectionHandler.isValidConnectionProperty(disallowedProperty));
+      assertFalse(
+          "Expected " + disallowedProperty + " not in SUPPORTED_STARTUP_CONNECTION_PROPERTIES",
+          ConnectionHandler.SUPPORTED_STARTUP_CONNECTION_PROPERTIES.containsKey(
+              disallowedProperty.toLowerCase(Locale.ENGLISH)));
+    }
+
+    // Verify both underscored and non-underscored variants of sensitive properties are rejected.
+    assertFalse(ConnectionHandler.isValidConnectionProperty("grpc_interceptor_provider"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("grpcinterceptorprovider"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("connection_state_type"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("connectionstatetype"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("channel_provider"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("channelprovider"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("credentials_provider"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("credentialsprovider"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("universe_domain"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("universedomain"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("use_plain_text"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("useplaintext"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("host"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("credentialsUrl"));
+    assertFalse(ConnectionHandler.isValidConnectionProperty("credentials_url"));
+
+    // Verify safe properties (both camelCase and snake_case) are allowed.
+    assertTrue(ConnectionHandler.isValidConnectionProperty("numChannels"));
+    assertTrue(ConnectionHandler.isValidConnectionProperty("optimizerVersion"));
+    assertTrue(ConnectionHandler.isValidConnectionProperty("default_isolation_level"));
+    assertTrue(ConnectionHandler.isValidConnectionProperty("savepoint_support"));
+
+    assertFalse(ConnectionHandler.isValidConnectionProperty(""));
+    assertFalse(ConnectionHandler.isValidConnectionProperty(null));
   }
 
   @Test
