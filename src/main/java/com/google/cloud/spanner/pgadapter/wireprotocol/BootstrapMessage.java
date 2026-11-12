@@ -23,6 +23,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.KeyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.common.base.Strings;
 import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
@@ -38,6 +39,8 @@ import java.util.Map;
 @InternalApi
 public abstract class BootstrapMessage extends WireMessage {
 
+  static final int MAX_STARTUP_PACKET_LENGTH = 10_000;
+
   public BootstrapMessage(ConnectionHandler connection, int length) {
     super(connection, length);
   }
@@ -52,16 +55,20 @@ public abstract class BootstrapMessage extends WireMessage {
    */
   public static BootstrapMessage create(ConnectionHandler connection) throws Exception {
     int length = connection.getConnectionMetadata().getInputStream().readInt();
+    checkLengthRange(length, "startup packet", 8, MAX_STARTUP_PACKET_LENGTH);
     int protocol = connection.getConnectionMetadata().getInputStream().readInt();
     switch (protocol) {
       case SSLMessage.IDENTIFIER:
+        checkLengthEquals(length, "SSL request", 8);
         return new SSLMessage(connection);
       case GSSENCRequestMessage.IDENTIFIER:
+        checkLengthEquals(length, "GSSAPI request", 8);
         return new GSSENCRequestMessage(connection);
       case StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER:
       case StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER:
         return new StartupMessage(connection, length, protocol);
       case CancelMessage.IDENTIFIER:
+        checkLengthIn(length, "cancel request", 16, 44);
         return new CancelMessage(connection, length);
       default:
         throw new IllegalStateException("Unknown message");
@@ -77,9 +84,14 @@ public abstract class BootstrapMessage extends WireMessage {
    */
   protected Map<String, String> parseParameters(String rawParameters) {
     Map<String, String> parameters = new HashMap<>();
-    String[] paramArray = rawParameters.split(new String(new byte[] {(byte) 0}));
-    for (int i = 0; i < paramArray.length; i = i + 2) {
-      parameters.put(paramArray[i], paramArray[i + 1]);
+    if (Strings.isNullOrEmpty(rawParameters)) {
+      return parameters;
+    }
+    String[] paramArray = rawParameters.split("\0", -1);
+    for (int i = 0; i < paramArray.length - 1; i += 2) {
+      if (!paramArray[i].isEmpty()) {
+        parameters.put(paramArray[i], paramArray[i + 1]);
+      }
     }
     return parameters;
   }
@@ -90,9 +102,14 @@ public abstract class BootstrapMessage extends WireMessage {
    */
   protected List<String> parseParameterKeys(String rawParameters) {
     List<String> keys = new ArrayList<>();
-    String[] paramArray = rawParameters.split(new String(new byte[] {(byte) 0}));
-    for (int i = 0; i < paramArray.length; i = i + 2) {
-      keys.add(paramArray[i]);
+    if (Strings.isNullOrEmpty(rawParameters)) {
+      return keys;
+    }
+    String[] paramArray = rawParameters.split("\0", -1);
+    for (int i = 0; i < paramArray.length - 1; i += 2) {
+      if (!paramArray[i].isEmpty()) {
+        keys.add(paramArray[i]);
+      }
     }
     return keys;
   }

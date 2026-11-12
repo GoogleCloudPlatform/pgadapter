@@ -34,6 +34,7 @@ public class CancelMessage extends BootstrapMessage {
 
   public CancelMessage(ConnectionHandler connection, int length) throws Exception {
     super(connection, length);
+    checkLengthIn(length, "cancel request", 16, 44);
     int secretLen = length - 12;
     this.connectionId = this.inputStream.readInt();
     this.secret = new byte[secretLen];

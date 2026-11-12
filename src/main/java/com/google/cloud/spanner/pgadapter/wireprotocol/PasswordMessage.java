@@ -58,6 +58,9 @@ import java.util.Objects;
 @InternalApi
 public class PasswordMessage extends ControlMessage {
 
+  static final int MAX_PASSWORD_LENGTH = 1024 * 1024;
+  private static final int MIN_PASSWORD_LENGTH = 5;
+
   private static final String USER_KEY = "user";
   protected static final char IDENTIFIER = 'p';
 
@@ -68,6 +71,7 @@ public class PasswordMessage extends ControlMessage {
   public PasswordMessage(ConnectionHandler connection, Map<String, String> parameters)
       throws Exception {
     super(connection);
+    checkLengthRange(this.length, "password message", MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH);
     this.parameters = parameters;
     this.username = parameters.get(USER_KEY);
     this.password = this.readAll();

@@ -104,6 +104,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSocketFactory;
 
 /**
@@ -565,10 +566,17 @@ public class ConnectionHandler implements Runnable {
 
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
-      } catch (EOFException ignore) {
+      } catch (EOFException | SocketException | SSLException ignore) {
         // Just ignore the connection and close it if the client never sends us a valid startup
-        // message. This also prevents probers that just check for an open TCP port to cause errors
-        // to be logged.
+        // message or disconnects abruptly. This also prevents probers that just check for an open
+        // TCP port to cause errors to be logged.
+        return result;
+      } catch (PGException exception) {
+        this.handleError(exception);
+        // We return TERMINATED here instead of re-throwing because handleError() has already
+        // logged the exception and transmitted the ErrorResponse and TerminateResponse to the
+        // client. Re-throwing would cause the outer catch block to log the exact same exception
+        // a second time.
         return result;
       } catch (Exception exception) {
         this.handleError(
@@ -576,7 +584,8 @@ public class ConnectionHandler implements Runnable {
                 .setSeverity(Severity.FATAL)
                 .setSQLState(SQLState.InternalError)
                 .build());
-        throw exception;
+        // Return TERMINATED for the same reason: handleError() has already logged and responded.
+        return result;
       }
       try {
         if (!ssl
@@ -598,7 +607,7 @@ public class ConnectionHandler implements Runnable {
           try {
             message.nextHandler();
             message.send();
-          } catch (EOFException eofException) {
+          } catch (EOFException | SocketException | SSLException disconnectException) {
             // This indicates that the frontend terminated the connection before we got
             // authenticated. This is in most cases an indication that the frontend killed the
             // connection after having requested SSL and gotten an SSL denied message.
