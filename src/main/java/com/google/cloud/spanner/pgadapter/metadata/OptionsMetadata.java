@@ -1288,17 +1288,13 @@ public class OptionsMetadata {
           ErrorCode.INVALID_ARGUMENT,
           String.format("Invalid instance ID in database name: %s", databaseName.getInstance()));
     }
-    if (!DATABASE_ID_PATTERN.matcher(databaseName.getDatabase()).matches()) {
-      throw SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT,
-          String.format("Invalid database ID in database name: %s", databaseName.getDatabase()));
-    }
+    validateDatabaseId(databaseName.getDatabase());
   }
 
   private static void validateDatabaseId(String databaseId) {
     if (!DATABASE_ID_PATTERN.matcher(databaseId).matches()) {
       throw SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT, String.format("Invalid database name: %s", databaseId));
+          ErrorCode.INVALID_ARGUMENT, String.format("Invalid database ID: %s", databaseId));
     }
   }
 
