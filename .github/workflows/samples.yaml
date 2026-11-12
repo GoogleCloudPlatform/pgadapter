@@ -115,6 +115,14 @@ jobs:
         env:
           TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
           TESTCONTAINERS_RYUK_DISABLED: true
+      - name: Run Cloud Run Node.js Sample tests
+        working-directory: ./samples/cloud-run/nodejs
+        run: |
+          npm install
+          npm test
+        env:
+          TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+          TESTCONTAINERS_RYUK_DISABLED: true
   ruby-samples:
     runs-on: ubuntu-latest
     steps:
