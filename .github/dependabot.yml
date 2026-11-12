@@ -4,6 +4,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "github-actions"
     # Workflow files stored in the
@@ -11,46 +13,99 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
 
   # ecosystem test packages
   - package-ecosystem: "nuget"
     directory: "/src/test/csharp/pgadapter_npgsql_tests"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "gomod"
     directory: "/src/test/golang/pgadapter_gorm_tests"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "gomod"
     directory: "/src/test/golang/pgadapter_pgx_tests"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "npm"
     directory: "/src/test/nodejs/node-postgres"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "npm"
     directory: "/src/test/nodejs/sequelize-tests"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "npm"
     directory: "/src/test/nodejs/typeorm/data-test"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: "pip"
+    directory: "/src/test/python/pg8000"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: "pip"
+    directory: "/src/test/python/psycopg2"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: "pip"
+    directory: "/src/test/python/psycopg3"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: "pip"
+    directory: "/src/test/python/sqlalchemy"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+    cooldown:
+      default-days: 7
+  - package-ecosystem: "pip"
+    directory: "/src/test/python/sqlalchemy2"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 7
 
   # ecosystem sample packages
   - package-ecosystem: "gomod"
     directory: "/samples/golang/gorm"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "gomod"
     directory: "/samples/golang/pgx"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "maven"
     directory: "/samples/java/cloudrun"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   
   # Java Samples
   # Java Cloud Run Sample
@@ -58,32 +113,44 @@ updates:
     directory: "/samples/java/cloud-run"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   # Java Hibernate Sample
   - package-ecosystem: "maven"
     directory: "/samples/java/hibernate"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   # Java JDBC Sample
   - package-ecosystem: "maven"
     directory: "/samples/java/jdbc"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   # Java Liquibase Sample
   - package-ecosystem: "maven"
     directory: "/samples/java/liquibase"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
   # Java Spring Data JPA Sample
   - package-ecosystem: "maven"
     directory: "/samples/java/spring-data-jpa"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
 
   # Node.js samples
   - package-ecosystem: "npm"
     directory: "/samples/nodejs/sequelize"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
 
   # Python Samples
   # Python psycopg3 Sample
@@ -91,9 +158,13 @@ updates:
     directory: "/samples/python/psycopg3"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
 
   # benchmarks
   - package-ecosystem: "maven"
     directory: "/benchmarks/latency-comparison/java"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7

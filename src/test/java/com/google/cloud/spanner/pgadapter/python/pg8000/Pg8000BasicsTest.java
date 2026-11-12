@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.FlushMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.TerminateMessage;
@@ -87,11 +88,12 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
 
     List<WireMessage> messages = getWireMessages();
-    assertEquals(4, messages.size());
-    assertEquals(StartupMessage.class, messages.get(0).getClass());
-    assertEquals(QueryMessage.class, messages.get(1).getClass());
+    assertEquals(5, messages.size());
+    assertEquals(SSLMessage.class, messages.get(0).getClass());
+    assertEquals(StartupMessage.class, messages.get(1).getClass());
     assertEquals(QueryMessage.class, messages.get(2).getClass());
-    assertEquals(TerminateMessage.class, messages.get(3).getClass());
+    assertEquals(QueryMessage.class, messages.get(3).getClass());
+    assertEquals(TerminateMessage.class, messages.get(4).getClass());
   }
 
   @Test
@@ -101,7 +103,17 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
 
     String actualOutput = execute("select_all_types.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "row: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'), datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), <PGInterval 14 months 3 days 4 hours 5 minutes 6.789 seconds>, datetime.date(2022, 3, 29), 'testÄ', {'key': 'value'}, [1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], [3.14, None, -99.99], [-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], [<PGInterval -100 months 0 days 34 hours 17 minutes 36.789 seconds>, None, <PGInterval 12 months 0 days>], [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], ['string1', None, 'string2'], [{'key': 'value1'}, None, {'key': 'value2'}]]\n";
+        "row: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'), datetime.datetime(2022, 2, 16,"
+            + " 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), <PGInterval 14 months 3 days 4"
+            + " hours 5 minutes 6.789 seconds>, datetime.date(2022, 3, 29), 'testÄ', {'key':"
+            + " 'value'}, [1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14,"
+            + " None, -99.99], [3.14, None, -99.99], [-100, None, -200], [Decimal('6.626'), None,"
+            + " Decimal('-3.14')], [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456,"
+            + " tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0,"
+            + " tzinfo=datetime.timezone.utc)], [<PGInterval -100 months 0 days 34 hours 17 minutes"
+            + " 36.789 seconds>, None, <PGInterval 12 months 0 days>], [datetime.date(2023, 2, 20),"
+            + " None, datetime.date(2000, 1, 1)], ['string1', None, 'string2'], [{'key': 'value1'},"
+            + " None, {'key': 'value2'}]]\n";
     assertEquals(expectedOutput, actualOutput.replace("tzlocal()", "tzutc()"));
   }
 
@@ -112,18 +124,40 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
 
     String actualOutput = execute("select_parameterized.py", host, pgServer.getLocalPort());
     String expectedOutput =
-        "first execution: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'), datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), <PGInterval 14 months 3 days 4 hours 5 minutes 6.789 seconds>, datetime.date(2022, 3, 29), 'testÄ', {'key': 'value'}, [1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], [3.14, None, -99.99], [-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], [<PGInterval -100 months 0 days 34 hours 17 minutes 36.789 seconds>, None, <PGInterval 12 months 0 days>], [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], ['string1', None, 'string2'], [{'key': 'value1'}, None, {'key': 'value2'}]]\n"
-            + "second execution: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'), datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), <PGInterval 14 months 3 days 4 hours 5 minutes 6.789 seconds>, datetime.date(2022, 3, 29), 'testÄ', {'key': 'value'}, [1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], [3.14, None, -99.99], [-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], [datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], [<PGInterval -100 months 0 days 34 hours 17 minutes 36.789 seconds>, None, <PGInterval 12 months 0 days>], [datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], ['string1', None, 'string2'], [{'key': 'value1'}, None, {'key': 'value2'}]]\n";
+        "first execution: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'),"
+            + " datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc),"
+            + " <PGInterval 14 months 3 days 4 hours 5 minutes 6.789 seconds>, datetime.date(2022,"
+            + " 3, 29), 'testÄ', {'key': 'value'}, [1, None, 2], [True, None, False], [b'bytes1',"
+            + " None, b'bytes2'], [3.14, None, -99.99], [3.14, None, -99.99], [-100, None, -200],"
+            + " [Decimal('6.626'), None, Decimal('-3.14')], [datetime.datetime(2022, 2, 16, 16, 18,"
+            + " 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0,"
+            + " tzinfo=datetime.timezone.utc)], [<PGInterval -100 months 0 days 34 hours 17 minutes"
+            + " 36.789 seconds>, None, <PGInterval 12 months 0 days>], [datetime.date(2023, 2, 20),"
+            + " None, datetime.date(2000, 1, 1)], ['string1', None, 'string2'], [{'key': 'value1'},"
+            + " None, {'key': 'value2'}]]\n"
+            + "second execution: [1, True, b'test', 3.14, 3.14, 100, Decimal('6.626'),"
+            + " datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc),"
+            + " <PGInterval 14 months 3 days 4 hours 5 minutes 6.789 seconds>, datetime.date(2022,"
+            + " 3, 29), 'testÄ', {'key': 'value'}, [1, None, 2], [True, None, False], [b'bytes1',"
+            + " None, b'bytes2'], [3.14, None, -99.99], [3.14, None, -99.99], [-100, None, -200],"
+            + " [Decimal('6.626'), None, Decimal('-3.14')], [datetime.datetime(2022, 2, 16, 16, 18,"
+            + " 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0,"
+            + " tzinfo=datetime.timezone.utc)], [<PGInterval -100 months 0 days 34 hours 17 minutes"
+            + " 36.789 seconds>, None, <PGInterval 12 months 0 days>], [datetime.date(2023, 2, 20),"
+            + " None, datetime.date(2000, 1, 1)], ['string1', None, 'string2'], [{'key': 'value1'},"
+            + " None, {'key': 'value2'}]]\n";
     assertEquals(expectedOutput, actualOutput);
 
     List<WireMessage> messages = getWireMessages();
-    assertEquals(25, messages.size());
-    // Yes, you read that right. 25 messages to execute the same query twice.
-    // 3 of these messages are not related to executing the queries:
-    // 1. Startup
-    // 2. Execute `set time zone 'utc'`
-    // 3. Terminate
+    assertEquals(26, messages.size());
+    // Yes, you read that right. 26 messages to execute the same query twice.
+    // 4 of these messages are not related to executing the queries:
+    // 1. SSL negotiation
+    // 2. Startup
+    // 3. Execute `set time zone 'utc'`
+    // 4. Terminate
     int index = 0;
+    assertEquals(SSLMessage.class, messages.get(index++).getClass());
     assertEquals(StartupMessage.class, messages.get(index++).getClass());
     assertEquals(QueryMessage.class, messages.get(index++).getClass());
 
