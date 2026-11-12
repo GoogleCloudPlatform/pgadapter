@@ -98,16 +98,6 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <dependency>
-        <groupId>org.bouncycastle</groupId>
-        <artifactId>bcprov-jdk18on</artifactId>
-        <version>1.86</version>
-      </dependency>
-      <dependency>
-        <groupId>org.bouncycastle</groupId>
-        <artifactId>bcutil-jdk18on</artifactId>
-        <version>1.86</version>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -227,11 +217,6 @@
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
       <version>3.10.0</version>
-    </dependency>
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.86</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.mojo</groupId>

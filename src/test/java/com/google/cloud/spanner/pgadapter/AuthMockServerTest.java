@@ -23,8 +23,6 @@ import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.Builder;
 import com.google.cloud.spanner.pgadapter.wireprotocol.PasswordMessage;
-import java.io.IOException;
-import java.io.StringWriter;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -33,8 +31,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
-import org.bouncycastle.openssl.jcajce.JcaPKCS8Generator;
+import java.util.Base64;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -228,15 +225,13 @@ public class AuthMockServerTest extends AbstractMockServerTest {
     assertEquals(CREDENTIALS_ERROR, exception.getMessage());
   }
 
-  private String generateRandomPrivateKey() throws NoSuchAlgorithmException, IOException {
+  private String generateRandomPrivateKey() throws NoSuchAlgorithmException {
     final KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
     generator.initialize(2048, null);
     final KeyPair keyPair = generator.generateKeyPair();
     final PrivateKey privateKey = keyPair.getPrivate();
-    final StringWriter stringWriter = new StringWriter();
-    try (JcaPEMWriter pemWriter = new JcaPEMWriter(stringWriter)) {
-      pemWriter.writeObject(new JcaPKCS8Generator(privateKey, null));
-    }
-    return stringWriter.toString();
+    return "-----BEGIN PRIVATE KEY-----\n"
+        + Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(privateKey.getEncoded())
+        + "\n-----END PRIVATE KEY-----\n";
   }
 }
