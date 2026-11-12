@@ -7,7 +7,7 @@ toolchain go1.27.4
 require (
 	github.com/moby/moby/api v1.56.1
 	github.com/testcontainers/testcontainers-go v0.45.0
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 )
 
 require (
