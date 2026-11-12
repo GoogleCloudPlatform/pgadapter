@@ -19,6 +19,8 @@ import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.BatchReadOnlyTransaction;
+import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
@@ -33,6 +35,7 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCou
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.SendResultSetRunnable;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Tracer;
 import java.io.ByteArrayInputStream;
@@ -42,6 +45,7 @@ import java.io.DataOutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Rule;
@@ -172,5 +176,23 @@ public final class ControlMessageTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> message.sendResultSet(describedResult, QueryMode.SIMPLE, 0L));
+  }
+
+  @Test
+  public void testSendResultSetRunnableCountsDownOnException() {
+    IntermediateStatement statement = mock(IntermediateStatement.class);
+    BatchReadOnlyTransaction batchReadOnlyTransaction = mock(BatchReadOnlyTransaction.class);
+    Partition partition = mock(Partition.class);
+    CountDownLatch latch = new CountDownLatch(1);
+
+    when(batchReadOnlyTransaction.execute(partition))
+        .thenThrow(new RuntimeException("Partition execution failed"));
+
+    SendResultSetRunnable runnable =
+        SendResultSetRunnable.forPartition(
+            statement, batchReadOnlyTransaction, partition, QueryMode.SIMPLE, latch);
+
+    assertThrows(RuntimeException.class, runnable::call);
+    assertEquals(0, latch.getCount());
   }
 }
