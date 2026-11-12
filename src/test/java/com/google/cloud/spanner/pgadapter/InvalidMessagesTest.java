@@ -128,7 +128,6 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         outputStream.writeInt(12);
         outputStream.writeInt(SSLMessage.IDENTIFIER);
-        outputStream.writeInt(0);
         outputStream.flush();
 
         assertEquals('E', inputStream.readByte());
@@ -149,9 +148,6 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         outputStream.writeInt(20);
         outputStream.writeInt(CancelMessage.IDENTIFIER);
-        outputStream.writeInt(1);
-        outputStream.writeInt(2);
-        outputStream.writeInt(3);
         outputStream.flush();
 
         assertEquals('E', inputStream.readByte());
@@ -191,7 +187,6 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
         outputStream.writeInt(12);
         outputStream.writeInt(GSSENCRequestMessage.IDENTIFIER);
-        outputStream.writeInt(0);
         outputStream.flush();
 
         assertEquals('E', inputStream.readByte());
