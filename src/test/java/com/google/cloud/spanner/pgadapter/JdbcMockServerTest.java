@@ -4427,10 +4427,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
           List<ParseMessage> parseMessages =
               getWireMessagesOfType(ParseMessage.class).stream()
-                  .filter(
-                      message ->
-                          ImmutableList.of("BEGIN", SELECT_RANDOM.getSql(), "COMMIT")
-                              .contains(message.getSql()))
+                  .filter(message ->
+                      ImmutableList.of("BEGIN", SELECT_RANDOM.getSql(), "COMMIT")
+                          .contains(message.getSql()))
                   .collect(Collectors.toList());
           assertEquals(2, parseMessages.size());
           assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(0).getStatement().getSql());
@@ -7003,15 +7002,14 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         connection.setAutoCommit(autocommit);
         mockSpanner.freeze();
         Future<Long> queryResult =
-            executor.submit(
-                () -> {
-                  try (ResultSet resultSet = statement.executeQuery(sql)) {
-                    if (resultSet.next()) {
-                      return resultSet.getLong(1);
-                    }
-                    return 0L;
-                  }
-                });
+            executor.submit(() -> {
+              try (ResultSet resultSet = statement.executeQuery(sql)) {
+                if (resultSet.next()) {
+                  return resultSet.getLong(1);
+                }
+                return 0L;
+              }
+            });
         // Wait for the request to have landed on the server.
         mockSpanner.waitForRequestsToContain(
             msg -> {

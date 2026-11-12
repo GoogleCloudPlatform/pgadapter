@@ -412,28 +412,27 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     DatabaseClient dbClient = connection.getDatabaseClient();
     ImmutableList<Mutation> immutableMutations = ImmutableList.copyOf(mutations);
     ListenableFuture<Void> listenableFuture =
-        executorService.submit(
-            () -> {
-              Context context =
-                  Context.current()
-                      .withValue(
-                          SpannerOptions.CALL_CONTEXT_CONFIGURATOR_KEY,
-                          new CallContextConfigurator() {
-                            @Override
-                            public <ReqT, RespT> ApiCallContext configure(
-                                ApiCallContext context,
-                                ReqT request,
-                                MethodDescriptor<ReqT, RespT> method) {
-                              // Use the same timeout for all RPCs that are executed for the commit.
-                              // This could also include BeginTransaction and BatchCreateSessions.
-                              return GrpcCallContext.createDefault()
-                                  .withTimeout(
-                                      Duration.ofSeconds(copySettings.getCommitTimeoutSeconds()));
-                            }
-                          });
-              context.run(() -> dbClient.writeWithOptions(immutableMutations, commitOptions));
-              return null;
-            });
+        executorService.submit(() -> {
+          Context context =
+              Context.current()
+                  .withValue(
+                      SpannerOptions.CALL_CONTEXT_CONFIGURATOR_KEY,
+                      new CallContextConfigurator() {
+                        @Override
+                        public <ReqT, RespT> ApiCallContext configure(
+                            ApiCallContext context,
+                            ReqT request,
+                            MethodDescriptor<ReqT, RespT> method) {
+                          // Use the same timeout for all RPCs that are executed for the commit.
+                          // This could also include BeginTransaction and BatchCreateSessions.
+                          return GrpcCallContext.createDefault()
+                              .withTimeout(
+                                  Duration.ofSeconds(copySettings.getCommitTimeoutSeconds()));
+                        }
+                      });
+          context.run(() -> dbClient.writeWithOptions(immutableMutations, commitOptions));
+          return null;
+        });
     Futures.addCallback(
         listenableFuture,
         new FutureCallback<Void>() {

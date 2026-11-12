@@ -477,14 +477,13 @@ public class BackendConnection {
                 spannerConnection
                     .getDatabaseClient()
                     .readWriteTransaction()
-                    .run(
-                        transaction -> {
-                          ResultSet updateStatementMetadata =
-                              transaction.analyzeUpdateStatement(
-                                  statementToAnalyze, QueryAnalyzeMode.PLAN);
-                          updateStatementMetadata.next();
-                          return updateStatementMetadata;
-                        });
+                    .run(transaction -> {
+                      ResultSet updateStatementMetadata =
+                          transaction.analyzeUpdateStatement(
+                              statementToAnalyze, QueryAnalyzeMode.PLAN);
+                      updateStatementMetadata.next();
+                      return updateStatementMetadata;
+                    });
           } else {
             resultSet = spannerConnection.analyzeUpdateStatement(statement, QueryAnalyzeMode.PLAN);
           }
@@ -966,20 +965,19 @@ public class BackendConnection {
     this.ddlExecutor =
         new DdlExecutor(this, Suppliers.memoize(() -> wellKnownClient.get().getDdlReplacements()));
     this.localStatements =
-        Suppliers.memoize(
-            () -> {
-              if (localStatements.get().isEmpty()) {
-                return EMPTY_LOCAL_STATEMENTS;
-              } else {
-                Builder<String, LocalStatement> builder = ImmutableMap.builder();
-                for (LocalStatement localStatement : localStatements.get()) {
-                  for (String sql : localStatement.getSql()) {
-                    builder.put(new SimpleImmutableEntry<>(sql, localStatement));
-                  }
-                }
-                return builder.build();
+        Suppliers.memoize(() -> {
+          if (localStatements.get().isEmpty()) {
+            return EMPTY_LOCAL_STATEMENTS;
+          } else {
+            Builder<String, LocalStatement> builder = ImmutableMap.builder();
+            for (LocalStatement localStatement : localStatements.get()) {
+              for (String sql : localStatement.getSql()) {
+                builder.put(new SimpleImmutableEntry<>(sql, localStatement));
               }
-            });
+            }
+            return builder.build();
+          }
+        });
   }
 
   /** Returns the current connection state. */
@@ -1898,21 +1896,20 @@ public class BackendConnection {
       return ClientSideResultSet.forRows(
           Type.struct(StructField.of("partition", Type.bytes())),
           partitions.stream()
-              .map(
-                  partition -> {
-                    try {
-                      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                      ObjectOutputStream objectOutputStream =
-                          new ObjectOutputStream(byteArrayOutputStream);
-                      objectOutputStream.writeObject(partition);
-                      return Struct.newBuilder()
-                          .set("partition")
-                          .to(ByteArray.copyFrom(byteArrayOutputStream.toByteArray()))
-                          .build();
-                    } catch (IOException ioException) {
-                      return Struct.newBuilder().set("partition").to((ByteArray) null).build();
-                    }
-                  })
+              .map(partition -> {
+                try {
+                  ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                  ObjectOutputStream objectOutputStream =
+                      new ObjectOutputStream(byteArrayOutputStream);
+                  objectOutputStream.writeObject(partition);
+                  return Struct.newBuilder()
+                      .set("partition")
+                      .to(ByteArray.copyFrom(byteArrayOutputStream.toByteArray()))
+                      .build();
+                } catch (IOException ioException) {
+                  return Struct.newBuilder().set("partition").to((ByteArray) null).build();
+                }
+              })
               .collect(Collectors.toList()));
     }
 

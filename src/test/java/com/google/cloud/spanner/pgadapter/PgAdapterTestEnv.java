@@ -520,19 +520,17 @@ public class PgAdapterTestEnv {
     DatabaseClient dbClient = spanner.getDatabaseClient(db);
     dbClient
         .readWriteTransaction()
-        .run(
-            transaction -> {
-              List<Statement> batchStatements = new ArrayList<>();
-              for (String dml : statements) {
-                batchStatements.add(Statement.of(dml));
-              }
-              if (!batchStatements.isEmpty()) {
-                transaction.batchUpdate(batchStatements);
-              }
-              logger.log(
-                  Level.INFO, "Tables were updated by {0}.", String.join(" and ", statements));
-              return null;
-            });
+        .run(transaction -> {
+          List<Statement> batchStatements = new ArrayList<>();
+          for (String dml : statements) {
+            batchStatements.add(Statement.of(dml));
+          }
+          if (!batchStatements.isEmpty()) {
+            transaction.batchUpdate(batchStatements);
+          }
+          logger.log(Level.INFO, "Tables were updated by {0}.", String.join(" and ", statements));
+          return null;
+        });
   }
 
   /**

@@ -245,11 +245,10 @@ public class SavepointMockServerTest extends AbstractMockServerTest {
 
       List<AbstractMessage> requests =
           mockSpanner.getRequests().stream()
-              .filter(
-                  request ->
-                      request instanceof ExecuteSqlRequest
-                          || request instanceof RollbackRequest
-                          || request instanceof CommitRequest)
+              .filter(request ->
+                  request instanceof ExecuteSqlRequest
+                      || request instanceof RollbackRequest
+                      || request instanceof CommitRequest)
               .collect(Collectors.toList());
       assertEquals(4, requests.size());
       int index = 0;
@@ -291,11 +290,10 @@ public class SavepointMockServerTest extends AbstractMockServerTest {
 
       List<AbstractMessage> requests =
           mockSpanner.getRequests().stream()
-              .filter(
-                  request ->
-                      request instanceof ExecuteSqlRequest
-                          || request instanceof RollbackRequest
-                          || request instanceof CommitRequest)
+              .filter(request ->
+                  request instanceof ExecuteSqlRequest
+                      || request instanceof RollbackRequest
+                      || request instanceof CommitRequest)
               .collect(Collectors.toList());
       assertEquals(7, requests.size());
       int index = 0;
@@ -346,11 +344,10 @@ public class SavepointMockServerTest extends AbstractMockServerTest {
 
       List<AbstractMessage> requests =
           mockSpanner.getRequests().stream()
-              .filter(
-                  request ->
-                      request instanceof ExecuteSqlRequest
-                          || request instanceof RollbackRequest
-                          || request instanceof CommitRequest)
+              .filter(request ->
+                  request instanceof ExecuteSqlRequest
+                      || request instanceof RollbackRequest
+                      || request instanceof CommitRequest)
               .collect(Collectors.toList());
       assertEquals(6, requests.size());
       int index = 0;
@@ -464,11 +461,10 @@ public class SavepointMockServerTest extends AbstractMockServerTest {
 
       List<AbstractMessage> requests =
           mockSpanner.getRequests().stream()
-              .filter(
-                  request ->
-                      request instanceof ExecuteSqlRequest
-                          || request instanceof RollbackRequest
-                          || request instanceof CommitRequest)
+              .filter(request ->
+                  request instanceof ExecuteSqlRequest
+                      || request instanceof RollbackRequest
+                      || request instanceof CommitRequest)
               .collect(Collectors.toList());
       assertEquals(6, requests.size());
       int index = 0;
@@ -514,12 +510,11 @@ public class SavepointMockServerTest extends AbstractMockServerTest {
 
       List<AbstractMessage> requests =
           mockSpanner.getRequests().stream()
-              .filter(
-                  request ->
-                      request instanceof ExecuteSqlRequest
-                          || request instanceof RollbackRequest
-                          || request instanceof CommitRequest
-                          || request instanceof ExecuteBatchDmlRequest)
+              .filter(request ->
+                  request instanceof ExecuteSqlRequest
+                      || request instanceof RollbackRequest
+                      || request instanceof CommitRequest
+                      || request instanceof ExecuteBatchDmlRequest)
               .collect(Collectors.toList());
       assertEquals(8, requests.size());
       int index = 0;

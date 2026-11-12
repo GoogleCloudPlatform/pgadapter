@@ -987,10 +987,9 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     ExecuteBatchDmlRequest request =
         mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).stream()
             .findAny()
-            .orElseThrow(
-                () ->
-                    SpannerExceptionFactory.newSpannerException(
-                        ErrorCode.NOT_FOUND, "ExecuteBatchDmlRequest not found"));
+            .orElseThrow(() ->
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.NOT_FOUND, "ExecuteBatchDmlRequest not found"));
     assertEquals(3, request.getStatementsCount());
     for (ExecuteBatchDmlRequest.Statement statement : request.getStatementsList()) {
       assertEquals(insertSql, statement.getSql());
@@ -1412,9 +1411,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(
-                request ->
-                    request.getSql().equals("SELECT 1") || request.getSql().equals("SELECT 2"))
+            .filter(request ->
+                request.getSql().equals("SELECT 1") || request.getSql().equals("SELECT 2"))
             .collect(Collectors.toList());
     assertEquals(2, requests.size());
     for (ExecuteSqlRequest request : requests) {

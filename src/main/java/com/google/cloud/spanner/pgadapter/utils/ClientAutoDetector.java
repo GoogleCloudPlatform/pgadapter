@@ -612,25 +612,23 @@ public class ClientAutoDetector {
       boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         boolean hasVersionQuery =
             skippedParseMessages.stream()
-                .anyMatch(
-                    p -> {
-                      String sql = p.getSql().toLowerCase(Locale.ENGLISH).trim();
-                      return sql.equals("select version()") || sql.equals("select version();");
-                    });
+                .anyMatch(p -> {
+                  String sql = p.getSql().toLowerCase(Locale.ENGLISH).trim();
+                  return sql.equals("select version()") || sql.equals("select version();");
+                });
         return hasVersionQuery
             && statements.stream()
-                .anyMatch(
-                    s -> {
-                      String sql = s.getSql().replaceAll("\\s+", " ");
-                      return (sql.contains(
-                                  "SELECT oid, typname, typreceive, typbasetype, typrelid, typarray FROM pg_cat")
-                              && sql.contains("type")
-                              && sql.contains("typreceive != 0 OR typsend != 0"))
-                          || (sql.contains(
-                                  "SELECT attrelid, attname, atttypid FROM pg_catalog.pg_attribute ORDER BY attrelid, attnum")
-                              || sql.contains(
-                                  "SELECT attrelid, attname, atttypid FROM pg_attribute ORDER BY attrelid, attnum"));
-                    });
+                .anyMatch(s -> {
+                  String sql = s.getSql().replaceAll("\\s+", " ");
+                  return (sql.contains(
+                              "SELECT oid, typname, typreceive, typbasetype, typrelid, typarray FROM pg_cat")
+                          && sql.contains("type")
+                          && sql.contains("typreceive != 0 OR typsend != 0"))
+                      || (sql.contains(
+                              "SELECT attrelid, attname, atttypid FROM pg_catalog.pg_attribute ORDER BY attrelid, attnum")
+                          || sql.contains(
+                              "SELECT attrelid, attname, atttypid FROM pg_attribute ORDER BY attrelid, attnum"));
+                });
       }
 
       @Override

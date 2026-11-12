@@ -68,11 +68,10 @@ public class CommandMockServerTest extends AbstractMockServerTest {
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
     Future<Void> future =
-        executor.submit(
-            () -> {
-              Server.runCommand(pgServer, "d", "psql", "-c", sql);
-              return null;
-            });
+        executor.submit(() -> {
+          Server.runCommand(pgServer, "d", "psql", "-c", sql);
+          return null;
+        });
     executor.shutdown();
     future.get();
 

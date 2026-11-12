@@ -196,10 +196,9 @@ public class SessionState {
         + PGSetting.getSelectJsonbSetting()
         + "from unnest(array[\n"
         + getAll().stream()
-            .filter(
-                setting ->
-                    setting.getName().toLowerCase().startsWith("spanner.")
-                        || SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getCasePreservingKey()))
+            .filter(setting ->
+                setting.getName().toLowerCase().startsWith("spanner.")
+                    || SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getCasePreservingKey()))
             .map(PGSetting::getJsonbLiteral)
             .collect(Collectors.joining(",\n"))
         + "\n]) t"

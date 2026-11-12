@@ -932,10 +932,8 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> describeInsertRequests =
         requests.stream()
-            .filter(
-                request ->
-                    request.getSql().equals(insertSql)
-                        && request.getQueryMode().equals(QueryMode.PLAN))
+            .filter(request ->
+                request.getSql().equals(insertSql) && request.getQueryMode().equals(QueryMode.PLAN))
             .collect(Collectors.toList());
     assertEquals(1, describeInsertRequests.size());
     // TODO(#477): These Describe-message flows could use single-use read/write transactions.
@@ -944,18 +942,16 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> describeSelectRequests =
         requests.stream()
-            .filter(
-                request ->
-                    request.getSql().equals(selectSql) && request.getQueryMode() == QueryMode.PLAN)
+            .filter(request ->
+                request.getSql().equals(selectSql) && request.getQueryMode() == QueryMode.PLAN)
             .collect(Collectors.toList());
     assertEquals(1, describeSelectRequests.size());
     assertTrue(describeSelectRequests.get(0).getTransaction().hasId());
 
     List<ExecuteSqlRequest> describeUpdateRequests =
         requests.stream()
-            .filter(
-                request ->
-                    request.getSql().equals(updateSql) && request.getQueryMode() == QueryMode.PLAN)
+            .filter(request ->
+                request.getSql().equals(updateSql) && request.getQueryMode() == QueryMode.PLAN)
             .collect(Collectors.toList());
     assertEquals(1, describeUpdateRequests.size());
     assertTrue(describeUpdateRequests.get(0).getTransaction().hasId());
@@ -991,11 +987,10 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     // used the same transaction ids.
     List<AbstractMessage> allRequests =
         mockSpanner.getRequests().stream()
-            .filter(
-                request ->
-                    request instanceof ExecuteSqlRequest
-                        || request instanceof ExecuteBatchDmlRequest
-                        || request instanceof CommitRequest)
+            .filter(request ->
+                request instanceof ExecuteSqlRequest
+                    || request instanceof ExecuteBatchDmlRequest
+                    || request instanceof CommitRequest)
             .collect(Collectors.toList());
     // 9 == 3 Commit + 1 Batch DML + 5 ExecuteSql.
     assertEquals(8, allRequests.size());
@@ -1023,10 +1018,9 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     assertEquals(
         3,
         allRequests.subList(0, 4).stream()
-            .filter(
-                request ->
-                    request instanceof ExecuteSqlRequest
-                        && ((ExecuteSqlRequest) request).getQueryMode() == QueryMode.PLAN)
+            .filter(request ->
+                request instanceof ExecuteSqlRequest
+                    && ((ExecuteSqlRequest) request).getQueryMode() == QueryMode.PLAN)
             .count());
     assertEquals(ExecuteBatchDmlRequest.class, allRequests.get(4).getClass());
     assertEquals(ExecuteSqlRequest.class, allRequests.get(5).getClass());
@@ -1090,10 +1084,9 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     assertTrue(prepareRequests.size() > 0);
     assertTrue(
         prepareRequests.stream()
-            .anyMatch(
-                request ->
-                    request.getSql().equals(invalidSelectSql)
-                        && request.getQueryMode() == QueryMode.PLAN));
+            .anyMatch(request ->
+                request.getSql().equals(invalidSelectSql)
+                    && request.getQueryMode() == QueryMode.PLAN));
     assertFalse(
         prepareRequests.stream().anyMatch(request -> request.getQueryMode() == QueryMode.NORMAL));
   }
@@ -1168,10 +1161,9 @@ public class Pgx5MockServerTest extends AbstractMockServerTest {
     ExecuteBatchDmlRequest request =
         mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).stream()
             .findAny()
-            .orElseThrow(
-                () ->
-                    SpannerExceptionFactory.newSpannerException(
-                        ErrorCode.NOT_FOUND, "ExecuteBatchDmlRequest not found"));
+            .orElseThrow(() ->
+                SpannerExceptionFactory.newSpannerException(
+                    ErrorCode.NOT_FOUND, "ExecuteBatchDmlRequest not found"));
     assertEquals(3, request.getStatementsCount());
     for (ExecuteBatchDmlRequest.Statement statement : request.getStatementsList()) {
       assertEquals(insertSql, statement.getSql());

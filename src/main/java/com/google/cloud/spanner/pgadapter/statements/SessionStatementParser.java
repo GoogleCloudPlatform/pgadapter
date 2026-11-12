@@ -214,16 +214,15 @@ public class SessionStatementParser {
                   StructField.of("setting", Type.string()),
                   StructField.of("description", Type.string())),
               sessionState.getAll().stream()
-                  .map(
-                      setting ->
-                          Struct.newBuilder()
-                              .set("name")
-                              .to(setting.getCasePreservingKey())
-                              .set("setting")
-                              .to(setting.getSetting())
-                              .set("description")
-                              .to(setting.getShortDesc())
-                              .build())
+                  .map(setting ->
+                      Struct.newBuilder()
+                          .set("name")
+                          .to(setting.getCasePreservingKey())
+                          .set("setting")
+                          .to(setting.getSetting())
+                          .set("description")
+                          .to(setting.getShortDesc())
+                          .build())
                   .collect(Collectors.toList())));
     }
 
