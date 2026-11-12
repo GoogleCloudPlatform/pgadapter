@@ -1225,26 +1225,30 @@ public class BackendConnection {
       while (index < bufferedStatements.size()) {
         BufferedStatement<?> bufferedStatement = bufferedStatements.get(index);
         maybeBeginImplicitTransaction(index, isSync);
-        // Prepare the connection for executing a DDL statement. This could include committing the
-        // current transaction, depending on the settings for execute DDL in transactions.
-        if (bufferedStatement.parsedStatement.isDdl()) {
-          prepareExecuteDdl(bufferedStatement);
-        } else if (transactionMode == TransactionMode.DDL_BATCH && !isTransactionStatement(index)) {
-          // End the automatically created DDL batch and revert to an explicit transaction.
-          try {
-            spannerConnection.runBatch();
-          } catch (Exception exception) {
-            // Register the exception on the current statement, even though it was caused by a
-            // previous one.
-            bufferedStatements.get(index).result.setException(exception);
-            throw exception;
-          } finally {
-            transactionMode = TransactionMode.EXPLICIT;
+        if (connectionState != ConnectionState.ABORTED) {
+          // Prepare the connection for executing a DDL statement. This could include committing the
+          // current transaction, depending on the settings for execute DDL in transactions.
+          if (bufferedStatement.parsedStatement.isDdl()) {
+            prepareExecuteDdl(bufferedStatement);
+          } else if (transactionMode == TransactionMode.DDL_BATCH
+              && !isTransactionStatement(index)) {
+            // End the automatically created DDL batch and revert to an explicit transaction.
+            try {
+              spannerConnection.runBatch();
+            } catch (Exception exception) {
+              // Register the exception on the current statement, even though it was caused by a
+              // previous one.
+              bufferedStatements.get(index).result.setException(exception);
+              throw exception;
+            } finally {
+              transactionMode = TransactionMode.EXPLICIT;
+            }
+            spannerConnection.beginTransaction();
           }
-          spannerConnection.beginTransaction();
         }
         boolean canUseBatch = false;
-        if (!spannerConnection.isDdlBatchActive()
+        if (connectionState != ConnectionState.ABORTED
+            && !spannerConnection.isDdlBatchActive()
             && !spannerConnection.isDmlBatchActive()
             && bufferedStatement.isBatchingPossible()
             && index < (getStatementCount() - 1)) {

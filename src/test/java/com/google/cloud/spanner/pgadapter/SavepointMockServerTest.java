@@ -1446,4 +1446,161 @@ public class SavepointMockServerTest extends AbstractMockServerTest {
       assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     }
   }
+
+  @Test
+  public void testDdlStatementInAbortedTransactionWithSavepointDoesNotCommit() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Sending DDL while the transaction is aborted must fail with 25P02 and must NOT commit the
+      // pending statements to Spanner.
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  connection.createStatement().execute("create table bar (id bigint primary key)"));
+      assertEquals(SQLState.InFailedSqlTransaction.toString(), exception.getSQLState());
+
+      // Rolling back to savepoint1 should still be possible and recover the transaction.
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
+
+  @Test
+  public void testDdlStatementInAbortedTransactionWithSavepointFullRollback() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Sending DDL while the transaction is aborted must fail with 25P02 and must NOT commit the
+      // pending statements to Spanner.
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  connection.createStatement().execute("create table bar (id bigint primary key)"));
+      assertEquals(SQLState.InFailedSqlTransaction.toString(), exception.getSQLState());
+
+      // Rolling back the entire transaction should send a RollbackRequest to Spanner without
+      // committing.
+      connection.rollback();
+
+      assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
+
+  @Test
+  public void testMultiStatementDdlInAbortedTransactionWithSavepoint() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Sending multi-statement DDL while aborted must fail with 25P02 and must NOT commit to
+      // Spanner.
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  connection
+                      .createStatement()
+                      .execute(
+                          "create table bar (id bigint primary key); create table baz (id bigint"
+                              + " primary key)"));
+      assertEquals(SQLState.InFailedSqlTransaction.toString(), exception.getSQLState());
+
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
+
+  @Test
+  public void testDdlStatementInAbortedTransactionDefaultMode() throws SQLException {
+    String invalidSql = "insert into foo values ('invalid')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSql),
+            Status.INVALID_ARGUMENT.withDescription("Invalid value").asRuntimeException()));
+
+    try (Connection connection = createConnection()) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      Savepoint savepoint1 = connection.setSavepoint("s1");
+
+      assertThrows(
+          SQLException.class, () -> connection.createStatement().executeUpdate(invalidSql));
+
+      // Under default ddl_transaction_mode=Batch, DDL in aborted transaction must fail with 25P02
+      // (InFailedSqlTransaction), not 25000 (InvalidTransactionState).
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  connection.createStatement().execute("create table bar (id bigint primary key)"));
+      assertEquals(SQLState.InFailedSqlTransaction.toString(), exception.getSQLState());
+
+      connection.rollback(savepoint1);
+
+      connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql());
+      connection.commit();
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    }
+  }
 }
