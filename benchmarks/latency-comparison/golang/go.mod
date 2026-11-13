@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/spanner v1.96.1
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.13.0
-	github.com/moby/moby/api v1.56.1
+	github.com/moby/moby/api v1.57.0
 	github.com/montanaflynn/stats v0.14.0
 	github.com/testcontainers/testcontainers-go v0.45.0
 	golang.org/x/oauth2 v0.38.0
