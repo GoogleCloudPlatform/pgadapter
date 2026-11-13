@@ -147,13 +147,12 @@ public class PgCatalogTest {
 
             return ImmutableList.<QueryPartReplacer>builder()
                 .addAll(replacers)
-                .add(
-                    sql -> {
-                      if ("select * from replace_and_stop".equals(sql)) {
-                        return Tuple.of("select * from replaced", ReplacementStatus.STOP);
-                      }
-                      return Tuple.of(sql, ReplacementStatus.CONTINUE);
-                    })
+                .add(sql -> {
+                  if ("select * from replace_and_stop".equals(sql)) {
+                    return Tuple.of("select * from replaced", ReplacementStatus.STOP);
+                  }
+                  return Tuple.of(sql, ReplacementStatus.CONTINUE);
+                })
                 .build();
           }
         };

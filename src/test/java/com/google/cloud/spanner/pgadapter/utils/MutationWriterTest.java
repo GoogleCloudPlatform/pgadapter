@@ -147,15 +147,14 @@ public class MutationWriterTest {
             false);
 
     Future<?> fut =
-        executor.submit(
-            () -> {
-              try {
-                mutationWriter.addCopyData("1\tOne\n2\tTwo\n".getBytes(StandardCharsets.UTF_8));
-                mutationWriter.commit();
-                mutationWriter.close();
-              } catch (IOException ignore) {
-              }
-            });
+        executor.submit(() -> {
+          try {
+            mutationWriter.addCopyData("1\tOne\n2\tTwo\n".getBytes(StandardCharsets.UTF_8));
+            mutationWriter.commit();
+            mutationWriter.close();
+          } catch (IOException ignore) {
+          }
+        });
 
     StatementResult updateCount = mutationWriter.call();
     fut.get();
@@ -200,15 +199,13 @@ public class MutationWriterTest {
               format,
               false);
 
-      executor.submit(
-          () -> {
-            try {
-              mutationWriter.addCopyData(
-                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-              mutationWriter.close();
-            } catch (IOException ignore) {
-            }
-          });
+      executor.submit(() -> {
+        try {
+          mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.close();
+        } catch (IOException ignore) {
+        }
+      });
 
       PGException exception = assertThrows(PGException.class, mutationWriter::call);
       assertEquals(
@@ -257,17 +254,16 @@ public class MutationWriterTest {
               format,
               false);
 
-      executor.submit(
-          () -> {
-            try {
-              mutationWriter.addCopyData(
-                  "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
-                      .getBytes(StandardCharsets.UTF_8));
-              mutationWriter.commit();
-              mutationWriter.close();
-            } catch (IOException ignore) {
-            }
-          });
+      executor.submit(() -> {
+        try {
+          mutationWriter.addCopyData(
+              "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
+                  .getBytes(StandardCharsets.UTF_8));
+          mutationWriter.commit();
+          mutationWriter.close();
+        } catch (IOException ignore) {
+        }
+      });
 
       StatementResult updateCount = mutationWriter.call();
 
@@ -309,14 +305,13 @@ public class MutationWriterTest {
       // 1. 8 bytes for the INT64
       // 2. 3 characters * 4 bytes per character = 12 bytes for STRING
       // 3. Total: 20 bytes per record, 40 bytes for the entire batch.
-      executor.submit(
-          () -> {
-            try {
-              mutationWriter.addCopyData("1\tOne\n2\tTwo\n".getBytes(StandardCharsets.UTF_8));
-              mutationWriter.close();
-            } catch (IOException ignore) {
-            }
-          });
+      executor.submit(() -> {
+        try {
+          mutationWriter.addCopyData("1\tOne\n2\tTwo\n".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.close();
+        } catch (IOException ignore) {
+        }
+      });
 
       PGException exception = assertThrows(PGException.class, mutationWriter::call);
       assertTrue(exception.getMessage().contains("Commit size: 40 has exceeded the limit: 30"));
@@ -355,16 +350,15 @@ public class MutationWriterTest {
               format,
               false);
 
-      executor.submit(
-          () -> {
-            try {
-              mutationWriter.addCopyData(
-                  "1\tOne\n2\tTwo\n3\tThree\n4\tFour\n5\tFive\n".getBytes(StandardCharsets.UTF_8));
-              mutationWriter.commit();
-              mutationWriter.close();
-            } catch (IOException ignore) {
-            }
-          });
+      executor.submit(() -> {
+        try {
+          mutationWriter.addCopyData(
+              "1\tOne\n2\tTwo\n3\tThree\n4\tFour\n5\tFive\n".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.commit();
+          mutationWriter.close();
+        } catch (IOException ignore) {
+        }
+      });
 
       StatementResult updateCount = mutationWriter.call();
 
@@ -410,18 +404,17 @@ public class MutationWriterTest {
             false);
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
-    executor.submit(
-        () -> {
-          mutationWriter.addCopyData("1\tOne\n".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData("2\tTwo".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData("".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData("\n3\t".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData("Three\n4\tFour\n5\t".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData("Five\n".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.commit();
-          mutationWriter.close();
-          return null;
-        });
+    executor.submit(() -> {
+      mutationWriter.addCopyData("1\tOne\n".getBytes(StandardCharsets.UTF_8));
+      mutationWriter.addCopyData("2\tTwo".getBytes(StandardCharsets.UTF_8));
+      mutationWriter.addCopyData("".getBytes(StandardCharsets.UTF_8));
+      mutationWriter.addCopyData("\n3\t".getBytes(StandardCharsets.UTF_8));
+      mutationWriter.addCopyData("Three\n4\tFour\n5\t".getBytes(StandardCharsets.UTF_8));
+      mutationWriter.addCopyData("Five\n".getBytes(StandardCharsets.UTF_8));
+      mutationWriter.commit();
+      mutationWriter.close();
+      return null;
+    });
     Future<StatementResult> updateCount = executor.submit(mutationWriter);
 
     assertEquals(5L, updateCount.get().getUpdateCount().longValue());
@@ -639,16 +632,13 @@ public class MutationWriterTest {
 
     CountDownLatch latch = new CountDownLatch(1);
     Future<?> fut =
-        executor.submit(
-            () -> {
-              mutationWriter.addCopyData(
-                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-              mutationWriter.close();
-              latch.await();
-              mutationWriter.addCopyData(
-                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-              return null;
-            });
+        executor.submit(() -> {
+          mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.close();
+          latch.await();
+          mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+          return null;
+        });
 
     mutationWriter.call();
     latch.countDown();

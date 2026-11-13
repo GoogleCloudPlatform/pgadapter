@@ -1169,14 +1169,13 @@ public class ITPsqlTest implements IntegrationTest {
             .map(s -> s.replace("primary key", ""))
             .map(s -> s.replace("col_int int", "col_int bigint"))
             .map(s -> s.replace("col_array_int int[]", "col_array_int bigint[]"))
-            .map(
-                s ->
-                    s
-                        + String.format(
-                            " server pgadapter options (table_name '%s');",
-                            s.substring(
-                                "create foreign table f_".length(),
-                                s.indexOf(' ', "create foreign table f_".length()))))
+            .map(s ->
+                s
+                    + String.format(
+                        " server pgadapter options (table_name '%s');",
+                        s.substring(
+                            "create foreign table f_".length(),
+                            s.indexOf(' ', "create foreign table f_".length()))))
             .collect(Collectors.joining("\n"));
 
     try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());

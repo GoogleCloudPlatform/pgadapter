@@ -586,9 +586,8 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(
-                request ->
-                    request.getSql().equals("SELECT 1") || request.getSql().equals("SELECT 2"))
+            .filter(request ->
+                request.getSql().equals("SELECT 1") || request.getSql().equals("SELECT 2"))
             .collect(Collectors.toList());
     assertEquals(2, requests.size());
     assertTrue(requests.get(0).getTransaction().hasId());
