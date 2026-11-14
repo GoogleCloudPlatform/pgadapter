@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.56.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.3...v0.56.4) (2026-11-14)
+
+
+### Dependencies
+
+* update gcr.io/google.com/cloudsdktool/google-cloud-cli docker tag to v593 ([#5174](https://github.com/GoogleCloudPlatform/pgadapter/issues/5174)) ([07d38e0](https://github.com/GoogleCloudPlatform/pgadapter/commit/07d38e06d4638c9877a5871c8537b0a3ccb3d798))
+* update module github.com/googlecloudplatform/pgadapter/wrappers/golang to v0.56.3 ([#5176](https://github.com/GoogleCloudPlatform/pgadapter/issues/5176)) ([8c23f21](https://github.com/GoogleCloudPlatform/pgadapter/commit/8c23f2172a7c2bc743bba488841c2876d77040ca))
+* update module github.com/moby/moby/api to v1.57.0 ([#5179](https://github.com/GoogleCloudPlatform/pgadapter/issues/5179)) ([7b6a545](https://github.com/GoogleCloudPlatform/pgadapter/commit/7b6a5450f6d4cd18546253a5202def8f4ecfafd8))
+* update module go.opentelemetry.io/otel/trace to v1.47.0 [security] ([#5187](https://github.com/GoogleCloudPlatform/pgadapter/issues/5187)) ([cc1a529](https://github.com/GoogleCloudPlatform/pgadapter/commit/cc1a529bbd1cff739dc47b9a2a0807ba122ad7eb))
+* update module google.golang.org/api to v0.314.0 ([#5177](https://github.com/GoogleCloudPlatform/pgadapter/issues/5177)) ([b966282](https://github.com/GoogleCloudPlatform/pgadapter/commit/b966282bb8eeec62a8dd0ba7b653a749e265c472))
+
 ## [0.56.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.2...v0.56.3) (2026-11-12)
 
 
