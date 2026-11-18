@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -29,7 +30,6 @@ import java.sql.SQLException;
 import java.util.List;
 import org.junit.After;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -37,6 +37,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class IsolationLevelMockServerTest extends AbstractMockServerTest {
   private static final String INSERT = "insert into foo values (1)";
+  private static final String REPEATABLE_READ_DATABASE = "repeatable_read_db";
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -67,6 +68,30 @@ public class IsolationLevelMockServerTest extends AbstractMockServerTest {
         pgServer.getLocalPort(), database);
   }
 
+  /**
+   * Connects to a database with default isolation level repeatable read. The default isolation
+   * level is cached per database, so this uses a separate database.
+   */
+  private static Connection connectToRepeatableReadDatabase(String url) throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.detectDialectResult(Dialect.POSTGRESQL, IsolationLevel.REPEATABLE_READ));
+    try {
+      return DriverManager.getConnection(url);
+    } finally {
+      mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+      mockSpanner.clearRequests();
+    }
+  }
+
+  private static String show(java.sql.Statement stmt, String sql) throws SQLException {
+    try (ResultSet rs = stmt.executeQuery(sql)) {
+      assertTrue(rs.next());
+      String value = rs.getString(1);
+      assertFalse(rs.next());
+      return value;
+    }
+  }
+
   @Test
   public void testUnspecifiedIsolationLevel() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl("my_db"));
@@ -76,7 +101,115 @@ public class IsolationLevelMockServerTest extends AbstractMockServerTest {
       stmt.execute("commit");
     }
 
+    assertIsolationLevel(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+  }
+
+  @Test
+  public void testDatabaseDefaultIsolationLevel() throws SQLException {
+    try (Connection connection =
+            connectToRepeatableReadDatabase(createUrl(REPEATABLE_READ_DATABASE));
+        java.sql.Statement stmt = connection.createStatement()) {
+      assertEquals("repeatable read", show(stmt, "show default_transaction_isolation"));
+      assertEquals("repeatable read", show(stmt, "show transaction_isolation"));
+      assertEquals("repeatable read", show(stmt, "show transaction isolation level"));
+      assertEquals(Connection.TRANSACTION_REPEATABLE_READ, connection.getTransactionIsolation());
+
+      stmt.execute("begin");
+      stmt.execute(INSERT);
+      stmt.execute("commit");
+    }
+
+    assertIsolationLevel(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+  }
+
+  @Test
+  public void testDatabaseDefaultIsolationLevelInAutocommit() throws SQLException {
+    try (Connection connection =
+            connectToRepeatableReadDatabase(createUrl(REPEATABLE_READ_DATABASE));
+        java.sql.Statement stmt = connection.createStatement()) {
+      stmt.execute(INSERT);
+    }
+
+    assertIsolationLevel(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+  }
+
+  @Test
+  public void testDefaultIsolationLevelInUrlOverridesDatabaseDefault() throws SQLException {
+    String url =
+        createUrl(REPEATABLE_READ_DATABASE)
+            + "&options=-c%20default_transaction_isolation=serializable";
+    try (Connection connection = connectToRepeatableReadDatabase(url);
+        java.sql.Statement stmt = connection.createStatement()) {
+      assertEquals("serializable", show(stmt, "show default_transaction_isolation"));
+
+      stmt.execute("begin");
+      stmt.execute(INSERT);
+      stmt.execute("commit");
+    }
+
     assertIsolationLevel(IsolationLevel.SERIALIZABLE);
+  }
+
+  @Test
+  public void testSetDefaultIsolationLevelOverridesDatabaseDefault() throws SQLException {
+    try (Connection connection =
+            connectToRepeatableReadDatabase(createUrl(REPEATABLE_READ_DATABASE));
+        java.sql.Statement stmt = connection.createStatement()) {
+      stmt.execute("set default_transaction_isolation = 'serializable'");
+      assertEquals("serializable", show(stmt, "show default_transaction_isolation"));
+      stmt.execute("begin");
+      stmt.execute(INSERT);
+      stmt.execute("commit");
+      assertIsolationLevel(IsolationLevel.SERIALIZABLE);
+
+      mockSpanner.clearRequests();
+      stmt.execute("set default_transaction_isolation to default");
+      assertEquals("repeatable read", show(stmt, "show default_transaction_isolation"));
+      stmt.execute("begin");
+      stmt.execute(INSERT);
+      stmt.execute("commit");
+      assertIsolationLevel(IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
+    }
+  }
+
+  @Test
+  public void testBeginIsolationLevelOverridesDatabaseDefault() throws SQLException {
+    try (Connection connection =
+            connectToRepeatableReadDatabase(createUrl(REPEATABLE_READ_DATABASE));
+        java.sql.Statement stmt = connection.createStatement()) {
+      stmt.execute("begin isolation level serializable");
+      assertEquals("serializable", show(stmt, "show transaction_isolation"));
+      assertEquals("repeatable read", show(stmt, "show default_transaction_isolation"));
+      stmt.execute(INSERT);
+      stmt.execute("commit");
+      assertEquals("repeatable read", show(stmt, "show transaction_isolation"));
+    }
+
+    assertIsolationLevel(IsolationLevel.SERIALIZABLE);
+  }
+
+  @Test
+  public void testCheckSetRestoreIsolationLevelWithDatabaseDefault() throws SQLException {
+    // Uses the default extended query mode of the PG JDBC driver, like Spring and HikariCP.
+    String url =
+        String.format(
+            "jdbc:postgresql://localhost:%d/%s", pgServer.getLocalPort(), REPEATABLE_READ_DATABASE);
+    try (Connection connection = connectToRepeatableReadDatabase(url)) {
+      int previousIsolationLevel = connection.getTransactionIsolation();
+      assertEquals(Connection.TRANSACTION_REPEATABLE_READ, previousIsolationLevel);
+
+      connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+      connection.setAutoCommit(false);
+      try (java.sql.Statement stmt = connection.createStatement()) {
+        stmt.executeUpdate(INSERT);
+      }
+      connection.commit();
+      assertIsolationLevel(IsolationLevel.SERIALIZABLE);
+
+      connection.setAutoCommit(true);
+      connection.setTransactionIsolation(previousIsolationLevel);
+      assertEquals(Connection.TRANSACTION_REPEATABLE_READ, connection.getTransactionIsolation());
+    }
   }
 
   @Test
@@ -134,7 +267,6 @@ public class IsolationLevelMockServerTest extends AbstractMockServerTest {
     assertIsolationLevel(IsolationLevel.REPEATABLE_READ);
   }
 
-  @Ignore("Requires https://github.com/googleapis/java-spanner/pull/4285")
   @Test
   public void testShowDefaultIsolationLevel() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl("my_db"));
@@ -147,7 +279,7 @@ public class IsolationLevelMockServerTest extends AbstractMockServerTest {
       stmt.execute("set default_transaction_isolation='repeatable read'");
       try (ResultSet rs = stmt.executeQuery("show default_transaction_isolation")) {
         assertTrue(rs.next());
-        assertEquals("repeatable_read", rs.getString(1));
+        assertEquals("repeatable read", rs.getString(1));
         assertFalse(rs.next());
       }
     }
