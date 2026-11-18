@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.56.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.3...v0.56.4) (2026-11-18)
+
+
+### Bug Fixes
+
+* **deps:** update base container image digests in Dockerfiles ([#5202](https://github.com/GoogleCloudPlatform/pgadapter/issues/5202)) ([7948ab3](https://github.com/GoogleCloudPlatform/pgadapter/commit/7948ab3f13519081c8d8a2f87984902a289a62d4))
+* **deps:** update libraries-bom to 26.94.0 and google-cloud-spanner-bom to 6.128.0 ([#5196](https://github.com/GoogleCloudPlatform/pgadapter/issues/5196)) ([fe46c9c](https://github.com/GoogleCloudPlatform/pgadapter/commit/fe46c9ca4afda8aa925dbd040d0eab679f83a9a7))
+
+
+### Dependencies
+
+* update actions/setup-go action to v7.1.0 ([#5195](https://github.com/GoogleCloudPlatform/pgadapter/issues/5195)) ([3b3d0c5](https://github.com/GoogleCloudPlatform/pgadapter/commit/3b3d0c5285e1982e3bcfe85babadc8950026e98f))
+* update actions/setup-java action to v6.3.0 ([#5189](https://github.com/GoogleCloudPlatform/pgadapter/issues/5189)) ([85437d1](https://github.com/GoogleCloudPlatform/pgadapter/commit/85437d1ad9346737d885da7b6bbbb8a490a8a999))
+* update dependency coverlet.collector to 10.1.1 ([#5192](https://github.com/GoogleCloudPlatform/pgadapter/issues/5192)) ([cfe36d6](https://github.com/GoogleCloudPlatform/pgadapter/commit/cfe36d6a24f23cefee7ca2464596ac4e4bd15c3e))
+* update dependency org.hibernate.orm:hibernate-core to v7.4.16.final ([#5190](https://github.com/GoogleCloudPlatform/pgadapter/issues/5190)) ([f13a6eb](https://github.com/GoogleCloudPlatform/pgadapter/commit/f13a6eb70fb74d9047712fd6fab17cd7fe2b2e69))
+* update dependency sqlalchemy to v2.1.9 ([#5194](https://github.com/GoogleCloudPlatform/pgadapter/issues/5194)) ([b293e0e](https://github.com/GoogleCloudPlatform/pgadapter/commit/b293e0e9e423ad5563cd215e7cb53343d4deac6c))
+* update gcr.io/google.com/cloudsdktool/google-cloud-cli docker tag to v593 ([#5174](https://github.com/GoogleCloudPlatform/pgadapter/issues/5174)) ([07d38e0](https://github.com/GoogleCloudPlatform/pgadapter/commit/07d38e06d4638c9877a5871c8537b0a3ccb3d798))
+* update module github.com/googlecloudplatform/pgadapter/wrappers/golang to v0.56.3 ([#5176](https://github.com/GoogleCloudPlatform/pgadapter/issues/5176)) ([8c23f21](https://github.com/GoogleCloudPlatform/pgadapter/commit/8c23f2172a7c2bc743bba488841c2876d77040ca))
+* update module github.com/moby/moby/api to v1.57.0 ([#5179](https://github.com/GoogleCloudPlatform/pgadapter/issues/5179)) ([7b6a545](https://github.com/GoogleCloudPlatform/pgadapter/commit/7b6a5450f6d4cd18546253a5202def8f4ecfafd8))
+* update module go.opentelemetry.io/otel/sdk to v1.47.0 [security] ([#5186](https://github.com/GoogleCloudPlatform/pgadapter/issues/5186)) ([4d7be04](https://github.com/GoogleCloudPlatform/pgadapter/commit/4d7be04d71562cff853a3e6896c063b3df73413f))
+* update module go.opentelemetry.io/otel/trace to v1.47.0 [security] ([#5187](https://github.com/GoogleCloudPlatform/pgadapter/issues/5187)) ([cc1a529](https://github.com/GoogleCloudPlatform/pgadapter/commit/cc1a529bbd1cff739dc47b9a2a0807ba122ad7eb))
+* update module google.golang.org/api to v0.314.0 ([#5177](https://github.com/GoogleCloudPlatform/pgadapter/issues/5177)) ([b966282](https://github.com/GoogleCloudPlatform/pgadapter/commit/b966282bb8eeec62a8dd0ba7b653a749e265c472))
+* update module google.golang.org/api to v0.315.0 ([#5188](https://github.com/GoogleCloudPlatform/pgadapter/issues/5188)) ([2c43da3](https://github.com/GoogleCloudPlatform/pgadapter/commit/2c43da395f86b8268e44cb3cfd4794399533a468))
+* update module google.golang.org/api to v0.316.0 ([#5199](https://github.com/GoogleCloudPlatform/pgadapter/issues/5199)) ([a917f46](https://github.com/GoogleCloudPlatform/pgadapter/commit/a917f4627abdbedce881e9d3087bb7e656c7d4e8))
+
 ## [0.56.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.2...v0.56.3) (2026-11-12)
 
 
