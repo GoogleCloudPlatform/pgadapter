@@ -14,7 +14,7 @@ fi
 SPANNER_PROJECT=$(gcloud --quiet config get project)
 
 java --version
-java -jar pgadapter.jar -p $SPANNER_PROJECT -i $SPANNER_INSTANCE -enable_otel -r="minSessions=1000;maxSessions=1000;numChannels=20;useVirtualThreads=true;useVirtualGrpcTransportThreads=true" &
+java -XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2 -jar pgadapter.jar -p $SPANNER_PROJECT -i $SPANNER_INSTANCE -enable_otel -r="minSessions=1000;maxSessions=1000;numChannels=20;useVirtualThreads=true;useVirtualGrpcTransportThreads=true" &
 sleep 6
 export PGDATABASE=$SPANNER_DATABASE
 psql -h localhost -c "CREATE TABLE IF NOT EXISTS usertable (

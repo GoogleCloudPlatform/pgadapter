@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Start PGAdapter.
-java -jar /home/pgadapter/pgadapter.jar > /app/pgadapter.log 2>&1 &
+java -XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2 -jar /home/pgadapter/pgadapter.jar > /app/pgadapter.log 2>&1 &
 sleep 2
 echo "Started PGAdapter in the background"
 

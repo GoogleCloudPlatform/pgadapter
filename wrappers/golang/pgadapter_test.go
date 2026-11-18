@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -211,6 +212,20 @@ func TestCommand(t *testing.T) {
 			"docker run -d --rm -p 5432 gcr.io/cloud-spanner-pg-adapter/pgadapter -r numChannels=10;",
 			nil,
 		},
+		{
+			Config{ExecutionEnvironment: &Java{DownloadSettings: DownloadSettings{DownloadLocation: "/opt/pgadapter"}}},
+			"java -XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2 -jar /opt/pgadapter/pgadapter.jar ",
+			nil,
+		},
+		{
+			Config{
+				ExecutionEnvironment: &Java{DownloadSettings: DownloadSettings{DownloadLocation: "/opt/pgadapter/"}},
+				Project:              "my-project",
+				Instance:             "my-instance",
+			},
+			"java -XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2 -jar /opt/pgadapter/pgadapter.jar -p my-project -i my-instance",
+			nil,
+		},
 	} {
 		cmd, err := exec.conf.ExecutionEnvironment.Command(exec.conf)
 		if (exec.wantErr == nil && err != nil) || (exec.wantErr != nil && err == nil) || (exec.wantErr != nil && err != nil && exec.wantErr.Error() != err.Error()) {
@@ -219,5 +234,19 @@ func TestCommand(t *testing.T) {
 		if g, w := cmd, exec.want; g != w {
 			t.Errorf("%d: command mismatch\n Got: %v\nWant: %v", i, g, w)
 		}
+	}
+}
+
+func TestBuildJavaCommandArgs(t *testing.T) {
+	gotDynamic := buildJavaCommandArgs("/opt/pgadapter/pgadapter.jar", []string{"-p", "my-project"}, 54321, false)
+	wantDynamic := []string{"-XX:+IgnoreUnrecognizedVMOptions", "-XX:UseAVX=2", "-jar", "/opt/pgadapter/pgadapter.jar", "-p", "my-project", "-s", "54321"}
+	if !reflect.DeepEqual(gotDynamic, wantDynamic) {
+		t.Errorf("dynamic port args mismatch\n Got: %v\nWant: %v", gotDynamic, wantDynamic)
+	}
+
+	gotFixed := buildJavaCommandArgs("/opt/pgadapter/pgadapter.jar", []string{"-p", "my-project"}, 5432, true)
+	wantFixed := []string{"-XX:+IgnoreUnrecognizedVMOptions", "-XX:UseAVX=2", "-jar", "/opt/pgadapter/pgadapter.jar", "-p", "my-project"}
+	if !reflect.DeepEqual(gotFixed, wantFixed) {
+		t.Errorf("fixed port args mismatch\n Got: %v\nWant: %v", gotFixed, wantFixed)
 	}
 }

@@ -44,4 +44,5 @@ COPY --from=build --chown=nonroot logging.properties /home/pgadapter/
 # Run as nonroot
 USER 65532
 WORKDIR /home/pgadapter
-ENTRYPOINT ["/usr/bin/java", "-jar", "pgadapter.jar"]
+ENV JDK_JAVA_OPTIONS="-XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2"
+ENTRYPOINT ["/usr/bin/java", "-XX:+IgnoreUnrecognizedVMOptions", "-XX:UseAVX=2", "-jar", "pgadapter.jar"]
