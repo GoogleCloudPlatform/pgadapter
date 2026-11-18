@@ -3,7 +3,7 @@
 ################################################################################
 
 # maven:3-eclipse-temurin-21
-FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/maven@sha256:25d3ec9a193045ff370c5749e9f08c48d5a2b71d69d8e8ebb96b6b70c8d56be7 AS build
+FROM us-docker.pkg.dev/artifact-foundry-prod/docker-3p-trusted/maven@sha256:851ccd76d49d5646915645e5fb51e9b00ef53ad3dc68b0e9a2a9846b9c56bde3 AS build
 
 # Copy over build files to docker image.
 COPY LICENSE ./
