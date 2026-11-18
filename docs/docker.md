@@ -107,4 +107,9 @@ docker run \
   -c /credentials.json -x
 ```
 
+Note: The official PGAdapter Docker images pass `-XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2` in
+their startup command and set `JDK_JAVA_OPTIONS="-XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2"` by
+default. If you override **both** the container `ENTRYPOINT` and `JDK_JAVA_OPTIONS`, include
+`-XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2` in your custom options.
+
 

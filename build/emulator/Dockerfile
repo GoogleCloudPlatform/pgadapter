@@ -22,4 +22,6 @@ RUN chmod u+x /emulator/emulator_main
 # Expose 5432 (PGAdapter PostgreSQL port), 9010 (Emulator gRPC port), and 9020 (Emulator REST port)
 EXPOSE 5432 9010 9020
 
+ENV JDK_JAVA_OPTIONS="-XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2"
+
 ENTRYPOINT ["/bin/bash", "/home/pgadapter/startup.sh"]

@@ -47,4 +47,6 @@ COPY --from=build logging.properties /home/pgadapter/
 ADD build/startup.sh /home/pgadapter/startup.sh
 RUN chmod +x /home/pgadapter/startup.sh
 
+ENV JDK_JAVA_OPTIONS="-XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2"
+
 ENTRYPOINT ["/bin/bash", "/home/pgadapter/startup.sh"]

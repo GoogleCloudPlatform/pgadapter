@@ -136,7 +136,7 @@ func (java *Java) Command(config Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cmd := "java -jar " + java.DownloadSettings.DownloadLocation
+	cmd := "java -XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2 -jar " + java.DownloadSettings.DownloadLocation
 	if !strings.HasSuffix(cmd, "/") {
 		cmd += "/"
 	}
@@ -395,10 +395,7 @@ func startJava(ctx context.Context, config Config) (*PGAdapter, error) {
 	} else {
 		port = config.Port
 	}
-	args = append([]string{"-jar", jar}, args...)
-	if config.Port == 0 {
-		args = append(args, "-s", strconv.Itoa(port))
-	}
+	args = buildJavaCommandArgs(jar, args, port, config.Port != 0)
 	commandCtx, cancelFunc := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(commandCtx, "java", args...)
 	cmd.Cancel = func() error {
@@ -417,6 +414,19 @@ func startJava(ctx context.Context, config Config) (*PGAdapter, error) {
 		return nil, err
 	}
 	return &PGAdapter{stopFunc: cancelFunc, port: port}, nil
+}
+
+// buildJavaCommandArgs constructs the CLI arguments passed to the java binary when starting
+// PGAdapter locally. -XX:+IgnoreUnrecognizedVMOptions must precede -XX:UseAVX=2 so non-x86
+// JVMs (such as arm64) ignore the x86-only UseAVX option instead of failing at startup.
+func buildJavaCommandArgs(jar string, args []string, port int, fixedPort bool) []string {
+	out := make([]string, 0, len(args)+6)
+	out = append(out, "-XX:+IgnoreUnrecognizedVMOptions", "-XX:UseAVX=2", "-jar", jar)
+	out = append(out, args...)
+	if !fixedPort {
+		out = append(out, "-s", strconv.Itoa(port))
+	}
+	return out
 }
 
 func waitForPort(port int, initialWait, waitInterval time.Duration, maxAttempts int) error {

@@ -58,6 +58,6 @@ else
 fi
 
 cd /home/pgadapter
-COMMAND="java ${JAVA_ARGUMENTS} -jar pgadapter.jar ${ARGUMENTS}"
+COMMAND="java -XX:+IgnoreUnrecognizedVMOptions -XX:UseAVX=2 ${JAVA_ARGUMENTS} -jar pgadapter.jar ${ARGUMENTS}"
 echo $COMMAND
 exec $COMMAND

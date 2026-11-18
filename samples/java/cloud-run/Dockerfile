@@ -30,4 +30,4 @@ FROM eclipse-temurin:25-jre-alpine
 COPY --from=builder /app/target/google-cloud-spanner-pgadapter-samples-cloud-run-*.jar /google-cloud-spanner-pgadapter-samples-cloud-run.jar
 
 # Run the web service on container startup.
-CMD ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "/google-cloud-spanner-pgadapter-samples-cloud-run.jar"]
+CMD ["java", "-XX:+IgnoreUnrecognizedVMOptions", "-XX:UseAVX=2", "-Djava.security.egd=file:/dev/./urandom", "-jar", "/google-cloud-spanner-pgadapter-samples-cloud-run.jar"]
