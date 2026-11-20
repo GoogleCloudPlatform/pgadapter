@@ -1,2 +1,2 @@
-psycopg[binary]==3.3.8
+psycopg[binary]==3.3.9
 pytz==2026.6
