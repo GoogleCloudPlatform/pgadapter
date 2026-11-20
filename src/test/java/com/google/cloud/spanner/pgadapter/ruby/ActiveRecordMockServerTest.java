@@ -593,11 +593,10 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     assertEquals(
         1,
         mockSpanner.getRequestsOfType(CommitRequest.class).stream()
-            .filter(
-                request ->
-                    request
-                        .getTransactionId()
-                        .equals(insertSingersRequests.get(0).getTransaction().getId()))
+            .filter(request ->
+                request
+                    .getTransactionId()
+                    .equals(insertSingersRequests.get(0).getTransaction().getId()))
             .count());
   }
 

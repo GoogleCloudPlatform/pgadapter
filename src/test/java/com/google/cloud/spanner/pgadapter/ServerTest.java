@@ -495,14 +495,13 @@ public class ServerTest {
     public static void main(String[] args) throws Exception {
       Runtime.getRuntime()
           .addShutdownHook(
-              new Thread(
-                  () -> {
-                    try {
-                      Files.asCharSink(new File(args[1]), StandardCharsets.UTF_8).write("HOOK_RAN");
-                    } catch (IOException ignored) {
-                      // ignore
-                    }
-                  }));
+              new Thread(() -> {
+                try {
+                  Files.asCharSink(new File(args[1]), StandardCharsets.UTF_8).write("HOOK_RAN");
+                } catch (IOException ignored) {
+                  // ignore
+                }
+              }));
       new ProxyServer(
               OptionsMetadata.newBuilder()
                   .setProject("p")

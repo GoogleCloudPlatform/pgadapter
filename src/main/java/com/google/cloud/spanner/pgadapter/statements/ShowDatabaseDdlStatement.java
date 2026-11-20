@@ -123,16 +123,15 @@ public class ShowDatabaseDdlStatement extends IntermediatePortalStatement {
         ClientSideResultSet.forRows(
             Type.struct(StructField.of("Statement", Type.string())),
             getDatabaseDdl(spanner, connectionHandler.getDatabaseId()).stream()
-                .map(
-                    statement ->
-                        Struct.newBuilder()
-                            .set("Statement")
-                            .to(
-                                (parsedShowDatabaseDdlStatement.forPostgreSQL
-                                        ? DdlTranslator.translate(statement)
-                                        : statement)
-                                    + ";")
-                            .build())
+                .map(statement ->
+                    Struct.newBuilder()
+                        .set("Statement")
+                        .to(
+                            (parsedShowDatabaseDdlStatement.forPostgreSQL
+                                    ? DdlTranslator.translate(statement)
+                                    : statement)
+                                + ";")
+                        .build())
                 .collect(Collectors.toList()));
     return new QueryResult(resultSet);
   }

@@ -41,16 +41,14 @@ public class PGAdapterConnectionOptionsHelper {
   public static Builder maybeAddGrpcLogInterceptor(
       Builder connectionOptionsBuilder, boolean logGrpcMessagesAsInfo) {
     if (GrpcLogInterceptor.isGrpcFinestLogEnabled()) {
-      return connectionOptionsBuilder.setConfigurator(
-          options ->
-              options.setInterceptorProvider(
-                  () -> ImmutableList.of(new GrpcLogInterceptor(Level.FINEST))));
+      return connectionOptionsBuilder.setConfigurator(options ->
+          options.setInterceptorProvider(
+              () -> ImmutableList.of(new GrpcLogInterceptor(Level.FINEST))));
     }
     if (logGrpcMessagesAsInfo) {
-      return connectionOptionsBuilder.setConfigurator(
-          options ->
-              options.setInterceptorProvider(
-                  () -> ImmutableList.of(new GrpcLogInterceptor(Level.INFO))));
+      return connectionOptionsBuilder.setConfigurator(options ->
+          options.setInterceptorProvider(
+              () -> ImmutableList.of(new GrpcLogInterceptor(Level.INFO))));
     }
     return connectionOptionsBuilder;
   }

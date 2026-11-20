@@ -551,16 +551,13 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
                         ImmutableList.of("table_schema", "table_name")))
                 .addAllRows(
                     views.stream()
-                        .map(
-                            view ->
-                                ListValue.newBuilder()
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(view.table_schema)
-                                            .build())
-                                    .addValues(
-                                        Value.newBuilder().setStringValue(view.table_name).build())
-                                    .build())
+                        .map(view ->
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder().setStringValue(view.table_schema).build())
+                                .addValues(
+                                    Value.newBuilder().setStringValue(view.table_name).build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }
@@ -583,26 +580,25 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
                         ImmutableList.of("table_schema", "table_name", "parent_table_name")))
                 .addAllRows(
                     tables.stream()
-                        .map(
-                            table ->
-                                ListValue.newBuilder()
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(table.tableName.table_schema)
+                        .map(table ->
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(table.tableName.table_schema)
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(table.tableName.table_name)
+                                        .build())
+                                .addValues(
+                                    table.parent_table_name == null
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue(table.parent_table_name)
                                             .build())
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(table.tableName.table_name)
-                                            .build())
-                                    .addValues(
-                                        table.parent_table_name == null
-                                            ? Value.newBuilder()
-                                                .setNullValue(NullValue.NULL_VALUE)
-                                                .build()
-                                            : Value.newBuilder()
-                                                .setStringValue(table.parent_table_name)
-                                                .build())
-                                    .build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }
@@ -628,16 +624,13 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
                         ImmutableList.of("table_schema", "index_name")))
                 .addAllRows(
                     indexes.stream()
-                        .map(
-                            index ->
-                                ListValue.newBuilder()
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(index.table_schema)
-                                            .build())
-                                    .addValues(
-                                        Value.newBuilder().setStringValue(index.index_name).build())
-                                    .build())
+                        .map(index ->
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder().setStringValue(index.table_schema).build())
+                                .addValues(
+                                    Value.newBuilder().setStringValue(index.index_name).build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }
@@ -660,16 +653,13 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
                         ImmutableList.of("table_schema", "index_name")))
                 .addAllRows(
                     indexes.stream()
-                        .map(
-                            index ->
-                                ListValue.newBuilder()
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(index.table_schema)
-                                            .build())
-                                    .addValues(
-                                        Value.newBuilder().setStringValue(index.index_name).build())
-                                    .build())
+                        .map(index ->
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder().setStringValue(index.table_schema).build())
+                                .addValues(
+                                    Value.newBuilder().setStringValue(index.index_name).build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }
@@ -703,22 +693,21 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
                         ImmutableList.of("table_schema", "table_name", "constraint_name")))
                 .addAllRows(
                     foreignKeys.stream()
-                        .map(
-                            foreignKey ->
-                                ListValue.newBuilder()
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(foreignKey.tableName.table_schema)
-                                            .build())
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(foreignKey.tableName.table_name)
-                                            .build())
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(foreignKey.constraint_name)
-                                            .build())
-                                    .build())
+                        .map(foreignKey ->
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(foreignKey.tableName.table_schema)
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(foreignKey.tableName.table_name)
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(foreignKey.constraint_name)
+                                        .build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }
@@ -749,22 +738,21 @@ public class DropCascadeMockServerTest extends AbstractMockServerTest {
                         ImmutableList.of("table_schema", "table_name", "constraint_name")))
                 .addAllRows(
                     foreignKeys.stream()
-                        .map(
-                            foreignKey ->
-                                ListValue.newBuilder()
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(foreignKey.tableName.table_schema)
-                                            .build())
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(foreignKey.tableName.table_name)
-                                            .build())
-                                    .addValues(
-                                        Value.newBuilder()
-                                            .setStringValue(foreignKey.constraint_name)
-                                            .build())
-                                    .build())
+                        .map(foreignKey ->
+                            ListValue.newBuilder()
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(foreignKey.tableName.table_schema)
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(foreignKey.tableName.table_name)
+                                        .build())
+                                .addValues(
+                                    Value.newBuilder()
+                                        .setStringValue(foreignKey.constraint_name)
+                                        .build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }

@@ -730,10 +730,9 @@ public class SessionStateTest {
   @Test
   public void testTryGet() {
     assertNull(
-        tryGet(
-            () -> {
-              throw new IllegalArgumentException();
-            }));
+        tryGet(() -> {
+          throw new IllegalArgumentException();
+        }));
     assertEquals("test", tryGet(() -> "test"));
   }
 

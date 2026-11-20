@@ -179,1062 +179,1019 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   @Test
   public void testDatabaseMetaDataVersion() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          int lastPointIndex = version.lastIndexOf('.');
-          int patchVersion = Integer.parseInt(version.substring(lastPointIndex + 1));
-          String comparableVersion =
-              version.substring(0, lastPointIndex + 1) + String.format("%03d", patchVersion);
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            // Options in the connection string are only supported from version 42.2.6.
-            if (comparableVersion.compareTo("42.2.006") >= 0) {
-              assertEquals("14.1", metadata.getDatabaseProductVersion());
-            } else if (testEnv.getServer() != null) {
-              assertEquals(
-                  "14.1",
-                  testEnv.getServer().getOptions().getServerVersion(),
-                  metadata.getDatabaseProductVersion());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      int lastPointIndex = version.lastIndexOf('.');
+      int patchVersion = Integer.parseInt(version.substring(lastPointIndex + 1));
+      String comparableVersion =
+          version.substring(0, lastPointIndex + 1) + String.format("%03d", patchVersion);
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        // Options in the connection string are only supported from version 42.2.6.
+        if (comparableVersion.compareTo("42.2.006") >= 0) {
+          assertEquals("14.1", metadata.getDatabaseProductVersion());
+        } else if (testEnv.getServer() != null) {
+          assertEquals(
+              "14.1",
+              testEnv.getServer().getOptions().getServerVersion(),
+              metadata.getDatabaseProductVersion());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testSelectEdbRedwoodDateSetting() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            try (ResultSet resultSet =
-                connection
-                    .createStatement()
-                    .executeQuery(
-                        "select setting from pg_settings where name = 'edb_redwood_date'")) {
-              assertFalse(resultSet.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        try (ResultSet resultSet =
+            connection
+                .createStatement()
+                .executeQuery("select setting from pg_settings where name = 'edb_redwood_date'")) {
+          assertFalse(resultSet.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataTables() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet tables =
-                metadata.getTables(null, "public", null, new String[] {"TABLE"})) {
-              assertTrue(tables.next());
-              assertEquals("albums", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("all_types", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("numbers", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("singers", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("tracks", tables.getString("TABLE_NAME"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet tables = metadata.getTables(null, "public", null, new String[] {"TABLE"})) {
+          assertTrue(tables.next());
+          assertEquals("albums", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("all_types", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("numbers", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("singers", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("tracks", tables.getString("TABLE_NAME"));
 
-              assertFalse(tables.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(tables.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataTables_Unfiltered() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet tables = metadata.getTables(null, null, null, null)) {
-              // Just assert that there is at least one result.
-              assertTrue(tables.next());
-              //noinspection StatementWithEmptyBody
-              while (tables.next()) {}
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet tables = metadata.getTables(null, null, null, null)) {
+          // Just assert that there is at least one result.
+          assertTrue(tables.next());
+          //noinspection StatementWithEmptyBody
+          while (tables.next()) {}
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataTables_FilteredByName() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet tables =
-                metadata.getTables(null, "public", "%a%", new String[] {"TABLE"})) {
-              assertTrue(tables.next());
-              assertEquals("albums", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("all_types", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("tracks", tables.getString("TABLE_NAME"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet tables = metadata.getTables(null, "public", "%a%", new String[] {"TABLE"})) {
+          assertTrue(tables.next());
+          assertEquals("albums", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("all_types", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("tracks", tables.getString("TABLE_NAME"));
 
-              assertFalse(tables.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(tables.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataTables_TablesAndViews() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet tables =
-                metadata.getTables(null, "public", "%a%", new String[] {"TABLE", "VIEW"})) {
-              assertTrue(tables.next());
-              assertEquals("albums", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("all_types", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("tracks", tables.getString("TABLE_NAME"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet tables =
+            metadata.getTables(null, "public", "%a%", new String[] {"TABLE", "VIEW"})) {
+          assertTrue(tables.next());
+          assertEquals("albums", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("all_types", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("tracks", tables.getString("TABLE_NAME"));
 
-              assertFalse(tables.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(tables.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataTables_AllTypes() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet tables =
-                metadata.getTables(
-                    null,
-                    "public",
-                    "%a%",
-                    new String[] {
-                      "TABLE",
-                      "PARTITIONED TABLE",
-                      "INDEX",
-                      "PARTITIONED INDEX",
-                      "SEQUENCE",
-                      "TYPE",
-                      "SYSTEM TABLE",
-                      "SYSTEM TOAST TABLE",
-                      "SYSTEM TOAST INDEX",
-                      "SYSTEM VIEW",
-                      "SYSTEM INDEX",
-                      "TEMPORARY TABLE",
-                      "TEMPORARY INDEX",
-                      "TEMPORARY VIEW",
-                      "TEMPORARY SEQUENCE",
-                      "FOREIGN TABLE",
-                      "MATERIALIZED VIEW",
-                      "VIEW"
-                    })) {
-              assertTrue(tables.next());
-              assertEquals("albums", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("all_types", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
-              assertTrue(tables.next());
-              assertEquals("tracks", tables.getString("TABLE_NAME"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet tables =
+            metadata.getTables(
+                null,
+                "public",
+                "%a%",
+                new String[] {
+                  "TABLE",
+                  "PARTITIONED TABLE",
+                  "INDEX",
+                  "PARTITIONED INDEX",
+                  "SEQUENCE",
+                  "TYPE",
+                  "SYSTEM TABLE",
+                  "SYSTEM TOAST TABLE",
+                  "SYSTEM TOAST INDEX",
+                  "SYSTEM VIEW",
+                  "SYSTEM INDEX",
+                  "TEMPORARY TABLE",
+                  "TEMPORARY INDEX",
+                  "TEMPORARY VIEW",
+                  "TEMPORARY SEQUENCE",
+                  "FOREIGN TABLE",
+                  "MATERIALIZED VIEW",
+                  "VIEW"
+                })) {
+          assertTrue(tables.next());
+          assertEquals("albums", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("all_types", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
+          assertTrue(tables.next());
+          assertEquals("tracks", tables.getString("TABLE_NAME"));
 
-              assertFalse(tables.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(tables.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataColumns() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet columns = metadata.getColumns(null, "public", "all_types", null)) {
-              assertTrue(columns.next());
-              assertEquals("col_bigint", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.BIGINT, columns.getInt("DATA_TYPE"));
-              assertEquals("int8", columns.getString("TYPE_NAME"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet columns = metadata.getColumns(null, "public", "all_types", null)) {
+          assertTrue(columns.next());
+          assertEquals("col_bigint", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.BIGINT, columns.getInt("DATA_TYPE"));
+          assertEquals("int8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_bool", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.BIT, columns.getInt("DATA_TYPE"));
-              assertEquals("bool", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_bool", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.BIT, columns.getInt("DATA_TYPE"));
+          assertEquals("bool", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_bytea", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.BINARY, columns.getInt("DATA_TYPE"));
-              assertEquals("bytea", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_bytea", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.BINARY, columns.getInt("DATA_TYPE"));
+          assertEquals("bytea", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_float4", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.REAL, columns.getInt("DATA_TYPE"));
-              assertEquals("float4", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_float4", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.REAL, columns.getInt("DATA_TYPE"));
+          assertEquals("float4", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_float8", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.DOUBLE, columns.getInt("DATA_TYPE"));
-              assertEquals("float8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_float8", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.DOUBLE, columns.getInt("DATA_TYPE"));
+          assertEquals("float8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_int", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.BIGINT, columns.getInt("DATA_TYPE"));
-              assertEquals("int8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_int", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.BIGINT, columns.getInt("DATA_TYPE"));
+          assertEquals("int8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_numeric", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.NUMERIC, columns.getInt("DATA_TYPE"));
-              assertEquals("numeric", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_numeric", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.NUMERIC, columns.getInt("DATA_TYPE"));
+          assertEquals("numeric", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_timestamptz", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.TIMESTAMP, columns.getInt("DATA_TYPE"));
-              String name = columns.getString("TYPE_NAME");
-              assertTrue("timestamptz".equals(name) || "timestamp with time zone".equals(name));
+          assertTrue(columns.next());
+          assertEquals("col_timestamptz", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.TIMESTAMP, columns.getInt("DATA_TYPE"));
+          String name = columns.getString("TYPE_NAME");
+          assertTrue("timestamptz".equals(name) || "timestamp with time zone".equals(name));
 
-              assertTrue(columns.next());
-              assertEquals("col_date", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.DATE, columns.getInt("DATA_TYPE"));
-              assertEquals("date", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_date", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.DATE, columns.getInt("DATA_TYPE"));
+          assertEquals("date", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_varchar", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
-              assertEquals("varchar", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_varchar", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
+          assertEquals("varchar", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_jsonb", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.OTHER, columns.getInt("DATA_TYPE"));
-              assertEquals("jsonb", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_jsonb", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.OTHER, columns.getInt("DATA_TYPE"));
+          assertEquals("jsonb", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_bigint", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_int8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_bigint", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_int8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_bool", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_bool", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_bool", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_bool", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_bytea", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_bytea", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_bytea", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_bytea", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_float4", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_float4", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_float4", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_float4", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_float8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_float8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_int", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_int8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_int", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_int8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_numeric", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_numeric", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_numeric", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_numeric", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_timestamptz", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              name = columns.getString("TYPE_NAME");
-              assertTrue("_timestamptz".equals(name) || "_timestamp with time zone".equals(name));
+          assertTrue(columns.next());
+          assertEquals("col_array_timestamptz", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          name = columns.getString("TYPE_NAME");
+          assertTrue("_timestamptz".equals(name) || "_timestamp with time zone".equals(name));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_date", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_date", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_date", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_date", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_varchar", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_varchar", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_varchar", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_varchar", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_jsonb", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_jsonb", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_jsonb", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_jsonb", columns.getString("TYPE_NAME"));
 
-              assertFalse(columns.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(columns.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataColumns_FilteredByName() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet columns = metadata.getColumns(null, "public", "all_types", "%a%")) {
-              assertTrue(columns.next());
-              assertEquals("col_bytea", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.BINARY, columns.getInt("DATA_TYPE"));
-              assertEquals("bytea", columns.getString("TYPE_NAME"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet columns = metadata.getColumns(null, "public", "all_types", "%a%")) {
+          assertTrue(columns.next());
+          assertEquals("col_bytea", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.BINARY, columns.getInt("DATA_TYPE"));
+          assertEquals("bytea", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_float4", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.REAL, columns.getInt("DATA_TYPE"));
-              assertEquals("float4", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_float4", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.REAL, columns.getInt("DATA_TYPE"));
+          assertEquals("float4", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_float8", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.DOUBLE, columns.getInt("DATA_TYPE"));
-              assertEquals("float8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_float8", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.DOUBLE, columns.getInt("DATA_TYPE"));
+          assertEquals("float8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_timestamptz", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.TIMESTAMP, columns.getInt("DATA_TYPE"));
-              String name = columns.getString("TYPE_NAME");
-              assertTrue("timestamptz".equals(name) || "timestamp with time zone".equals(name));
+          assertTrue(columns.next());
+          assertEquals("col_timestamptz", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.TIMESTAMP, columns.getInt("DATA_TYPE"));
+          String name = columns.getString("TYPE_NAME");
+          assertTrue("timestamptz".equals(name) || "timestamp with time zone".equals(name));
 
-              assertTrue(columns.next());
-              assertEquals("col_date", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.DATE, columns.getInt("DATA_TYPE"));
-              assertEquals("date", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_date", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.DATE, columns.getInt("DATA_TYPE"));
+          assertEquals("date", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_varchar", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
-              assertEquals("varchar", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_varchar", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
+          assertEquals("varchar", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_bigint", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_int8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_bigint", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_int8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_bool", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_bool", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_bool", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_bool", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_bytea", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_bytea", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_bytea", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_bytea", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_float4", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_float4", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_float4", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_float4", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_float8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_float8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_int", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_int8", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_int", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_int8", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_numeric", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_numeric", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_numeric", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_numeric", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_timestamptz", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              name = columns.getString("TYPE_NAME");
-              assertTrue("_timestamptz".equals(name) || "_timestamp with time zone".equals(name));
+          assertTrue(columns.next());
+          assertEquals("col_array_timestamptz", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          name = columns.getString("TYPE_NAME");
+          assertTrue("_timestamptz".equals(name) || "_timestamp with time zone".equals(name));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_date", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_date", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_date", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_date", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_varchar", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_varchar", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_varchar", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_varchar", columns.getString("TYPE_NAME"));
 
-              assertTrue(columns.next());
-              assertEquals("col_array_jsonb", columns.getString("COLUMN_NAME"));
-              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
-              assertEquals("_jsonb", columns.getString("TYPE_NAME"));
+          assertTrue(columns.next());
+          assertEquals("col_array_jsonb", columns.getString("COLUMN_NAME"));
+          assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+          assertEquals("_jsonb", columns.getString("TYPE_NAME"));
 
-              assertFalse(columns.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(columns.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataIndexInfo() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet indexInfo =
-                metadata.getIndexInfo(null, "public", "all_types", false, false)) {
-              assertTrue(indexInfo.next());
-              assertEquals("col_bigint", indexInfo.getString("COLUMN_NAME"));
-              assertEquals("PRIMARY_KEY", indexInfo.getString("INDEX_NAME"));
-              assertTrue(indexInfo.next());
-              assertEquals("col_varchar", indexInfo.getString("COLUMN_NAME"));
-              assertEquals("idx_col_varchar_int", indexInfo.getString("INDEX_NAME"));
-              assertTrue(indexInfo.next());
-              assertEquals("col_int", indexInfo.getString("COLUMN_NAME"));
-              assertEquals("idx_col_varchar_int", indexInfo.getString("INDEX_NAME"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet indexInfo =
+            metadata.getIndexInfo(null, "public", "all_types", false, false)) {
+          assertTrue(indexInfo.next());
+          assertEquals("col_bigint", indexInfo.getString("COLUMN_NAME"));
+          assertEquals("PRIMARY_KEY", indexInfo.getString("INDEX_NAME"));
+          assertTrue(indexInfo.next());
+          assertEquals("col_varchar", indexInfo.getString("COLUMN_NAME"));
+          assertEquals("idx_col_varchar_int", indexInfo.getString("INDEX_NAME"));
+          assertTrue(indexInfo.next());
+          assertEquals("col_int", indexInfo.getString("COLUMN_NAME"));
+          assertEquals("idx_col_varchar_int", indexInfo.getString("INDEX_NAME"));
 
-              assertFalse(indexInfo.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(indexInfo.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataIndexInfo_Unique() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet indexInfo =
-                metadata.getIndexInfo(null, "public", "numbers", true, false)) {
-              assertTrue(indexInfo.next());
-              assertEquals("num", indexInfo.getString("COLUMN_NAME"));
-              assertEquals("PRIMARY_KEY", indexInfo.getString("INDEX_NAME"));
-              assertTrue(indexInfo.next());
-              assertEquals("name", indexInfo.getString("COLUMN_NAME"));
-              assertEquals("idx_numbers_name", indexInfo.getString("INDEX_NAME"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet indexInfo = metadata.getIndexInfo(null, "public", "numbers", true, false)) {
+          assertTrue(indexInfo.next());
+          assertEquals("num", indexInfo.getString("COLUMN_NAME"));
+          assertEquals("PRIMARY_KEY", indexInfo.getString("INDEX_NAME"));
+          assertTrue(indexInfo.next());
+          assertEquals("name", indexInfo.getString("COLUMN_NAME"));
+          assertEquals("idx_numbers_name", indexInfo.getString("INDEX_NAME"));
 
-              assertFalse(indexInfo.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(indexInfo.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataPrimaryKeys() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet primaryKeys = metadata.getPrimaryKeys(null, "public", "all_types")) {
-              assertTrue(primaryKeys.next());
-              assertEquals("col_bigint", primaryKeys.getString("COLUMN_NAME"));
-              assertEquals(1, primaryKeys.getShort("KEY_SEQ"));
-              assertFalse(primaryKeys.next());
-            }
-            try (ResultSet primaryKeys = metadata.getPrimaryKeys(null, "public", "tracks")) {
-              assertTrue(primaryKeys.next());
-              assertEquals("album_id", primaryKeys.getString("COLUMN_NAME"));
-              assertEquals(1, primaryKeys.getShort("KEY_SEQ"));
-              assertTrue(primaryKeys.next());
-              assertEquals("track_number", primaryKeys.getString("COLUMN_NAME"));
-              assertEquals(2, primaryKeys.getShort("KEY_SEQ"));
-              assertFalse(primaryKeys.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet primaryKeys = metadata.getPrimaryKeys(null, "public", "all_types")) {
+          assertTrue(primaryKeys.next());
+          assertEquals("col_bigint", primaryKeys.getString("COLUMN_NAME"));
+          assertEquals(1, primaryKeys.getShort("KEY_SEQ"));
+          assertFalse(primaryKeys.next());
+        }
+        try (ResultSet primaryKeys = metadata.getPrimaryKeys(null, "public", "tracks")) {
+          assertTrue(primaryKeys.next());
+          assertEquals("album_id", primaryKeys.getString("COLUMN_NAME"));
+          assertEquals(1, primaryKeys.getShort("KEY_SEQ"));
+          assertTrue(primaryKeys.next());
+          assertEquals("track_number", primaryKeys.getString("COLUMN_NAME"));
+          assertEquals(2, primaryKeys.getShort("KEY_SEQ"));
+          assertFalse(primaryKeys.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataExportedKeys() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet exportedKeys = metadata.getExportedKeys(null, "public", "singers")) {
-              assertTrue(exportedKeys.next());
-              assertEquals("singers", exportedKeys.getString("PKTABLE_NAME"));
-              assertEquals("singer_id", exportedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("albums", exportedKeys.getString("FKTABLE_NAME"));
-              assertEquals("singer_id", exportedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(1, exportedKeys.getShort("KEY_SEQ"));
-              assertFalse(exportedKeys.next());
-            }
-            try (ResultSet exportedKeys = metadata.getExportedKeys(null, "public", "albums")) {
-              assertTrue(exportedKeys.next());
-              assertEquals("albums", exportedKeys.getString("PKTABLE_NAME"));
-              assertEquals("album_id", exportedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", exportedKeys.getString("FKTABLE_NAME"));
-              assertEquals("album", exportedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(1, exportedKeys.getShort("KEY_SEQ"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet exportedKeys = metadata.getExportedKeys(null, "public", "singers")) {
+          assertTrue(exportedKeys.next());
+          assertEquals("singers", exportedKeys.getString("PKTABLE_NAME"));
+          assertEquals("singer_id", exportedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("albums", exportedKeys.getString("FKTABLE_NAME"));
+          assertEquals("singer_id", exportedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(1, exportedKeys.getShort("KEY_SEQ"));
+          assertFalse(exportedKeys.next());
+        }
+        try (ResultSet exportedKeys = metadata.getExportedKeys(null, "public", "albums")) {
+          assertTrue(exportedKeys.next());
+          assertEquals("albums", exportedKeys.getString("PKTABLE_NAME"));
+          assertEquals("album_id", exportedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", exportedKeys.getString("FKTABLE_NAME"));
+          assertEquals("album", exportedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(1, exportedKeys.getShort("KEY_SEQ"));
 
-              assertTrue(exportedKeys.next());
-              assertEquals("albums", exportedKeys.getString("PKTABLE_NAME"));
-              assertEquals("album_id", exportedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("tracks", exportedKeys.getString("FKTABLE_NAME"));
-              assertEquals("album_id", exportedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(1, exportedKeys.getShort("KEY_SEQ"));
-              assertFalse(exportedKeys.next());
-            }
-            try (ResultSet exportedKeys = metadata.getExportedKeys(null, "public", "tracks")) {
-              assertTrue(exportedKeys.next());
-              assertEquals("tracks", exportedKeys.getString("PKTABLE_NAME"));
-              assertEquals("album_id", exportedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", exportedKeys.getString("FKTABLE_NAME"));
-              assertEquals("album", exportedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(1, exportedKeys.getShort("KEY_SEQ"));
-              assertTrue(exportedKeys.next());
-              assertEquals("tracks", exportedKeys.getString("PKTABLE_NAME"));
-              assertEquals("track_number", exportedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", exportedKeys.getString("FKTABLE_NAME"));
-              assertEquals("track", exportedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(2, exportedKeys.getShort("KEY_SEQ"));
+          assertTrue(exportedKeys.next());
+          assertEquals("albums", exportedKeys.getString("PKTABLE_NAME"));
+          assertEquals("album_id", exportedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("tracks", exportedKeys.getString("FKTABLE_NAME"));
+          assertEquals("album_id", exportedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(1, exportedKeys.getShort("KEY_SEQ"));
+          assertFalse(exportedKeys.next());
+        }
+        try (ResultSet exportedKeys = metadata.getExportedKeys(null, "public", "tracks")) {
+          assertTrue(exportedKeys.next());
+          assertEquals("tracks", exportedKeys.getString("PKTABLE_NAME"));
+          assertEquals("album_id", exportedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", exportedKeys.getString("FKTABLE_NAME"));
+          assertEquals("album", exportedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(1, exportedKeys.getShort("KEY_SEQ"));
+          assertTrue(exportedKeys.next());
+          assertEquals("tracks", exportedKeys.getString("PKTABLE_NAME"));
+          assertEquals("track_number", exportedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", exportedKeys.getString("FKTABLE_NAME"));
+          assertEquals("track", exportedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(2, exportedKeys.getShort("KEY_SEQ"));
 
-              assertFalse(exportedKeys.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(exportedKeys.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataImportedKeys() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet importedKeys = metadata.getImportedKeys(null, "public", "albums")) {
-              assertTrue(importedKeys.next());
-              assertEquals("singers", importedKeys.getString("PKTABLE_NAME"));
-              assertEquals("singer_id", importedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("albums", importedKeys.getString("FKTABLE_NAME"));
-              assertEquals("singer_id", importedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(1, importedKeys.getShort("KEY_SEQ"));
-              assertFalse(importedKeys.next());
-            }
-            try (ResultSet importedKeys = metadata.getImportedKeys(null, "public", "tracks")) {
-              assertTrue(importedKeys.next());
-              assertEquals("albums", importedKeys.getString("PKTABLE_NAME"));
-              assertEquals("album_id", importedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("tracks", importedKeys.getString("FKTABLE_NAME"));
-              assertEquals("album_id", importedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(1, importedKeys.getShort("KEY_SEQ"));
-              assertFalse(importedKeys.next());
-            }
-            try (ResultSet importedKeys =
-                metadata.getImportedKeys(null, "public", "recording_attempt")) {
-              assertTrue(importedKeys.next());
-              assertEquals("albums", importedKeys.getString("PKTABLE_NAME"));
-              assertEquals("album_id", importedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", importedKeys.getString("FKTABLE_NAME"));
-              assertEquals("album", importedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(1, importedKeys.getShort("KEY_SEQ"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet importedKeys = metadata.getImportedKeys(null, "public", "albums")) {
+          assertTrue(importedKeys.next());
+          assertEquals("singers", importedKeys.getString("PKTABLE_NAME"));
+          assertEquals("singer_id", importedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("albums", importedKeys.getString("FKTABLE_NAME"));
+          assertEquals("singer_id", importedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(1, importedKeys.getShort("KEY_SEQ"));
+          assertFalse(importedKeys.next());
+        }
+        try (ResultSet importedKeys = metadata.getImportedKeys(null, "public", "tracks")) {
+          assertTrue(importedKeys.next());
+          assertEquals("albums", importedKeys.getString("PKTABLE_NAME"));
+          assertEquals("album_id", importedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("tracks", importedKeys.getString("FKTABLE_NAME"));
+          assertEquals("album_id", importedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(1, importedKeys.getShort("KEY_SEQ"));
+          assertFalse(importedKeys.next());
+        }
+        try (ResultSet importedKeys =
+            metadata.getImportedKeys(null, "public", "recording_attempt")) {
+          assertTrue(importedKeys.next());
+          assertEquals("albums", importedKeys.getString("PKTABLE_NAME"));
+          assertEquals("album_id", importedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", importedKeys.getString("FKTABLE_NAME"));
+          assertEquals("album", importedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(1, importedKeys.getShort("KEY_SEQ"));
 
-              assertTrue(importedKeys.next());
-              assertEquals("tracks", importedKeys.getString("PKTABLE_NAME"));
-              assertEquals("album_id", importedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", importedKeys.getString("FKTABLE_NAME"));
-              assertEquals("album", importedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(1, importedKeys.getShort("KEY_SEQ"));
-              assertTrue(importedKeys.next());
-              assertEquals("tracks", importedKeys.getString("PKTABLE_NAME"));
-              assertEquals("track_number", importedKeys.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", importedKeys.getString("FKTABLE_NAME"));
-              assertEquals("track", importedKeys.getString("FKCOLUMN_NAME"));
-              assertEquals(2, importedKeys.getShort("KEY_SEQ"));
+          assertTrue(importedKeys.next());
+          assertEquals("tracks", importedKeys.getString("PKTABLE_NAME"));
+          assertEquals("album_id", importedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", importedKeys.getString("FKTABLE_NAME"));
+          assertEquals("album", importedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(1, importedKeys.getShort("KEY_SEQ"));
+          assertTrue(importedKeys.next());
+          assertEquals("tracks", importedKeys.getString("PKTABLE_NAME"));
+          assertEquals("track_number", importedKeys.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", importedKeys.getString("FKTABLE_NAME"));
+          assertEquals("track", importedKeys.getString("FKCOLUMN_NAME"));
+          assertEquals(2, importedKeys.getShort("KEY_SEQ"));
 
-              assertFalse(importedKeys.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(importedKeys.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataCrossReference() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            // Retrieve the references from albums (foreign table) to singers (parent table).
-            try (ResultSet references =
-                metadata.getCrossReference(null, "public", "singers", null, "public", "albums")) {
-              assertTrue(references.next());
-              assertEquals("singers", references.getString("PKTABLE_NAME"));
-              assertEquals("singer_id", references.getString("PKCOLUMN_NAME"));
-              assertEquals("albums", references.getString("FKTABLE_NAME"));
-              assertEquals("singer_id", references.getString("FKCOLUMN_NAME"));
-              assertEquals(1, references.getShort("KEY_SEQ"));
-              assertFalse(references.next());
-            }
-            // Retrieve the references from tracks to albums.
-            try (ResultSet references =
-                metadata.getCrossReference(null, "public", "albums", null, "public", "tracks")) {
-              assertTrue(references.next());
-              assertEquals("albums", references.getString("PKTABLE_NAME"));
-              assertEquals("album_id", references.getString("PKCOLUMN_NAME"));
-              assertEquals("tracks", references.getString("FKTABLE_NAME"));
-              assertEquals("album_id", references.getString("FKCOLUMN_NAME"));
-              assertEquals(1, references.getShort("KEY_SEQ"));
-              assertFalse(references.next());
-            }
-            // Retrieve the references from recording_attempt to albums.
-            try (ResultSet references =
-                metadata.getCrossReference(
-                    null, "public", "albums", null, "public", "recording_attempt")) {
-              assertTrue(references.next());
-              assertEquals("albums", references.getString("PKTABLE_NAME"));
-              assertEquals("album_id", references.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", references.getString("FKTABLE_NAME"));
-              assertEquals("album", references.getString("FKCOLUMN_NAME"));
-              assertEquals(1, references.getShort("KEY_SEQ"));
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        // Retrieve the references from albums (foreign table) to singers (parent table).
+        try (ResultSet references =
+            metadata.getCrossReference(null, "public", "singers", null, "public", "albums")) {
+          assertTrue(references.next());
+          assertEquals("singers", references.getString("PKTABLE_NAME"));
+          assertEquals("singer_id", references.getString("PKCOLUMN_NAME"));
+          assertEquals("albums", references.getString("FKTABLE_NAME"));
+          assertEquals("singer_id", references.getString("FKCOLUMN_NAME"));
+          assertEquals(1, references.getShort("KEY_SEQ"));
+          assertFalse(references.next());
+        }
+        // Retrieve the references from tracks to albums.
+        try (ResultSet references =
+            metadata.getCrossReference(null, "public", "albums", null, "public", "tracks")) {
+          assertTrue(references.next());
+          assertEquals("albums", references.getString("PKTABLE_NAME"));
+          assertEquals("album_id", references.getString("PKCOLUMN_NAME"));
+          assertEquals("tracks", references.getString("FKTABLE_NAME"));
+          assertEquals("album_id", references.getString("FKCOLUMN_NAME"));
+          assertEquals(1, references.getShort("KEY_SEQ"));
+          assertFalse(references.next());
+        }
+        // Retrieve the references from recording_attempt to albums.
+        try (ResultSet references =
+            metadata.getCrossReference(
+                null, "public", "albums", null, "public", "recording_attempt")) {
+          assertTrue(references.next());
+          assertEquals("albums", references.getString("PKTABLE_NAME"));
+          assertEquals("album_id", references.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", references.getString("FKTABLE_NAME"));
+          assertEquals("album", references.getString("FKCOLUMN_NAME"));
+          assertEquals(1, references.getShort("KEY_SEQ"));
 
-              assertFalse(references.next());
-            }
-            // Retrieve the references from recording_attempt to tracks.
-            try (ResultSet references =
-                metadata.getCrossReference(
-                    null, "public", "tracks", null, "public", "recording_attempt")) {
-              assertTrue(references.next());
-              assertEquals("tracks", references.getString("PKTABLE_NAME"));
-              assertEquals("album_id", references.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", references.getString("FKTABLE_NAME"));
-              assertEquals("album", references.getString("FKCOLUMN_NAME"));
-              assertEquals(1, references.getShort("KEY_SEQ"));
-              assertTrue(references.next());
-              assertEquals("tracks", references.getString("PKTABLE_NAME"));
-              assertEquals("track_number", references.getString("PKCOLUMN_NAME"));
-              assertEquals("recording_attempt", references.getString("FKTABLE_NAME"));
-              assertEquals("track", references.getString("FKCOLUMN_NAME"));
-              assertEquals(2, references.getShort("KEY_SEQ"));
+          assertFalse(references.next());
+        }
+        // Retrieve the references from recording_attempt to tracks.
+        try (ResultSet references =
+            metadata.getCrossReference(
+                null, "public", "tracks", null, "public", "recording_attempt")) {
+          assertTrue(references.next());
+          assertEquals("tracks", references.getString("PKTABLE_NAME"));
+          assertEquals("album_id", references.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", references.getString("FKTABLE_NAME"));
+          assertEquals("album", references.getString("FKCOLUMN_NAME"));
+          assertEquals(1, references.getShort("KEY_SEQ"));
+          assertTrue(references.next());
+          assertEquals("tracks", references.getString("PKTABLE_NAME"));
+          assertEquals("track_number", references.getString("PKCOLUMN_NAME"));
+          assertEquals("recording_attempt", references.getString("FKTABLE_NAME"));
+          assertEquals("track", references.getString("FKCOLUMN_NAME"));
+          assertEquals(2, references.getShort("KEY_SEQ"));
 
-              assertFalse(references.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(references.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataTypeInfo() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            Map<String, Integer> results = new HashMap<>();
-            try (ResultSet types = metadata.getTypeInfo()) {
-              while (types.next()) {
-                results.put(types.getString("TYPE_NAME"), types.getInt("DATA_TYPE"));
-              }
-            }
-            assertTrue(results.containsKey("bool"));
-            assertEquals(Types.BIT, results.get("bool").intValue());
-            assertTrue(results.containsKey("bytea"));
-            assertEquals(Types.BINARY, results.get("bytea").intValue());
-            assertTrue(results.containsKey("float8"));
-            assertEquals(Types.DOUBLE, results.get("float8").intValue());
-            assertTrue(results.containsKey("int8"));
-            assertEquals(Types.BIGINT, results.get("int8").intValue());
-            assertTrue(results.containsKey("numeric"));
-            assertEquals(Types.NUMERIC, results.get("numeric").intValue());
-            assertTrue(results.containsKey("timestamptz"));
-            assertEquals(Types.TIMESTAMP, results.get("timestamptz").intValue());
-            assertTrue(results.containsKey("date"));
-            assertEquals(Types.DATE, results.get("date").intValue());
-            assertTrue(results.containsKey("varchar"));
-            assertEquals(Types.VARCHAR, results.get("varchar").intValue());
-            assertTrue(results.containsKey("jsonb"));
-            assertEquals(Types.OTHER, results.get("jsonb").intValue());
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        Map<String, Integer> results = new HashMap<>();
+        try (ResultSet types = metadata.getTypeInfo()) {
+          while (types.next()) {
+            results.put(types.getString("TYPE_NAME"), types.getInt("DATA_TYPE"));
           }
-        });
+        }
+        assertTrue(results.containsKey("bool"));
+        assertEquals(Types.BIT, results.get("bool").intValue());
+        assertTrue(results.containsKey("bytea"));
+        assertEquals(Types.BINARY, results.get("bytea").intValue());
+        assertTrue(results.containsKey("float8"));
+        assertEquals(Types.DOUBLE, results.get("float8").intValue());
+        assertTrue(results.containsKey("int8"));
+        assertEquals(Types.BIGINT, results.get("int8").intValue());
+        assertTrue(results.containsKey("numeric"));
+        assertEquals(Types.NUMERIC, results.get("numeric").intValue());
+        assertTrue(results.containsKey("timestamptz"));
+        assertEquals(Types.TIMESTAMP, results.get("timestamptz").intValue());
+        assertTrue(results.containsKey("date"));
+        assertEquals(Types.DATE, results.get("date").intValue());
+        assertTrue(results.containsKey("varchar"));
+        assertEquals(Types.VARCHAR, results.get("varchar").intValue());
+        assertTrue(results.containsKey("jsonb"));
+        assertEquals(Types.OTHER, results.get("jsonb").intValue());
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataSuperTypes() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            // This method is not supported by the PG JDBC driver.
-            assertThrows(
-                SQLFeatureNotSupportedException.class,
-                () -> metadata.getSuperTypes(null, null, null));
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        // This method is not supported by the PG JDBC driver.
+        assertThrows(
+            SQLFeatureNotSupportedException.class, () -> metadata.getSuperTypes(null, null, null));
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataTableTypes() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            boolean hasTable = false;
-            boolean hasView = false;
-            try (ResultSet tableTypes = metadata.getTableTypes()) {
-              while (tableTypes.next()) {
-                hasTable = hasTable || "TABLE".equals(tableTypes.getString("TABLE_TYPE"));
-                hasView = hasView || "VIEW".equals(tableTypes.getString("TABLE_TYPE"));
-              }
-            }
-            assertTrue(hasTable);
-            assertTrue(hasView);
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        boolean hasTable = false;
+        boolean hasView = false;
+        try (ResultSet tableTypes = metadata.getTableTypes()) {
+          while (tableTypes.next()) {
+            hasTable = hasTable || "TABLE".equals(tableTypes.getString("TABLE_TYPE"));
+            hasView = hasView || "VIEW".equals(tableTypes.getString("TABLE_TYPE"));
           }
-        });
+        }
+        assertTrue(hasTable);
+        assertTrue(hasView);
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataTablePrivileges() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet tablePrivileges = metadata.getTablePrivileges(null, null, null)) {
-              assertFalse(tablePrivileges.next());
-            }
-            try (ResultSet tablePrivileges =
-                metadata.getTablePrivileges(null, "public", "all_types")) {
-              assertFalse(tablePrivileges.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet tablePrivileges = metadata.getTablePrivileges(null, null, null)) {
+          assertFalse(tablePrivileges.next());
+        }
+        try (ResultSet tablePrivileges = metadata.getTablePrivileges(null, "public", "all_types")) {
+          assertFalse(tablePrivileges.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataColumnPrivileges() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet columnPrivileges =
-                metadata.getColumnPrivileges(null, null, null, null)) {
-              assertFalse(columnPrivileges.next());
-            }
-            try (ResultSet columnPrivileges =
-                metadata.getColumnPrivileges(null, "public", "all_types", null)) {
-              assertFalse(columnPrivileges.next());
-            }
-            try (ResultSet columnPrivileges =
-                metadata.getColumnPrivileges(null, null, null, "col_bigint")) {
-              assertFalse(columnPrivileges.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet columnPrivileges = metadata.getColumnPrivileges(null, null, null, null)) {
+          assertFalse(columnPrivileges.next());
+        }
+        try (ResultSet columnPrivileges =
+            metadata.getColumnPrivileges(null, "public", "all_types", null)) {
+          assertFalse(columnPrivileges.next());
+        }
+        try (ResultSet columnPrivileges =
+            metadata.getColumnPrivileges(null, null, null, "col_bigint")) {
+          assertFalse(columnPrivileges.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataAttributes() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            // This method is not supported by the PG JDBC driver.
-            assertThrows(
-                SQLFeatureNotSupportedException.class,
-                () -> metadata.getAttributes(null, null, null, null));
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        // This method is not supported by the PG JDBC driver.
+        assertThrows(
+            SQLFeatureNotSupportedException.class,
+            () -> metadata.getAttributes(null, null, null, null));
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Ignore("Not yet supported")
   @Test
   public void testDatabaseMetaDataBestRowIdentifier() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            // PG just returns the primary key of each table for this method.
-            try (ResultSet rowIdentifiers =
-                metadata.getBestRowIdentifier(
-                    null, "public", "singers", DatabaseMetaData.bestRowTransaction, false)) {
-              assertTrue(rowIdentifiers.next());
-              assertEquals("singer_id", rowIdentifiers.getString("COLUMN_NAME"));
-              assertEquals("int8", rowIdentifiers.getString("TYPE_NAME"));
-              assertFalse(rowIdentifiers.next());
-            }
-            try (ResultSet rowIdentifiers =
-                metadata.getBestRowIdentifier(
-                    null, "public", "tracks", DatabaseMetaData.bestRowTransaction, false)) {
-              assertTrue(rowIdentifiers.next());
-              assertEquals("album_id", rowIdentifiers.getString("COLUMN_NAME"));
-              assertEquals("int8", rowIdentifiers.getString("TYPE_NAME"));
-              assertTrue(rowIdentifiers.next());
-              assertEquals("track_number", rowIdentifiers.getString("COLUMN_NAME"));
-              assertEquals("int8", rowIdentifiers.getString("TYPE_NAME"));
-              assertFalse(rowIdentifiers.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        // PG just returns the primary key of each table for this method.
+        try (ResultSet rowIdentifiers =
+            metadata.getBestRowIdentifier(
+                null, "public", "singers", DatabaseMetaData.bestRowTransaction, false)) {
+          assertTrue(rowIdentifiers.next());
+          assertEquals("singer_id", rowIdentifiers.getString("COLUMN_NAME"));
+          assertEquals("int8", rowIdentifiers.getString("TYPE_NAME"));
+          assertFalse(rowIdentifiers.next());
+        }
+        try (ResultSet rowIdentifiers =
+            metadata.getBestRowIdentifier(
+                null, "public", "tracks", DatabaseMetaData.bestRowTransaction, false)) {
+          assertTrue(rowIdentifiers.next());
+          assertEquals("album_id", rowIdentifiers.getString("COLUMN_NAME"));
+          assertEquals("int8", rowIdentifiers.getString("TYPE_NAME"));
+          assertTrue(rowIdentifiers.next());
+          assertEquals("track_number", rowIdentifiers.getString("COLUMN_NAME"));
+          assertEquals("int8", rowIdentifiers.getString("TYPE_NAME"));
+          assertFalse(rowIdentifiers.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataBestRowIdentifier_NoData() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            // The current replacement returns an empty result set.
-            try (ResultSet rowIdentifiers =
-                metadata.getBestRowIdentifier(
-                    null, "public", "singers", DatabaseMetaData.bestRowTransaction, false)) {
-              assertFalse(rowIdentifiers.next());
-            }
-            try (ResultSet rowIdentifiers =
-                metadata.getBestRowIdentifier(
-                    null, "public", "tracks", DatabaseMetaData.bestRowTransaction, false)) {
-              assertFalse(rowIdentifiers.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        // The current replacement returns an empty result set.
+        try (ResultSet rowIdentifiers =
+            metadata.getBestRowIdentifier(
+                null, "public", "singers", DatabaseMetaData.bestRowTransaction, false)) {
+          assertFalse(rowIdentifiers.next());
+        }
+        try (ResultSet rowIdentifiers =
+            metadata.getBestRowIdentifier(
+                null, "public", "tracks", DatabaseMetaData.bestRowTransaction, false)) {
+          assertFalse(rowIdentifiers.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataCatalogs() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet catalogs = metadata.getCatalogs()) {
-              assertTrue(catalogs.next());
-              assertNotNull(catalogs.getString("TABLE_CAT"));
-              assertFalse(catalogs.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet catalogs = metadata.getCatalogs()) {
+          assertTrue(catalogs.next());
+          assertNotNull(catalogs.getString("TABLE_CAT"));
+          assertFalse(catalogs.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataSchemas() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            String expectedCatalog = database.getId().getDatabase();
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet schemas = metadata.getSchemas()) {
-              assertTrue(schemas.next());
-              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
-              assertEquals("information_schema", schemas.getString("TABLE_SCHEM"));
+    runForAllVersions((connection, version) -> {
+      try {
+        String expectedCatalog = database.getId().getDatabase();
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet schemas = metadata.getSchemas()) {
+          assertTrue(schemas.next());
+          assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
+          assertEquals("information_schema", schemas.getString("TABLE_SCHEM"));
 
-              assertTrue(schemas.next());
-              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
-              assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
+          assertTrue(schemas.next());
+          assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
+          assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
 
-              assertTrue(schemas.next());
-              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
-              assertEquals("public", schemas.getString("TABLE_SCHEM"));
+          assertTrue(schemas.next());
+          assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
+          assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
-              assertTrue(schemas.next());
-              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
-              assertEquals("spanner_sys", schemas.getString("TABLE_SCHEM"));
+          assertTrue(schemas.next());
+          assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
+          assertEquals("spanner_sys", schemas.getString("TABLE_SCHEM"));
 
-              assertFalse(schemas.next());
-            }
+          assertFalse(schemas.next());
+        }
 
-            try (ResultSet schemas = metadata.getSchemas(null, "public")) {
-              assertTrue(schemas.next());
-              assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
-              assertEquals("public", schemas.getString("TABLE_SCHEM"));
+        try (ResultSet schemas = metadata.getSchemas(null, "public")) {
+          assertTrue(schemas.next());
+          assertEquals(expectedCatalog, schemas.getString("TABLE_CATALOG"));
+          assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
-              assertFalse(schemas.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+          assertFalse(schemas.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataClientInfoProperties() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet clientInfoProperties = metadata.getClientInfoProperties()) {
-              // Ignore values, just check that it does not fail.
-              clientInfoProperties.next();
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet clientInfoProperties = metadata.getClientInfoProperties()) {
+          // Ignore values, just check that it does not fail.
+          clientInfoProperties.next();
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataFunctions() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet functions = metadata.getFunctions(null, null, null)) {
-              assertFalse(functions.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet functions = metadata.getFunctions(null, null, null)) {
+          assertFalse(functions.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataFunctionColumns() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet functionColumns = metadata.getFunctionColumns(null, null, null, null)) {
-              assertFalse(functionColumns.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet functionColumns = metadata.getFunctionColumns(null, null, null, null)) {
+          assertFalse(functionColumns.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataProcedures() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet procedures = metadata.getProcedures(null, null, null)) {
-              assertFalse(procedures.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet procedures = metadata.getProcedures(null, null, null)) {
+          assertFalse(procedures.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataProcedureColumns() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet procedureColumns =
-                metadata.getProcedureColumns(null, null, null, null)) {
-              assertFalse(procedureColumns.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet procedureColumns = metadata.getProcedureColumns(null, null, null, null)) {
+          assertFalse(procedureColumns.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataPseudoColumns() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            assertThrows(
-                SQLFeatureNotSupportedException.class,
-                () -> metadata.getPseudoColumns(null, null, null, null));
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        assertThrows(
+            SQLFeatureNotSupportedException.class,
+            () -> metadata.getPseudoColumns(null, null, null, null));
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataVersionColumns() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet versionColumns = metadata.getVersionColumns(null, null, null)) {
-              // Just ensure it does not fail, ignore any results.
-              assertTrue(versionColumns.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet versionColumns = metadata.getVersionColumns(null, null, null)) {
+          // Just ensure it does not fail, ignore any results.
+          assertTrue(versionColumns.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataUDTs() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            try (ResultSet types = metadata.getUDTs(null, null, null, null)) {
-              assertFalse(types.next());
-            }
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet types = metadata.getUDTs(null, null, null, null)) {
+          assertFalse(types.next());
+        }
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataMaxNameLength() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            assertEquals(128, metadata.getMaxColumnNameLength());
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        assertEquals(128, metadata.getMaxColumnNameLength());
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 
   @Test
   public void testDatabaseMetaDataSQLKeywords() throws Exception {
-    runForAllVersions(
-        (connection, version) -> {
-          try {
-            DatabaseMetaData metadata = connection.getMetaData();
-            assertTrue(metadata.getSQLKeywords().length() > 0);
-          } catch (SQLException e) {
-            throw SpannerExceptionFactory.asSpannerException(e);
-          }
-        });
+    runForAllVersions((connection, version) -> {
+      try {
+        DatabaseMetaData metadata = connection.getMetaData();
+        assertTrue(metadata.getSQLKeywords().length() > 0);
+      } catch (SQLException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
+    });
   }
 }

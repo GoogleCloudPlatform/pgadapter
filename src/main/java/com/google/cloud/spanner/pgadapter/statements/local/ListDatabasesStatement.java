@@ -83,25 +83,24 @@ public class ListDatabasesStatement implements LocalStatement {
                 StructField.of("Ctype", Type.string()),
                 StructField.of("Access privileges", Type.string())),
             listDatabases(spanner).stream()
-                .map(
-                    database ->
-                        Struct.newBuilder()
-                            .set("Name")
-                            .to(
-                                database.getId().getInstanceId().equals(defaultInstanceId)
-                                    ? database.getId().getDatabase()
-                                    : database.getId().toString())
-                            .set("Owner")
-                            .to("")
-                            .set("Encoding")
-                            .to("UTF8")
-                            .set("Collate")
-                            .to("")
-                            .set("Ctype")
-                            .to("")
-                            .set("Access privileges")
-                            .to("")
-                            .build())
+                .map(database ->
+                    Struct.newBuilder()
+                        .set("Name")
+                        .to(
+                            database.getId().getInstanceId().equals(defaultInstanceId)
+                                ? database.getId().getDatabase()
+                                : database.getId().toString())
+                        .set("Owner")
+                        .to("")
+                        .set("Encoding")
+                        .to("UTF8")
+                        .set("Collate")
+                        .to("")
+                        .set("Ctype")
+                        .to("")
+                        .set("Access privileges")
+                        .to("")
+                        .build())
                 .sorted(Comparator.comparing(row -> row.getString("Name")))
                 .collect(Collectors.toList()));
     return new QueryResult(resultSet);
