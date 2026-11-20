@@ -129,7 +129,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ruby/setup-ruby@20eb24b0d509e2b9ed9b6d42ddfeb992915e0564 # v1.341.0
         with:
-          ruby-version: '4.0.9'
+          ruby-version: '4.0.10'
           bundler-cache: true
       - run: ruby --version
       - name: Run Ruby on Rails ActiveRecord Sample tests
