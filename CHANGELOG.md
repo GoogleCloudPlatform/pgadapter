@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.56.5](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.4...v0.56.5) (2026-11-20)
+
+
+### Dependencies
+
+* update dependency org.hibernate.orm:hibernate-core to v7.4.17.final ([#5214](https://github.com/GoogleCloudPlatform/pgadapter/issues/5214)) ([e5dfc5c](https://github.com/GoogleCloudPlatform/pgadapter/commit/e5dfc5cd3995274c15da1cbd8f2996327d4e8903))
+* update gcr.io/google.com/cloudsdktool/google-cloud-cli docker tag to v594 ([#5203](https://github.com/GoogleCloudPlatform/pgadapter/issues/5203)) ([b8ffcea](https://github.com/GoogleCloudPlatform/pgadapter/commit/b8ffcea1e4f69169c1f46db6278fc4ac25ba2edf))
+* update module github.com/googlecloudplatform/pgadapter/wrappers/golang to v0.56.4 ([#5209](https://github.com/GoogleCloudPlatform/pgadapter/issues/5209)) ([679a312](https://github.com/GoogleCloudPlatform/pgadapter/commit/679a312f607577f50725a350ce241a77d33e0f0a))
+* update ruby/setup-ruby action to v1.341.0 ([#5200](https://github.com/GoogleCloudPlatform/pgadapter/issues/5200)) ([593cc79](https://github.com/GoogleCloudPlatform/pgadapter/commit/593cc79de618c1a0834d3cc07b3770add1162e29))
+
 ## [0.56.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.3...v0.56.4) (2026-11-18)
 
 
