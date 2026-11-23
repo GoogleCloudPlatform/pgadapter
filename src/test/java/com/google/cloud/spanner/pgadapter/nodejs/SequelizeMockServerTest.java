@@ -332,12 +332,13 @@ public class SequelizeMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testUnmanagedReadWriteTransaction() throws IOException, InterruptedException {
-    testTransaction("testUnmanagedReadWriteTransaction", IsolationLevel.SERIALIZABLE);
+    testTransaction(
+        "testUnmanagedReadWriteTransaction", IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
   }
 
   @Test
   public void testManagedReadWriteTransaction() throws IOException, InterruptedException {
-    testTransaction("testManagedReadWriteTransaction", IsolationLevel.SERIALIZABLE);
+    testTransaction("testManagedReadWriteTransaction", IsolationLevel.ISOLATION_LEVEL_UNSPECIFIED);
   }
 
   @Test
