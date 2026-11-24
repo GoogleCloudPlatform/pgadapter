@@ -21,6 +21,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -35,6 +36,9 @@ import org.postgresql.util.ByteConverter;
 /** Translate from wire protocol to long. */
 @InternalApi
 public class LongParser extends Parser<Long> {
+
+  private static final int MAX_DECIMAL_LENGTH = 128;
+  private static final int MAX_INTEGER_DIGITS = 20;
 
   LongParser(ResultSet item, int position) {
     this.item = item.getLong(position);
@@ -55,18 +59,103 @@ public class LongParser extends Parser<Long> {
     }
     switch (formatCode) {
       case TEXT:
-        String stringValue = new String(item);
-        try {
-          return new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).longValueExact();
-        } catch (Exception exception) {
-          throw PGExceptionFactory.newPGException(
-              "Invalid int8 value: " + stringValue, SQLState.SyntaxError);
-        }
+        return parseTextInteger(item, "int8", Long.MIN_VALUE, Long.MAX_VALUE);
       case BINARY:
         return toLong(item);
       default:
         throw new IllegalArgumentException("Unsupported format: " + formatCode);
     }
+  }
+
+  static long parseTextInteger(
+      @Nonnull byte[] item, @Nonnull String typeName, long minValue, long maxValue) {
+    // String.trim() also strips ASCII control characters <= 0x20 (such as \0 or \u0001), which is
+    // slightly more permissive than PostgreSQL whitespace, and Long.parseLong/BigDecimal accept
+    // non-ASCII Unicode digits. We intentionally rely on the standard library here to avoid a
+    // custom parser for these extreme outliers.
+    String stringValue = new String(item, UTF8).trim();
+    long parsedValue;
+    try {
+      parsedValue = Long.parseLong(stringValue);
+    } catch (NumberFormatException numberFormatException) {
+      if (isPlainIntegerSyntax(stringValue)) {
+        throw invalidValueException(typeName, stringValue, SQLState.NumericValueOutOfRange);
+      }
+      parsedValue = parseDecimalToLong(stringValue, typeName);
+    }
+    if (parsedValue < minValue || parsedValue > maxValue) {
+      throw invalidValueException(typeName, stringValue, SQLState.NumericValueOutOfRange);
+    }
+    return parsedValue;
+  }
+
+  private static boolean isPlainIntegerSyntax(String value) {
+    if (value.isEmpty()) {
+      return false;
+    }
+    int startIndex = (value.charAt(0) == '+' || value.charAt(0) == '-') ? 1 : 0;
+    if (startIndex == value.length()) {
+      return false;
+    }
+    for (int index = startIndex; index < value.length(); index++) {
+      char character = value.charAt(index);
+      if (character < '0' || character > '9') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static long parseDecimalToLong(String stringValue, String typeName) {
+    // Bound non-integer string length before calling new BigDecimal(...) so multi-MB fractional
+    // strings cannot trigger expensive BigInteger base conversion or large allocations.
+    // Because decimal.precision() <= stringValue.length() <= MAX_DECIMAL_LENGTH, any non-zero
+    // value reaching setScale(0) with 0 <= integerDigits <= MAX_INTEGER_DIGITS is guaranteed to
+    // have -19 <= scale <= MAX_DECIMAL_LENGTH, preventing setScale(0) CPU/heap exhaustion.
+    // Overly long decimal/scientific strings (e.g., > 128 chars) are intentionally rejected.
+    if (stringValue.length() > MAX_DECIMAL_LENGTH) {
+      throw invalidValueException(typeName, stringValue, SQLState.SyntaxError);
+    }
+    BigDecimal decimal;
+    try {
+      // BigDecimal only supports 32-bit int exponents, so extreme exponents outside int range
+      // (e.g., 1e999999999999 or 1e-2147483648) intentionally fail here with SyntaxError.
+      decimal = new BigDecimal(stringValue);
+    } catch (NumberFormatException exception) {
+      throw invalidValueException(typeName, stringValue, SQLState.SyntaxError);
+    }
+    if (decimal.signum() == 0) {
+      return 0L;
+    }
+    long integerDigits = (long) decimal.precision() - (long) decimal.scale();
+    if (integerDigits < 0) {
+      // |decimal| < 0.1, so HALF_UP rounding to an integer always produces 0 without materializing
+      // 10^scale.
+      return 0L;
+    }
+    if (integerDigits > MAX_INTEGER_DIGITS) {
+      // |decimal| >= 10^20 > Long.MAX_VALUE, so it cannot fit in int8.
+      throw invalidValueException(typeName, stringValue, SQLState.NumericValueOutOfRange);
+    }
+    try {
+      return decimal.setScale(0, RoundingMode.HALF_UP).longValueExact();
+    } catch (ArithmeticException exception) {
+      throw invalidValueException(typeName, stringValue, SQLState.NumericValueOutOfRange);
+    }
+  }
+
+  private static PGException invalidValueException(
+      String typeName, String stringValue, SQLState sqlState) {
+    String displayValue = stringValue;
+    if (stringValue.length() > MAX_DECIMAL_LENGTH) {
+      int cutoff = MAX_DECIMAL_LENGTH;
+      if (Character.isHighSurrogate(stringValue.charAt(cutoff - 1))) {
+        cutoff--;
+      }
+      displayValue = stringValue.substring(0, cutoff) + "...";
+    }
+    return PGExceptionFactory.newPGException(
+        "Invalid " + typeName + " value: " + displayValue, sqlState);
   }
 
   /** Converts the binary data to a long value. */

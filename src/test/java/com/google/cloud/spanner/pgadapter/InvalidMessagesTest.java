@@ -45,6 +45,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
 public class InvalidMessagesTest extends AbstractMockServerTest {
@@ -1834,6 +1835,84 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
         assertEquals('Z', inputStream.readByte());
         assertEquals(5, inputStream.readInt());
         assertEquals('I', inputStream.readByte());
+      }
+    }
+  }
+
+  @Test(timeout = 5000)
+  public void testBindLargeScientificNotationIntegerParameter() throws IOException {
+    byte[] sqlBytes = "SELECT $1".getBytes(StandardCharsets.UTF_8);
+    byte[] paramBytes = "1e100000000".getBytes(StandardCharsets.UTF_8);
+    for (int oid : new int[] {Oid.INT2, Oid.INT4, Oid.INT8}) {
+      try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+        try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+            DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+          // Startup
+          outputStream.writeInt(17);
+          outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+          outputStream.writeBytes("user");
+          outputStream.writeByte(0);
+          outputStream.writeBytes("foo");
+          outputStream.writeByte(0);
+          outputStream.flush();
+
+          while (true) {
+            byte message = inputStream.readByte();
+            int length = inputStream.readInt();
+            inputStream.readFully(new byte[length - 4]);
+            if (message == 'Z') {
+              break;
+            }
+          }
+
+          // PARSE unnamed statement with 1 parameter OID
+          outputStream.writeByte('P');
+          outputStream.writeInt(4 + 1 + sqlBytes.length + 1 + 2 + 4);
+          outputStream.writeByte(0);
+          outputStream.write(sqlBytes);
+          outputStream.writeByte(0);
+          outputStream.writeShort(1);
+          outputStream.writeInt(oid);
+
+          // BIND unnamed portal with 1 text parameter ("1e100000000")
+          outputStream.writeByte('B');
+          outputStream.writeInt(4 + 1 + 1 + 2 + 2 + 4 + paramBytes.length + 2);
+          outputStream.writeByte(0);
+          outputStream.writeByte(0);
+          outputStream.writeShort(0);
+          outputStream.writeShort(1);
+          outputStream.writeInt(paramBytes.length);
+          outputStream.write(paramBytes);
+          outputStream.writeShort(0);
+
+          // EXECUTE unnamed portal
+          outputStream.writeByte('E');
+          outputStream.writeInt(4 + 1 + 4);
+          outputStream.writeByte(0);
+          outputStream.writeInt(0);
+
+          // SYNC
+          outputStream.writeByte('S');
+          outputStream.writeInt(4);
+          outputStream.flush();
+
+          boolean sawError = false;
+          while (true) {
+            byte message = inputStream.readByte();
+            int length = inputStream.readInt();
+            byte[] payload = new byte[length - 4];
+            inputStream.readFully(payload);
+            if (message == 'E') {
+              String errorPayload = new String(payload, StandardCharsets.UTF_8);
+              assertTrue(errorPayload.contains("22003"));
+              assertTrue(errorPayload.contains("1e100000000"));
+              sawError = true;
+            } else if (message == 'Z') {
+              break;
+            }
+          }
+          assertTrue(sawError);
+        }
       }
     }
   }

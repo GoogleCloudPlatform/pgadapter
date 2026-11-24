@@ -16,11 +16,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Value;
-import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableMap;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to int. */
@@ -45,13 +41,8 @@ class IntegerParser extends Parser<Integer> {
     }
     switch (formatCode) {
       case TEXT:
-        String stringValue = new String(item);
-        try {
-          return new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).intValueExact();
-        } catch (Exception exception) {
-          throw PGExceptionFactory.newPGException(
-              "Invalid int4 value: " + stringValue, SQLState.SyntaxError);
-        }
+        return Math.toIntExact(
+            LongParser.parseTextInteger(item, "int4", Integer.MIN_VALUE, Integer.MAX_VALUE));
       case BINARY:
         return ByteConverter.int4(item, 0);
       default:
