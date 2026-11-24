@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -27,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -35,7 +38,14 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -232,6 +242,126 @@ public class WireMessageTest {
     ConnectionHandler connection = createConnectionHandler(outputStream.toByteArray());
     PasswordMessage passwordMessage = new PasswordMessage(connection, Collections.emptyMap());
     assertEquals("secret_password", passwordMessage.getPassword());
+  }
+
+  private interface ThrowingRunnable {
+    void run() throws Exception;
+  }
+
+  private ConnectionHandler createMockConnection(byte[] inputBytes) {
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(options.shouldAuthenticate()).thenReturn(false);
+    when(server.getOptions()).thenReturn(options);
+    when(server.getMessageReader()).thenReturn(new MessageReader(options));
+
+    ConnectionMetadata metadata = mock(ConnectionMetadata.class);
+    when(metadata.getInputStream())
+        .thenReturn(new DataInputStream(new ByteArrayInputStream(inputBytes)));
+    when(metadata.getOutputStream()).thenReturn(new DataOutputStream(new ByteArrayOutputStream()));
+
+    ConnectionHandler connection = mock(ConnectionHandler.class);
+    when(connection.getServer()).thenReturn(server);
+    when(connection.getConnectionMetadata()).thenReturn(metadata);
+    when(connection.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    return connection;
+  }
+
+  private List<String> captureWireMessageFinestLogs(ThrowingRunnable action) throws Exception {
+    Logger wireMessageLogger = Logger.getLogger(WireMessage.class.getName());
+    Level previousLevel = wireMessageLogger.getLevel();
+    boolean previousUseParentHandlers = wireMessageLogger.getUseParentHandlers();
+    List<String> loggedMessages = new ArrayList<>();
+    Handler testHandler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord record) {
+            loggedMessages.add(record.getMessage());
+          }
+
+          @Override
+          public void flush() {}
+
+          @Override
+          public void close() {}
+        };
+    try {
+      wireMessageLogger.setUseParentHandlers(false);
+      wireMessageLogger.addHandler(testHandler);
+      wireMessageLogger.setLevel(Level.FINEST);
+      action.run();
+    } finally {
+      wireMessageLogger.removeHandler(testHandler);
+      wireMessageLogger.setLevel(previousLevel);
+      wireMessageLogger.setUseParentHandlers(previousUseParentHandlers);
+    }
+    return loggedMessages;
+  }
+
+  @Test
+  public void testPasswordMessage_redactsPasswordInLogs() throws Exception {
+    String secretToken = "ya29.secret_oauth_token_value";
+    byte[] passwordBytes = (secretToken + "\0").getBytes(StandardCharsets.UTF_8);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeInt(4 + passwordBytes.length);
+    dataOutputStream.write(passwordBytes);
+
+    ConnectionHandler connection = createMockConnection(outputStream.toByteArray());
+    PasswordMessage passwordMessage =
+        new PasswordMessage(connection, Collections.singletonMap("user", "oauth2"));
+
+    assertFalse(passwordMessage.getPayloadString().contains(secretToken));
+    assertTrue(passwordMessage.getPayloadString().contains("Username: oauth2"));
+    assertTrue(passwordMessage.getPayloadString().contains("<REDACTED>"));
+    assertFalse(passwordMessage.toString().contains(secretToken));
+
+    List<String> loggedMessages = captureWireMessageFinestLogs(passwordMessage::send);
+    String targetMessage = null;
+    for (String message : loggedMessages) {
+      assertFalse(message.contains(secretToken));
+      if (message.contains("Username: oauth2")) {
+        targetMessage = message;
+      }
+    }
+    assertNotNull(targetMessage);
+    assertTrue(targetMessage.contains("<REDACTED>"));
+  }
+
+  @Test
+  public void testCancelMessage_redactsSecretInLogs() throws Exception {
+    byte[][] secrets =
+        new byte[][] {
+          new byte[] {17, 29, 43, 59},
+          new byte[] {
+            11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+            33, 34, 35, 36, 37, 38, 39, 40, 41, 42
+          }
+        };
+    for (byte[] secret : secrets) {
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+      DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+      dataOutputStream.writeInt(77);
+      dataOutputStream.write(secret);
+
+      int length = 12 + secret.length;
+      ConnectionHandler connection = createMockConnection(outputStream.toByteArray());
+      CancelMessage cancelMessage = new CancelMessage(connection, length);
+      assertFalse(cancelMessage.getPayloadString().contains(Arrays.toString(secret)));
+      assertTrue(cancelMessage.getPayloadString().contains("Connection ID: 77"));
+      assertTrue(cancelMessage.getPayloadString().contains("<REDACTED>"));
+
+      List<String> loggedMessages = captureWireMessageFinestLogs(cancelMessage::send);
+      String targetMessage = null;
+      for (String message : loggedMessages) {
+        assertFalse(message.contains(Arrays.toString(secret)));
+        if (message.contains("Connection ID: 77")) {
+          targetMessage = message;
+        }
+      }
+      assertNotNull(targetMessage);
+      assertTrue(targetMessage.contains("<REDACTED>"));
+    }
   }
 
   @Test

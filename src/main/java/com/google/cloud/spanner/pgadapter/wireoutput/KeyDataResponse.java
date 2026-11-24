@@ -18,7 +18,6 @@ import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Arrays;
 
 /**
  * Sends back information regarding the current connection (identifier and secret) as part of
@@ -55,6 +54,6 @@ public class KeyDataResponse extends WireOutput {
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}, " + "Process ID: {1}, " + "Secret Key: {2}")
-        .format(new Object[] {this.length, this.processId, Arrays.toString(this.secret)});
+        .format(new Object[] {this.length, this.processId, "<REDACTED>"});
   }
 }

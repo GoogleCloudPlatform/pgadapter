@@ -84,10 +84,10 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -978,18 +978,15 @@ public class ConnectionHandler implements Runnable {
             SQLState.ProtocolViolation);
     }
 
-    if (!Arrays.equals(secret, connectionToCancel.getSecret())) {
+    if (!MessageDigest.isEqual(secret, connectionToCancel.getSecret())) {
       logger.log(
           Level.WARNING,
           Logging.format(
               "CancelActiveStatement",
               () ->
                   MessageFormat.format(
-                      "User attempted to cancel a connection with the incorrect secret."
-                          + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
-                      connectionId,
-                      Arrays.toString(secret),
-                      Arrays.toString(connectionToCancel.getSecret()))));
+                      "User attempted to cancel a connection with the incorrect secret. Connection: {0}",
+                      connectionId)));
       // Since the user does not accept a response, there is no need to except here: simply return.
       return false;
     }
