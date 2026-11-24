@@ -15,11 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.Value;
-import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.collect.ImmutableMap;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to short. */
@@ -40,13 +36,7 @@ class ShortParser extends Parser<Short> {
     }
     switch (formatCode) {
       case TEXT:
-        String stringValue = new String(item);
-        try {
-          return new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).shortValueExact();
-        } catch (Exception exception) {
-          throw PGExceptionFactory.newPGException(
-              "Invalid int2 value: " + stringValue, SQLState.SyntaxError);
-        }
+        return (short) LongParser.parseTextInteger(item, "int2", Short.MIN_VALUE, Short.MAX_VALUE);
       case BINARY:
         return ByteConverter.int2(item, 0);
       default:

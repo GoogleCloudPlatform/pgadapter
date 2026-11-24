@@ -21,6 +21,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
@@ -101,5 +102,127 @@ public class LongParserTest {
         () ->
             new LongParser(
                 (Long.MIN_VALUE + "0").getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+  }
+
+  @Test(timeout = 2000)
+  public void testScientificNotationAndLargeInputs() {
+    assertEquals(
+        100L,
+        new LongParser("1e2".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        150L,
+        new LongParser("1.5e2".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        -25L,
+        new LongParser("-2.5E1".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        1L,
+        new LongParser("0.5".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        -1L,
+        new LongParser("-0.5".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        0L,
+        new LongParser("0e100000000".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        0L,
+        new LongParser("0e-100000000".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        0L,
+        new LongParser("1e-100000000".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        0L,
+        new LongParser("-1e-1000000000".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        42L,
+        new LongParser(" 42 ".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        -2L,
+        new LongParser("\t-1.5\n".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        0L,
+        new LongParser("0.09".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        0L,
+        new LongParser("-0.09".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        0L,
+        new LongParser("1e-2147483647".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        1L,
+        new LongParser(
+                ("1." + new String(new char[125]).replace('\0', '0') + "5")
+                    .getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        42L,
+        new LongParser(
+                (new String(new char[200]).replace('\0', '0') + "42")
+                    .getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        Long.MAX_VALUE,
+        new LongParser((Long.MAX_VALUE + ".4").getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        Long.MIN_VALUE,
+        new LongParser((Long.MIN_VALUE + ".4").getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+
+    for (String overflowValue :
+        new String[] {
+          "1e10000000",
+          "1e100000000",
+          "1e1000000000",
+          "-1e100000000",
+          "1e2147483647",
+          "10e2147483647",
+          "1e19",
+          "1e20",
+          Long.MAX_VALUE + ".5",
+          Long.MIN_VALUE + ".5",
+          "-9223372036854775809",
+          "+9223372036854775808",
+          " 99999999999999999999 ",
+          "+99999999999999999999",
+          "1" + new String(new char[1024]).replace('\0', '0'),
+        }) {
+      PGException exception =
+          assertThrows(
+              PGException.class,
+              () ->
+                  new LongParser(overflowValue.getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+      assertEquals(SQLState.NumericValueOutOfRange, exception.getSQLState());
+    }
+
+    for (String syntaxErrorValue :
+        new String[] {
+          "",
+          "   ",
+          "+",
+          "-",
+          "1e999999999999",
+          "1e-2147483648",
+          "1." + new String(new char[126]).replace('\0', '0') + "5",
+          "1." + new String(new char[500_000]).replace('\0', '0') + "5",
+          "1" + new String(new char[500_000]).replace('\0', '0') + "e-500000",
+        }) {
+      PGException exception =
+          assertThrows(
+              PGException.class,
+              () ->
+                  new LongParser(
+                      syntaxErrorValue.getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+      assertEquals(SQLState.SyntaxError, exception.getSQLState());
+    }
   }
 }
