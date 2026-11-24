@@ -22,6 +22,7 @@ import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
@@ -77,12 +78,19 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import javax.net.ssl.SSLException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -642,6 +650,76 @@ public class ConnectionHandlerTest {
           connectionHandler.cancelActiveStatement(
               connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
     } finally {
+      CONNECTION_HANDLERS.remove(connectionHandlerToCancel.getConnectionId());
+    }
+  }
+
+  @Test
+  public void testCancelActiveStatementDoesNotLogSecrets() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    Connection spannerConnection = mock(Connection.class);
+
+    ConnectionHandler connectionHandler =
+        new ConnectionHandler(server, socket, mock(Connection.class));
+    ConnectionHandler connectionHandlerToCancel =
+        new ConnectionHandler(server, socket, spannerConnection);
+    connectionHandlerToCancel.setThread(mock(Thread.class));
+    connectionHandlerToCancel.setProtocolVersionProperties(
+        StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+
+    Logger connectionHandlerLogger = Logger.getLogger(ConnectionHandler.class.getName());
+    Level previousLevel = connectionHandlerLogger.getLevel();
+    boolean previousUseParentHandlers = connectionHandlerLogger.getUseParentHandlers();
+    List<LogRecord> logRecords = new ArrayList<>();
+    Handler testHandler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord record) {
+            logRecords.add(record);
+          }
+
+          @Override
+          public void flush() {}
+
+          @Override
+          public void close() {}
+        };
+    try {
+      CONNECTION_HANDLERS.put(
+          connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel);
+      connectionHandlerLogger.setUseParentHandlers(false);
+      connectionHandlerLogger.addHandler(testHandler);
+      connectionHandlerLogger.setLevel(Level.WARNING);
+      byte[] wrongSecret = new byte[] {11, 22, 33, 44};
+      if (Arrays.equals(wrongSecret, connectionHandlerToCancel.getSecret())) {
+        wrongSecret[0]++;
+      }
+      assertFalse(
+          connectionHandler.cancelActiveStatement(
+              connectionHandlerToCancel.getConnectionId(), wrongSecret));
+
+      String expectedSecretString = Arrays.toString(connectionHandlerToCancel.getSecret());
+      String attemptedSecretString = Arrays.toString(wrongSecret);
+      String formattedConnectionId =
+          MessageFormat.format("{0}", connectionHandlerToCancel.getConnectionId());
+      String targetMessage = null;
+      for (LogRecord record : logRecords) {
+        if (record.getLevel() == Level.WARNING) {
+          String message = record.getMessage();
+          assertFalse(message.contains(expectedSecretString));
+          assertFalse(message.contains(attemptedSecretString));
+          if (message.contains("Connection: " + formattedConnectionId)) {
+            targetMessage = message;
+          }
+        }
+      }
+      assertNotNull(targetMessage);
+    } finally {
+      connectionHandlerLogger.removeHandler(testHandler);
+      connectionHandlerLogger.setLevel(previousLevel);
+      connectionHandlerLogger.setUseParentHandlers(previousUseParentHandlers);
       CONNECTION_HANDLERS.remove(connectionHandlerToCancel.getConnectionId());
     }
   }

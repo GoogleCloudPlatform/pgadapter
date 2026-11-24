@@ -186,7 +186,7 @@ public class PasswordMessage extends ControlMessage {
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}, " + "Username: {1}, " + "Password: {2}")
-        .format(new Object[] {this.length, this.username, this.password});
+        .format(new Object[] {this.length, this.username, "<REDACTED>"});
   }
 
   @Override

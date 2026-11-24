@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.text.MessageFormat;
-import java.util.Arrays;
 
 /**
  * This message handles the imperative cancellation, as issues in a new connection by the PG wire
@@ -55,7 +54,7 @@ public class CancelMessage extends BootstrapMessage {
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}, Connection ID: {1}, Secret: {2}")
-        .format(new Object[] {this.length, this.connectionId, Arrays.toString(this.secret)});
+        .format(new Object[] {this.length, this.connectionId, "<REDACTED>"});
   }
 
   @Override
