@@ -15,8 +15,10 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
@@ -202,6 +204,12 @@ public class LongParserTest {
               () ->
                   new LongParser(overflowValue.getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
       assertEquals(SQLState.NumericValueOutOfRange, exception.getSQLState());
+      if (overflowValue.trim().length() > 128) {
+        assertTrue(exception.getMessage().endsWith("..."));
+        assertTrue(exception.getMessage().length() <= "Invalid int8 value: ".length() + 131);
+      } else {
+        assertFalse(exception.getMessage().endsWith("..."));
+      }
     }
 
     for (String syntaxErrorValue :
@@ -215,6 +223,7 @@ public class LongParserTest {
           "1." + new String(new char[126]).replace('\0', '0') + "5",
           "1." + new String(new char[500_000]).replace('\0', '0') + "5",
           "1" + new String(new char[500_000]).replace('\0', '0') + "e-500000",
+          new String(new char[127]).replace('\0', 'a') + "\uD83D\uDE00",
         }) {
       PGException exception =
           assertThrows(
@@ -223,6 +232,15 @@ public class LongParserTest {
                   new LongParser(
                       syntaxErrorValue.getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
       assertEquals(SQLState.SyntaxError, exception.getSQLState());
+      if (syntaxErrorValue.trim().length() > 128) {
+        assertTrue(exception.getMessage().endsWith("..."));
+        assertTrue(exception.getMessage().length() <= "Invalid int8 value: ".length() + 131);
+        assertFalse(
+            Character.isHighSurrogate(
+                exception.getMessage().charAt(exception.getMessage().length() - 4)));
+      } else {
+        assertFalse(exception.getMessage().endsWith("..."));
+      }
     }
   }
 }

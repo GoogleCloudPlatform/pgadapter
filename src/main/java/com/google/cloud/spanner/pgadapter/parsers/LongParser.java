@@ -146,8 +146,16 @@ public class LongParser extends Parser<Long> {
 
   private static PGException invalidValueException(
       String typeName, String stringValue, SQLState sqlState) {
+    String displayValue = stringValue;
+    if (stringValue.length() > MAX_DECIMAL_LENGTH) {
+      int cutoff = MAX_DECIMAL_LENGTH;
+      if (Character.isHighSurrogate(stringValue.charAt(cutoff - 1))) {
+        cutoff--;
+      }
+      displayValue = stringValue.substring(0, cutoff) + "...";
+    }
     return PGExceptionFactory.newPGException(
-        "Invalid " + typeName + " value: " + stringValue, sqlState);
+        "Invalid " + typeName + " value: " + displayValue, sqlState);
   }
 
   /** Converts the binary data to a long value. */
