@@ -15,7 +15,8 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.appendPropertiesToUrl;
-import static com.google.cloud.spanner.pgadapter.ConnectionHandler.buildConnectionURL;
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.appendStartupParametersToUrl;
+import static com.google.cloud.spanner.pgadapter.ConnectionHandler.buildConnectionOptionsBuilder;
 import static com.google.cloud.spanner.pgadapter.ConnectionHandler.listDatabasesOrInstances;
 import static com.google.cloud.spanner.pgadapter.EmulatedPsqlMockServerTest.newStatusResourceNotFoundException;
 import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
@@ -38,6 +39,7 @@ import com.google.api.core.SettableApiFuture;
 import com.google.api.gax.paging.Pages;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.DatabaseAdminClient;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
@@ -46,6 +48,12 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.ConnectionOptions;
+import com.google.cloud.spanner.connection.ConnectionOptions.StartupPropertyPolicy;
+import com.google.cloud.spanner.connection.ConnectionOptionsHelperTest;
+import com.google.cloud.spanner.connection.ConnectionProperties;
+import com.google.cloud.spanner.connection.ConnectionProperty;
+import com.google.cloud.spanner.connection.PGAdapterConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.TestChannelProvider;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -54,6 +62,7 @@ import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
@@ -81,8 +90,8 @@ import java.net.SocketException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -1017,8 +1026,21 @@ public class ConnectionHandlerTest {
     assertTrue(connectionHandler.getSkippedAutoDetectParseMessages().isEmpty());
   }
 
+  private static ConnectionOptions buildConnectionOptions(
+      String database,
+      OptionsMetadata options,
+      Properties properties,
+      Map<String, String> startupParameters) {
+    ConnectionOptions.Builder builder =
+        buildConnectionOptionsBuilder(database, options, properties, startupParameters);
+    if (options.getCredentials() != null) {
+      PGAdapterConnectionOptionsHelper.setCredentials(builder, options.getCredentials());
+    }
+    return builder.build();
+  }
+
   @Test
-  public void testBuildConnectionUrl() {
+  public void testBuildConnectionOptionsBuilder() {
     assumeTrue(
         System.getProperty(OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME) == null);
     assumeTrue(
@@ -1027,28 +1049,31 @@ public class ConnectionHandlerTest {
 
     OptionsMetadata options =
         OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
-    // Check that the dialect is included in the connection URL. This is required to support the
-    // 'autoConfigEmulator' property.
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
+
+    ConnectionOptions defaultOptions =
+        buildConnectionOptions(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
             buildProperties(ImmutableMap.of()),
-            ImmutableMap.of()));
+            ImmutableMap.of());
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;key1=value1;dialect=postgresql",
-        buildConnectionURL(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database",
+        defaultOptions.getUri());
+    assertEquals(Dialect.POSTGRESQL, defaultOptions.getDialect());
+
+    // Server properties with lenient=true allow custom properties.
+    ConnectionOptions lenientServerOptions =
+        buildConnectionOptions(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
-            buildProperties(ImmutableMap.of("key1", "value1")),
-            ImmutableMap.of()));
+            buildProperties(ImmutableMap.of("lenient", "true", "key1", "value1")),
+            ImmutableMap.of());
+    assertEquals(Dialect.POSTGRESQL, lenientServerOptions.getDialect());
 
-    // If the options contain a full database specification, then the database in the connection
-    // request is ignored.
-    assertEquals(
-        "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
+    // If options contain a full database specification, the database in the connection request is
+    // ignored.
+    ConnectionOptions fixedDatabaseOptions =
+        buildConnectionOptions(
             "projects/my-project/instances/my-instance/databases/my-database",
             OptionsMetadata.newBuilder()
                 .setCredentials(NoCredentials.getInstance())
@@ -1057,32 +1082,64 @@ public class ConnectionHandlerTest {
                 .setDatabase("test-database")
                 .build(),
             buildProperties(ImmutableMap.of()),
-            ImmutableMap.of()));
-    // Enable the autoConfigEmulator flag through the options builder.
-    OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
+            ImmutableMap.of());
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;autoConfigEmulator=true;defaultSequenceKind=bit_reversed_positive;dialect=postgresql",
-        buildConnectionURL(
+        "cloudspanner:/projects/test-project/instances/test-instance/databases/test-database",
+        fixedDatabaseOptions.getUri());
+
+    // Server defaultConnectionUrl with '?' delimiter takes precedence over client USER options.
+    @SuppressWarnings("deprecation")
+    OptionsMetadata serverOverrideOptions =
+        new OptionsMetadata(
+            "cloudspanner:/projects/p/instances/i/databases/d?optimizerVersion=1;numChannels=4",
+            5432,
+            TextFormat.POSTGRESQL,
+            false,
+            false,
+            false,
+            false,
+            null);
+    ConnectionOptions mergedOverrideOptions =
+        PGAdapterConnectionOptionsHelper.setCredentials(
+                buildConnectionOptionsBuilder(
+                    "ignored-db",
+                    serverOverrideOptions,
+                    buildProperties(ImmutableMap.of()),
+                    ImmutableMap.of("options", "-c optimizerVersion=2")),
+                NoCredentials.getInstance())
+            .build();
+    assertEquals(
+        "cloudspanner:/projects/p/instances/i/databases/d;optimizerVersion=2",
+        mergedOverrideOptions.getUri());
+    assertEquals(
+        "1",
+        ConnectionOptionsHelperTest.getInitialConnectionPropertyValue(
+            mergedOverrideOptions, ConnectionProperties.OPTIMIZER_VERSION));
+    assertEquals(Integer.valueOf(4), mergedOverrideOptions.getNumChannels());
+
+    // autoConfigureEmulator sets autoConfigEmulator=true and dialect=postgresql.
+    OptionsMetadata emulatorOptions = OptionsMetadata.newBuilder().autoConfigureEmulator().build();
+    ConnectionOptions emulatorConnectionOptions =
+        buildConnectionOptions(
             "projects/my-project/instances/my-instance/databases/my-database",
             emulatorOptions,
             buildProperties(emulatorOptions.getPropertyMap()),
-            ImmutableMap.of()));
+            ImmutableMap.of());
+    assertTrue(emulatorConnectionOptions.isAutoConfigEmulator());
+    assertEquals(Dialect.POSTGRESQL, emulatorConnectionOptions.getDialect());
 
     // Set a channel provider.
     String currentChannelProvider = System.getProperty("CHANNEL_PROVIDER");
     String currentEnableChannelProvider = System.getProperty("ENABLE_CHANNEL_PROVIDER");
     try {
       System.setProperty("CHANNEL_PROVIDER", TestChannelProvider.class.getName());
-      assertEquals(
-          "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database"
-              + ";userAgent=pg-adapter;dialect=postgresql"
-              + ";channelProvider=com.google.cloud.spanner.connection.TestChannelProvider"
-              + ";usePlainText=true",
-          buildConnectionURL(
+      ConnectionOptions channelProviderOptions =
+          buildConnectionOptions(
               "projects/my-project/instances/my-instance/databases/my-database",
               options,
               buildProperties(ImmutableMap.of()),
-              ImmutableMap.of()));
+              ImmutableMap.of());
+      assertNotNull(channelProviderOptions.getChannelProvider());
       assertEquals("true", System.getProperty("ENABLE_CHANNEL_PROVIDER"));
 
       // Set an invalid channel provider.
@@ -1091,7 +1148,7 @@ public class ConnectionHandlerTest {
       assertThrows(
           SpannerException.class,
           () ->
-              buildConnectionURL(
+              buildConnectionOptionsBuilder(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   options,
                   buildProperties(ImmutableMap.of()),
@@ -1110,21 +1167,22 @@ public class ConnectionHandlerTest {
       }
     }
 
-    // Verify that the virtual threads properties are carried over to the connection URL.
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;useVirtualThreads=true;dialect=postgresql",
-        buildConnectionURL(
+    // Verify that the virtual threads properties are carried over to ConnectionOptions.
+    ConnectionOptions virtualThreadsOptions =
+        buildConnectionOptions(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
             buildProperties(ImmutableMap.of("useVirtualThreads", "true")),
-            ImmutableMap.of()));
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;useVirtualGrpcTransportThreads=true;dialect=postgresql",
-        buildConnectionURL(
+            ImmutableMap.of());
+    assertTrue(virtualThreadsOptions.isUseVirtualThreads());
+
+    ConnectionOptions virtualGrpcOptions =
+        buildConnectionOptions(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
             buildProperties(ImmutableMap.of("useVirtualGrpcTransportThreads", "true")),
-            ImmutableMap.of()));
+            ImmutableMap.of());
+    assertTrue(virtualGrpcOptions.isUseVirtualGrpcTransportThreads());
 
     runWithSystemProperty(
         OptionsMetadata.USE_VIRTUAL_THREADS_SYSTEM_PROPERTY_NAME,
@@ -1132,13 +1190,13 @@ public class ConnectionHandlerTest {
         () -> {
           OptionsMetadata optionsWithSystemProperty =
               OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
-          assertEquals(
-              "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualThreads=true;dialect=postgresql",
-              buildConnectionURL(
+          ConnectionOptions connectionOptions =
+              buildConnectionOptions(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   optionsWithSystemProperty,
                   buildProperties(optionsWithSystemProperty.getPropertyMap()),
-                  ImmutableMap.of()));
+                  ImmutableMap.of());
+          assertTrue(connectionOptions.isUseVirtualThreads());
         });
     runWithSystemProperty(
         OptionsMetadata.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_SYSTEM_PROPERTY_NAME,
@@ -1146,168 +1204,406 @@ public class ConnectionHandlerTest {
         () -> {
           OptionsMetadata optionsWithSystemProperty =
               OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
-          assertEquals(
-              "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;defaultSequenceKind=bit_reversed_positive;useVirtualGrpcTransportThreads=true;dialect=postgresql",
-              buildConnectionURL(
+          ConnectionOptions connectionOptions =
+              buildConnectionOptions(
                   "projects/my-project/instances/my-instance/databases/my-database",
                   optionsWithSystemProperty,
                   buildProperties(optionsWithSystemProperty.getPropertyMap()),
-                  ImmutableMap.of()));
+                  ImmutableMap.of());
+          assertTrue(connectionOptions.isUseVirtualGrpcTransportThreads());
         });
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;enableEndToEndTracing=true;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c enableEndToEndTracing=true")));
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;minSessions=10;numChannels=2;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c minSessions=10 -c numChannels=2")));
 
-    // Invalid options are not added to the connection URL.
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;numChannels=2;dialect=postgresql",
-        buildConnectionURL(
+    // Without SSL or authentication in 0.x, non-disallowed Context.STARTUP properties in client
+    // 'options' are still accepted for backwards compatibility.
+    ConnectionOptions legacyTracingOptions =
+        buildConnectionOptions(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
             buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c invalid_option=some-value -c numChannels=2")));
+            ImmutableMap.of("options", "-c enableEndToEndTracing=true"));
+    assertTrue(legacyTracingOptions.isEndToEndTracingEnabled());
 
-    // Security: Disallowed connection properties (endpoint, credentials, providers, etc.) are
-    // ignored.
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;numChannels=2;dialect=postgresql",
-        buildConnectionURL(
+    ConnectionOptions legacySessionOptions =
+        buildConnectionOptions(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            options,
+            buildProperties(ImmutableMap.of()),
+            ImmutableMap.of(
+                "options", "-c invalid_option=some-value -c minSessions=10 -c numChannels=2"));
+    assertEquals(Integer.valueOf(10), legacySessionOptions.getMinSessions());
+    assertEquals(Integer.valueOf(2), legacySessionOptions.getNumChannels());
+
+    // Security: Disallowed connection properties are ignored in non-reject 0.x mode.
+    ConnectionOptions disallowedIgnoredOptions =
+        buildConnectionOptions(
             "projects/my-project/instances/my-instance/databases/my-database",
             options,
             buildProperties(ImmutableMap.of()),
             ImmutableMap.of(
                 "options",
-                "-c endpoint=attacker.com:443 -c credentialsProvider=com.example.Evil -c credentials=/path/to/key.json -c universeDomain=attacker.com -c usePlainText=true -c channelProvider=com.example.ChannelProvider -c grpc_interceptor_provider=com.example.Evil -c connection_state_type=TRANSACTIONAL -c numChannels=2")));
+                "-c endpoint=attacker.com:443 -c credentialsProvider=com.example.Evil -c credentials=/path/to/key.json -c universeDomain=attacker.com -c usePlainText=true -c channelProvider=com.example.ChannelProvider -c grpc_interceptor_provider=com.example.Evil -c connection_state_type=TRANSACTIONAL -c numChannels=2"));
+    assertEquals(
+        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;numChannels=2",
+        disallowedIgnoredOptions.getUri());
+    assertEquals(Integer.valueOf(2), disallowedIgnoredOptions.getNumChannels());
 
-    // Safe options specified in options are preserved.
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;optimizerVersion=1;autoPartitionMode=true;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c optimizerVersion=1 -c autoPartitionMode=true")));
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;optimizerVersion=2;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c optimizerVersion=2")));
+    // When SSL or authentication is enabled, ALL Context.STARTUP properties fail hard by default,
+    // while server properties configured programmatically are still applied.
+    OptionsMetadata sslOptions =
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .setSslMode(SslMode.Enable)
+            .setNumChannels(4)
+            .setDatabaseRole("my-role")
+            .build();
+    for (String startupOption :
+        new String[] {
+          "-c enableEndToEndTracing=true",
+          "-c minSessions=10",
+          "-c maxSessions=50",
+          "-c numChannels=2",
+          "-c dcpMinChannels=2",
+          "-c dcpMaxChannels=100",
+          "-c enableDynamicChannelPool=true",
+          "-c databaseRole=admin",
+          "-c endpoint=attacker.com:443",
+          "-c optimizerVersion=2 -c numChannels=2",
+          "-c numChannels=-1",
+          "-c numChannels=2;endpoint=evil"
+        }) {
+      PGException sslStartupException =
+          assertThrows(
+              "Expected STARTUP option '" + startupOption + "' to fail under SSL",
+              PGException.class,
+              () ->
+                  buildConnectionOptionsBuilder(
+                      "projects/my-project/instances/my-instance/databases/my-database",
+                      sslOptions,
+                      buildProperties(sslOptions.getPropertyMap()),
+                      ImmutableMap.of("options", startupOption)));
+      assertEquals(Severity.FATAL, sslStartupException.getSeverity());
+      assertEquals(
+          SQLState.SQLServerRejectedEstablishmentOfSQLConnection,
+          sslStartupException.getSQLState());
+    }
 
-    // Security: Delimiter injection in allowed property value is rejected.
+    OptionsMetadata authOptions =
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .setRequireAuthentication()
+            .build();
+    PGException authStartupException =
+        assertThrows(
+            PGException.class,
+            () ->
+                buildConnectionOptionsBuilder(
+                    "projects/my-project/instances/my-instance/databases/my-database",
+                    authOptions,
+                    buildProperties(ImmutableMap.of()),
+                    ImmutableMap.of("options", "-c numChannels=2 -c optimizerVersion=2")));
+    assertEquals(Severity.FATAL, authStartupException.getSeverity());
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c numChannels=2;endpoint=attacker.com:443")));
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c numChannels=2?endpoint=attacker.com:443")));
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c numChannels=2%3Bendpoint=attacker.com:443")));
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c numChannels=2\nendpoint=attacker.com:443")));
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c numChannels=2\rendpoint=attacker.com:443")));
-    assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c numChannels=2\0endpoint=attacker.com:443")));
+        SQLState.SQLServerRejectedEstablishmentOfSQLConnection, authStartupException.getSQLState());
 
-    // Security: Invalid property value conversion is rejected.
+    // When allow_startup_connection_options is explicitly false, Context.STARTUP properties fail
+    // hard
+    // even when SSL and authentication are disabled.
+    OptionsMetadata explicitFalseOptions =
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .setAllowStartupConnectionOptions(false)
+            .build();
+    PGException explicitFalseException =
+        assertThrows(
+            PGException.class,
+            () ->
+                buildConnectionOptionsBuilder(
+                    "projects/my-project/instances/my-instance/databases/my-database",
+                    explicitFalseOptions,
+                    buildProperties(ImmutableMap.of()),
+                    ImmutableMap.of("options", "-c numChannels=2 -c optimizerVersion=2")));
+    assertEquals(Severity.FATAL, explicitFalseException.getSeverity());
     assertEquals(
-        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;userAgent=pg-adapter;dialect=postgresql",
-        buildConnectionURL(
-            "projects/my-project/instances/my-instance/databases/my-database",
-            options,
-            buildProperties(ImmutableMap.of()),
-            ImmutableMap.of("options", "-c minSessions=-1")));
+        SQLState.SQLServerRejectedEstablishmentOfSQLConnection,
+        explicitFalseException.getSQLState());
+    assertTrue(explicitFalseException.getMessage().contains("PGAdapter's -r command-line option"));
 
-    // Security: Null or delimiter/percent-containing property values are rejected.
+    // Server properties and Context.USER options are preserved when startup options are rejected.
+    ConnectionOptions sslUserOptions =
+        buildConnectionOptions(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            sslOptions,
+            buildProperties(sslOptions.getPropertyMap()),
+            ImmutableMap.of("options", "-c optimizerVersion=1 -c autoPartitionMode=true"));
+    assertEquals(Dialect.POSTGRESQL, sslUserOptions.getDialect());
+    assertEquals(Integer.valueOf(4), sslUserOptions.getNumChannels());
+    assertEquals("my-role", sslUserOptions.getDatabaseRole());
+    assertEquals(
+        "1",
+        ConnectionOptionsHelperTest.getInitialConnectionPropertyValue(
+            sslUserOptions, ConnectionProperties.OPTIMIZER_VERSION));
+    assertEquals(
+        Boolean.TRUE,
+        ConnectionOptionsHelperTest.getInitialConnectionPropertyValue(
+            sslUserOptions, ConnectionProperties.AUTO_PARTITION_MODE));
+
+    // Even if client startup URI somehow contained a STARTUP property directly, ConnectionOptions
+    // enforces StartupPropertyPolicy.REJECT.
+    SpannerException policyException =
+        assertThrows(
+            SpannerException.class,
+            () ->
+                ConnectionOptions.newBuilder()
+                    .setStartupPropertyPolicy(StartupPropertyPolicy.REJECT)
+                    .setUri(
+                        "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database;numChannels=2"));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, policyException.getErrorCode());
+
+    // When allow_startup_connection_options=true, client startup properties in options are applied
+    // even when SSL is enabled.
+    OptionsMetadata allowStartupOptions =
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .setSslMode(SslMode.Enable)
+            .setAllowStartupConnectionOptions(true)
+            .build();
+    ConnectionOptions allowedConnectionOptions =
+        buildConnectionOptions(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            allowStartupOptions,
+            buildProperties(allowStartupOptions.getPropertyMap()),
+            ImmutableMap.of("options", "-c minSessions=5 -c numChannels=3"));
+    assertEquals(Integer.valueOf(3), allowedConnectionOptions.getNumChannels());
+    assertEquals(Integer.valueOf(5), allowedConnectionOptions.getMinSessions());
+
+    // Server-configured STARTUP properties still take precedence over client STARTUP options when
+    // allow_startup_connection_options=true.
+    OptionsMetadata allowWithServerNumChannels =
+        OptionsMetadata.newBuilder()
+            .setCredentials(NoCredentials.getInstance())
+            .setSslMode(SslMode.Enable)
+            .setNumChannels(4)
+            .setAllowStartupConnectionOptions(true)
+            .build();
+    ConnectionOptions serverPrecedenceOptions =
+        buildConnectionOptions(
+            "projects/my-project/instances/my-instance/databases/my-database",
+            allowWithServerNumChannels,
+            buildProperties(allowWithServerNumChannels.getPropertyMap()),
+            ImmutableMap.of("options", "-c numChannels=2"));
+    assertEquals(Integer.valueOf(4), serverPrecedenceOptions.getNumChannels());
+
+    // Security: Delimiter injection, control characters, and invalid values are ignored even when
+    // startup options are allowed.
+    for (String maliciousOption :
+        new String[] {
+          "-c numChannels=2;endpoint=attacker.com:443",
+          "-c numChannels=2?endpoint=attacker.com:443",
+          "-c numChannels=2%3Bendpoint=attacker.com:443",
+          "-c numChannels=2\nendpoint=attacker.com:443",
+          "-c numChannels=2\rendpoint=attacker.com:443",
+          "-c numChannels=2\0endpoint=attacker.com:443",
+          "-c minSessions=-1",
+          "-c optimizerVersion=1;endpoint=attacker.com:443"
+        }) {
+      ConnectionOptions sanitized =
+          buildConnectionOptions(
+              "projects/my-project/instances/my-instance/databases/my-database",
+              allowStartupOptions,
+              buildProperties(ImmutableMap.of()),
+              ImmutableMap.of("options", maliciousOption));
+      assertEquals(
+          "Expected option '" + maliciousOption + "' to be stripped",
+          "cloudspanner:/projects/my-project/instances/my-instance/databases/my-database",
+          sanitized.getUri());
+      assertNull(sanitized.getNumChannels());
+    }
+  }
+
+  @Test
+  public void testAppendStartupParametersToUrlAndPropertyPolicies() {
+    String baseUri = "cloudspanner:/projects/p/instances/i/databases/d";
+
+    assertEquals(baseUri, appendStartupParametersToUrl(baseUri, null, true, false));
+    assertEquals(baseUri, appendStartupParametersToUrl(baseUri, ImmutableMap.of(), true, false));
+
+    Map<String, String> nullOptionsValue = new HashMap<>();
+    nullOptionsValue.put("options", null);
+    assertEquals(baseUri, appendStartupParametersToUrl(baseUri, nullOptionsValue, true, false));
+
+    // Uppercase OPTIONS key and '+'-encoded space separator are handled; malformed commands
+    // skipped.
+    assertEquals(
+        baseUri + ";numChannels=2",
+        appendStartupParametersToUrl(
+            baseUri,
+            ImmutableMap.of("OPTIONS", "-c+numChannels=2 -c malformed -c =bar"),
+            false,
+            false));
+
+    // Null or delimiter/percent-containing property values are rejected.
+    ConnectionProperty<?> numChannelsProperty =
+        ConnectionHandler.getConnectionProperty("numChannels");
+    assertNotNull(numChannelsProperty);
+    assertFalse(ConnectionHandler.isValidStartupPropertyValue(numChannelsProperty, null));
     assertFalse(
-        ConnectionHandler.isValidStartupPropertyValue(
-            ConnectionHandler.SUPPORTED_STARTUP_CONNECTION_PROPERTIES.get("numchannels"), null));
-    assertFalse(
-        ConnectionHandler.isValidStartupPropertyValue(
-            ConnectionHandler.SUPPORTED_STARTUP_CONNECTION_PROPERTIES.get("numchannels"),
-            "2%3Bendpoint=foo"));
+        ConnectionHandler.isValidStartupPropertyValue(numChannelsProperty, "2%3Bendpoint=foo"));
 
-    // All disallowed startup connection property names must be rejected.
+    // All disallowed 0.x startup connection property names are rejected by
+    // isDisallowedConnectionProperty
+    // and skipped in non-reject appendStartupParametersToUrl.
     for (String disallowedProperty :
         ConnectionHandler.DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES) {
       assertTrue(
           "Expected " + disallowedProperty + " to be disallowed",
           ConnectionHandler.isDisallowedConnectionProperty(disallowedProperty));
-      assertFalse(
-          "Expected " + disallowedProperty + " to not be valid",
-          ConnectionHandler.isValidConnectionProperty(disallowedProperty));
-      assertFalse(
-          "Expected " + disallowedProperty + " not in SUPPORTED_STARTUP_CONNECTION_PROPERTIES",
-          ConnectionHandler.SUPPORTED_STARTUP_CONNECTION_PROPERTIES.containsKey(
-              disallowedProperty.toLowerCase(Locale.ENGLISH)));
+      assertEquals(
+          baseUri,
+          appendStartupParametersToUrl(
+              baseUri,
+              ImmutableMap.of("options", "-c " + disallowedProperty + "=val"),
+              false,
+              false));
+    }
+    assertTrue(ConnectionHandler.isDisallowedConnectionProperty(null));
+    assertTrue(ConnectionHandler.isDisallowedConnectionProperty(""));
+
+    // Every Context.STARTUP property throws PGException when rejectStartupConnectionOptions=true.
+    for (ConnectionProperty<?> property : ConnectionProperties.VALID_CONNECTION_PROPERTIES) {
+      if (property.getContext() == ConnectionProperty.Context.STARTUP) {
+        PGException exception =
+            assertThrows(
+                "Expected STARTUP property " + property.getKey() + " to throw PGException",
+                PGException.class,
+                () ->
+                    appendStartupParametersToUrl(
+                        baseUri,
+                        ImmutableMap.of("options", "-c " + property.getKey() + "=value"),
+                        true,
+                        false));
+        assertEquals(Severity.FATAL, exception.getSeverity());
+        assertEquals(
+            SQLState.SQLServerRejectedEstablishmentOfSQLConnection, exception.getSQLState());
+      }
     }
 
-    // Verify both underscored and non-underscored variants of sensitive properties are rejected.
-    assertFalse(ConnectionHandler.isValidConnectionProperty("grpc_interceptor_provider"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("grpcinterceptorprovider"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("connection_state_type"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("connectionstatetype"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("channel_provider"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("channelprovider"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("credentials_provider"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("credentialsprovider"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("universe_domain"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("universedomain"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("use_plain_text"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("useplaintext"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("host"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("credentialsUrl"));
-    assertFalse(ConnectionHandler.isValidConnectionProperty("credentials_url"));
+    // Context.USER properties pass through even when rejectStartupConnectionOptions=true.
+    assertEquals(
+        baseUri + ";optimizerVersion=2;autoPartitionMode=true",
+        appendStartupParametersToUrl(
+            baseUri,
+            ImmutableMap.of("options", "-c optimizerVersion=2 -c autoPartitionMode=true"),
+            true,
+            true));
+  }
 
-    // Verify safe properties (both camelCase and snake_case) are allowed.
-    assertTrue(ConnectionHandler.isValidConnectionProperty("numChannels"));
-    assertTrue(ConnectionHandler.isValidConnectionProperty("optimizerVersion"));
-    assertTrue(ConnectionHandler.isValidConnectionProperty("default_isolation_level"));
-    assertTrue(ConnectionHandler.isValidConnectionProperty("savepoint_support"));
+  @Test
+  public void testDeprecationWarningLoggedOnceOnlyWhenUnset() {
+    Logger handlerLogger = Logger.getLogger(ConnectionHandler.class.getName());
+    List<String> warningMessages = new ArrayList<>();
+    Handler testHandler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord record) {
+            if (record.getLevel().equals(Level.WARNING)
+                && record.getMessage() != null
+                && record.getMessage().contains("is deprecated and will be rejected by default")) {
+              warningMessages.add(record.getMessage());
+            }
+          }
 
-    assertFalse(ConnectionHandler.isValidConnectionProperty(""));
-    assertFalse(ConnectionHandler.isValidConnectionProperty(null));
+          @Override
+          public void flush() {}
+
+          @Override
+          public void close() {}
+        };
+    boolean previousFlag = ConnectionHandler.LOGGED_DEPRECATED_STARTUP_OPTIONS_WARNING.get();
+    Level previousLevel = handlerLogger.getLevel();
+    ConnectionHandler.LOGGED_DEPRECATED_STARTUP_OPTIONS_WARNING.set(false);
+    handlerLogger.setLevel(Level.WARNING);
+    handlerLogger.addHandler(testHandler);
+    try {
+      // Explicit allow_startup_connection_options=true must never log the deprecation warning.
+      OptionsMetadata explicitTrueOptions =
+          OptionsMetadata.newBuilder()
+              .setCredentials(NoCredentials.getInstance())
+              .setAllowStartupConnectionOptions(true)
+              .build();
+      buildConnectionOptions(
+          "projects/my-project/instances/my-instance/databases/my-database",
+          explicitTrueOptions,
+          buildProperties(ImmutableMap.of()),
+          ImmutableMap.of("options", "-c numChannels=2 -c minSessions=5"));
+      assertEquals(0, warningMessages.size());
+
+      // Unset allow_startup_connection_options does not log the deprecation warning for
+      // Context.USER properties, disallowed properties, or invalid property values.
+      OptionsMetadata unsetOptions =
+          OptionsMetadata.newBuilder().setCredentials(NoCredentials.getInstance()).build();
+      buildConnectionOptions(
+          "projects/my-project/instances/my-instance/databases/my-database",
+          unsetOptions,
+          buildProperties(ImmutableMap.of()),
+          ImmutableMap.of(
+              "options", "-c optimizerVersion=2 -c endpoint=attacker.com:443 -c numChannels=-1"));
+      assertEquals(0, warningMessages.size());
+
+      // Unset allow_startup_connection_options logs the deprecation warning exactly once overall
+      // across multiple valid startup properties and multiple connections.
+      buildConnectionOptions(
+          "projects/my-project/instances/my-instance/databases/my-database",
+          unsetOptions,
+          buildProperties(ImmutableMap.of()),
+          ImmutableMap.of("options", "-c numChannels=2 -c minSessions=5"));
+      buildConnectionOptions(
+          "projects/my-project/instances/my-instance/databases/my-database",
+          unsetOptions,
+          buildProperties(ImmutableMap.of()),
+          ImmutableMap.of("options", "-c maxSessions=10"));
+      assertEquals(1, warningMessages.size());
+      assertTrue(warningMessages.get(0).contains("in an upcoming version"));
+      assertTrue(warningMessages.get(0).contains("PGAdapter's -r command-line option"));
+    } finally {
+      handlerLogger.removeHandler(testHandler);
+      handlerLogger.setLevel(previousLevel);
+      ConnectionHandler.LOGGED_DEPRECATED_STARTUP_OPTIONS_WARNING.set(previousFlag);
+    }
+  }
+
+  @Test
+  public void testStripUriProperties() {
+    assertEquals(
+        "cloudspanner:/projects/p/instances/i/databases/d",
+        ConnectionHandler.stripUriProperties("cloudspanner:/projects/p/instances/i/databases/d"));
+    assertEquals(
+        "cloudspanner:/projects/p/instances/i/databases/d",
+        ConnectionHandler.stripUriProperties(
+            "cloudspanner:/projects/p/instances/i/databases/d;userAgent=pg-adapter;dialect=postgresql"));
+    assertEquals(
+        "cloudspanner:/projects/p/instances/i/databases/d",
+        ConnectionHandler.stripUriProperties(
+            "cloudspanner:/projects/p/instances/i/databases/d?numChannels=2;dialect=postgresql"));
+    assertEquals(
+        "cloudspanner:/projects/p/instances/i/databases/d",
+        ConnectionHandler.stripUriProperties(
+            "cloudspanner:/projects/p/instances/i/databases/d;a=1?b=2"));
+  }
+
+  @Test
+  public void testGetConnectionPropertyAndContext() {
+    assertNull(ConnectionHandler.getConnectionProperty(null));
+    assertNull(ConnectionHandler.getConnectionProperty("unknown_property"));
+
+    ConnectionProperty<?> numChannels = ConnectionHandler.getConnectionProperty("numChannels");
+    assertNotNull(numChannels);
+    assertSame(numChannels, ConnectionHandler.getConnectionProperty("NUMCHANNELS"));
+    assertTrue(ConnectionHandler.isStartupProperty(numChannels));
+
+    ConnectionProperty<?> optimizerVersion =
+        ConnectionHandler.getConnectionProperty("optimizerVersion");
+    assertNotNull(optimizerVersion);
+    assertFalse(ConnectionHandler.isStartupProperty(optimizerVersion));
   }
 
   @Test

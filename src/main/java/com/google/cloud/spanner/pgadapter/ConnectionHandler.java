@@ -39,6 +39,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
+import com.google.cloud.spanner.connection.ConnectionOptions.StartupPropertyPolicy;
 import com.google.cloud.spanner.connection.ConnectionProperties;
 import com.google.cloud.spanner.connection.ConnectionProperty;
 import com.google.cloud.spanner.connection.PGAdapterConnectionOptionsHelper;
@@ -99,6 +100,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -120,6 +122,66 @@ import javax.net.ssl.SSLSocketFactory;
 public class ConnectionHandler implements Runnable {
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
+
+  @VisibleForTesting
+  static final AtomicBoolean LOGGED_DEPRECATED_STARTUP_OPTIONS_WARNING = new AtomicBoolean(false);
+
+  // TODO: Remove DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES and
+  // isDisallowedConnectionProperty once OptionsMetadata.shouldRejectStartupConnectionOptions()
+  // rejects Context.STARTUP properties by default in all modes when allowStartupConnectionOptions
+  // is not explicitly set.
+  @VisibleForTesting
+  static final ImmutableSet<String> DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES =
+      ImmutableSet.of(
+          "endpoint",
+          "universedomain",
+          "universe_domain",
+          "isexperimentalhost",
+          "is_experimental_host",
+          "autoconfigemulator",
+          "auto_config_emulator",
+          "useplaintext",
+          "use_plain_text",
+          "credentials",
+          "encodedcredentials",
+          "encoded_credentials",
+          "oauthtoken",
+          "oauth_token",
+          "credentialsprovider",
+          "credentials_provider",
+          "clientcertificate",
+          "client_certificate",
+          "clientkey",
+          "client_key",
+          "cacertificate",
+          "ca_certificate",
+          "channelprovider",
+          "channel_provider",
+          "grpcinterceptorprovider",
+          "grpc_interceptor_provider",
+          "dialect",
+          "connectionstatetype",
+          "connection_state_type",
+          "type",
+          "useragent",
+          "user_agent",
+          "lenient",
+          "username",
+          "password",
+          "host",
+          "credentialsurl",
+          "credentials_url");
+
+  private static final ImmutableMap<String, ConnectionProperty<?>> CONNECTION_PROPERTIES =
+      createConnectionPropertiesMap();
+
+  private static ImmutableMap<String, ConnectionProperty<?>> createConnectionPropertiesMap() {
+    ImmutableMap.Builder<String, ConnectionProperty<?>> builder = ImmutableMap.builder();
+    for (ConnectionProperty<?> property : ConnectionProperties.VALID_CONNECTION_PROPERTIES) {
+      builder.put(property.getKey().toLowerCase(Locale.ENGLISH), property);
+    }
+    return builder.build();
+  }
 
   private final ProxyServer server;
   private Socket socket;
@@ -208,8 +270,8 @@ public class ConnectionHandler implements Runnable {
   public void connectToSpanner(
       String database, @Nullable Credentials credentials, Map<String, String> parameters) {
     OptionsMetadata options = getServer().getOptions();
-    String uri = buildConnectionURL(database, options, getServer().getProperties(), parameters);
-    ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
+    ConnectionOptions.Builder connectionOptionsBuilder =
+        buildConnectionOptionsBuilder(database, options, getServer().getProperties(), parameters);
     connectionOptionsBuilder =
         PGAdapterConnectionOptionsHelper.maybeAddGrpcLogInterceptor(
             connectionOptionsBuilder, options.isLogGrpcMessages());
@@ -284,17 +346,52 @@ public class ConnectionHandler implements Runnable {
   }
 
   @VisibleForTesting
-  static String buildConnectionURL(
+  static ConnectionOptions.Builder buildConnectionOptionsBuilder(
       String database,
       OptionsMetadata options,
       Properties properties,
       Map<String, String> startupParameters) {
+    String serverUri = buildServerConnectionURL(database, options, properties);
+    String baseUri = stripUriProperties(serverUri);
+    boolean rejectStartupConnectionOptions = options.shouldRejectStartupConnectionOptions();
+    boolean warnOnStartupProperty = options.getAllowStartupConnectionOptions() == null;
+    String clientUri =
+        appendStartupParametersToUrl(
+            baseUri, startupParameters, rejectStartupConnectionOptions, warnOnStartupProperty);
+    ConnectionOptions.Builder builder =
+        ConnectionOptions.newBuilder()
+            .setStartupPropertyPolicy(
+                rejectStartupConnectionOptions
+                    ? StartupPropertyPolicy.REJECT
+                    : StartupPropertyPolicy.ALLOW);
+    PGAdapterConnectionOptionsHelper.addPropertiesFromServerUri(builder, serverUri);
+    return builder.setUri(clientUri);
+  }
+
+  /**
+   * Strips all connection properties (everything from the first {@code ;} or {@code ?} onward) from
+   * {@code uri}, returning only the base connection URI.
+   */
+  @VisibleForTesting
+  static String stripUriProperties(String uri) {
+    int semicolonIndex = uri.indexOf(';');
+    int questionMarkIndex = uri.indexOf('?');
+    int delimiterIndex;
+    if (semicolonIndex >= 0 && questionMarkIndex >= 0) {
+      delimiterIndex = Math.min(semicolonIndex, questionMarkIndex);
+    } else {
+      delimiterIndex = Math.max(semicolonIndex, questionMarkIndex);
+    }
+    return delimiterIndex >= 0 ? uri.substring(0, delimiterIndex) : uri;
+  }
+
+  private static String buildServerConnectionURL(
+      String database, OptionsMetadata options, Properties properties) {
     String uri =
         options.hasDefaultConnectionUrl()
             ? options.getDefaultConnectionUrl()
             : options.buildConnectionURL(database);
     uri = appendPropertiesToUrl(uri, properties);
-    uri = appendStartupParametersToUrl(uri, startupParameters);
     // We add 'dialect=postgresql' here in all cases, although it is only being used if
     // 'autoConfigEmulator=true' has also been set in the connection URL. This dialect property is
     // only used to determine what dialect the database should have that is being created on the
@@ -342,47 +439,6 @@ public class ConnectionHandler implements Runnable {
   }
 
   @VisibleForTesting
-  static final ImmutableSet<String> DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES =
-      ImmutableSet.of(
-          "endpoint",
-          "universedomain",
-          "universe_domain",
-          "isexperimentalhost",
-          "is_experimental_host",
-          "autoconfigemulator",
-          "auto_config_emulator",
-          "useplaintext",
-          "use_plain_text",
-          "credentials",
-          "encodedcredentials",
-          "encoded_credentials",
-          "oauthtoken",
-          "oauth_token",
-          "credentialsprovider",
-          "credentials_provider",
-          "clientcertificate",
-          "client_certificate",
-          "clientkey",
-          "client_key",
-          "cacertificate",
-          "ca_certificate",
-          "channelprovider",
-          "channel_provider",
-          "grpcinterceptorprovider",
-          "grpc_interceptor_provider",
-          "dialect",
-          "connectionstatetype",
-          "connection_state_type",
-          "type",
-          "useragent",
-          "user_agent",
-          "lenient",
-          "username",
-          "password",
-          "host",
-          "credentialsurl",
-          "credentials_url");
-
   static boolean isDisallowedConnectionProperty(String name) {
     if (Strings.isNullOrEmpty(name)) {
       return true;
@@ -393,57 +449,96 @@ public class ConnectionHandler implements Runnable {
         || DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES.contains(stripped);
   }
 
-  static final ImmutableMap<String, ConnectionProperty<?>> SUPPORTED_STARTUP_CONNECTION_PROPERTIES =
-      initSupportedStartupConnectionProperties();
-
-  private static ImmutableMap<String, ConnectionProperty<?>>
-      initSupportedStartupConnectionProperties() {
-    ImmutableMap.Builder<String, ConnectionProperty<?>> builder = ImmutableMap.builder();
-    for (ConnectionProperty<?> property : ConnectionProperties.VALID_CONNECTION_PROPERTIES) {
-      if (!isDisallowedConnectionProperty(property.getKey())) {
-        builder.put(property.getKey().toLowerCase(Locale.ENGLISH), property);
-      }
-    }
-    return builder.build();
-  }
-
   /**
    * Adds parameters to the connection URL that have been added as 'options=-c ...' to the
-   * PostgreSQL connection string. Disallowed startup connection properties (such as network
-   * endpoints, credentials, or class loaders) are ignored to prevent credential exfiltration,
-   * arbitrary class instantiation, or security configuration tampering.
+   * PostgreSQL connection string. When {@code rejectStartupConnectionOptions} is true, any {@code
+   * Context.STARTUP} connection property fails the connection with a {@link PGException} (and is
+   * also rejected by {@link StartupPropertyPolicy#REJECT} in {@link ConnectionOptions}).
    */
-  static String appendStartupParametersToUrl(String url, Map<String, String> startupParameters) {
+  @VisibleForTesting
+  static String appendStartupParametersToUrl(
+      String url,
+      Map<String, String> startupParameters,
+      boolean rejectStartupConnectionOptions,
+      boolean warnOnStartupProperty) {
     if (startupParameters == null || startupParameters.isEmpty()) {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
     for (Map.Entry<String, String> entry : startupParameters.entrySet()) {
       if ("options".equalsIgnoreCase(entry.getKey()) && entry.getValue() != null) {
-        appendOptionsToUrl(result, entry.getValue());
+        appendOptionsToUrl(
+            result, entry.getValue(), rejectStartupConnectionOptions, warnOnStartupProperty);
       }
     }
     return result.toString();
   }
 
-  private static void appendOptionsToUrl(StringBuilder result, String options) {
+  private static void appendOptionsToUrl(
+      StringBuilder result,
+      String options,
+      boolean rejectStartupConnectionOptions,
+      boolean warnOnStartupProperty) {
     String[] commands = options.split("-c[\\s+]+");
     for (String command : commands) {
-      appendOptionCommandToUrl(result, command);
+      appendOptionCommandToUrl(
+          result, command, rejectStartupConnectionOptions, warnOnStartupProperty);
     }
   }
 
-  private static void appendOptionCommandToUrl(StringBuilder result, String command) {
+  private static void appendOptionCommandToUrl(
+      StringBuilder result,
+      String command,
+      boolean rejectStartupConnectionOptions,
+      boolean warnOnStartupProperty) {
     String[] keyValue = command.split("=", 2);
     if (keyValue.length == 2 && keyValue[0] != null && keyValue[1] != null) {
       String propertyKey = keyValue[0].trim();
       String propertyValue = keyValue[1].trim();
-      appendStartupPropertyIfValid(result, propertyKey, propertyValue);
+      appendStartupPropertyIfValid(
+          result,
+          propertyKey,
+          propertyValue,
+          rejectStartupConnectionOptions,
+          warnOnStartupProperty);
     }
   }
 
+  @VisibleForTesting
+  @Nullable
+  static ConnectionProperty<?> getConnectionProperty(@Nullable String name) {
+    if (name == null) {
+      return null;
+    }
+    return CONNECTION_PROPERTIES.get(name.toLowerCase(Locale.ENGLISH));
+  }
+
+  @VisibleForTesting
+  static boolean isStartupProperty(ConnectionProperty<?> property) {
+    return property.getContext() == ConnectionProperty.Context.STARTUP;
+  }
+
   private static void appendStartupPropertyIfValid(
-      StringBuilder result, String propertyKey, String propertyValue) {
+      StringBuilder result,
+      String propertyKey,
+      String propertyValue,
+      boolean rejectStartupConnectionOptions,
+      boolean warnOnStartupProperty) {
+    ConnectionProperty<?> property = getConnectionProperty(propertyKey);
+    if (property == null) {
+      return;
+    }
+    if (rejectStartupConnectionOptions && isStartupProperty(property)) {
+      throw PGException.newBuilder(
+              String.format(
+                  "Spanner startup connection property '%s' is not allowed in client startup options. "
+                      + "Configure startup connection properties using PGAdapter's -r command-line option, "
+                      + "or start PGAdapter with the -allow_startup_connection_options command-line option.",
+                  propertyKey))
+          .setSeverity(Severity.FATAL)
+          .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+          .build();
+    }
     if (isDisallowedConnectionProperty(propertyKey)) {
       logger.log(
           Level.WARNING,
@@ -453,12 +548,23 @@ public class ConnectionHandler implements Runnable {
                   propertyKey));
       return;
     }
-    ConnectionProperty<?> property =
-        SUPPORTED_STARTUP_CONNECTION_PROPERTIES.get(propertyKey.toLowerCase(Locale.ENGLISH));
-    if (property == null) {
-      return;
-    }
     if (isValidStartupPropertyValue(property, propertyValue)) {
+      // TODO: Remove this deprecation warning once startup connection options are rejected by
+      // default in all modes when allowStartupConnectionOptions is not explicitly set.
+      if (warnOnStartupProperty
+          && isStartupProperty(property)
+          && LOGGED_DEPRECATED_STARTUP_OPTIONS_WARNING.compareAndSet(false, true)) {
+        logger.log(
+            Level.WARNING,
+            () ->
+                String.format(
+                    "Specifying Spanner startup connection properties (such as '%s') in client startup options without "
+                        + "PGAdapter's -allow_startup_connection_options command-line option is deprecated "
+                        + "and will be rejected by default in an upcoming version. Configure startup connection "
+                        + "properties using PGAdapter's -r command-line option, or start PGAdapter with "
+                        + "-allow_startup_connection_options.",
+                    propertyKey));
+      }
       result.append(";").append(propertyKey).append("=").append(propertyValue);
     } else {
       logger.log(
@@ -470,14 +576,7 @@ public class ConnectionHandler implements Runnable {
     }
   }
 
-  static boolean isValidConnectionProperty(String name) {
-    if (Strings.isNullOrEmpty(name)) {
-      return false;
-    }
-    return !isDisallowedConnectionProperty(name)
-        && SUPPORTED_STARTUP_CONNECTION_PROPERTIES.containsKey(name.toLowerCase(Locale.ENGLISH));
-  }
-
+  @VisibleForTesting
   static boolean isValidStartupPropertyValue(ConnectionProperty<?> property, String value) {
     if (value == null
         || value.indexOf(';') >= 0

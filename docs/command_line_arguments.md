@@ -87,6 +87,20 @@
   * Note that `SHUTDOWN [SMART | FAST | IMMEDIATE]` only works on PGAdapter. This command is not
     supported by PostgreSQL.
 
+-allow_startup_connection_options / --allow-startup-connection-options
+  * Controls whether clients may specify Spanner `STARTUP` connection properties (such as
+    `numChannels`, `minSessions`, `databaseRole`, or tracing flags) in the PostgreSQL connection
+    string `options` parameter (for example `-c numChannels=2`).
+  * When omitted: Spanner `STARTUP` connection properties in client `options` are rejected when
+    SSL (`-ssl`) or authentication (`-a`) is enabled on PGAdapter, and allowed with a deprecation
+    warning otherwise (in an upcoming version, the default when omitted is expected to reject client
+    startup connection properties in all modes).
+  * Set `-allow_startup_connection_options` (or `true`) to explicitly allow client startup
+    connection properties even when SSL or authentication is enabled, or set
+    `-allow_startup_connection_options false` to reject them in all modes.
+  * Server-configured properties specified via `-r` are always applied and take precedence over
+    client options.
+
 -r
   * PGAdapter internally uses the core engine of the Cloud Spanner JDBC driver. This option specifies
     additional properties that will be used with that internal JDBC connection. All connection properties

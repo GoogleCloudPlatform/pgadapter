@@ -17,12 +17,14 @@ package com.google.cloud.spanner.connection;
 import com.google.api.core.InternalApi;
 import com.google.auth.Credentials;
 import com.google.cloud.spanner.connection.ConnectionOptions.Builder;
+import com.google.cloud.spanner.connection.ConnectionOptions.ParsedUriProperties;
+import com.google.cloud.spanner.connection.ConnectionOptions.StartupPropertyPolicy;
 import com.google.cloud.spanner.connection.StatementExecutor.StatementExecutorType;
 import com.google.cloud.spanner.pgadapter.logging.GrpcLogInterceptor;
 import com.google.common.collect.ImmutableList;
 import java.util.logging.Level;
 
-/** Simple helper class to get access to a package-private method in the ConnectionOptions. */
+/** Simple helper class to get access to package-private methods in ConnectionOptions. */
 @InternalApi
 public class PGAdapterConnectionOptionsHelper {
   /** Private constructor to prevent instantiation. */
@@ -64,5 +66,26 @@ public class PGAdapterConnectionOptionsHelper {
     } catch (Exception exception) {
       return false;
     }
+  }
+
+  /**
+   * Parses and validates all connection properties in {@code serverUri} and applies them
+   * programmatically on {@code connectionOptionsBuilder}, so they are not subject to {@link
+   * StartupPropertyPolicy#REJECT} when the URI is later set on the builder.
+   */
+  public static Builder addPropertiesFromServerUri(
+      Builder connectionOptionsBuilder, String serverUri) {
+    ParsedUriProperties parsedProperties = ConnectionOptions.parseUriProperties(serverUri);
+    String lenientValue = parsedProperties.getValue(ConnectionProperties.LENIENT.getKey());
+    ConnectionPropertyValue<Boolean> lenientPropertyValue =
+        lenientValue == null ? null : ConnectionProperties.LENIENT.convert(lenientValue);
+    boolean lenient =
+        lenientPropertyValue != null && Boolean.TRUE.equals(lenientPropertyValue.getValue());
+    ConnectionOptions.checkValidProperties(lenient, parsedProperties, StartupPropertyPolicy.ALLOW);
+    for (ConnectionPropertyValue<?> propertyValue :
+        ConnectionProperties.parseValues(parsedProperties).values()) {
+      connectionOptionsBuilder.setConnectionPropertyValue(propertyValue);
+    }
+    return connectionOptionsBuilder;
   }
 }

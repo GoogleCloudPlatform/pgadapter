@@ -1038,4 +1038,219 @@ public class OptionsMetadataTest {
     assertTrue(options.hasDefaultTimeZone());
     assertEquals("Europe/London", options.getDefaultTimeZone());
   }
+
+  @Test
+  public void testAllowStartupConnectionOptions() {
+    OptionsMetadata defaultOptions =
+        new OptionsMetadata(new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
+    assertNull(defaultOptions.getAllowStartupConnectionOptions());
+    assertFalse(defaultOptions.isAllowStartupConnectionOptions());
+    assertFalse(defaultOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata authOptions = new OptionsMetadata(new String[] {"-p", "p", "-i", "i", "-a"});
+    assertNull(authOptions.getAllowStartupConnectionOptions());
+    assertFalse(authOptions.isAllowStartupConnectionOptions());
+    assertTrue(authOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata sslOptions =
+        new OptionsMetadata(
+            new String[] {"-p", "p", "-i", "i", "-c", "credentials.json", "-ssl", "Enable"});
+    assertNull(sslOptions.getAllowStartupConnectionOptions());
+    assertFalse(sslOptions.isAllowStartupConnectionOptions());
+    assertTrue(sslOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata cliEnabledOptions =
+        new OptionsMetadata(
+            new String[] {
+              "-p",
+              "p",
+              "-i",
+              "i",
+              "-c",
+              "credentials.json",
+              "-ssl",
+              "Require",
+              "-allow_startup_connection_options"
+            });
+    assertEquals(Boolean.TRUE, cliEnabledOptions.getAllowStartupConnectionOptions());
+    assertTrue(cliEnabledOptions.isAllowStartupConnectionOptions());
+    assertFalse(cliEnabledOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata longCliEnabledOptions =
+        new OptionsMetadata(
+            new String[] {"-p", "p", "-i", "i", "-a", "--allow-startup-connection-options"});
+    assertEquals(Boolean.TRUE, longCliEnabledOptions.getAllowStartupConnectionOptions());
+    assertTrue(longCliEnabledOptions.isAllowStartupConnectionOptions());
+    assertFalse(longCliEnabledOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata cliEnabledBeforeOtherFlags =
+        new OptionsMetadata(
+            new String[] {"-allow_startup_connection_options", "-p", "p", "-i", "i", "-a"});
+    assertEquals(Boolean.TRUE, cliEnabledBeforeOtherFlags.getAllowStartupConnectionOptions());
+    assertTrue(cliEnabledBeforeOtherFlags.isAllowStartupConnectionOptions());
+    assertFalse(cliEnabledBeforeOtherFlags.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata cliExplicitTrueOptions =
+        new OptionsMetadata(
+            new String[] {"-allow_startup_connection_options", "true", "-p", "p", "-i", "i", "-a"});
+    assertEquals(Boolean.TRUE, cliExplicitTrueOptions.getAllowStartupConnectionOptions());
+    assertTrue(cliExplicitTrueOptions.isAllowStartupConnectionOptions());
+    assertFalse(cliExplicitTrueOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata cliExplicitFalseOptions =
+        new OptionsMetadata(
+            new String[] {
+              "-p",
+              "p",
+              "-i",
+              "i",
+              "-c",
+              "credentials.json",
+              "-allow_startup_connection_options",
+              "false"
+            });
+    assertEquals(Boolean.FALSE, cliExplicitFalseOptions.getAllowStartupConnectionOptions());
+    assertFalse(cliExplicitFalseOptions.isAllowStartupConnectionOptions());
+    assertTrue(cliExplicitFalseOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata longCliExplicitFalseOptions =
+        new OptionsMetadata(
+            new String[] {
+              "-p",
+              "p",
+              "-i",
+              "i",
+              "-c",
+              "credentials.json",
+              "--allow-startup-connection-options=false"
+            });
+    assertEquals(Boolean.FALSE, longCliExplicitFalseOptions.getAllowStartupConnectionOptions());
+    assertFalse(longCliExplicitFalseOptions.isAllowStartupConnectionOptions());
+    assertTrue(longCliExplicitFalseOptions.shouldRejectStartupConnectionOptions());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new OptionsMetadata(
+                new String[] {
+                  "-p",
+                  "p",
+                  "-i",
+                  "i",
+                  "-c",
+                  "credentials.json",
+                  "-allow_startup_connection_options",
+                  "foo"
+                }));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new OptionsMetadata(
+                new String[] {
+                  "-p",
+                  "p",
+                  "-i",
+                  "i",
+                  "-c",
+                  "credentials.json",
+                  "-allow_startup_connection_options",
+                  ""
+                }));
+
+    OptionsMetadata mixedCaseTrueOptions =
+        new OptionsMetadata(
+            new String[] {"-allow_startup_connection_options", "TRUE", "-p", "p", "-i", "i", "-a"});
+    assertEquals(Boolean.TRUE, mixedCaseTrueOptions.getAllowStartupConnectionOptions());
+    assertFalse(mixedCaseTrueOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata mixedCaseFalseOptions =
+        new OptionsMetadata(
+            new String[] {
+              "-p",
+              "p",
+              "-i",
+              "i",
+              "-c",
+              "credentials.json",
+              "-allow_startup_connection_options",
+              "False"
+            });
+    assertEquals(Boolean.FALSE, mixedCaseFalseOptions.getAllowStartupConnectionOptions());
+    assertTrue(mixedCaseFalseOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata builderDefaultOptions = OptionsMetadata.newBuilder().build();
+    assertNull(builderDefaultOptions.getAllowStartupConnectionOptions());
+    assertFalse(builderDefaultOptions.isAllowStartupConnectionOptions());
+    assertFalse(builderDefaultOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata builderExplicitFalseOptions =
+        OptionsMetadata.newBuilder().setAllowStartupConnectionOptions(false).build();
+    assertEquals(Boolean.FALSE, builderExplicitFalseOptions.getAllowStartupConnectionOptions());
+    assertFalse(builderExplicitFalseOptions.isAllowStartupConnectionOptions());
+    assertTrue(builderExplicitFalseOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata builderSslOptions =
+        OptionsMetadata.newBuilder().setSslMode(SslMode.Enable).build();
+    assertNull(builderSslOptions.getAllowStartupConnectionOptions());
+    assertTrue(builderSslOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata builderSslRequireOptions =
+        OptionsMetadata.newBuilder().setSslMode(SslMode.Require).build();
+    assertNull(builderSslRequireOptions.getAllowStartupConnectionOptions());
+    assertTrue(builderSslRequireOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata builderEnabledOptions =
+        OptionsMetadata.newBuilder()
+            .setSslMode(SslMode.Enable)
+            .setAllowStartupConnectionOptions(true)
+            .build();
+    assertEquals(Boolean.TRUE, builderEnabledOptions.getAllowStartupConnectionOptions());
+    assertTrue(builderEnabledOptions.isAllowStartupConnectionOptions());
+    assertFalse(builderEnabledOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata builderAuthAllowedOptions =
+        OptionsMetadata.newBuilder()
+            .setRequireAuthentication()
+            .setAllowStartupConnectionOptions(true)
+            .build();
+    assertEquals(Boolean.TRUE, builderAuthAllowedOptions.getAllowStartupConnectionOptions());
+    assertFalse(builderAuthAllowedOptions.shouldRejectStartupConnectionOptions());
+
+    OptionsMetadata builderAuthRejectedOptions =
+        OptionsMetadata.newBuilder()
+            .setRequireAuthentication()
+            .setAllowStartupConnectionOptions(false)
+            .build();
+    assertEquals(Boolean.FALSE, builderAuthRejectedOptions.getAllowStartupConnectionOptions());
+    assertTrue(builderAuthRejectedOptions.shouldRejectStartupConnectionOptions());
+
+    @SuppressWarnings("deprecation")
+    OptionsMetadata deprecatedUnauthenticated =
+        new OptionsMetadata(
+            "cloudspanner:/projects/p/instances/i/databases/d",
+            5432,
+            TextFormat.POSTGRESQL,
+            false,
+            false,
+            false,
+            false,
+            null);
+    assertNull(deprecatedUnauthenticated.getAllowStartupConnectionOptions());
+    assertFalse(deprecatedUnauthenticated.shouldRejectStartupConnectionOptions());
+
+    @SuppressWarnings("deprecation")
+    OptionsMetadata deprecatedAuthenticated =
+        new OptionsMetadata(
+            "cloudspanner:/projects/p/instances/i/databases/d",
+            5432,
+            TextFormat.POSTGRESQL,
+            false,
+            true,
+            false,
+            false,
+            null);
+    assertNull(deprecatedAuthenticated.getAllowStartupConnectionOptions());
+    assertTrue(deprecatedAuthenticated.shouldRejectStartupConnectionOptions());
+  }
 }
