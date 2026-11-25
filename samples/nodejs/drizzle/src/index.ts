@@ -100,7 +100,8 @@ async function runTransactionWithRetry<T>(
       return await db.transaction(callback);
     } catch (err: any) {
       if (isSerializationFailure(err) && attempt < MAX_TRANSACTION_RETRIES) {
-        const delayMs = Math.min(1000, 50 * Math.pow(2, attempt - 1));
+        const delayMs =
+          Math.min(1000, 50 * Math.pow(2, attempt - 1)) + Math.floor(Math.random() * 100);
         await new Promise<void>(resolve => setTimeout(resolve, delayMs));
         continue;
       }
