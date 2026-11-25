@@ -72,7 +72,10 @@ public class ITDrizzleSampleTest implements IntegrationTest {
     assertTrue(output, output.contains("Creating venue, concert, and ticket sale..."));
     assertTrue(output, output.contains("Successfully sold ticket. Generated serial ID returned:"));
     assertTrue(output, output.contains("Executing a stale read"));
-    assertTrue(output, output.contains("Stale read returned singer:"));
+    assertTrue(
+        output,
+        output.contains("Stale read returned singer:")
+            || output.contains("Stale read returned no singers"));
     assertTrue(
         output,
         output.contains(

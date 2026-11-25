@@ -78,10 +78,41 @@ async function main() {
   }
 }
 
+const MAX_TRANSACTION_RETRIES = 5;
+
+function isSerializationFailure(err: any): boolean {
+  let current = err;
+  for (let depth = 0; current && depth < 10; depth++) {
+    if (current.code === '40001') {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
+async function runTransactionWithRetry<T>(
+  db: any,
+  callback: (tx: any) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await db.transaction(callback);
+    } catch (err: any) {
+      if (isSerializationFailure(err) && attempt < MAX_TRANSACTION_RETRIES) {
+        const delayMs = Math.min(1000, 50 * Math.pow(2, attempt - 1));
+        await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 async function createRandomSingersAndAlbums(db: any, count: number) {
   console.log(`Creating ${count} random singers and their albums inside a transaction...`);
 
-  await db.transaction(async (tx: any) => {
+  await runTransactionWithRetry(db, async (tx: any) => {
     for (let i = 0; i < count; i++) {
       const singerId = randomUUID();
       const firstName = randomFirstName();
@@ -147,7 +178,7 @@ async function printSingersAlbums(db: any) {
 async function createVenueConcertAndTicket(db: any) {
   console.log("Creating venue, concert, and ticket sale...");
 
-  await db.transaction(async (tx: any) => {
+  const ticketSaleId = await runTransactionWithRetry(db, async (tx: any) => {
     // 1. Get first singer
     const singerList = await tx.select().from(singers).limit(1);
     const singer = singerList[0];
@@ -185,8 +216,10 @@ async function createVenueConcertAndTicket(db: any) {
       updated_at: new Date()
     }).returning({ id: ticketSales.id });
 
-    console.log(`Successfully sold ticket. Generated serial ID returned: ${returnedIds[0].id}`);
+    return returnedIds[0].id;
   });
+
+  console.log(`Successfully sold ticket. Generated serial ID returned: ${ticketSaleId}`);
 }
 
 async function runStaleRead(db: any) {
@@ -199,6 +232,8 @@ async function runStaleRead(db: any) {
   const results = await db.select().from(singers).limit(1);
   if (results.length > 0) {
     console.log(`Stale read returned singer: ${results[0].last_name}`);
+  } else {
+    console.log("Stale read returned no singers (data was written within the staleness window).");
   }
 
   // Reset to default
