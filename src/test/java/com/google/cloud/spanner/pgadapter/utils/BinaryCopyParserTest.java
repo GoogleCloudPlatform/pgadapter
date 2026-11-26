@@ -15,12 +15,14 @@
 package com.google.cloud.spanner.pgadapter.utils;
 
 import static com.google.cloud.spanner.pgadapter.statements.CopyToStatement.COPY_BINARY_HEADER;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
@@ -28,6 +30,7 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.utils.BinaryCopyParser.BinaryField;
 import com.google.cloud.spanner.pgadapter.utils.BinaryCopyParser.BinaryRecord;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
@@ -423,5 +426,178 @@ public class BinaryCopyParserTest {
     assertTrue(record4.isNull(1));
 
     assertFalse(iterator.hasNext());
+  }
+
+  @Test
+  public void testIteratorNext_FieldLengthExceedsDefaultMax() throws IOException {
+    for (int invalidLength :
+        new int[] {BinaryCopyParser.DEFAULT_MAX_FIELD_LENGTH + 1, 0x7ffffff0, Integer.MAX_VALUE}) {
+      try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+          PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+          DataOutputStream dataOutputStream = new DataOutputStream(pipedOutputStream)) {
+        BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream);
+        dataOutputStream.write(COPY_BINARY_HEADER);
+        dataOutputStream.writeInt(0);
+        dataOutputStream.writeInt(0);
+        dataOutputStream.writeShort(1);
+        dataOutputStream.writeInt(invalidLength);
+        dataOutputStream.flush();
+
+        Iterator<CopyRecord> iterator = parser.iterator();
+        assertTrue(iterator.hasNext());
+        SpannerException spannerException = assertThrows(SpannerException.class, iterator::next);
+        assertEquals(ErrorCode.FAILED_PRECONDITION, spannerException.getErrorCode());
+        assertTrue(
+            spannerException
+                .getMessage()
+                .contains(
+                    String.format(
+                        "Field length %d exceeds maximum allowed length of %d bytes",
+                        invalidLength, BinaryCopyParser.DEFAULT_MAX_FIELD_LENGTH)));
+      }
+    }
+  }
+
+  @Test
+  public void testIteratorNext_FieldLengthCustomMaxBoundary() throws IOException {
+    byte[] exactPayload = new byte[16];
+    for (int i = 0; i < exactPayload.length; i++) {
+      exactPayload[i] = (byte) i;
+    }
+
+    try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+        DataOutputStream dataOutputStream = new DataOutputStream(pipedOutputStream)) {
+      BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream, 16);
+      dataOutputStream.write(COPY_BINARY_HEADER);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeInt(0);
+
+      // Row 1: exact max length (16) should succeed.
+      dataOutputStream.writeShort(1);
+      dataOutputStream.writeInt(16);
+      dataOutputStream.write(exactPayload);
+
+      // Row 2: length 17 exceeds custom max (16) and must be rejected immediately.
+      dataOutputStream.writeShort(1);
+      dataOutputStream.writeInt(17);
+      dataOutputStream.flush();
+
+      Iterator<CopyRecord> iterator = parser.iterator();
+      assertTrue(iterator.hasNext());
+      CopyRecord record = iterator.next();
+      assertArrayEquals(exactPayload, record.getValue(Type.bytes(), 0).getBytes().toByteArray());
+
+      assertTrue(iterator.hasNext());
+      SpannerException spannerException = assertThrows(SpannerException.class, iterator::next);
+      assertEquals(ErrorCode.FAILED_PRECONDITION, spannerException.getErrorCode());
+    }
+  }
+
+  @Test
+  public void testConstructor_NegativeAndZeroMaxFieldLength() throws IOException {
+    try (PipedInputStream pipedInputStream = new PipedInputStream()) {
+      assertThrows(
+          IllegalArgumentException.class, () -> new BinaryCopyParser(pipedInputStream, -1));
+    }
+
+    try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+        DataOutputStream dataOutputStream = new DataOutputStream(pipedOutputStream)) {
+      BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream, 0);
+      dataOutputStream.write(COPY_BINARY_HEADER);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeShort(1);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeShort(1);
+      dataOutputStream.writeInt(1);
+      dataOutputStream.flush();
+
+      Iterator<CopyRecord> iterator = parser.iterator();
+      assertTrue(iterator.hasNext());
+      assertEquals(
+          Value.bytes(ByteArray.copyFrom(new byte[0])), iterator.next().getValue(Type.bytes(), 0));
+
+      assertTrue(iterator.hasNext());
+      SpannerException spannerException = assertThrows(SpannerException.class, iterator::next);
+      assertEquals(ErrorCode.FAILED_PRECONDITION, spannerException.getErrorCode());
+    }
+  }
+
+  @Test
+  public void testIteratorNext_LargeFieldReadInChunks() throws IOException {
+    int payloadLength = BinaryCopyParser.MAX_READ_CHUNK_SIZE * 2 + 123;
+    byte[] expectedPayload = new byte[payloadLength];
+    for (int i = 0; i < payloadLength; i++) {
+      expectedPayload[i] = (byte) (i * 31);
+    }
+
+    try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream pipedInputStream =
+            new PipedInputStream(pipedOutputStream, payloadLength + 256);
+        DataOutputStream dataOutputStream = new DataOutputStream(pipedOutputStream)) {
+      BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream);
+      dataOutputStream.write(COPY_BINARY_HEADER);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeShort(1);
+      dataOutputStream.writeInt(payloadLength);
+      dataOutputStream.write(expectedPayload);
+      dataOutputStream.writeShort(-1);
+      dataOutputStream.flush();
+
+      Iterator<CopyRecord> iterator = parser.iterator();
+      assertTrue(iterator.hasNext());
+      CopyRecord record = iterator.next();
+      assertEquals(
+          Value.bytes(ByteArray.copyFrom(expectedPayload)), record.getValue(Type.bytes(), 0));
+      assertFalse(iterator.hasNext());
+    }
+  }
+
+  @Test
+  public void testIteratorNext_TruncatedLargeFieldDoesNotAllocateFullLength() throws IOException {
+    try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+        DataOutputStream dataOutputStream = new DataOutputStream(pipedOutputStream)) {
+      BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream);
+      dataOutputStream.write(COPY_BINARY_HEADER);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeShort(1);
+      // Claim the maximum allowed field length, but send only 10 bytes before closing the stream.
+      dataOutputStream.writeInt(BinaryCopyParser.DEFAULT_MAX_FIELD_LENGTH);
+      dataOutputStream.write(new byte[10]);
+      dataOutputStream.close();
+
+      Iterator<CopyRecord> iterator = parser.iterator();
+      assertTrue(iterator.hasNext());
+      SpannerException spannerException = assertThrows(SpannerException.class, iterator::next);
+      assertEquals(ErrorCode.INTERNAL, spannerException.getErrorCode());
+      assertTrue(spannerException.getCause() instanceof EOFException);
+    }
+  }
+
+  @Test
+  public void testIteratorNext_ZeroLengthField() throws IOException {
+    try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+        DataOutputStream dataOutputStream = new DataOutputStream(pipedOutputStream)) {
+      BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream);
+      dataOutputStream.write(COPY_BINARY_HEADER);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeShort(1);
+      dataOutputStream.writeInt(0);
+      dataOutputStream.writeShort(-1);
+      dataOutputStream.flush();
+
+      Iterator<CopyRecord> iterator = parser.iterator();
+      assertTrue(iterator.hasNext());
+      CopyRecord record = iterator.next();
+      assertEquals(Value.bytes(ByteArray.copyFrom(new byte[0])), record.getValue(Type.bytes(), 0));
+      assertFalse(iterator.hasNext());
+    }
   }
 }
