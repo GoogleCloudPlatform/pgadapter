@@ -32,7 +32,7 @@ RUN mvn -B -s /root/.m2/settings.xml package -Passembly -Dmaven.test.skip=true
 #                                   RELEASE                                    #
 ################################################################################
 
-FROM gcr.io/distroless/java25-debian13:nonroot
+FROM gcr.io/distroless/java25-debian13:nonroot@sha256:4618e7a1a1f5177222985347e1ffd503076f6be5837b89c8fd02800bd8551bde
 
 COPY --from=build --chown=nonroot target/pgadapter /home/pgadapter
 COPY --from=build --chown=nonroot LICENSE /home/pgadapter/
