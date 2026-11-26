@@ -33,6 +33,7 @@ import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.common.base.Preconditions;
+import com.google.common.io.ByteStreams;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
@@ -82,9 +83,12 @@ class BinaryCopyParser implements CopyInParser {
       // This should according to the current spec always be zero.
       // But if it happens not to be so, we should just skip the following bytes.
       int headerExtensionLength = this.dataInputStream.readInt();
-      while (headerExtensionLength > 0) {
-        headerExtensionLength -= this.dataInputStream.skip(headerExtensionLength);
+      if (headerExtensionLength < 0) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.FAILED_PRECONDITION,
+            "Invalid header extension length: " + headerExtensionLength);
       }
+      ByteStreams.skipFully(this.dataInputStream, headerExtensionLength);
     } catch (IOException ioException) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INTERNAL, "Failed to read binary file header", ioException);
@@ -94,7 +98,9 @@ class BinaryCopyParser implements CopyInParser {
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    this.dataInputStream.close();
+  }
 
   void verifyBinaryHeader() throws IOException {
     // Binary COPY files should have the following 11-bytes fixed header:
