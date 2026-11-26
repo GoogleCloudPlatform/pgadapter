@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.DdlExecutor.unquoteIdentifier;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -43,6 +44,7 @@ public class DdlExecutorTest {
 
   @Test
   public void testUnquoteIdentifier() {
+    assertNull(unquoteIdentifier(null));
     assertEquals("foo", unquoteIdentifier("foo"));
     assertEquals("foo", unquoteIdentifier("FOO"));
     assertEquals("foo", unquoteIdentifier("Foo"));
@@ -53,6 +55,10 @@ public class DdlExecutorTest {
 
     assertEquals("", unquoteIdentifier(""));
     assertEquals("a", unquoteIdentifier("a"));
+    assertEquals("a", unquoteIdentifier("A"));
+    assertEquals("\"", unquoteIdentifier("\""));
+    assertEquals("\"foo", unquoteIdentifier("\"foo"));
+    assertEquals("foo\"", unquoteIdentifier("foo\""));
     assertEquals("", unquoteIdentifier("\"\""));
   }
 
@@ -107,10 +113,39 @@ public class DdlExecutorTest {
             Statement.of(
                 "create table foo (id bigint, value text, constraint pk_foo primary key (id), constraint fk_bar foreign key (value) references bar (id))")));
     assertEquals(
+        Statement.of(
+            "create table foo (id bigint, value text, constraint chk_bar check (length(value) < 100),  primary key (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "create table foo (id bigint, value text, constraint chk_bar check (length(value) < 100), constraint pk_foo primary key (id))")));
+    assertEquals(
+        Statement.of(
+            "create table foo (a int, b int, constraint fk_other foreign key (a, b) references other (a, b),  primary key (a, b))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "create table foo (a int, b int, constraint fk_other foreign key (a, b) references other (a, b), constraint pk_foo primary key (a, b))")));
+    assertEquals(
         Statement.of("create table public.foo (id bigint, value text,  primary key (id) )"),
         ddlExecutor.maybeRemovePrimaryKeyConstraintName(
             Statement.of(
                 "create table public.foo (id bigint, value text, constraint pk_foo primary key (id) )")));
+    assertEquals(
+        Statement.of("CREATE TABLE \"public\".\"Foo\" (id int,  PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "CREATE TABLE \"public\".\"Foo\" (id int, CONSTRAINT \"pk_Foo\" PRIMARY KEY (id))")));
+    assertEquals(
+        Statement.of("CREATE TABLE foo(id int,PRIMARY KEY(id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of("CREATE TABLE foo(id int,CONSTRAINT\"pk_foo\"PRIMARY KEY(id))")));
+    assertEquals(
+        Statement.of("/* c */ CREATE TABLE foo (id int,  PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of("/* c */ CREATE TABLE foo (id int, CONSTRAINT pk_foo PRIMARY KEY (id))")));
+    assertEquals(
+        Statement.of("-- c\nCREATE TABLE foo (id int,  PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of("-- c\nCREATE TABLE foo (id int, CONSTRAINT pk_foo PRIMARY KEY (id))")));
 
     assertEquals(
         Statement.of(
@@ -118,6 +153,122 @@ public class DdlExecutorTest {
         ddlExecutor.maybeRemovePrimaryKeyConstraintName(
             Statement.of(
                 "CREATE TABLE \"user\" (\"id\" integer NOT NULL, \"firstName\" character varying NOT NULL, \"lastName\" character varying NOT NULL, \"age\" integer NOT NULL, CONSTRAINT \"PK_user\" PRIMARY KEY (\"id\"))")));
+    assertEquals(
+        Statement.of("CREATE TABLE \"T\" (id int,  PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of("CREATE TABLE \"T\" (id int, CONSTRAINT pk_t PRIMARY KEY (id))")));
+    assertEquals(
+        Statement.of("CREATE TABLE t (id int,  PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of("CREATE TABLE t (id int, CONSTRAINT \"pk_t\" PRIMARY KEY (id))")));
+    assertEquals(
+        Statement.of("CREATE TABLE \"a\"\"b\" (id int,  PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "CREATE TABLE \"a\"\"b\" (id int, CONSTRAINT \"pk_a\"\"b\" PRIMARY KEY (id))")));
+    assertEquals(
+        Statement.of("CREATE TABLE t (\"constraint\" text,  PRIMARY KEY (\"constraint\"))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "CREATE TABLE t (\"constraint\" text, CONSTRAINT pk_t PRIMARY KEY (\"constraint\"))")));
+    assertEquals(
+        Statement.of("CREATE TABLE t (id int,  /* c */ PRIMARY /* c */ KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "CREATE TABLE t (id int, CONSTRAINT /* c */ pk_t /* c */ PRIMARY /* c */ KEY (id))")));
+    assertEquals(
+        Statement.of("CREATE TABLE t (id int, CONSTRAINT \"\" PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of("CREATE TABLE t (id int, CONSTRAINT \"\" PRIMARY KEY (id))")));
+    assertEquals(
+        Statement.of("create table if not exists foo (id bigint,  primary key (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "create table if not exists foo (id bigint, constraint pk_foo primary key (id))")));
+    assertEquals(
+        Statement.of("CREATE TABLE \"a b\" (id int,  PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of("CREATE TABLE \"a b\" (id int, CONSTRAINT \"pk_a b\" PRIMARY KEY (id))")));
+    assertEquals(
+        Statement.of("CREATE TABLE \"😀\" (id int,  PRIMARY KEY (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of("CREATE TABLE \"😀\" (id int, CONSTRAINT \"pk_😀\" PRIMARY KEY (id))")));
+    assertEquals(
+        Statement.of(
+            "create table t (id bigint, s text default 'a''b), constraint pk_t primary key',  primary key (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "create table t (id bigint, s text default 'a''b), constraint pk_t primary key', constraint pk_t primary key (id))")));
+    assertEquals(
+        Statement.of("create table t (id bigint, s text default e'a\\' ),',  primary key (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "create table t (id bigint, s text default e'a\\' ),', constraint pk_t primary key (id))")));
+    assertEquals(
+        Statement.of("create table t (id bigint, s text default $$a,b)c$$,  primary key (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "create table t (id bigint, s text default $$a,b)c$$, constraint pk_t primary key (id))")));
+    assertEquals(
+        Statement.of("create table t (id bigint /* ) /* nested ) */ */, -- )\n  primary key (id))"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(
+            Statement.of(
+                "create table t (id bigint /* ) /* nested ) */ */, -- )\n constraint pk_t primary key (id))")));
+    assertEquals(
+        Statement.of("CREATE TABLE t ()"),
+        ddlExecutor.maybeRemovePrimaryKeyConstraintName(Statement.of("CREATE TABLE t ()")));
+  }
+
+  @Test(timeout = 5000L)
+  public void testMaybeRemovePrimaryKeyConstraintName_MalformedCreateTable() {
+    DdlExecutor ddlExecutor =
+        new DdlExecutor(mock(BackendConnection.class), Suppliers.ofInstance(ImmutableList.of()));
+
+    ImmutableList<String> malformedStatements =
+        ImmutableList.of(
+            "CREATE TABLE",
+            "CREATE TABLE (",
+            "CREATE TABLE \"unclosed",
+            "CREATE TABLE 123 (id int)",
+            "CREATE TABLE t",
+            "CREATE TABLE IF NOT EXISTS t",
+            "CREATE TABLE t AS SELECT 1",
+            "CREATE TABLE t (",
+            "CREATE TABLE t ((a int))",
+            "CREATE TABLE t ((a int",
+            "CREATE TABLE t (a int",
+            "CREATE TABLE t (a int\0",
+            "CREATE TABLE t (a int   ",
+            "CREATE TABLE t (a int CHECK (a > 0)",
+            "CREATE TABLE t (a text DEFAULT 'unclosed)",
+            "CREATE TABLE t (a text DEFAULT e'unclosed)",
+            "CREATE TABLE t (a text DEFAULT $tag$unclosed $other$)",
+            "CREATE TABLE t (a text DEFAULT $$unclosed)",
+            "CREATE TABLE t (\"unclosed)",
+            "CREATE TABLE t (a int /* unclosed)",
+            "CREATE TABLE t (a int -- )",
+            "CREATE TABLE t ($a $ $)",
+            "CREATE TABLE t (CONSTRAINT",
+            "CREATE TABLE t (CONSTRAINT ",
+            "CREATE TABLE t (CONSTRAINT foo",
+            "CREATE TABLE t (CONSTRAINT foo (",
+            "CREATE TABLE t (id int, CONSTRAINT chk CHECK (a > 0",
+            "CREATE TABLE t (id int, CONSTRAINT chk CHECK (s = 'unclosed",
+            "CREATE TABLE t (id int, CONSTRAINT chk CHECK (/* unclosed)",
+            "CREATE TABLE t (CONSTRAINT PRIMARY KEY (id))",
+            "CREATE TABLE t (CONSTRAINT (id))",
+            "CREATE TABLE t (CONSTRAINT 123 PRIMARY KEY (id))",
+            "CREATE TABLE t (CONSTRAINT \"unclosed",
+            "CREATE TABLE t (id int, CONSTRAINT foo PRIMARY, CONSTRAINT pk_t PRIMARY KEY (id))",
+            "CREATE TABLE t (id int, CONSTRAINT pk_t",
+            "CREATE TABLE t (id int, CONSTRAINT pk_t PRIMARY (id))",
+            "CREATE TABLE t (id int, CONSTRAINT pk_t PRIMARY");
+
+    for (String sql : malformedStatements) {
+      Statement statement = Statement.of(sql);
+      assertSame(sql, statement, ddlExecutor.maybeRemovePrimaryKeyConstraintName(statement));
+      assertEquals(sql, statement, translate(sql, ddlExecutor));
+    }
   }
 
   @Test
