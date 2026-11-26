@@ -15,7 +15,10 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.pgadapter.metadata.TestOptionsMetadataBuilder;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.common.collect.ImmutableMap;
 import io.opentelemetry.api.OpenTelemetry;
@@ -115,6 +118,77 @@ public class StartupMessageMockServerTest extends AbstractMockServerTest {
         Map<String, String> parameters = readParameterStatuses(inputStream);
         assertEquals("Europe/Paris", parameters.get("TimeZone"));
       }
+    }
+  }
+
+  @Test
+  public void testRejectStartupConnectionOptionsOnStartup() throws IOException {
+    TestOptionsMetadataBuilder builder = new TestOptionsMetadataBuilder();
+    builder.setProject("p").setInstance("i").setDatabase("d");
+    builder
+        .setUsePlainText()
+        .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
+        .setCredentials(NoCredentials.getInstance())
+        .setEnableEndToEndTracing(true)
+        .setAllowStartupConnectionOptions(false);
+    ProxyServer rejectServer = new ProxyServer(builder.build(), OpenTelemetry.noop());
+    rejectServer.startServer();
+    try {
+      try (Socket socket = new Socket("localhost", rejectServer.getLocalPort());
+          DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        sendStartupMessage(
+            outputStream,
+            ImmutableMap.of("user", "foo", "database", "d", "options", "-c numChannels=2"));
+        assertEquals('E', inputStream.readByte());
+        int length = inputStream.readInt();
+        byte[] contents = new byte[length - 4];
+        inputStream.readFully(contents);
+        String errorPayload = new String(contents, StandardCharsets.UTF_8);
+        assertTrue(errorPayload, errorPayload.contains("08004"));
+        assertTrue(errorPayload, errorPayload.contains("-allow_startup_connection_options"));
+      }
+
+      try (Socket socket = new Socket("localhost", rejectServer.getLocalPort());
+          DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        sendStartupMessage(
+            outputStream,
+            ImmutableMap.of("user", "foo", "database", "d", "options", "-c optimizerVersion=2"));
+        readParameterStatuses(inputStream);
+      }
+    } finally {
+      rejectServer.stopServer();
+    }
+  }
+
+  @Test
+  public void testAllowStartupConnectionOptionsOnStartup() throws IOException {
+    TestOptionsMetadataBuilder builder = new TestOptionsMetadataBuilder();
+    builder.setProject("p").setInstance("i").setDatabase("d");
+    builder
+        .setUsePlainText()
+        .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
+        .setCredentials(NoCredentials.getInstance())
+        .setEnableEndToEndTracing(true)
+        .setAllowStartupConnectionOptions(true);
+    ProxyServer allowServer = new ProxyServer(builder.build(), OpenTelemetry.noop());
+    allowServer.startServer();
+    try (Socket socket = new Socket("localhost", allowServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      sendStartupMessage(
+          outputStream,
+          ImmutableMap.of(
+              "user",
+              "foo",
+              "database",
+              "d",
+              "options",
+              "-c endpoint=attacker.com:443 -c numChannels=2"));
+      readParameterStatuses(inputStream);
+    } finally {
+      allowServer.stopServer();
     }
   }
 }

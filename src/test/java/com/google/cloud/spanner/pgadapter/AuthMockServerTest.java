@@ -21,6 +21,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.Builder;
 import com.google.cloud.spanner.pgadapter.wireprotocol.PasswordMessage;
 import java.security.KeyPair;
@@ -223,6 +224,38 @@ public class AuthMockServerTest extends AbstractMockServerTest {
             PSQLException.class,
             () -> DriverManager.getConnection(createUrl(), username, password));
     assertEquals(CREDENTIALS_ERROR, exception.getMessage());
+  }
+
+  @Test
+  public void testConnectWithStartupOptionIsRejected() throws Exception {
+    String username = "whatever";
+    String password = String.format(RANDOM_CREDENTIALS_FILE, generateRandomPrivateKey());
+    PSQLException exception =
+        assertThrows(
+            PSQLException.class,
+            () ->
+                DriverManager.getConnection(
+                    createUrl() + "?options=-c%20numChannels=2", username, password));
+    assertEquals(
+        SQLState.SQLServerRejectedEstablishmentOfSQLConnection.toString(), exception.getSQLState());
+    assertTrue(
+        exception.getMessage(),
+        exception.getMessage().contains("-allow_startup_connection_options"));
+  }
+
+  @Test
+  public void testConnectWithUserOptionSucceeds() throws Exception {
+    String username = "whatever";
+    String password = String.format(RANDOM_CREDENTIALS_FILE, generateRandomPrivateKey());
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20optimizerVersion=2", username, password)) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+    }
   }
 
   private String generateRandomPrivateKey() throws NoSuchAlgorithmException {

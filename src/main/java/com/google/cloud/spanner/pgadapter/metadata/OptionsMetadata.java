@@ -50,6 +50,7 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.json.simple.JSONObject;
@@ -117,6 +118,7 @@ public class OptionsMetadata {
     private boolean autoConfigEmulator;
     private boolean logGrpcMessages;
     private boolean allowShutdownStatement;
+    private Boolean allowStartupConnectionOptions;
     private boolean debugMode;
     private String endpoint;
     private boolean usePlainText;
@@ -422,6 +424,18 @@ public class OptionsMetadata {
       return this;
     }
 
+    /**
+     * Configures whether clients are allowed to specify Spanner startup connection properties in
+     * PostgreSQL connection string options. When unset, startup connection properties are rejected
+     * when SSL or authentication is enabled, and allowed with a deprecation warning otherwise. In
+     * an upcoming version, the default when unset is expected to change to reject client startup
+     * connection properties in all modes.
+     */
+    public Builder setAllowStartupConnectionOptions(boolean allowStartupConnectionOptions) {
+      this.allowStartupConnectionOptions = allowStartupConnectionOptions;
+      return this;
+    }
+
     Builder enableDebugMode() {
       this.debugMode = true;
       return this;
@@ -598,6 +612,12 @@ public class OptionsMetadata {
       if (allowShutdownStatement) {
         addOption(args, OPTION_ALLOW_SHUTDOWN_STATEMENT);
       }
+      if (allowStartupConnectionOptions != null) {
+        addOption(
+            args,
+            OPTION_ALLOW_STARTUP_CONNECTION_OPTIONS,
+            String.valueOf(allowStartupConnectionOptions));
+      }
       if (debugMode) {
         addOption(args, OPTION_INTERNAL_DEBUG_MODE);
         addOption(args, OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING);
@@ -724,6 +744,8 @@ public class OptionsMetadata {
   private static final String OPTION_LEGACY_LOGGING = "legacy_logging";
   private static final String OPTION_LOG_GRPC_MESSAGES = "log_grpc_messages";
   private static final String OPTION_ALLOW_SHUTDOWN_STATEMENT = "allow_shutdown_statement";
+  private static final String OPTION_ALLOW_STARTUP_CONNECTION_OPTIONS =
+      "allow_startup_connection_options";
   private static final String OPTION_COMMAND = "cmd";
   private static final String OPTION_DESCRIBE_CACHE_EXPIRE_MINUTES =
       "describe_cache_expire_minutes";
@@ -768,6 +790,7 @@ public class OptionsMetadata {
   private final Duration startupTimeout;
   private final boolean logGrpcMessages;
   private final boolean allowShutdownStatement;
+  @Nullable private final Boolean allowStartupConnectionOptions;
   private final String command;
   private final long describeCacheExpireMinutes;
   private final long describeCacheMaxSize;
@@ -896,6 +919,8 @@ public class OptionsMetadata {
     this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
     this.logGrpcMessages = commandLine.hasOption(OPTION_LOG_GRPC_MESSAGES);
     this.allowShutdownStatement = commandLine.hasOption(OPTION_ALLOW_SHUTDOWN_STATEMENT);
+    this.allowStartupConnectionOptions =
+        parseNullableBooleanOption(commandLine, OPTION_ALLOW_STARTUP_CONNECTION_OPTIONS);
     this.command = commandLine.getOptionValue(OPTION_COMMAND);
     this.startupTimeout = startupTimeout;
   }
@@ -976,6 +1001,7 @@ public class OptionsMetadata {
     this.debugMode = false;
     this.logGrpcMessages = false;
     this.allowShutdownStatement = false;
+    this.allowStartupConnectionOptions = null;
     this.command = null;
     this.startupTimeout = DEFAULT_STARTUP_TIMEOUT;
   }
@@ -1011,6 +1037,23 @@ public class OptionsMetadata {
       properties.put(ConnectionOptions.USE_VIRTUAL_GRPC_TRANSPORT_THREADS_PROPERTY_NAME, "true");
     }
     return properties;
+  }
+
+  @Nullable
+  private static Boolean parseNullableBooleanOption(CommandLine commandLine, String optionName) {
+    if (!commandLine.hasOption(optionName)) {
+      return null;
+    }
+    String value = commandLine.getOptionValue(optionName);
+    if (value == null || "true".equalsIgnoreCase(value)) {
+      return Boolean.TRUE;
+    }
+    if ("false".equalsIgnoreCase(value)) {
+      return Boolean.FALSE;
+    }
+    throw new IllegalArgumentException(
+        String.format(
+            "Invalid value '%s' for -%s. Expected 'true' or 'false'.", value, optionName));
   }
 
   static SslMode parseSslMode(String value) {
@@ -1621,6 +1664,20 @@ public class OptionsMetadata {
         false,
         "Allows the proxy server to be shutdown by executing the SHUTDOWN [SMART | FAST | IMMEDIATE] statement.");
     options.addOption(
+        Option.builder(OPTION_ALLOW_STARTUP_CONNECTION_OPTIONS)
+            .longOpt("allow-startup-connection-options")
+            .hasArg()
+            .optionalArg(true)
+            .argName("true|false")
+            .desc(
+                "Controls whether clients may specify Spanner startup connection properties in "
+                    + "PostgreSQL connection string options. When omitted, startup connection "
+                    + "properties are rejected when SSL or authentication is enabled, and allowed "
+                    + "with a deprecation warning otherwise (and will be rejected by default in all "
+                    + "modes in an upcoming version). Set to true (or pass without a value) to "
+                    + "allow, or false to reject in all modes.")
+            .build());
+    options.addOption(
         OPTION_INTERNAL_DEBUG_MODE,
         "internal-debug-mode",
         false,
@@ -1729,6 +1786,39 @@ public class OptionsMetadata {
 
   public boolean isAllowShutdownStatement() {
     return this.allowShutdownStatement;
+  }
+
+  /**
+   * Returns true if {@code -allow_startup_connection_options} was explicitly enabled. Returns
+   * {@code false} both when it was explicitly set to {@code false} and when it was omitted; see
+   * {@link #getAllowStartupConnectionOptions()} and {@link
+   * #shouldRejectStartupConnectionOptions()}.
+   */
+  public boolean isAllowStartupConnectionOptions() {
+    return Boolean.TRUE.equals(this.allowStartupConnectionOptions);
+  }
+
+  /**
+   * Returns whether client startup connection options are explicitly allowed ({@code
+   * Boolean.TRUE}), explicitly disallowed ({@code Boolean.FALSE}), or unset ({@code null}).
+   */
+  @Nullable
+  public Boolean getAllowStartupConnectionOptions() {
+    return this.allowStartupConnectionOptions;
+  }
+
+  /**
+   * Returns true if {@code Context.STARTUP} Spanner connection properties in client {@code options}
+   * must be rejected.
+   */
+  public boolean shouldRejectStartupConnectionOptions() {
+    if (this.allowStartupConnectionOptions != null) {
+      return !this.allowStartupConnectionOptions;
+    }
+    // TODO: Change the default when allowStartupConnectionOptions is not set to true so startup
+    // properties in client connection options are rejected by default in all modes, and remove
+    // ConnectionHandler.DISALLOWED_STARTUP_CONNECTION_PROPERTY_NAMES.
+    return this.sslMode.isSslEnabled() || this.authenticate;
   }
 
   public boolean isDebugMode() {
