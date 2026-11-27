@@ -20,6 +20,7 @@ import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_PASSWORD;
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_PORT;
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_USER;
 import static com.google.cloud.spanner.pgadapter.ProxyServer.CONNECTION_HANDLERS;
+import static com.google.cloud.spanner.pgadapter.statements.CopyToStatement.COPY_BINARY_HEADER;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -2684,6 +2685,119 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       socket.close();
     }
 
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_BinaryLargeValidCopyDataAndField() throws Exception {
+    setupCopyInformationSchemaResults();
+
+    String largeName = Strings.repeat("a", 200_000);
+    byte[] largeNameBytes = largeName.getBytes(StandardCharsets.UTF_8);
+
+    ByteArrayOutputStream copyPayload = new ByteArrayOutputStream();
+    try (DataOutputStream copyDataStream = new DataOutputStream(copyPayload)) {
+      copyDataStream.write(COPY_BINARY_HEADER);
+      copyDataStream.writeInt(0); // flags
+      copyDataStream.writeInt(0); // header extension length
+      // Row 1: large field (> READ_CHUNK_SIZE and > pipe buffer size 64 KiB)
+      copyDataStream.writeShort(3);
+      copyDataStream.writeInt(8);
+      copyDataStream.writeLong(1L);
+      copyDataStream.writeInt(8);
+      copyDataStream.writeLong(30L);
+      copyDataStream.writeInt(largeNameBytes.length);
+      copyDataStream.write(largeNameBytes);
+      // Row 2: normal row in the same CopyData message
+      byte[] smallNameBytes = "bob".getBytes(StandardCharsets.UTF_8);
+      copyDataStream.writeShort(3);
+      copyDataStream.writeInt(8);
+      copyDataStream.writeLong(2L);
+      copyDataStream.writeInt(8);
+      copyDataStream.writeLong(40L);
+      copyDataStream.writeInt(smallNameBytes.length);
+      copyDataStream.write(smallNameBytes);
+      copyDataStream.writeShort(-1); // trailer
+    }
+    byte[] payloadBytes = copyPayload.toByteArray();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      long copied =
+          copyManager.copyIn(
+              "COPY users FROM STDIN (FORMAT BINARY);", new ByteArrayInputStream(payloadBytes));
+      assertEquals(2L, copied);
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(2, mutation.getInsert().getValuesCount());
+    assertEquals("1", mutation.getInsert().getValues(0).getValues(0).getStringValue());
+    assertEquals("30", mutation.getInsert().getValues(0).getValues(1).getStringValue());
+    assertEquals(largeName, mutation.getInsert().getValues(0).getValues(2).getStringValue());
+    assertEquals("2", mutation.getInsert().getValues(1).getValues(0).getStringValue());
+    assertEquals("40", mutation.getInsert().getValues(1).getValues(1).getStringValue());
+    assertEquals("bob", mutation.getInsert().getValues(1).getValues(2).getStringValue());
+
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_BinaryFieldLengthExceedsMaxReturnsError() throws Exception {
+    assumeFalse(useDomainSocket);
+    setupCopyInformationSchemaResults();
+
+    try (Socket socket = connectAndStartup();
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+      byte[] sqlBytes = "COPY users FROM STDIN (FORMAT BINARY);\0".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('Q');
+      outputStream.writeInt(4 + sqlBytes.length);
+      outputStream.write(sqlBytes);
+      outputStream.flush();
+
+      assertEquals('G', (char) inputStream.readByte());
+      int copyInLength = inputStream.readInt();
+      inputStream.skipBytes(copyInLength - 4);
+
+      // Send a minimal binary COPY payload claiming a ~2 GiB field without sending the field data.
+      ByteArrayOutputStream copyPayload = new ByteArrayOutputStream();
+      try (DataOutputStream copyDataStream = new DataOutputStream(copyPayload)) {
+        copyDataStream.write(COPY_BINARY_HEADER);
+        copyDataStream.writeInt(0); // flags
+        copyDataStream.writeInt(0); // header extension length
+        copyDataStream.writeShort(3); // field count
+        copyDataStream.writeInt(0x7ffffff0); // oversized field length
+      }
+      byte[] payloadBytes = copyPayload.toByteArray();
+      outputStream.writeByte('d');
+      outputStream.writeInt(4 + payloadBytes.length);
+      outputStream.write(payloadBytes);
+      outputStream.writeByte('c');
+      outputStream.writeInt(4);
+      outputStream.flush();
+
+      assertEquals('E', (char) inputStream.readByte());
+      int errorLength = inputStream.readInt();
+      byte[] errorBytes = new byte[errorLength - 4];
+      inputStream.readFully(errorBytes);
+      String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+      assertTrue(errorPayload.contains("exceeds maximum allowed length"));
+
+      assertEquals('Z', (char) inputStream.readByte());
+      int readyLength = inputStream.readInt();
+      inputStream.skipBytes(readyLength - 4);
+
+      outputStream.writeByte('X');
+      outputStream.writeInt(4);
+      outputStream.flush();
+    }
+
+    assertEquals(0, mockSpanner.getRequestsOfType(CommitRequest.class).size());
     waitForActiveConnectionHandlersToClose();
   }
 

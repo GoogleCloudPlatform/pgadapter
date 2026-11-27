@@ -32,6 +32,7 @@ import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
 import java.io.BufferedInputStream;
@@ -40,6 +41,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -55,13 +57,26 @@ import java.util.logging.Logger;
 class BinaryCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(BinaryCopyParser.class.getName());
 
+  static final int DEFAULT_MAX_FIELD_LENGTH = 100_000_000;
+  static final int READ_CHUNK_SIZE = 8192;
+  static final int MAX_READ_CHUNK_SIZE = 1024 * 1024;
+  private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+
   private final DataInputStream dataInputStream;
+  private final int maxFieldLength;
   private boolean containsOids;
   private boolean calledIterator = false;
   private short firstRowFieldCount = -1;
 
   BinaryCopyParser(PipedInputStream inputStream) {
+    this(inputStream, DEFAULT_MAX_FIELD_LENGTH);
+  }
+
+  @VisibleForTesting
+  BinaryCopyParser(PipedInputStream inputStream, int maxFieldLength) {
+    Preconditions.checkArgument(maxFieldLength >= 0, "maxFieldLength must be non-negative");
     this.dataInputStream = new DataInputStream(new BufferedInputStream(inputStream));
+    this.maxFieldLength = maxFieldLength;
   }
 
   @Override
@@ -202,13 +217,17 @@ class BinaryCopyParser implements CopyInParser {
           int length = dataInputStream.readInt();
           if (length == -1) {
             currentRow[field] = new BinaryField(null);
-          } else if (length > -1) {
-            byte[] data = new byte[length];
-            dataInputStream.readFully(data);
-            currentRow[field] = new BinaryField(data);
-          } else {
+          } else if (length < -1) {
             throw SpannerExceptionFactory.newSpannerException(
                 ErrorCode.FAILED_PRECONDITION, "Invalid field length: " + length);
+          } else if (length > maxFieldLength) {
+            throw SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION,
+                String.format(
+                    "Field length %d exceeds maximum allowed length of %d bytes",
+                    length, maxFieldLength));
+          } else {
+            currentRow[field] = new BinaryField(readFieldData(length));
           }
         }
         return new BinaryRecord(currentRow);
@@ -217,6 +236,35 @@ class BinaryCopyParser implements CopyInParser {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INTERNAL, ioException.getMessage(), ioException);
       }
+    }
+
+    private byte[] readFieldData(int length) throws IOException {
+      if (length == 0) {
+        return EMPTY_BYTE_ARRAY;
+      }
+      if (length <= READ_CHUNK_SIZE) {
+        byte[] data = new byte[length];
+        dataInputStream.readFully(data);
+        return data;
+      }
+      List<byte[]> chunks = new ArrayList<>(16);
+      int remaining = length;
+      int nextChunkSize = READ_CHUNK_SIZE;
+      while (remaining > 0) {
+        int chunkSize = Math.min(remaining, nextChunkSize);
+        byte[] chunk = new byte[chunkSize];
+        dataInputStream.readFully(chunk);
+        chunks.add(chunk);
+        remaining -= chunkSize;
+        nextChunkSize = Math.min(nextChunkSize * 2, MAX_READ_CHUNK_SIZE);
+      }
+      byte[] data = new byte[length];
+      int offset = 0;
+      for (byte[] chunk : chunks) {
+        System.arraycopy(chunk, 0, data, offset, chunk.length);
+        offset += chunk.length;
+      }
+      return data;
     }
   }
 
