@@ -719,11 +719,14 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
                     .asRuntimeException()));
         String name = "my_statement";
 
+        byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
+
         // Create a named prepared statement.
         // PARSE
         outputStream.writeByte('P');
-        outputStream.writeInt(4 + 1 + invalidSql.getBytes(StandardCharsets.UTF_8).length + 1 + 2);
-        outputStream.write(name.getBytes(StandardCharsets.UTF_8));
+        outputStream.writeInt(
+            4 + nameBytes.length + 1 + invalidSql.getBytes(StandardCharsets.UTF_8).length + 1 + 2);
+        outputStream.write(nameBytes);
         outputStream.writeByte(0); // String terminator for the named statement
         outputStream.write(invalidSql.getBytes(StandardCharsets.UTF_8));
         outputStream.writeByte(0);
@@ -749,9 +752,9 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
         // BIND
         byte[] value = "value".getBytes(StandardCharsets.UTF_8);
         outputStream.writeByte('B');
-        outputStream.writeInt(4 + 1 + 1 + 2 + 2 + 2 + value.length + 1);
+        outputStream.writeInt(4 + 1 + nameBytes.length + 1 + 2 + 2 + 4 + value.length + 1 + 2);
         outputStream.writeByte(0); // Empty string terminator for the unnamed portal
-        outputStream.write(name.getBytes(StandardCharsets.UTF_8));
+        outputStream.write(nameBytes);
         outputStream.writeByte(0); // String terminator for the named statement.
         outputStream.writeShort(0); // Zero parameter format codes
         outputStream.writeShort(1); // One parameter value
@@ -1998,6 +2001,90 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
       }
     } finally {
       customServer.stopServer();
+    }
+  }
+
+  @Test(timeout = 30_000L)
+  public void testBindOversizedParameterLength_terminatesConnection() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      sendStartupAndAwaitReady(outputStream, inputStream);
+
+      // Send a tiny Bind frame declaring a 2 GB parameter length.
+      outputStream.writeByte('B');
+      outputStream.writeInt(16);
+      outputStream.writeByte(0);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(1);
+      outputStream.writeInt(Integer.MAX_VALUE);
+      outputStream.flush();
+
+      assertFatalProtocolViolationAndEof(inputStream, "parameter length");
+    }
+  }
+
+  @Test(timeout = 30_000L)
+  public void testFunctionCallOversizedArgumentLength_terminatesConnection() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      sendStartupAndAwaitReady(outputStream, inputStream);
+
+      // Send a tiny FunctionCall frame declaring a 2 GB argument length.
+      outputStream.writeByte('F');
+      outputStream.writeInt(18);
+      outputStream.writeInt(1);
+      outputStream.writeShort(0);
+      outputStream.writeShort(1);
+      outputStream.writeInt(Integer.MAX_VALUE);
+      outputStream.flush();
+
+      assertFatalProtocolViolationAndEof(inputStream, "parameter length");
+    }
+  }
+
+  @Test(timeout = 30_000L)
+  public void testParseInvalidParameterCount_terminatesConnection() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      sendStartupAndAwaitReady(outputStream, inputStream);
+
+      // Send a minimal Parse frame claiming 5 parameter OIDs without space for them.
+      outputStream.writeByte('P');
+      outputStream.writeInt(8);
+      outputStream.writeByte(0);
+      outputStream.writeByte(0);
+      outputStream.writeShort(5);
+      outputStream.flush();
+
+      assertFatalProtocolViolationAndEof(inputStream, "number of parameters");
+    }
+  }
+
+  @Test(timeout = 30_000L)
+  public void testBindTruncatedLargeParameter_closesWithoutPreallocating() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      sendStartupAndAwaitReady(outputStream, inputStream);
+
+      // Declare a valid 50 MB Bind frame with a 49,999,984-byte parameter, send only a few payload
+      // bytes, and close the write side without OOM or pinning 50 MB.
+      outputStream.writeByte('B');
+      outputStream.writeInt(50_000_000);
+      outputStream.writeByte(0);
+      outputStream.writeByte(0);
+      outputStream.writeShort(0);
+      outputStream.writeShort(1);
+      outputStream.writeInt(49_999_984);
+      outputStream.write(new byte[64]);
+      outputStream.flush();
+      socket.shutdownOutput();
+
+      assertEquals(-1, inputStream.read());
     }
   }
 

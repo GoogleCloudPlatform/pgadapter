@@ -86,14 +86,11 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
 
   public ParseMessage(ConnectionHandler connection) throws Exception {
     super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
-    this.name = this.readString();
-    Statement originalStatement = Statement.of(this.readString());
+    this.name = readBoundedString(3, "parse message");
+    Statement originalStatement = Statement.of(readBoundedString(2, "parse message"));
+    this.parameterDataTypes = readParameterDataTypes("parse message");
+    checkRemainingBytes(0, "parse message");
     ParsedStatement parsedStatement = PARSER.parse(originalStatement);
-    short numberOfParameters = this.inputStream.readShort();
-    this.parameterDataTypes = new int[numberOfParameters];
-    for (int i = 0; i < numberOfParameters; i++) {
-      parameterDataTypes[i] = this.inputStream.readInt();
-    }
     this.statement =
         createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
     connection.maybeDetermineWellKnownClient(this);

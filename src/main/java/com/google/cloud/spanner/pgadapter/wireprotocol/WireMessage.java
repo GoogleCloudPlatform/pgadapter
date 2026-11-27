@@ -20,6 +20,7 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.utils.Logging;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -43,7 +44,10 @@ public abstract class WireMessage {
    */
   static final int READ_CHUNK_SIZE = 256 * 1024;
 
+  private static final int INITIAL_STRING_BUFFER_SIZE = 64;
   private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+  private static final byte[][] EMPTY_PARAMETERS = new byte[0][];
+  private static final int[] EMPTY_PARAMETER_TYPES = new int[0];
 
   protected final int length;
   protected final int maxMessageLength;
@@ -51,6 +55,7 @@ public abstract class WireMessage {
   protected final DataInputStream inputStream;
   protected final DataOutputStream outputStream;
   protected final ConnectionHandler connection;
+  private int remainingBytes;
 
   public WireMessage(ConnectionHandler connection, int length) {
     Preconditions.checkArgument(length >= 4);
@@ -60,30 +65,144 @@ public abstract class WireMessage {
     this.inputStream = connection.getConnectionMetadata().getInputStream();
     this.outputStream = connection.getConnectionMetadata().getOutputStream();
     this.length = length;
+    this.remainingBytes = length - 4;
   }
 
   /**
-   * Extracts parameters/arguments from the user input.
+   * Extracts parameters/arguments from the user input, validating counts and per-parameter lengths
+   * against the remaining bytes of the enclosing wire message.
    *
    * @param input The data stream containing the user request.
+   * @param remainingBytes The number of bytes remaining in the enclosing message before reading the
+   *     parameter count.
+   * @param trailingMinBytes The minimum number of bytes required by fields following the parameters
+   *     in the enclosing message.
    * @return A byte array of user-defined parameters to be bound.
-   * @throws Exception If reading fails in any way.
+   * @throws Exception If reading fails or the message violates the wire protocol bounds.
    */
-  protected static byte[][] getParameters(DataInputStream input) throws Exception {
+  @VisibleForTesting
+  static byte[][] getParameters(DataInputStream input, int remainingBytes, int trailingMinBytes)
+      throws Exception {
+    Preconditions.checkArgument(trailingMinBytes >= 0, "trailingMinBytes must be non-negative");
+    if (remainingBytes < 2L + trailingMinBytes) {
+      throw protocolViolation(
+          String.format("invalid remaining length for parameters: %d", remainingBytes));
+    }
     int numberOfParameters = input.readShort();
+    remainingBytes -= 2;
+    if (numberOfParameters < 0) {
+      throw protocolViolation(
+          String.format("invalid number of parameters: %d", numberOfParameters));
+    }
+    long availableForParameters = (long) remainingBytes - trailingMinBytes;
+    if (4L * numberOfParameters > availableForParameters) {
+      throw protocolViolation(
+          String.format(
+              "number of parameters (%d) exceeds remaining message length (%d)",
+              numberOfParameters, availableForParameters));
+    }
+    if (numberOfParameters == 0) {
+      return EMPTY_PARAMETERS;
+    }
     byte[][] parameters = new byte[numberOfParameters][];
-    for (int i = 0; i < numberOfParameters; i++) {
-      int paramLength = input.readInt();
-      if (paramLength == -1) {
-        parameters[i] = null;
+    for (int index = 0; index < numberOfParameters; index++) {
+      long minimumBytesAfterParameter = 4L * (numberOfParameters - index - 1) + trailingMinBytes;
+      int parameterLength = input.readInt();
+      remainingBytes -= 4;
+      if (parameterLength < -1) {
+        throw protocolViolation(String.format("invalid parameter length: %d", parameterLength));
+      }
+      if (parameterLength == -1) {
+        parameters[index] = null;
       } else {
-        parameters[i] = new byte[paramLength];
-        if (paramLength > 0) {
-          input.readFully(parameters[i]);
+        long maximumAllowedLength = (long) remainingBytes - minimumBytesAfterParameter;
+        if (parameterLength > maximumAllowedLength) {
+          throw protocolViolation(
+              String.format(
+                  "parameter length (%d) exceeds remaining message length (%d)",
+                  parameterLength, maximumAllowedLength));
         }
+        parameters[index] = readBytes(input, parameterLength);
+        remainingBytes -= parameterLength;
       }
     }
     return parameters;
+  }
+
+  private static int consumedParameterBytes(byte[][] parameters) {
+    int totalBytes = 2;
+    for (byte[] parameter : parameters) {
+      totalBytes += 4;
+      if (parameter != null) {
+        totalBytes += parameter.length;
+      }
+    }
+    return totalBytes;
+  }
+
+  protected int readInt(String messageType) throws IOException {
+    if (this.remainingBytes < 4) {
+      throw protocolViolation(String.format("invalid length of %s: %d", messageType, this.length));
+    }
+    int value = this.inputStream.readInt();
+    this.remainingBytes -= 4;
+    return value;
+  }
+
+  protected String readBoundedString(int trailingMinBytes, String messageType) throws IOException {
+    byte[] bytes =
+        readBoundedNullTerminatedBytes(this.remainingBytes - trailingMinBytes, messageType);
+    this.remainingBytes -= bytes.length + 1;
+    return bytes.length == 0 ? "" : new String(bytes, StandardCharsets.UTF_8);
+  }
+
+  protected short[] readFormatCodes(int trailingMinBytes) throws Exception {
+    short[] formatCodes =
+        MessageReader.getFormatCodes(this.inputStream, this.remainingBytes, trailingMinBytes);
+    this.remainingBytes -= 2 + 2 * formatCodes.length;
+    return formatCodes;
+  }
+
+  protected byte[][] readParameters(int trailingMinBytes) throws Exception {
+    byte[][] parameters = getParameters(this.inputStream, this.remainingBytes, trailingMinBytes);
+    this.remainingBytes -= consumedParameterBytes(parameters);
+    return parameters;
+  }
+
+  protected int[] readParameterDataTypes(String messageType) throws IOException {
+    if (this.remainingBytes < 2) {
+      throw protocolViolation(String.format("invalid length of %s: %d", messageType, this.length));
+    }
+    short numberOfParameters = this.inputStream.readShort();
+    this.remainingBytes -= 2;
+    if (numberOfParameters < 0) {
+      throw protocolViolation(
+          String.format("invalid number of parameters: %d", numberOfParameters));
+    }
+    if (4L * numberOfParameters > this.remainingBytes) {
+      throw protocolViolation(
+          String.format(
+              "number of parameters (%d) exceeds remaining message length (%d)",
+              numberOfParameters, this.remainingBytes));
+    }
+    if (numberOfParameters == 0) {
+      return EMPTY_PARAMETER_TYPES;
+    }
+    int[] parameterDataTypes = new int[numberOfParameters];
+    for (int index = 0; index < numberOfParameters; index++) {
+      parameterDataTypes[index] = this.inputStream.readInt();
+    }
+    this.remainingBytes -= 4 * numberOfParameters;
+    return parameterDataTypes;
+  }
+
+  protected void checkRemainingBytes(int expectedRemaining, String messageType) {
+    if (this.remainingBytes != expectedRemaining) {
+      throw protocolViolation(
+          String.format(
+              "invalid length of %s: expected %d trailing bytes, got %d",
+              messageType, expectedRemaining, this.remainingBytes));
+    }
   }
 
   /**
@@ -184,17 +303,20 @@ public abstract class WireMessage {
   /**
    * Reads {@code numBytes} bytes from {@link #inputStream}. For lengths larger than {@link
    * #READ_CHUNK_SIZE}, grows a single buffer exponentially starting from {@link #READ_CHUNK_SIZE}
-   * as bytes arrive so an unfulfilled frame header cannot pre-allocate a large buffer while
-   * avoiding intermediate chunk lists and extra final copies.
+   * as bytes arrive so an unfulfilled frame header cannot pre-allocate a large buffer.
    */
   protected byte[] readBytes(int numBytes) throws IOException {
     validateReadLength(numBytes, 0);
+    return readBytes(this.inputStream, numBytes);
+  }
+
+  private static byte[] readBytes(DataInputStream input, int numBytes) throws IOException {
     if (numBytes == 0) {
       return EMPTY_BYTE_ARRAY;
     }
     if (numBytes <= READ_CHUNK_SIZE) {
       byte[] buffer = new byte[numBytes];
-      this.inputStream.readFully(buffer);
+      input.readFully(buffer);
       return buffer;
     }
     byte[] buffer = new byte[READ_CHUNK_SIZE];
@@ -207,7 +329,7 @@ public abstract class WireMessage {
         targetLength = buffer.length <= numBytes / 2 ? buffer.length * 2 : numBytes;
         buffer = Arrays.copyOf(buffer, targetLength);
       }
-      this.inputStream.readFully(buffer, offset, targetLength - offset);
+      input.readFully(buffer, offset, targetLength - offset);
       offset = targetLength;
     }
     return buffer;
@@ -221,36 +343,60 @@ public abstract class WireMessage {
    *     is found before the end of the stream.
    */
   public String readString() throws IOException {
-    int markReadLimit = Math.min(getMaxMessageLength(), this.length);
-    this.inputStream.mark(markReadLimit);
-    try {
-      int index = 0;
-      while (index < markReadLimit) {
-        byte b = this.inputStream.readByte();
-        if (b == 0) {
-          break;
-        }
-        index++;
-        if (index == markReadLimit) {
-          throw new IOException("No null terminator found");
-        }
-      }
-      if (index == 0) {
-        // Empty string, we don't have to ready anything.
-        return "";
-      }
+    int maxReadLimit = Math.min(getMaxMessageLength(), this.length);
+    byte[] bytes = readNullTerminatedBytes(maxReadLimit, false, null);
+    return bytes.length == 0 ? "" : new String(bytes, StandardCharsets.UTF_8);
+  }
 
-      // Reset the stream to the mark and read the string.
-      this.inputStream.reset();
-      byte[] result = new byte[index];
-      this.inputStream.readFully(result);
-      // Read the null-terminator.
-      this.inputStream.readByte();
-      return new String(result, StandardCharsets.UTF_8);
-    } finally {
-      // Drop the mark.
-      this.inputStream.mark(0);
+  private byte[] readBoundedNullTerminatedBytes(int maxBytes, String messageType)
+      throws IOException {
+    if (maxBytes < 1) {
+      throw protocolViolation(String.format("invalid length of %s: %d", messageType, this.length));
     }
+    return readNullTerminatedBytes(maxBytes, true, messageType);
+  }
+
+  private byte[] readNullTerminatedBytes(
+      int maxBytes, boolean throwProtocolViolationOnLimit, String messageType) throws IOException {
+    if (maxBytes < 1) {
+      throw new IOException("Invalid message length: " + maxBytes);
+    }
+    byte firstByte = this.inputStream.readByte();
+    if (firstByte == 0) {
+      return EMPTY_BYTE_ARRAY;
+    }
+    if (maxBytes == 1) {
+      throw stringLimitExceeded(maxBytes, throwProtocolViolationOnLimit, messageType);
+    }
+    int maxStringBytes = maxBytes - 1;
+    byte[] buffer = new byte[Math.min(INITIAL_STRING_BUFFER_SIZE, maxStringBytes)];
+    buffer[0] = firstByte;
+    int index = 1;
+    while (true) {
+      byte currentByte = this.inputStream.readByte();
+      if (currentByte == 0) {
+        return index == buffer.length ? buffer : Arrays.copyOf(buffer, index);
+      }
+      if (index == maxStringBytes) {
+        throw stringLimitExceeded(maxBytes, throwProtocolViolationOnLimit, messageType);
+      }
+      if (index == buffer.length) {
+        int nextCapacity = buffer.length <= maxStringBytes / 2 ? buffer.length * 2 : maxStringBytes;
+        buffer = Arrays.copyOf(buffer, nextCapacity);
+      }
+      buffer[index++] = currentByte;
+    }
+  }
+
+  private static IOException stringLimitExceeded(
+      int maxBytes, boolean throwProtocolViolationOnLimit, String messageType) {
+    if (throwProtocolViolationOnLimit) {
+      throw protocolViolation(
+          String.format(
+              "invalid string in %s: no null terminator found within %d bytes",
+              messageType, maxBytes));
+    }
+    return new IOException("No null terminator found");
   }
 
   /**
@@ -297,6 +443,13 @@ public abstract class WireMessage {
       }
       throw builder.build();
     }
+  }
+
+  protected static PGException protocolViolation(String message) {
+    return PGException.newBuilder(message)
+        .setSeverity(Severity.FATAL)
+        .setSQLState(SQLState.ProtocolViolation)
+        .build();
   }
 
   /**
@@ -347,10 +500,7 @@ public abstract class WireMessage {
    */
   protected static void checkLengthEquals(int length, String messageType, int expectedLength) {
     if (length != expectedLength) {
-      throw PGException.newBuilder(String.format("invalid length of %s: %d", messageType, length))
-          .setSeverity(Severity.FATAL)
-          .setSQLState(SQLState.ProtocolViolation)
-          .build();
+      throw protocolViolation(String.format("invalid length of %s: %d", messageType, length));
     }
   }
 
@@ -368,9 +518,6 @@ public abstract class WireMessage {
         return;
       }
     }
-    throw PGException.newBuilder(String.format("invalid length of %s: %d", messageType, length))
-        .setSeverity(Severity.FATAL)
-        .setSQLState(SQLState.ProtocolViolation)
-        .build();
+    throw protocolViolation(String.format("invalid length of %s: %d", messageType, length));
   }
 }
