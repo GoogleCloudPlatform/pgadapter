@@ -49,7 +49,8 @@ public class StartupMessage extends BootstrapMessage {
   public StartupMessage(ConnectionHandler connection, int length, int protocolVersion)
       throws Exception {
     super(connection, length);
-    checkLengthRange(length, "startup packet", 8, MAX_STARTUP_PACKET_LENGTH);
+    checkLengthRange(
+        length, "startup packet", MIN_STARTUP_PACKET_LENGTH, MAX_STARTUP_PACKET_LENGTH);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
     String rawParameters = this.readAll();
     this.parameters = this.parseParameters(rawParameters);

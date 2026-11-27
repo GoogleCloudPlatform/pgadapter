@@ -26,6 +26,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,7 +36,17 @@ public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
 
+  /**
+   * Initial chunk size (in bytes) for incremental payload reads. Keeping this small bounds the heap
+   * pinned by a connection that sends a large declared length header and then stalls before sending
+   * the payload.
+   */
+  static final int READ_CHUNK_SIZE = 256 * 1024;
+
+  private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+
   protected final int length;
+  protected final int maxMessageLength;
   protected final MessageReader messageReader;
   protected final DataInputStream inputStream;
   protected final DataOutputStream outputStream;
@@ -44,6 +55,7 @@ public abstract class WireMessage {
   public WireMessage(ConnectionHandler connection, int length) {
     Preconditions.checkArgument(length >= 4);
     this.connection = connection;
+    this.maxMessageLength = connection.getMaxMessageLength();
     this.messageReader = connection.getServer().getMessageReader();
     this.inputStream = connection.getConnectionMetadata().getInputStream();
     this.outputStream = connection.getConnectionMetadata().getOutputStream();
@@ -144,18 +156,16 @@ public abstract class WireMessage {
 
   /**
    * Reads a fixed-length string from the saved stream. The string still needs to be
-   * null-terminated, but the read is more efficient, as we can read the entire string in one go
-   * instead of continuously checking for a null-terminator.
+   * null-terminated, and is read incrementally for large lengths so an unfulfilled frame header
+   * cannot pin a large heap buffer before bytes actually arrive.
    *
    * @param length The number of bytes to read.
    * @return the string.
-   * @throws IOException if an error occurs while reading from the stream, or if no null-terminator
-   *     is found at the end of the string.
+   * @throws IOException if an error occurs while reading from the stream, if the length exceeds
+   *     {@link #maxMessageLength}, or if no null-terminator is found at the end of the string.
    */
   public String read(int length) throws IOException {
-    if (length < 1) {
-      throw new IOException("Invalid message length: " + length);
-    }
+    validateReadLength(length, 1);
     if (length == 1) {
       byte zero = inputStream.readByte();
       if (zero != (byte) 0) {
@@ -163,8 +173,7 @@ public abstract class WireMessage {
       }
       return "";
     }
-    byte[] buffer = new byte[length - 1];
-    this.inputStream.readFully(buffer);
+    byte[] buffer = readBytes(length - 1);
     byte zero = inputStream.readByte();
     if (zero != (byte) 0) {
       throw new IOException("String was not null-terminated");
@@ -173,11 +182,36 @@ public abstract class WireMessage {
   }
 
   /**
-   * The max number of characters to read when scanning for a null-terminator. Null-terminated
-   * strings are used in the PG wire-protocol for names of prepared statements and portals, but also
-   * for the SQL string of a statement. We therefore need to read potentially very long strings.
+   * Reads {@code numBytes} bytes from {@link #inputStream}. For lengths larger than {@link
+   * #READ_CHUNK_SIZE}, grows a single buffer exponentially starting from {@link #READ_CHUNK_SIZE}
+   * as bytes arrive so an unfulfilled frame header cannot pre-allocate a large buffer while
+   * avoiding intermediate chunk lists and extra final copies.
    */
-  private static final int MARK_READ_LIMIT = 100_000_000;
+  protected byte[] readBytes(int numBytes) throws IOException {
+    validateReadLength(numBytes, 0);
+    if (numBytes == 0) {
+      return EMPTY_BYTE_ARRAY;
+    }
+    if (numBytes <= READ_CHUNK_SIZE) {
+      byte[] buffer = new byte[numBytes];
+      this.inputStream.readFully(buffer);
+      return buffer;
+    }
+    byte[] buffer = new byte[READ_CHUNK_SIZE];
+    int offset = 0;
+    while (offset < numBytes) {
+      int targetLength;
+      if (offset == 0) {
+        targetLength = READ_CHUNK_SIZE;
+      } else {
+        targetLength = buffer.length <= numBytes / 2 ? buffer.length * 2 : numBytes;
+        buffer = Arrays.copyOf(buffer, targetLength);
+      }
+      this.inputStream.readFully(buffer, offset, targetLength - offset);
+      offset = targetLength;
+    }
+    return buffer;
+  }
 
   /**
    * Reads a null-terminated string from a {@link DataInputStream}.
@@ -187,16 +221,17 @@ public abstract class WireMessage {
    *     is found before the end of the stream.
    */
   public String readString() throws IOException {
-    this.inputStream.mark(MARK_READ_LIMIT);
+    int markReadLimit = Math.min(getMaxMessageLength(), this.length);
+    this.inputStream.mark(markReadLimit);
     try {
       int index = 0;
-      while (index < MARK_READ_LIMIT) {
+      while (index < markReadLimit) {
         byte b = this.inputStream.readByte();
         if (b == 0) {
           break;
         }
         index++;
-        if (index == MARK_READ_LIMIT) {
+        if (index == markReadLimit) {
           throw new IOException("No null terminator found");
         }
       }
@@ -237,6 +272,33 @@ public abstract class WireMessage {
     this.connection.setMessageState(this.messageReader.create(this.connection));
   }
 
+  protected int getMaxMessageLength() {
+    return this.maxMessageLength;
+  }
+
+  protected static String getMaxMessageLengthHint(int maxMessageLength) {
+    return String.format(
+        "Maximum allowed message length is %d bytes. Increase the max_message_length setting if larger messages are required.",
+        maxMessageLength);
+  }
+
+  private void validateReadLength(int numBytes, int min) throws IOException {
+    if (numBytes < min) {
+      throw new IOException("Invalid message length: " + numBytes);
+    }
+    int effectiveMaxLength = getMaxMessageLength();
+    if (numBytes > effectiveMaxLength) {
+      PGException.Builder builder =
+          PGException.newBuilder("Invalid message length: " + numBytes)
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.ProtocolViolation);
+      if (effectiveMaxLength == this.maxMessageLength) {
+        builder.setHints(getMaxMessageLengthHint(effectiveMaxLength));
+      }
+      throw builder.build();
+    }
+  }
+
   /**
    * Validates that the message length is within the expected range [min, max], inclusive.
    *
@@ -247,11 +309,31 @@ public abstract class WireMessage {
    * @throws PGException If the length is outside the range.
    */
   protected static void checkLengthRange(int length, String messageType, int min, int max) {
+    checkLengthRange(length, messageType, min, max, null);
+  }
+
+  /**
+   * Validates that the message length is within the expected range [min, max], inclusive.
+   *
+   * @param length The message length to check.
+   * @param messageType The description of the message type for the error message.
+   * @param min The minimum allowed length.
+   * @param max The maximum allowed length.
+   * @param maxExceededHint Optional hint attached to the {@link PGException} when {@code length >
+   *     max}.
+   * @throws PGException If the length is outside the range.
+   */
+  protected static void checkLengthRange(
+      int length, String messageType, int min, int max, String maxExceededHint) {
     if (length < min || length > max) {
-      throw PGException.newBuilder(String.format("invalid length of %s: %d", messageType, length))
-          .setSeverity(Severity.FATAL)
-          .setSQLState(SQLState.ProtocolViolation)
-          .build();
+      PGException.Builder builder =
+          PGException.newBuilder(String.format("invalid length of %s: %d", messageType, length))
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.ProtocolViolation);
+      if (length > max && maxExceededHint != null) {
+        builder.setHints(maxExceededHint);
+      }
+      throw builder.build();
     }
   }
 

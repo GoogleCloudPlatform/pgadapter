@@ -23,9 +23,12 @@ import java.text.MessageFormat;
 public class TerminateMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'X';
+  private static final String MESSAGE_NAME = "Terminate";
+  // 4-byte length.
+  private static final int MESSAGE_LENGTH = 4;
 
   public TerminateMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MESSAGE_LENGTH, MESSAGE_LENGTH, MESSAGE_NAME);
   }
 
   @Override
@@ -35,7 +38,7 @@ public class TerminateMessage extends ControlMessage {
 
   @Override
   protected String getMessageName() {
-    return "Terminate";
+    return MESSAGE_NAME;
   }
 
   @Override

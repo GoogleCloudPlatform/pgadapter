@@ -74,6 +74,10 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'P';
+  private static final String MESSAGE_NAME = "Parse";
+  // 4-byte length + 1-byte statement null terminator + 1-byte query null terminator + 2-byte
+  // parameter count.
+  private static final int MIN_MESSAGE_LENGTH = 8;
   private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final String name;
@@ -81,7 +85,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   private final int[] parameterDataTypes;
 
   public ParseMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     this.name = this.readString();
     Statement originalStatement = Statement.of(this.readString());
     ParsedStatement parsedStatement = PARSER.parse(originalStatement);
@@ -329,7 +333,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
 
   @Override
   protected String getMessageName() {
-    return "Parse";
+    return MESSAGE_NAME;
   }
 
   @Override

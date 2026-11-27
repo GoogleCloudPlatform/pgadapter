@@ -36,6 +36,9 @@ import java.util.concurrent.Future;
 public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   protected static final char IDENTIFIER = 'D';
+  private static final String MESSAGE_NAME = "Describe";
+  // 4-byte length + 1-byte target type + 1-byte null terminator for the target name.
+  private static final int MIN_MESSAGE_LENGTH = 6;
   private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final PreparedType type;
@@ -44,7 +47,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   private Future<StatementResult> describePortalMetadata;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
     this.name = this.readAll();
     IntermediateStatement describedStatement;
@@ -116,7 +119,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   @Override
   protected String getMessageName() {
-    return "Describe";
+    return MESSAGE_NAME;
   }
 
   @Override

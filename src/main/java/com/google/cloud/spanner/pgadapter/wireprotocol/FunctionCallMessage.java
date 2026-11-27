@@ -28,6 +28,10 @@ import java.text.MessageFormat;
 public class FunctionCallMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'F';
+  private static final String MESSAGE_NAME = "Function Call";
+  // 4-byte length + 4-byte function OID + 2-byte argument format count + 2-byte argument count +
+  // 2-byte result format code.
+  private static final int MIN_MESSAGE_LENGTH = 14;
 
   private final int functionID;
   private final short[] argumentFormatCodes;
@@ -35,7 +39,7 @@ public class FunctionCallMessage extends ControlMessage {
   private final Short resultFormatCode;
 
   public FunctionCallMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     this.functionID = this.inputStream.readInt();
     this.argumentFormatCodes = MessageReader.getFormatCodes(this.inputStream);
     this.arguments = getParameters(this.inputStream);
@@ -49,7 +53,7 @@ public class FunctionCallMessage extends ControlMessage {
 
   @Override
   protected String getMessageName() {
-    return "Function Call";
+    return MESSAGE_NAME;
   }
 
   @Override

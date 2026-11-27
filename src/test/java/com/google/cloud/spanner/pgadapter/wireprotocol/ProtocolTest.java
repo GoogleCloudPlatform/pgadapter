@@ -81,6 +81,7 @@ import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -106,6 +107,12 @@ public class ProtocolTest {
   @Mock private IntermediatePortalStatement intermediatePortalStatement;
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private DataOutputStream outputStream;
+
+  @Before
+  public void setupConnectionHandler() {
+    when(connectionHandler.getMaxMessageLength())
+        .thenReturn(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+  }
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];

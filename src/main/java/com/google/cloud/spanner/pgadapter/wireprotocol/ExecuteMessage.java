@@ -26,6 +26,9 @@ import java.text.MessageFormat;
 @InternalApi
 public class ExecuteMessage extends AbstractQueryProtocolMessage {
   protected static final char IDENTIFIER = 'E';
+  private static final String MESSAGE_NAME = "Execute";
+  // 4-byte length + 1-byte portal null terminator + 4-byte max rows.
+  private static final int MIN_MESSAGE_LENGTH = 9;
   private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final String name;
@@ -34,7 +37,7 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
   private final boolean cleanupAfterExecute;
 
   public ExecuteMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     this.name = this.readAll();
     this.maxRows = this.inputStream.readInt();
     IntermediatePreparedStatement portalStatement;
@@ -88,7 +91,7 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
 
   @Override
   protected String getMessageName() {
-    return "Execute";
+    return MESSAGE_NAME;
   }
 
   @Override

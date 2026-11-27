@@ -59,6 +59,7 @@ public class BoostrapMessageTest {
     PipedInputStream pipedInputStream = new PipedInputStream(2048);
     DataInputStream dataInputStream = new DataInputStream(pipedInputStream);
     when(metadata.getInputStream()).thenReturn(dataInputStream);
+    when(connection.getMaxMessageLength()).thenReturn(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
     dataOutputStream = new DataOutputStream(new PipedOutputStream(pipedInputStream));
   }
 

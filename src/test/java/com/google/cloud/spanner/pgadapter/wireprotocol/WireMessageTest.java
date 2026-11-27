@@ -14,9 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -29,6 +31,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -91,6 +94,7 @@ public class WireMessageTest {
     DataOutputStream outputStream = new DataOutputStream(new ByteArrayOutputStream());
     when(metadata.getInputStream()).thenReturn(inputStream);
     when(metadata.getOutputStream()).thenReturn(outputStream);
+    when(connection.getMaxMessageLength()).thenReturn(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
     return connection;
   }
 
@@ -264,6 +268,7 @@ public class WireMessageTest {
     when(connection.getServer()).thenReturn(server);
     when(connection.getConnectionMetadata()).thenReturn(metadata);
     when(connection.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    when(connection.getMaxMessageLength()).thenReturn(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
     return connection;
   }
 
@@ -460,7 +465,423 @@ public class WireMessageTest {
     byte[] payload = new byte[] {0, 0, 0, 3};
     ConnectionHandler connection = createConnectionHandler(payload);
 
-    assertThrows(
-        IllegalArgumentException.class, () -> SkipMessage.createForValidStream(connection));
+    assertProtocolViolationWithoutHint(
+        assertThrows(PGException.class, () -> SkipMessage.createForValidStream(connection)),
+        "invalid length of control message: 3");
+  }
+
+  @Test
+  public void testRead_lengthExceedsMaxThrowsPGException() {
+    ConnectionHandler connection = createConnectionHandler(new byte[0]);
+    TestWireMessage message = new TestWireMessage(connection, 4);
+
+    assertMaxMessageLengthExceeded(
+        assertThrows(
+            PGException.class, () -> message.read(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH + 1)),
+        "Invalid message length: " + (OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH + 1),
+        OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+  }
+
+  @Test
+  public void testReadBytes_invalidLengthThrowsExpectedExceptions() {
+    ConnectionHandler connection = createConnectionHandler(new byte[0]);
+    TestWireMessage message = new TestWireMessage(connection, 4);
+
+    IOException negativeException = assertThrows(IOException.class, () -> message.readBytes(-1));
+    assertTrue(negativeException.getMessage().contains("Invalid message length"));
+
+    assertMaxMessageLengthExceeded(
+        assertThrows(
+            PGException.class,
+            () -> message.readBytes(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH + 1)),
+        "Invalid message length: " + (OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH + 1),
+        OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+  }
+
+  @Test
+  public void testReadBytes_boundaries() throws IOException {
+    ConnectionHandler emptyConnection = createConnectionHandler(new byte[0]);
+    TestWireMessage emptyMessage = new TestWireMessage(emptyConnection, 4);
+    assertArrayEquals(new byte[0], emptyMessage.readBytes(0));
+
+    for (int length : new int[] {1, WireMessage.READ_CHUNK_SIZE, WireMessage.READ_CHUNK_SIZE + 1}) {
+      byte[] expected = new byte[length];
+      for (int i = 0; i < length; i++) {
+        expected[i] = (byte) (i * 17 + 3);
+      }
+      ConnectionHandler connection = createConnectionHandler(expected);
+      TestWireMessage message = new TestWireMessage(connection, 4 + length);
+      assertArrayEquals(expected, message.readBytes(length));
+    }
+  }
+
+  @Test
+  public void testRead_incrementalLargePayloadReadsSuccessfully() throws IOException {
+    int payloadLength = WireMessage.READ_CHUNK_SIZE * 3 + 17;
+    byte[] payloadBytes = new byte[payloadLength + 1];
+    for (int i = 0; i < payloadLength; i++) {
+      payloadBytes[i] = (byte) ('a' + (i % 26));
+    }
+    payloadBytes[payloadLength] = 0;
+
+    ConnectionHandler connection = createConnectionHandler(payloadBytes);
+    TestWireMessage message = new TestWireMessage(connection, 4 + payloadBytes.length);
+
+    String result = message.read(payloadBytes.length);
+    assertEquals(payloadLength, result.length());
+    assertEquals(new String(payloadBytes, 0, payloadLength, StandardCharsets.UTF_8), result);
+  }
+
+  @Test
+  public void testRead_largeDeclaredLengthWithTruncatedStreamThrowsEOF() {
+    // Only 10 bytes present even though read() is asked for 10_000_000 bytes; must not
+    // pre-allocate 10_000_000 bytes and must fail with EOFException as soon as stream ends.
+    ConnectionHandler connection =
+        createConnectionHandler(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
+    TestWireMessage message = new TestWireMessage(connection, 10_000_004);
+
+    assertThrows(EOFException.class, () -> message.read(10_000_000));
+  }
+
+  @Test
+  public void testCopyDataMessage_incrementalLargePayloadReadsSuccessfully() throws Exception {
+    int payloadLength = WireMessage.READ_CHUNK_SIZE * 2 + 123;
+    byte[] data = new byte[payloadLength];
+    for (int i = 0; i < payloadLength; i++) {
+      data[i] = (byte) (i & 0xFF);
+    }
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeInt(4 + payloadLength);
+    dataOutputStream.write(data);
+
+    ConnectionHandler connection = createConnectionHandler(outputStream.toByteArray());
+    CopyDataMessage copyDataMessage = new CopyDataMessage(connection);
+    assertArrayEquals(data, copyDataMessage.getPayload());
+  }
+
+  private byte[] createLengthHeaderOnly(int length) throws IOException {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeInt(length);
+    return outputStream.toByteArray();
+  }
+
+  private ConnectionHandler createMockConnectionWithExtendedHandler(byte[] inputBytes) {
+    ConnectionHandler connection = createMockConnection(inputBytes);
+    when(connection.getExtendedQueryProtocolHandler())
+        .thenReturn(mock(ExtendedQueryProtocolHandler.class));
+    return connection;
+  }
+
+  @Test
+  public void testControlMessages_oversizedLengthRejectedBeforeAllocating() throws Exception {
+    int[] oversizedLengths = {OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH + 1, Integer.MAX_VALUE};
+    for (int oversizedLength : oversizedLengths) {
+      byte[] header = createLengthHeaderOnly(oversizedLength);
+
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new QueryMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of query message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new DescribeMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of describe message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new ExecuteMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of execute message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new CloseMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of close message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new CopyFailMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of copy fail message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new CopyDataMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of copy data message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new ParseMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of parse message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new BindMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of bind message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () -> new FunctionCallMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of function call message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+      assertMaxMessageLengthExceeded(
+          assertThrows(
+              PGException.class,
+              () ->
+                  SkipMessage.createForValidStream(
+                      createMockConnectionWithExtendedHandler(header))),
+          "invalid length of control message",
+          OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+    }
+  }
+
+  @Test
+  public void testControlMessages_invalidExactOrMinLengthRejected() throws Exception {
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new QueryMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(4)))),
+        "invalid length of query message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new DescribeMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(5)))),
+        "invalid length of describe message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new ExecuteMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(8)))),
+        "invalid length of execute message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new CloseMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(5)))),
+        "invalid length of close message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new CopyFailMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(4)))),
+        "invalid length of copy fail message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new FlushMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(5)))),
+        "invalid length of flush message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new SyncMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(5)))),
+        "invalid length of sync message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new TerminateMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(5)))),
+        "invalid length of terminate message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new CopyDoneMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(5)))),
+        "invalid length of copy done message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new ParseMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(7)))),
+        "invalid length of parse message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new BindMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(11)))),
+        "invalid length of bind message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new FunctionCallMessage(
+                    createMockConnectionWithExtendedHandler(createLengthHeaderOnly(13)))),
+        "invalid length of function call message");
+    assertProtocolViolationWithoutHint(
+        assertThrows(
+            PGException.class,
+            () ->
+                new PasswordMessage(
+                    createMockConnectionWithExtendedHandler(
+                        createLengthHeaderOnly(PasswordMessage.MAX_PASSWORD_LENGTH + 1)),
+                    Collections.emptyMap())),
+        "invalid length of password message");
+  }
+
+  @Test
+  public void testControlMessages_lengthSmallerThanHeaderThrowsPGException() throws Exception {
+    for (int invalidLength : new int[] {3, 0, -1}) {
+      byte[] header = createLengthHeaderOnly(invalidLength);
+      assertProtocolViolationWithoutHint(
+          assertThrows(
+              PGException.class,
+              () -> new QueryMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of query message: " + invalidLength);
+      assertProtocolViolationWithoutHint(
+          assertThrows(
+              PGException.class,
+              () -> new CopyDataMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of copy data message: " + invalidLength);
+      assertProtocolViolationWithoutHint(
+          assertThrows(
+              PGException.class,
+              () -> new SyncMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of sync message: " + invalidLength);
+      assertProtocolViolationWithoutHint(
+          assertThrows(
+              PGException.class,
+              () -> new FlushMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of flush message: " + invalidLength);
+      assertProtocolViolationWithoutHint(
+          assertThrows(
+              PGException.class,
+              () ->
+                  new PasswordMessage(
+                      createMockConnectionWithExtendedHandler(header), Collections.emptyMap())),
+          "invalid length of password message: " + invalidLength);
+      assertProtocolViolationWithoutHint(
+          assertThrows(
+              PGException.class,
+              () -> new ParseMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of parse message: " + invalidLength);
+      assertProtocolViolationWithoutHint(
+          assertThrows(
+              PGException.class,
+              () -> new BindMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of bind message: " + invalidLength);
+      assertProtocolViolationWithoutHint(
+          assertThrows(
+              PGException.class,
+              () -> new FunctionCallMessage(createMockConnectionWithExtendedHandler(header))),
+          "invalid length of function call message: " + invalidLength);
+    }
+  }
+
+  private static void assertProtocolViolation(PGException exception, String expectedMessage) {
+    assertEquals(SQLState.ProtocolViolation, exception.getSQLState());
+    assertEquals(Severity.FATAL, exception.getSeverity());
+    assertTrue(exception.getMessage().contains(expectedMessage));
+  }
+
+  private static void assertProtocolViolationWithoutHint(
+      PGException exception, String expectedMessage) {
+    assertProtocolViolation(exception, expectedMessage);
+    assertNull(exception.getHints());
+  }
+
+  private static void assertMaxMessageLengthExceeded(
+      PGException exception, String expectedMessage, int maxMessageLength) {
+    assertProtocolViolation(exception, expectedMessage);
+    assertNotNull(exception.getHints());
+    assertTrue(exception.getHints().contains(maxMessageLength + " bytes"));
+    assertTrue(exception.getHints().contains("max_message_length"));
+    assertFalse(exception.getHints().contains("PGAdapter"));
+  }
+
+  @Test
+  public void testConfigurableMaxMessageLength() throws Exception {
+    // Smaller configured max (100 bytes) rejects 101-byte QueryMessage immediately.
+    byte[] oversizedHeader = createLengthHeaderOnly(101);
+    ConnectionHandler smallLimitConnection =
+        createMockConnectionWithExtendedHandler(oversizedHeader);
+    when(smallLimitConnection.getMaxMessageLength()).thenReturn(100);
+    assertMaxMessageLengthExceeded(
+        assertThrows(PGException.class, () -> new QueryMessage(smallLimitConnection)),
+        "invalid length of query message: 101",
+        100);
+
+    // Exact configured max (13 bytes for "SELECT 1\0" + 4-byte length) succeeds.
+    byte[] sqlBytes = "SELECT 1\0".getBytes(StandardCharsets.UTF_8);
+    ByteArrayOutputStream exactOutputStream = new ByteArrayOutputStream();
+    DataOutputStream exactDataOutput = new DataOutputStream(exactOutputStream);
+    exactDataOutput.writeInt(4 + sqlBytes.length);
+    exactDataOutput.write(sqlBytes);
+    ConnectionHandler exactLimitConnection =
+        createMockConnectionWithExtendedHandler(exactOutputStream.toByteArray());
+    when(exactLimitConnection.getMaxMessageLength()).thenReturn(4 + sqlBytes.length);
+    QueryMessage exactQueryMessage = new QueryMessage(exactLimitConnection);
+    assertEquals("SELECT 1", exactQueryMessage.getStatement().getSql());
+
+    // Larger configured max (200 MB) allows message length > default 100 MB.
+    int aboveDefaultLength = OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH + 1;
+    byte[] aboveDefaultHeader = createLengthHeaderOnly(aboveDefaultLength);
+    ConnectionHandler largeLimitConnection =
+        createMockConnectionWithExtendedHandler(aboveDefaultHeader);
+    when(largeLimitConnection.getMaxMessageLength()).thenReturn(200_000_000);
+    // Rejects on EOF while reading payload rather than rejecting the 100_000_001 header length.
+    assertThrows(EOFException.class, () -> new QueryMessage(largeLimitConnection));
+  }
+
+  @Test
+  public void testReadString_missingNullTerminatorExceedsLimitThrowsIOException() {
+    byte[] nonTerminated = new byte[32];
+    Arrays.fill(nonTerminated, (byte) 'a');
+    ConnectionHandler connection = createConnectionHandler(nonTerminated);
+    TestWireMessage message = new TestWireMessage(connection, 16);
+
+    IOException exception = assertThrows(IOException.class, message::readString);
+    assertTrue(exception.getMessage().contains("No null terminator found"));
+  }
+
+  @Test
+  public void testReadBytes_exactCustomMaxMessageLengthAboveChunkSize() throws IOException {
+    int customMaxLength = WireMessage.READ_CHUNK_SIZE + 17;
+    byte[] expected = new byte[customMaxLength];
+    for (int i = 0; i < customMaxLength; i++) {
+      expected[i] = (byte) (i & 0xFF);
+    }
+    ConnectionHandler connection = createConnectionHandler(expected);
+    when(connection.getMaxMessageLength()).thenReturn(customMaxLength);
+    TestWireMessage message = new TestWireMessage(connection, 4 + customMaxLength);
+
+    assertArrayEquals(expected, message.readBytes(customMaxLength));
+  }
+
+  @Test
+  public void testPasswordMessage_largerThanSmallMaxMessageLengthSucceeds() throws Exception {
+    byte[] passwordBytes = "0123456789abcdef_secret_password\0".getBytes(StandardCharsets.UTF_8);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeInt(4 + passwordBytes.length);
+    dataOutputStream.write(passwordBytes);
+
+    ConnectionHandler connection = createConnectionHandler(outputStream.toByteArray());
+    when(connection.getMaxMessageLength()).thenReturn(16);
+    PasswordMessage passwordMessage = new PasswordMessage(connection, Collections.emptyMap());
+    assertEquals("0123456789abcdef_secret_password", passwordMessage.getPassword());
   }
 }

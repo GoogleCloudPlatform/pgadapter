@@ -48,11 +48,14 @@ public class QueryMessage extends ControlMessage {
       ImmutableList.of("SELECT", "CURRENT_SETTING");
   public static final ImmutableList<String> SELECT_SET_CONFIG =
       ImmutableList.of("SELECT", "SET_CONFIG");
+  private static final String MESSAGE_NAME = "Query";
+  // 4-byte length + 1-byte null terminator for the query string.
+  private static final int MIN_MESSAGE_LENGTH = 5;
   private final Statement originalStatement;
   private final SimpleQueryStatement simpleQueryStatement;
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     connection.getExtendedQueryProtocolHandler().maybeStartSpan(true);
     this.originalStatement = Statement.of(this.readAll());
     connection.maybeDetermineWellKnownClient(this.originalStatement);
@@ -68,7 +71,7 @@ public class QueryMessage extends ControlMessage {
 
   @Override
   protected String getMessageName() {
-    return "Query";
+    return MESSAGE_NAME;
   }
 
   @Override

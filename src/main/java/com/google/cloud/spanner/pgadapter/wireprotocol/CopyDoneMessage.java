@@ -29,10 +29,13 @@ import java.text.MessageFormat;
 @InternalApi
 public class CopyDoneMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'c';
+  private static final String MESSAGE_NAME = "Copy Done";
+  // 4-byte length.
+  private static final int MESSAGE_LENGTH = 4;
   private final CopyStatement statement;
 
   public CopyDoneMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MESSAGE_LENGTH, MESSAGE_LENGTH, MESSAGE_NAME);
     this.statement = connection.getActiveCopyStatement();
   }
 
@@ -55,7 +58,7 @@ public class CopyDoneMessage extends ControlMessage {
 
   @Override
   protected String getMessageName() {
-    return "Copy Done";
+    return MESSAGE_NAME;
   }
 
   @Override

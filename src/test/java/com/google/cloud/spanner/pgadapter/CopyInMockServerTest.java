@@ -2852,4 +2852,92 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertTrue(mockSpanner.getRequestsOfType(CommitRequest.class).isEmpty());
     waitForActiveConnectionHandlersToClose();
   }
+
+  @Test(timeout = 30_000L)
+  public void testCopyIn_CopyDataMessageLengthTooLarge_TerminatesConnection() throws Exception {
+    assumeFalse(useDomainSocket);
+    setupCopyInformationSchemaResults();
+
+    try (Socket socket = connectAndStartup();
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+      byte[] sqlBytes = "COPY users FROM STDIN;\0".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('Q');
+      outputStream.writeInt(4 + sqlBytes.length);
+      outputStream.write(sqlBytes);
+      outputStream.flush();
+
+      char responseType = (char) inputStream.readByte();
+      assertEquals('G', responseType);
+      int length = inputStream.readInt();
+      inputStream.skipBytes(length - 4);
+
+      // Send one valid CopyData row first so CopyStatement/MutationWriter has active data buffered.
+      byte[] validRow = "5\t5\t5\n".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('d');
+      outputStream.writeInt(4 + validRow.length);
+      outputStream.write(validRow);
+
+      // Send 5-byte CopyDataMessage header claiming ~2 GB length without sending any payload.
+      outputStream.writeByte('d');
+      outputStream.writeInt(Integer.MAX_VALUE);
+      outputStream.flush();
+
+      assertEquals('E', inputStream.readByte());
+      int errorLength = inputStream.readInt();
+      byte[] errorBytes = new byte[errorLength - 4];
+      inputStream.readFully(errorBytes);
+      String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+      assertTrue(errorPayload.contains("FATAL"));
+      assertTrue(errorPayload.contains("08P01"));
+      assertTrue(errorPayload.contains("invalid length of copy data message"));
+      assertTrue(errorPayload.contains("max_message_length"));
+
+      assertEquals(-1, inputStream.read());
+    }
+
+    assertTrue(mockSpanner.getRequestsOfType(CommitRequest.class).isEmpty());
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test(timeout = 30_000L)
+  public void testCopyIn_CopyDataMessageLengthTooSmall_TerminatesConnection() throws Exception {
+    assumeFalse(useDomainSocket);
+    setupCopyInformationSchemaResults();
+
+    for (int invalidLength : new int[] {3, -1}) {
+      try (Socket socket = connectAndStartup();
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+          DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+        byte[] sqlBytes = "COPY users FROM STDIN;\0".getBytes(StandardCharsets.UTF_8);
+        outputStream.writeByte('Q');
+        outputStream.writeInt(4 + sqlBytes.length);
+        outputStream.write(sqlBytes);
+        outputStream.flush();
+
+        char responseType = (char) inputStream.readByte();
+        assertEquals('G', responseType);
+        int length = inputStream.readInt();
+        inputStream.skipBytes(length - 4);
+
+        outputStream.writeByte('d');
+        outputStream.writeInt(invalidLength);
+        outputStream.flush();
+
+        assertEquals('E', inputStream.readByte());
+        int errorLength = inputStream.readInt();
+        byte[] errorBytes = new byte[errorLength - 4];
+        inputStream.readFully(errorBytes);
+        String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+        assertTrue(errorPayload.contains("FATAL"));
+        assertTrue(errorPayload.contains("08P01"));
+        assertTrue(errorPayload.contains("invalid length of copy data message: " + invalidLength));
+
+        assertEquals(-1, inputStream.read());
+      }
+    }
+
+    assertTrue(mockSpanner.getRequestsOfType(CommitRequest.class).isEmpty());
+    waitForActiveConnectionHandlersToClose();
+  }
 }

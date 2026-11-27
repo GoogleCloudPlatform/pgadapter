@@ -24,7 +24,7 @@ import java.text.MessageFormat;
 /** Handles SSL bootstrap message. */
 @InternalApi
 public class SSLMessage extends BootstrapMessage {
-  private static final int MESSAGE_LENGTH = 8;
+  static final int MESSAGE_LENGTH = 8;
   public static final int IDENTIFIER = 80877103; // First Hextet: 1234, Second Hextet: 5679
 
   private final ThreadLocal<Boolean> executedOnce = ThreadLocal.withInitial(() -> false);

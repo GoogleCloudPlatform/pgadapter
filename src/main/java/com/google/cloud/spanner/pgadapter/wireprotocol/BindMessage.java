@@ -35,6 +35,9 @@ import java.util.Arrays;
 @InternalApi
 public class BindMessage extends AbstractQueryProtocolMessage {
   protected static final char IDENTIFIER = 'B';
+  private static final String MESSAGE_NAME = "Bind";
+  // 4-byte length + 2 null terminators (portal, statement) + 3 x 2-byte format/parameter counts.
+  private static final int MIN_MESSAGE_LENGTH = 12;
   private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final String portalName;
@@ -47,7 +50,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   /** Constructor for Bind messages that are received from the front-end. */
   public BindMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     this.portalName = this.readString();
     this.statementName = this.readString();
     this.formatCodes = MessageReader.getFormatCodes(this.inputStream);
@@ -146,7 +149,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   protected String getMessageName() {
-    return "Bind";
+    return MESSAGE_NAME;
   }
 
   @Override

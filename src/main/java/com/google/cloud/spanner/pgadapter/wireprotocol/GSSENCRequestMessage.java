@@ -23,7 +23,7 @@ import java.text.MessageFormat;
 /** Handles GSSENCRequest bootstrap message. */
 @InternalApi
 public class GSSENCRequestMessage extends BootstrapMessage {
-  private static final int MESSAGE_LENGTH = 8;
+  static final int MESSAGE_LENGTH = 8;
   public static final int IDENTIFIER = 80877104; // First Hextet: 1234, Second Hextet: 5680
 
   private final ThreadLocal<Boolean> executedOnce = ThreadLocal.withInitial(() -> false);

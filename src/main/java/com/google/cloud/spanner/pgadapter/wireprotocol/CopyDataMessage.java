@@ -31,16 +31,18 @@ import java.text.MessageFormat;
 public class CopyDataMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'd';
+  private static final String MESSAGE_NAME = "Copy Data";
+  // 4-byte length (payload may be empty).
+  private static final int MIN_MESSAGE_LENGTH = 4;
 
   private final byte[] payload;
   private final CopyStatement statement;
 
   public CopyDataMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     // Payload byte array excluding 4 bytes containing the length of message itself
-    int dataLength = this.length - 4;
-    this.payload = new byte[dataLength];
-    this.inputStream.readFully(this.payload);
+    int dataLength = this.length - MIN_MESSAGE_LENGTH;
+    this.payload = readBytes(dataLength);
     this.statement = connection.getActiveCopyStatement();
   }
 
@@ -66,7 +68,7 @@ public class CopyDataMessage extends ControlMessage {
 
   @Override
   protected String getMessageName() {
-    return "Copy Data";
+    return MESSAGE_NAME;
   }
 
   @Override

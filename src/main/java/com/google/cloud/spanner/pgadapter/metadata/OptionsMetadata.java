@@ -128,6 +128,7 @@ public class OptionsMetadata {
     private String type = null;
     private Long describeCacheExpireMinutes;
     private Long describeCacheMaxSize;
+    private Integer maxMessageLength;
 
     Builder() {}
 
@@ -486,6 +487,15 @@ public class OptionsMetadata {
       return this;
     }
 
+    /**
+     * (Optional) The maximum allowed length in bytes for an incoming PostgreSQL wire-protocol
+     * control message. Defaults to {@link OptionsMetadata#DEFAULT_MAX_MESSAGE_LENGTH} (100 MB).
+     */
+    public Builder setMaxMessageLength(int maxMessageLength) {
+      this.maxMessageLength = validateMaxMessageLength(maxMessageLength);
+      return this;
+    }
+
     public OptionsMetadata build() {
       if (Strings.isNullOrEmpty(project) && !Strings.isNullOrEmpty(instance)) {
         throw SpannerExceptionFactory.newSpannerException(
@@ -513,6 +523,9 @@ public class OptionsMetadata {
       }
       if (describeCacheMaxSize != null) {
         addLongOption(args, OPTION_DESCRIBE_CACHE_MAX_SIZE, String.valueOf(describeCacheMaxSize));
+      }
+      if (maxMessageLength != null) {
+        addLongOption(args, OPTION_MAX_MESSAGE_LENGTH, String.valueOf(maxMessageLength));
       }
       if (!Strings.isNullOrEmpty(instance)) {
         addOption(args, OPTION_INSTANCE_ID, instance);
@@ -728,12 +741,16 @@ public class OptionsMetadata {
   private static final String OPTION_DESCRIBE_CACHE_EXPIRE_MINUTES =
       "describe_cache_expire_minutes";
   private static final String OPTION_DESCRIBE_CACHE_MAX_SIZE = "describe_cache_max_size";
+  private static final String OPTION_MAX_MESSAGE_LENGTH = "max_message_length";
   // The default for this cache is not to expire elements. The reason is that the values in this
   // cache would only be invalidated if the datatype of an existing column would change, which is
   // highly unlikely to occur for a production system.
   private static final long DEFAULT_DESCRIBE_CACHE_EXPIRE_MINUTES =
       Duration.ofSeconds(Long.MAX_VALUE).toMinutes();
   private static final long DEFAULT_DESCRIBE_CACHE_MAX_SIZE = 5000L;
+  public static final int DEFAULT_MAX_MESSAGE_LENGTH = 100_000_000;
+  static final int MIN_ALLOWED_MESSAGE_LENGTH = 4;
+  static final int MAX_ALLOWED_MESSAGE_LENGTH = Integer.MAX_VALUE - 8;
 
   private final Map<String, String> environment;
   private final String osName;
@@ -771,6 +788,7 @@ public class OptionsMetadata {
   private final String command;
   private final long describeCacheExpireMinutes;
   private final long describeCacheMaxSize;
+  private final int maxMessageLength;
 
   /**
    * Creates a new instance of {@link OptionsMetadata} from the given arguments.
@@ -852,6 +870,7 @@ public class OptionsMetadata {
     this.maxBacklog = buildMaxBacklog(commandLine);
     this.describeCacheExpireMinutes = buildDescribeCacheExpireMinutes(commandLine);
     this.describeCacheMaxSize = buildDescribeCacheMaxSize(commandLine);
+    this.maxMessageLength = buildMaxMessageLength(commandLine);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
@@ -954,6 +973,7 @@ public class OptionsMetadata {
     this.maxBacklog = DEFAULT_MAX_BACKLOG;
     this.describeCacheExpireMinutes = DEFAULT_DESCRIBE_CACHE_EXPIRE_MINUTES;
     this.describeCacheMaxSize = DEFAULT_DESCRIBE_CACHE_MAX_SIZE;
+    this.maxMessageLength = DEFAULT_MAX_MESSAGE_LENGTH;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
@@ -1123,6 +1143,28 @@ public class OptionsMetadata {
       throw new IllegalArgumentException("Describe cache max size must be greater than 0");
     }
     return maxSize;
+  }
+
+  private int buildMaxMessageLength(CommandLine commandLine) {
+    int maxLength =
+        Integer.parseInt(
+            commandLine
+                .getOptionValue(
+                    OPTION_MAX_MESSAGE_LENGTH, String.valueOf(DEFAULT_MAX_MESSAGE_LENGTH))
+                .trim());
+    return validateMaxMessageLength(maxLength);
+  }
+
+  private static int validateMaxMessageLength(int maxMessageLength) {
+    if (maxMessageLength < MIN_ALLOWED_MESSAGE_LENGTH) {
+      throw new IllegalArgumentException(
+          "Max message length must be at least " + MIN_ALLOWED_MESSAGE_LENGTH + " bytes");
+    }
+    if (maxMessageLength > MAX_ALLOWED_MESSAGE_LENGTH) {
+      throw new IllegalArgumentException(
+          "Max message length must be at most " + MAX_ALLOWED_MESSAGE_LENGTH + " bytes");
+    }
+    return maxMessageLength;
   }
 
   /**
@@ -1461,6 +1503,13 @@ public class OptionsMetadata {
         String.format(
             "The maximum number of described statements that are cached. Defaults to %d.",
             DEFAULT_DESCRIBE_CACHE_MAX_SIZE));
+    options.addOption(
+        null,
+        OPTION_MAX_MESSAGE_LENGTH,
+        true,
+        String.format(
+            "The maximum allowed length in bytes for an incoming wire-protocol control message. Defaults to %d.",
+            DEFAULT_MAX_MESSAGE_LENGTH));
     options.addOption(null, OPTION_ENABLE_OPEN_TELEMETRY, false, "Enable OpenTelemetry tracing.");
     options.addOption(
         null, OPTION_ENABLE_OPEN_TELEMETRY_METRICS, false, "Enable OpenTelemetry metrics.");
@@ -1857,6 +1906,10 @@ public class OptionsMetadata {
 
   public long getDescribeCacheMaxSize() {
     return this.describeCacheMaxSize;
+  }
+
+  public int getMaxMessageLength() {
+    return this.maxMessageLength;
   }
 
   public TextFormat getTextFormat() {

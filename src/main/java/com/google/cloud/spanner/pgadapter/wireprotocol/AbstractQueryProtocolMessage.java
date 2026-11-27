@@ -32,8 +32,9 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   protected final QueryMode queryMode;
   private boolean returnedErrorResponse;
 
-  AbstractQueryProtocolMessage(ConnectionHandler connection) throws IOException {
-    super(connection);
+  AbstractQueryProtocolMessage(ConnectionHandler connection, int minLength, String messageName)
+      throws IOException {
+    super(connection, minLength, messageName);
     this.handler = connection.getExtendedQueryProtocolHandler();
     this.queryMode = QueryMode.EXTENDED;
     this.handler.maybeStartSpan(false);

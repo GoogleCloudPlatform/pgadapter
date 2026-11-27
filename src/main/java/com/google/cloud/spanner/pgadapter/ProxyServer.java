@@ -103,6 +103,7 @@ public class ProxyServer extends AbstractApiService {
   private static final int MAX_DEBUG_MESSAGES = 100_000;
 
   private final boolean debugMode;
+  private final int maxMessageLength;
   private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
   private final AtomicInteger debugMessageCount = new AtomicInteger();
 
@@ -192,6 +193,7 @@ public class ProxyServer extends AbstractApiService {
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     this.debugMode = optionsMetadata.isDebugMode();
+    this.maxMessageLength = optionsMetadata.getMaxMessageLength();
     this.threadFactory =
         ThreadFactoryUtil.createVirtualOrPlatformDaemonThreadFactory(
             "ConnectionHandler", optionsMetadata.isUseVirtualThreads());
@@ -200,6 +202,10 @@ public class ProxyServer extends AbstractApiService {
 
   public MessageReader getMessageReader() {
     return this.messageReader;
+  }
+
+  public int getMaxMessageLength() {
+    return this.maxMessageLength;
   }
 
   private void addConnectionProperties() {
