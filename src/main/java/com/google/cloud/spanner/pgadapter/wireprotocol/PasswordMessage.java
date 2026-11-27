@@ -167,11 +167,17 @@ public class PasswordMessage extends ControlMessage {
   static boolean isValidCredentialsType(String credentials) throws IOException {
     JsonFactory jsonFactory = GsonFactory.getDefaultInstance();
     JsonObjectParser parser = new JsonObjectParser(jsonFactory);
-    GenericJson fileContents =
-        parser.parseAndClose(new StringReader(credentials), GenericJson.class);
+    GenericJson fileContents;
+    try {
+      fileContents = parser.parseAndClose(new StringReader(credentials), GenericJson.class);
+    } catch (IllegalArgumentException illegalArgumentException) {
+      // Thrown for valid JSON that is not an object, such as a number or a quoted string.
+      throw new IOException(
+          "Error reading credentials from password, not a JSON object.", illegalArgumentException);
+    }
 
-    String fileType = (String) fileContents.get("type");
-    if (fileType == null) {
+    Object fileType = fileContents.get("type");
+    if (!(fileType instanceof String)) {
       throw new IOException("Error reading credentials from password, 'type' field not specified.");
     }
     return Objects.equals("authorized_user", fileType)
