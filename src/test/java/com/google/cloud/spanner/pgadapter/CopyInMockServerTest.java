@@ -35,6 +35,7 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
@@ -2797,6 +2798,172 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals(0, mockSpanner.getRequestsOfType(CommitRequest.class).size());
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_BinaryHeaderExtension() throws Exception {
+    setupCopyInformationSchemaResults();
+
+    ByteArrayOutputStream chunkOneByteStream = new ByteArrayOutputStream();
+    try (DataOutputStream chunkOneDataStream = new DataOutputStream(chunkOneByteStream)) {
+      chunkOneDataStream.write(CopyToStatement.COPY_BINARY_HEADER);
+      chunkOneDataStream.writeInt(0); // flags
+      chunkOneDataStream.writeInt(16_384); // header extension length (> 8 KiB buffer)
+      chunkOneDataStream.write(new byte[6_000]); // partial extension bytes in first CopyData frame
+    }
+    byte[] chunkOne = chunkOneByteStream.toByteArray();
+
+    ByteArrayOutputStream chunkTwoByteStream = new ByteArrayOutputStream();
+    try (DataOutputStream chunkTwoDataStream = new DataOutputStream(chunkTwoByteStream)) {
+      chunkTwoDataStream.write(
+          new byte[10_384]); // remaining extension bytes in second CopyData frame
+      chunkTwoDataStream.writeShort(3); // field count for users (id, age, name)
+      chunkTwoDataStream.writeInt(8);
+      chunkTwoDataStream.writeLong(1L);
+      chunkTwoDataStream.writeInt(8);
+      chunkTwoDataStream.writeLong(25L);
+      byte[] nameBytes = "alice".getBytes(StandardCharsets.UTF_8);
+      chunkTwoDataStream.writeInt(nameBytes.length);
+      chunkTwoDataStream.write(nameBytes);
+      chunkTwoDataStream.writeShort(-1); // trailer
+    }
+    byte[] chunkTwo = chunkTwoByteStream.toByteArray();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      CopyIn copyOperation = copyManager.copyIn("COPY users FROM STDIN BINARY;");
+      copyOperation.writeToCopy(chunkOne, 0, chunkOne.length);
+      copyOperation.writeToCopy(chunkTwo, 0, chunkTwo.length);
+      assertEquals(1L, copyOperation.endCopy());
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getColumnsCount());
+    assertEquals(1, mutation.getInsert().getValuesCount());
+    assertEquals("1", mutation.getInsert().getValues(0).getValues(0).getStringValue());
+    assertEquals("25", mutation.getInsert().getValues(0).getValues(1).getStringValue());
+    assertEquals("alice", mutation.getInsert().getValues(0).getValues(2).getStringValue());
+
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_BinaryTruncatedHeaderExtension() throws Exception {
+    setupCopyInformationSchemaResults();
+
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    try (DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
+      dataOutputStream.write(CopyToStatement.COPY_BINARY_HEADER);
+      dataOutputStream.writeInt(0); // flags
+      dataOutputStream.writeInt(100); // positive header extension length with no extension bytes
+    }
+    byte[] truncatedHeader = byteArrayOutputStream.toByteArray();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  copyManager.copyIn(
+                      "COPY users FROM STDIN BINARY;", new ByteArrayInputStream(truncatedHeader)));
+      assertEquals(SQLState.RaiseException.toString(), exception.getSQLState());
+      assertTrue(exception.getMessage().contains("Failed to read binary file header"));
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertTrue(mockSpanner.getRequestsOfType(CommitRequest.class).isEmpty());
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_BinaryNegativeHeaderExtensionLength() throws Exception {
+    setupCopyInformationSchemaResults();
+
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    try (DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
+      dataOutputStream.write(CopyToStatement.COPY_BINARY_HEADER);
+      dataOutputStream.writeInt(0); // flags
+      dataOutputStream.writeInt(-1); // negative header extension length
+    }
+    byte[] invalidHeader = byteArrayOutputStream.toByteArray();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      PSQLException exception =
+          assertThrows(
+              PSQLException.class,
+              () ->
+                  copyManager.copyIn(
+                      "COPY users FROM STDIN BINARY;", new ByteArrayInputStream(invalidHeader)));
+      assertEquals(SQLState.RaiseException.toString(), exception.getSQLState());
+      assertTrue(exception.getMessage().contains("Invalid header extension length: -1"));
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertTrue(mockSpanner.getRequestsOfType(CommitRequest.class).isEmpty());
+    waitForActiveConnectionHandlersToClose();
+  }
+
+  @Test
+  public void testCopyIn_BinaryTruncatedHeaderExtension_ClientDisconnect() throws Exception {
+    assumeFalse(useDomainSocket);
+    setupCopyInformationSchemaResults();
+
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    try (DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
+      dataOutputStream.write(CopyToStatement.COPY_BINARY_HEADER);
+      dataOutputStream.writeInt(0); // flags
+      dataOutputStream.writeInt(100); // positive header extension length with no extension bytes
+    }
+    byte[] truncatedHeader = byteArrayOutputStream.toByteArray();
+
+    try (Socket socket = connectAndStartup();
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
+      byte[] sqlBytes = "COPY users FROM STDIN BINARY;\0".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('Q');
+      outputStream.writeInt(4 + sqlBytes.length);
+      outputStream.write(sqlBytes);
+      outputStream.flush();
+
+      char responseType = (char) inputStream.readByte();
+      assertEquals('G', responseType);
+      int length = inputStream.readInt();
+      inputStream.skipBytes(length - 4);
+
+      outputStream.writeByte('d');
+      outputStream.writeInt(4 + truncatedHeader.length);
+      outputStream.write(truncatedHeader);
+      outputStream.flush();
+
+      // Disconnect abruptly while skipFully is blocked waiting for remaining extension bytes.
+      socket.close();
+    }
+
+    assertTrue(mockSpanner.getRequestsOfType(CommitRequest.class).isEmpty());
     waitForActiveConnectionHandlersToClose();
   }
 }

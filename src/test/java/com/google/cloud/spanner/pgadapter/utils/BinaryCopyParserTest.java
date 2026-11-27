@@ -93,6 +93,90 @@ public class BinaryCopyParserTest {
   }
 
   @Test
+  public void testGetIterator_HeaderExtension() throws IOException {
+    try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+        DataOutputStream data = new DataOutputStream(pipedOutputStream)) {
+      BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream);
+
+      data.write(COPY_BINARY_HEADER);
+      data.writeInt(0); // flags
+      data.writeInt(16); // header extension length
+      data.write(new byte[16]); // header extension bytes
+      // Write a tuple with a single field.
+      data.writeShort(1);
+      data.writeInt(8);
+      data.writeLong(42L);
+      // Trailer.
+      data.writeShort(-1);
+
+      Iterator<CopyRecord> iterator = parser.iterator();
+      assertTrue(iterator.hasNext());
+      CopyRecord record = iterator.next();
+      assertEquals(Value.int64(42L), record.getValue(Type.int64(), 0));
+      assertFalse(iterator.hasNext());
+    }
+  }
+
+  @Test
+  public void testGetIterator_TruncatedHeaderExtension() throws IOException {
+    try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+        DataOutputStream data = new DataOutputStream(pipedOutputStream)) {
+      BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream);
+
+      data.write(COPY_BINARY_HEADER);
+      data.writeInt(0); // flags
+      data.writeInt(100); // header extension length
+      data.write(new byte[10]); // fewer bytes than declared
+      pipedOutputStream.close();
+
+      SpannerException exception = assertThrows(SpannerException.class, parser::iterator);
+      assertEquals(ErrorCode.INTERNAL, exception.getErrorCode());
+      assertTrue(exception.getCause() instanceof EOFException);
+    }
+  }
+
+  @Test
+  public void testGetIterator_LargeTruncatedHeaderExtension() throws IOException {
+    try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+        DataOutputStream data = new DataOutputStream(pipedOutputStream)) {
+      BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream);
+
+      data.write(COPY_BINARY_HEADER);
+      data.writeInt(0); // flags
+      data.writeInt(Integer.MAX_VALUE); // huge header extension length
+      pipedOutputStream.close();
+
+      SpannerException exception = assertThrows(SpannerException.class, parser::iterator);
+      assertEquals(ErrorCode.INTERNAL, exception.getErrorCode());
+      assertTrue(exception.getCause() instanceof EOFException);
+    }
+  }
+
+  @Test
+  public void testGetIterator_NegativeHeaderExtensionLength() throws IOException {
+    for (int invalidLength : new int[] {-1, Integer.MIN_VALUE}) {
+      try (PipedOutputStream pipedOutputStream = new PipedOutputStream();
+          PipedInputStream pipedInputStream = new PipedInputStream(pipedOutputStream, 256);
+          DataOutputStream data = new DataOutputStream(pipedOutputStream)) {
+        BinaryCopyParser parser = new BinaryCopyParser(pipedInputStream);
+        data.write(COPY_BINARY_HEADER);
+        data.writeInt(0); // flags
+        data.writeInt(invalidLength); // negative header extension length
+        pipedOutputStream.close();
+
+        SpannerException exception = assertThrows(SpannerException.class, parser::iterator);
+        assertEquals(ErrorCode.FAILED_PRECONDITION, exception.getErrorCode());
+        assertEquals(
+            "FAILED_PRECONDITION: Invalid header extension length: " + invalidLength,
+            exception.getMessage());
+      }
+    }
+  }
+
+  @Test
   public void testIteratorHasNext_Trailer() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
     BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));

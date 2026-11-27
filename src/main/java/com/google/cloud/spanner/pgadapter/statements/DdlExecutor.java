@@ -30,10 +30,12 @@ import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -64,13 +66,13 @@ class DdlExecutor {
    * was not quoted.
    */
   static String unquoteIdentifier(String identifier) {
-    if (identifier.length() < 2) {
+    if (Strings.isNullOrEmpty(identifier)) {
       return identifier;
     }
-    if (identifier.startsWith("\"")) {
+    if (identifier.length() > 1 && identifier.startsWith("\"") && identifier.endsWith("\"")) {
       return identifier.substring(1, identifier.length() - 1);
     }
-    return identifier.toLowerCase();
+    return identifier.toLowerCase(Locale.ENGLISH);
   }
 
   /**
@@ -161,37 +163,68 @@ class DdlExecutor {
     SimpleParser parser = new SimpleParser(createTableStatement.getSql());
     parser.eatKeyword("create", "table", "if", "not", "exists");
     TableOrIndexName tableName = parser.readTableOrIndexName();
-    if (tableName == null) {
+    if (tableName == null || !parser.eatToken("(")) {
       return createTableStatement;
     }
-    if (!parser.eatToken("(")) {
-      return createTableStatement;
-    }
-    while (true) {
+    String unquotedTableName = unquoteIdentifier(tableName.name);
+    while (parser.hasMoreTokens()) {
+      int positionBefore = parser.getPos();
       if (parser.eatToken(")")) {
         break;
-      } else if (parser.eatToken(",")) {
+      }
+      if (parser.eatToken(",")) {
         continue;
-      } else if (parser.peekKeyword("constraint")) {
-        int positionBeforeConstraintDefinition = parser.getPos();
-        parser.eatKeyword("constraint");
-        String constraintName = unquoteIdentifier(parser.readIdentifierPart());
-        int positionAfterConstraintName = parser.getPos();
-        if (parser.eatKeyword("primary", "key")) {
-          if (!constraintName.equalsIgnoreCase("pk_" + unquoteIdentifier(tableName.name))) {
-            return createTableStatement;
-          }
-          return Statement.of(
-              parser.getSql().substring(0, positionBeforeConstraintDefinition)
-                  + parser.getSql().substring(positionAfterConstraintName));
-        } else {
-          parser.parseExpression();
+      }
+      if (parser.peekKeyword("constraint")) {
+        Statement rewrittenStatement =
+            maybeRewriteNamedConstraint(parser, unquotedTableName, createTableStatement);
+        if (rewrittenStatement != null) {
+          return rewrittenStatement;
         }
-      } else {
-        parser.parseExpression();
+      } else if (parser.parseExpression() == null) {
+        // Stop on malformed or unterminated expressions (e.g., missing ')', unclosed literal or
+        // comment, unbalanced parentheses) and let Spanner report the syntax error.
+        return createTableStatement;
+      }
+      // Defensive invariant: SimpleParser currently advances pos on every non-null path above,
+      // but keep this explicit progress check so future parser changes or unforeseen edge cases
+      // can never reintroduce an infinite loop on a connection thread.
+      if (parser.getPos() <= positionBefore) {
+        return createTableStatement;
       }
     }
     return createTableStatement;
+  }
+
+  /**
+   * Inspects a table-level {@code CONSTRAINT <name> ...} definition at the current parser position.
+   *
+   * @return the rewritten statement if a matching {@code pk_<tableName>} primary key constraint
+   *     name was stripped, {@code createTableStatement} if scanning should stop without rewriting,
+   *     or {@code null} if a non-primary-key constraint was skipped and scanning should continue.
+   */
+  private static Statement maybeRewriteNamedConstraint(
+      SimpleParser parser, String unquotedTableName, Statement createTableStatement) {
+    int positionBeforeConstraintDefinition = parser.getPos();
+    parser.eatKeyword("constraint");
+    String rawConstraintName = parser.readIdentifierPart();
+    if (rawConstraintName == null) {
+      // Missing, invalid, or unterminated constraint name; avoid NPE and let Spanner reject it.
+      return createTableStatement;
+    }
+    String constraintName = unquoteIdentifier(rawConstraintName);
+    int positionAfterConstraintName = parser.getPos();
+    if (parser.eatKeyword("primary", "key")) {
+      if (!constraintName.equalsIgnoreCase("pk_" + unquotedTableName)) {
+        return createTableStatement;
+      }
+      return Statement.of(
+          parser.getSql().substring(0, positionBeforeConstraintDefinition)
+              + parser.getSql().substring(positionAfterConstraintName));
+    }
+    // Skip the remainder of a non-primary-key constraint (e.g., CHECK or FOREIGN KEY); abort
+    // scanning if the expression is malformed or unterminated.
+    return parser.parseExpression() == null ? createTableStatement : null;
   }
 
   ImmutableList<Statement> getDependentStatements(Statement statement) {
