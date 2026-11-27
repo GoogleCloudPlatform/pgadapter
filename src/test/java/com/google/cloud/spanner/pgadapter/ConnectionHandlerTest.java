@@ -78,6 +78,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -547,6 +548,221 @@ public class ConnectionHandlerTest {
     // SocketException indicates broken TCP connection, terminating immediately without sending
     // error responses to broken socket.
     assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+  }
+
+  @Test
+  public void testHandleMessages_FatalPGException_TerminatesWithoutReadyForQuery()
+      throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputBuffer);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(
+            PGException.newBuilder("invalid length of query message: 2000000000")
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.ProtocolViolation)
+                .build())
+        .when(message)
+        .nextHandler();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.AUTHENTICATED);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    byte[] written = outputBuffer.toByteArray();
+    assertTrue(written.length > 0);
+    assertEquals('E', written[0]);
+    String responseText = new String(written, StandardCharsets.UTF_8);
+    assertTrue(responseText.contains("FATAL"));
+    assertTrue(responseText.contains("08P01"));
+    assertFalse(responseText.contains("Z\0"));
+  }
+
+  @Test
+  public void testHandleMessages_FatalPGException_InCopyInMode_RollsBackAndTerminates()
+      throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputBuffer);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(
+            PGException.newBuilder("invalid length of copy data message: 2000000000")
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.ProtocolViolation)
+                .build())
+        .when(message)
+        .nextHandler();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.COPY_IN);
+    CopyStatement copyStatement = mock(CopyStatement.class);
+    MutationWriter mutationWriter = mock(MutationWriter.class);
+    when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
+    connection.setActiveCopyStatement(copyStatement);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    verify(mutationWriter).rollback();
+    verify(copyStatement).handleExecutionException(any(PGException.class));
+    verify(socket).close();
+    byte[] written = outputBuffer.toByteArray();
+    assertTrue(written.length > 0);
+    assertEquals('E', written[0]);
+    String responseText = new String(written, StandardCharsets.UTF_8);
+    assertTrue(responseText.contains("FATAL"));
+    assertTrue(responseText.contains("08P01"));
+    assertTrue(responseText.contains("invalid length of copy data message"));
+  }
+
+  @Test
+  public void testHandleMessages_FatalPGException_WhenAlreadyTerminated_SkipsDuplicateError()
+      throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputBuffer);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(
+            PGException.newBuilder("Connection terminated unexpectedly")
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.ConnectionFailure)
+                .build())
+        .when(message)
+        .send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.TERMINATED);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    assertEquals(0, outputBuffer.size());
+  }
+
+  @Test
+  public void testHandleMessages_FatalPGException_ErrorResponseSendFails_StillTerminates()
+      throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    DataOutputStream brokenOutputStream = mock(DataOutputStream.class);
+    doThrow(new IOException("broken pipe")).when(brokenOutputStream).write(any(byte[].class));
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(brokenOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(
+            PGException.newBuilder("invalid length of query message: 2000000000")
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.ProtocolViolation)
+                .build())
+        .when(message)
+        .nextHandler();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.AUTHENTICATED);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+    verify(socket).close();
+  }
+
+  @Test
+  public void testHandleMessages_NonFatalPGException_SendsReadyForQueryAndKeepsConnectionOpen()
+      throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    when(socket.getInetAddress()).thenReturn(InetAddress.getLoopbackAddress());
+    ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputBuffer);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(
+            PGException.newBuilder("non-fatal query error")
+                .setSeverity(Severity.ERROR)
+                .setSQLState(SQLState.SyntaxError)
+                .build())
+        .when(message)
+        .send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+    connection.setThread(mock(Thread.class));
+    connection.setMessageState(message);
+    connection.setStatus(ConnectionStatus.AUTHENTICATED);
+
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.AUTHENTICATED, connection.getStatus());
+    byte[] written = outputBuffer.toByteArray();
+    assertTrue(written.length > 0);
+    assertEquals('E', written[0]);
+    String responseText = new String(written, StandardCharsets.UTF_8);
+    assertTrue(responseText.contains("ERROR"));
+    assertTrue(responseText.contains("42601"));
+    assertTrue(responseText.contains("non-fatal query error"));
+    // Non-fatal PGException delegates to handleError(), which appends ReadyForQuery ('Z', len=5,
+    // 'I').
+    assertTrue(written.length >= 6);
+    assertEquals('Z', written[written.length - 6]);
+    assertEquals('I', written[written.length - 1]);
   }
 
   @Test

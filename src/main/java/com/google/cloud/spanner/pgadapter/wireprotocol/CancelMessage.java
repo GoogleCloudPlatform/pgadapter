@@ -27,13 +27,17 @@ import java.text.MessageFormat;
 public class CancelMessage extends BootstrapMessage {
 
   public static final int IDENTIFIER = 80877102; // First Hextet: 1234, Second Hextet: 5678
+  // 4-byte length + 4-byte cancel code + 4-byte backend PID + secret key (4 bytes in v3.0, 32 in
+  // v3.2).
+  static final int V30_MESSAGE_LENGTH = 16;
+  static final int V32_MESSAGE_LENGTH = 44;
 
   private final int connectionId;
   private final byte[] secret;
 
   public CancelMessage(ConnectionHandler connection, int length) throws Exception {
     super(connection, length);
-    checkLengthIn(length, "cancel request", 16, 44);
+    checkLengthIn(length, "cancel request", V30_MESSAGE_LENGTH, V32_MESSAGE_LENGTH);
     int secretLen = length - 12;
     this.connectionId = this.inputStream.readInt();
     this.secret = new byte[secretLen];

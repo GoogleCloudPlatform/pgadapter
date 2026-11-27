@@ -30,6 +30,9 @@ import javax.annotation.Nullable;
 public class CloseMessage extends AbstractQueryProtocolMessage {
 
   protected static final char IDENTIFIER = 'C';
+  private static final String MESSAGE_NAME = "Close";
+  // 4-byte length + 1-byte target type + 1-byte null terminator for the target name.
+  private static final int MIN_MESSAGE_LENGTH = 6;
   private static final String RECEIVED_EVENT_DESCRIPTION = "Received message: '" + IDENTIFIER + "'";
 
   private final PreparedType type;
@@ -37,7 +40,7 @@ public class CloseMessage extends AbstractQueryProtocolMessage {
   @Nullable private final IntermediateStatement statement;
 
   public CloseMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
     this.name = this.readAll();
     IntermediateStatement statement = null;
@@ -104,7 +107,7 @@ public class CloseMessage extends AbstractQueryProtocolMessage {
 
   @Override
   protected String getMessageName() {
-    return "Close";
+    return MESSAGE_NAME;
   }
 
   @Override

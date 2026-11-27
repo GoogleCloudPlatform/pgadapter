@@ -70,8 +70,7 @@ public class PasswordMessage extends ControlMessage {
 
   public PasswordMessage(ConnectionHandler connection, Map<String, String> parameters)
       throws Exception {
-    super(connection);
-    checkLengthRange(this.length, "password message", MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH);
+    super(connection, MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH, "Password");
     this.parameters = parameters;
     this.username = parameters.get(USER_KEY);
     this.password = this.readAll();
@@ -176,6 +175,11 @@ public class PasswordMessage extends ControlMessage {
     }
     return Objects.equals("authorized_user", fileType)
         || Objects.equals("service_account", fileType);
+  }
+
+  @Override
+  protected int getMaxMessageLength() {
+    return MAX_PASSWORD_LENGTH;
   }
 
   @Override

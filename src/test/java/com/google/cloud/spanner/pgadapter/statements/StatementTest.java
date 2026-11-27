@@ -706,6 +706,8 @@ public class StatementTest {
     when(server.getOptions()).thenReturn(options);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getMaxMessageLength())
+        .thenReturn(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
 
     WireMessage message = server.getMessageReader().create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());

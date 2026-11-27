@@ -32,12 +32,15 @@ import java.text.MessageFormat;
 @InternalApi
 public class CopyFailMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'f';
+  private static final String MESSAGE_NAME = "Copy Fail";
+  // 4-byte length + 1-byte null terminator for the error message.
+  private static final int MIN_MESSAGE_LENGTH = 5;
 
   private final CopyStatement statement;
   private final String errorMessage;
 
   public CopyFailMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
     this.errorMessage = this.readAll();
     this.statement = connection.getActiveCopyStatement();
   }
@@ -59,7 +62,7 @@ public class CopyFailMessage extends ControlMessage {
 
   @Override
   protected String getMessageName() {
-    return "Copy Fail";
+    return MESSAGE_NAME;
   }
 
   @Override

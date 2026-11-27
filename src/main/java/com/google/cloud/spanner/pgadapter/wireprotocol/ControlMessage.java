@@ -60,6 +60,7 @@ import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -87,11 +88,49 @@ public abstract class ControlMessage extends WireMessage {
     MANUALLY_CREATED_TOKEN
   }
 
+  /** Minimum valid length of any control message (the 4-byte length prefix itself). */
+  private static final int MIN_MESSAGE_LENGTH = 4;
+
   private final ManuallyCreatedToken manuallyCreatedToken;
 
   public ControlMessage(ConnectionHandler connection) throws IOException {
-    super(connection, connection.getConnectionMetadata().getInputStream().readInt());
+    this(connection, MIN_MESSAGE_LENGTH, "Control");
+  }
+
+  protected ControlMessage(ConnectionHandler connection, int minLength, String messageName)
+      throws IOException {
+    super(connection, readAndCheckLength(connection, minLength, messageName));
     this.manuallyCreatedToken = null;
+  }
+
+  protected ControlMessage(
+      ConnectionHandler connection, int minLength, int maxLength, String messageName)
+      throws IOException {
+    super(connection, readAndCheckLength(connection, minLength, maxLength, messageName, null));
+    this.manuallyCreatedToken = null;
+  }
+
+  private static int readAndCheckLength(
+      ConnectionHandler connection, int minLength, String messageName) throws IOException {
+    int maxLength = connection.getMaxMessageLength();
+    return readAndCheckLength(
+        connection, minLength, maxLength, messageName, getMaxMessageLengthHint(maxLength));
+  }
+
+  private static int readAndCheckLength(
+      ConnectionHandler connection,
+      int minLength,
+      int maxLength,
+      String messageName,
+      String maxExceededHint)
+      throws IOException {
+    int length = connection.getConnectionMetadata().getInputStream().readInt();
+    checkLengthRange(length, formatMessageType(messageName), minLength, maxLength, maxExceededHint);
+    return length;
+  }
+
+  private static String formatMessageType(String messageName) {
+    return messageName.toLowerCase(Locale.ROOT) + " message";
   }
 
   /** Constructor for manually created Control messages. */

@@ -48,6 +48,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -68,6 +69,12 @@ public final class ControlMessageTest {
   @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   @Mock private IntermediateStatement intermediateStatement;
   @Mock private ConnectionMetadata connectionMetadata;
+
+  @Before
+  public void setupConnectionHandler() {
+    when(connectionHandler.getMaxMessageLength())
+        .thenReturn(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+  }
 
   @Test
   public void testInsertResult() throws Exception {

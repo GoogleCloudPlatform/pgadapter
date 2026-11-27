@@ -26,13 +26,16 @@ import java.text.MessageFormat;
 public class SyncMessage extends ControlMessage {
 
   public static final char IDENTIFIER = 'S';
+  private static final String MESSAGE_NAME = "Sync";
+  // 4-byte length.
+  private static final int MESSAGE_LENGTH = 4;
 
   public SyncMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MESSAGE_LENGTH, MESSAGE_LENGTH, MESSAGE_NAME);
   }
 
   public SyncMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
-    super(connection, 4, manuallyCreatedToken);
+    super(connection, MESSAGE_LENGTH, manuallyCreatedToken);
   }
 
   @Override
@@ -42,7 +45,7 @@ public class SyncMessage extends ControlMessage {
 
   @Override
   protected String getMessageName() {
-    return "Sync";
+    return MESSAGE_NAME;
   }
 
   @Override

@@ -26,13 +26,16 @@ import java.text.MessageFormat;
 public class FlushMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'H';
+  private static final String MESSAGE_NAME = "Flush";
+  // 4-byte length.
+  private static final int MESSAGE_LENGTH = 4;
 
   public FlushMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+    super(connection, MESSAGE_LENGTH, MESSAGE_LENGTH, MESSAGE_NAME);
   }
 
   public FlushMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
-    super(connection, 4, manuallyCreatedToken);
+    super(connection, MESSAGE_LENGTH, manuallyCreatedToken);
   }
 
   @Override
@@ -42,7 +45,7 @@ public class FlushMessage extends ControlMessage {
 
   @Override
   protected String getMessageName() {
-    return "Flush";
+    return MESSAGE_NAME;
   }
 
   @Override

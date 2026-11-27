@@ -158,6 +158,7 @@ public class ConnectionHandler implements Runnable {
    */
   private final LinkedList<ParseMessage> skippedAutoDetectParseMessages = new LinkedList<>();
 
+  private final int maxMessageLength;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   private volatile CopyStatement activeCopyStatement;
 
@@ -172,6 +173,14 @@ public class ConnectionHandler implements Runnable {
     this.socket = socket;
     this.connectionId = incrementingConnectionId.incrementAndGet();
     this.spannerConnection = spannerConnection;
+    this.maxMessageLength =
+        server.getMaxMessageLength() > 0
+            ? server.getMaxMessageLength()
+            : OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH;
+  }
+
+  public int getMaxMessageLength() {
+    return this.maxMessageLength;
   }
 
   void start() {
@@ -715,6 +724,29 @@ public class ConnectionHandler implements Runnable {
         handleUnexpectedDisconnect(ioException);
       } else {
         this.handleError(PGExceptionFactory.toPGException(ioException));
+      }
+    } catch (PGException pgException) {
+      if (pgException.getSeverity() == Severity.FATAL) {
+        if (this.status == ConnectionStatus.TERMINATED) {
+          return;
+        }
+        logger.log(
+            Level.WARNING,
+            pgException,
+            () ->
+                String.format(
+                    "Fatal error on connection handler with ID %s: %s", getName(), pgException));
+        try {
+          new ErrorResponse(this, pgException).send();
+        } catch (Exception ignore) {
+        }
+        if (this.status == ConnectionStatus.COPY_IN) {
+          handleUnexpectedDisconnect(pgException);
+        } else {
+          terminate();
+        }
+      } else {
+        this.handleError(pgException);
       }
     } catch (Exception exception) {
       this.handleError(PGExceptionFactory.toPGException(exception));

@@ -17,8 +17,11 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.TestOptionsMetadataBuilder;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CancelMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.GSSENCRequestMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
@@ -1915,5 +1918,145 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
         }
       }
     }
+  }
+
+  @Test(timeout = 30_000L)
+  public void testQueryMessageLengthTooLarge_terminatesConnection() throws IOException {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      sendStartupAndAwaitReady(outputStream, inputStream);
+
+      // Send 5-byte QueryMessage header claiming ~2 GB length without sending any payload.
+      outputStream.writeByte('Q');
+      outputStream.writeInt(Integer.MAX_VALUE);
+      outputStream.flush();
+
+      assertFatalProtocolViolationAndEof(
+          inputStream, "invalid length of query message", "max_message_length", "100000000 bytes");
+    }
+  }
+
+  @Test(timeout = 30_000L)
+  public void testQueryMessageLengthTooSmall_terminatesConnection() throws IOException {
+    for (int invalidLength : new int[] {3, -1}) {
+      try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+          DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        sendStartupAndAwaitReady(outputStream, inputStream);
+
+        outputStream.writeByte('Q');
+        outputStream.writeInt(invalidLength);
+        outputStream.flush();
+
+        assertFatalProtocolViolationAndEof(
+            inputStream, "invalid length of query message: " + invalidLength);
+      }
+    }
+  }
+
+  @Test(timeout = 30_000L)
+  public void testCustomMaxMessageLength_endToEnd() throws Exception {
+    TestOptionsMetadataBuilder builder = new TestOptionsMetadataBuilder();
+    builder
+        .setProject("p")
+        .setInstance("i")
+        .setDatabase("d")
+        .setCredentials(NoCredentials.getInstance())
+        .setEnableEndToEndTracing(true)
+        .setMaxMessageLength(32)
+        .setPort(0);
+    builder.setUsePlainText();
+    builder.setEndpoint(String.format("localhost:%d", spannerServer.getPort()));
+    OptionsMetadata customOptions = builder.build();
+    ProxyServer customServer = new ProxyServer(customOptions, OpenTelemetry.noop());
+    customServer.startServer();
+    try {
+      try (Socket socket = new Socket("localhost", customServer.getLocalPort());
+          DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        // Normal StartupMessage (>32 bytes) succeeds because StartupMessage uses
+        // MAX_STARTUP_PACKET_LENGTH rather than max_message_length.
+        sendStartupWithParamsAndAwaitReady(outputStream, inputStream);
+
+        // Query within custom 32-byte limit (4 + 9 = 13 bytes) succeeds cleanly without
+        // ErrorResponse.
+        byte[] select1 = "SELECT 1\0".getBytes(StandardCharsets.UTF_8);
+        outputStream.writeByte('Q');
+        outputStream.writeInt(4 + select1.length);
+        outputStream.write(select1);
+        outputStream.flush();
+        assertTrue(drainUntilReadyExpectNoError(inputStream));
+
+        // Query claiming 33 bytes exceeds custom 32-byte limit and terminates immediately.
+        outputStream.writeByte('Q');
+        outputStream.writeInt(33);
+        outputStream.flush();
+
+        assertFatalProtocolViolationAndEof(
+            inputStream, "invalid length of query message: 33", "32 bytes", "max_message_length");
+      }
+    } finally {
+      customServer.stopServer();
+    }
+  }
+
+  private static void sendStartupAndAwaitReady(
+      DataOutputStream outputStream, DataInputStream inputStream) throws IOException {
+    outputStream.writeInt(17);
+    outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+    outputStream.writeBytes("user");
+    outputStream.writeByte(0);
+    outputStream.writeBytes("foo");
+    outputStream.writeByte(0);
+    outputStream.flush();
+    drainUntilReadyExpectNoError(inputStream);
+  }
+
+  private static void sendStartupWithParamsAndAwaitReady(
+      DataOutputStream outputStream, DataInputStream inputStream) throws IOException {
+    String params =
+        "user\0foo\0database\0d\0client_encoding\0UTF8\0application_name\0pgadapter-test\0\0";
+    byte[] paramBytes = params.getBytes(StandardCharsets.UTF_8);
+    outputStream.writeInt(8 + paramBytes.length);
+    outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+    outputStream.write(paramBytes);
+    outputStream.flush();
+    drainUntilReadyExpectNoError(inputStream);
+  }
+
+  private static boolean drainUntilReadyExpectNoError(DataInputStream inputStream)
+      throws IOException {
+    boolean sawCommandComplete = false;
+    while (true) {
+      byte message = inputStream.readByte();
+      int length = inputStream.readInt();
+      inputStream.readFully(new byte[length - 4]);
+      if (message == 'E') {
+        throw new AssertionError("Unexpected ErrorResponse from server");
+      }
+      if (message == 'C') {
+        sawCommandComplete = true;
+      }
+      if (message == 'Z') {
+        return sawCommandComplete;
+      }
+    }
+  }
+
+  private static void assertFatalProtocolViolationAndEof(
+      DataInputStream inputStream, String... expectedSubstrings) throws IOException {
+    assertEquals('E', inputStream.readByte());
+    int length = inputStream.readInt();
+    byte[] errorBytes = new byte[length - 4];
+    inputStream.readFully(errorBytes);
+    String errorPayload = new String(errorBytes, StandardCharsets.UTF_8);
+    assertTrue(errorPayload.contains("FATAL"));
+    assertTrue(errorPayload.contains("08P01"));
+    for (String expected : expectedSubstrings) {
+      assertTrue(errorPayload.contains(expected));
+    }
+    // Connection must be terminated immediately (no ReadyForQuery, EOF next).
+    assertEquals(-1, inputStream.read());
   }
 }

@@ -39,6 +39,8 @@ import java.util.Map;
 @InternalApi
 public abstract class BootstrapMessage extends WireMessage {
 
+  // 4-byte length + 4-byte protocol version/request code.
+  static final int MIN_STARTUP_PACKET_LENGTH = 8;
   static final int MAX_STARTUP_PACKET_LENGTH = 10_000;
 
   public BootstrapMessage(ConnectionHandler connection, int length) {
@@ -55,24 +57,34 @@ public abstract class BootstrapMessage extends WireMessage {
    */
   public static BootstrapMessage create(ConnectionHandler connection) throws Exception {
     int length = connection.getConnectionMetadata().getInputStream().readInt();
-    checkLengthRange(length, "startup packet", 8, MAX_STARTUP_PACKET_LENGTH);
+    checkLengthRange(
+        length, "startup packet", MIN_STARTUP_PACKET_LENGTH, MAX_STARTUP_PACKET_LENGTH);
     int protocol = connection.getConnectionMetadata().getInputStream().readInt();
     switch (protocol) {
       case SSLMessage.IDENTIFIER:
-        checkLengthEquals(length, "SSL request", 8);
+        checkLengthEquals(length, "SSL request", SSLMessage.MESSAGE_LENGTH);
         return new SSLMessage(connection);
       case GSSENCRequestMessage.IDENTIFIER:
-        checkLengthEquals(length, "GSSAPI request", 8);
+        checkLengthEquals(length, "GSSAPI request", GSSENCRequestMessage.MESSAGE_LENGTH);
         return new GSSENCRequestMessage(connection);
       case StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER:
       case StartupMessage.PROTOCOL_VERSION_3_2_IDENTIFIER:
         return new StartupMessage(connection, length, protocol);
       case CancelMessage.IDENTIFIER:
-        checkLengthIn(length, "cancel request", 16, 44);
+        checkLengthIn(
+            length,
+            "cancel request",
+            CancelMessage.V30_MESSAGE_LENGTH,
+            CancelMessage.V32_MESSAGE_LENGTH);
         return new CancelMessage(connection, length);
       default:
         throw new IllegalStateException("Unknown message");
     }
+  }
+
+  @Override
+  protected int getMaxMessageLength() {
+    return MAX_STARTUP_PACKET_LENGTH;
   }
 
   /**

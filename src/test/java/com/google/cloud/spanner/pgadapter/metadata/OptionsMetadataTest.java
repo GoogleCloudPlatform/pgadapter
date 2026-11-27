@@ -1038,4 +1038,77 @@ public class OptionsMetadataTest {
     assertTrue(options.hasDefaultTimeZone());
     assertEquals("Europe/London", options.getDefaultTimeZone());
   }
+
+  @Test
+  public void testDefaultMaxMessageLength() {
+    OptionsMetadata options =
+        new OptionsMetadata(new String[] {"-p", "p", "-i", "i", "-c", "credentials.json"});
+    assertEquals(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH, options.getMaxMessageLength());
+  }
+
+  @Test
+  public void testCustomMaxMessageLength() {
+    OptionsMetadata cliOptions =
+        new OptionsMetadata(
+            new String[] {
+              "-p", "p", "-i", "i", "-max_message_length", "200000000", "-c", "credentials.json"
+            });
+    assertEquals(200_000_000, cliOptions.getMaxMessageLength());
+
+    OptionsMetadata minBoundaryOptions =
+        new OptionsMetadata(
+            new String[] {
+              "-p", "p", "-i", "i", "-max_message_length", "4", "-c", "credentials.json"
+            });
+    assertEquals(4, minBoundaryOptions.getMaxMessageLength());
+
+    OptionsMetadata maxBoundaryOptions =
+        OptionsMetadata.newBuilder()
+            .setProject("p")
+            .setInstance("i")
+            .setCredentials(NoCredentials.getInstance())
+            .setMaxMessageLength(OptionsMetadata.MAX_ALLOWED_MESSAGE_LENGTH)
+            .build();
+    assertEquals(
+        OptionsMetadata.MAX_ALLOWED_MESSAGE_LENGTH, maxBoundaryOptions.getMaxMessageLength());
+
+    OptionsMetadata builderOptions =
+        OptionsMetadata.newBuilder()
+            .setProject("p")
+            .setInstance("i")
+            .setCredentials(NoCredentials.getInstance())
+            .setMaxMessageLength(1024)
+            .build();
+    assertEquals(1024, builderOptions.getMaxMessageLength());
+  }
+
+  @Test
+  public void testInvalidMaxMessageLength() {
+    for (String invalidCliValue :
+        new String[] {"abc", "0", "-1", "3", String.valueOf(Integer.MAX_VALUE)}) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              new OptionsMetadata(
+                  new String[] {
+                    "-p",
+                    "p",
+                    "-i",
+                    "i",
+                    "-max_message_length",
+                    invalidCliValue,
+                    "-c",
+                    "credentials.json"
+                  }));
+    }
+    assertThrows(
+        IllegalArgumentException.class, () -> OptionsMetadata.newBuilder().setMaxMessageLength(-1));
+    assertThrows(
+        IllegalArgumentException.class, () -> OptionsMetadata.newBuilder().setMaxMessageLength(0));
+    assertThrows(
+        IllegalArgumentException.class, () -> OptionsMetadata.newBuilder().setMaxMessageLength(3));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> OptionsMetadata.newBuilder().setMaxMessageLength(Integer.MAX_VALUE));
+  }
 }

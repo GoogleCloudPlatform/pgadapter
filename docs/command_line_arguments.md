@@ -116,6 +116,10 @@
 -max_backlog <maximum number of backlog connections>
   * Maximum queue length of incoming pending connections. Defaults to 1000.
 
+-max_message_length <maximum wire message length in bytes>
+  * Maximum allowed length in bytes for an incoming PostgreSQL wire-protocol control message.
+    Defaults to 100000000 (100 MB). Must be between 4 and 2147483639 bytes.
+
 -e <endpoint>
   * The Cloud Spanner endpoint that PGAdapter should connect to. Defaults to https://spanner.googleapis.com.
 
