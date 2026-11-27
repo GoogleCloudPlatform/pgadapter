@@ -47,6 +47,9 @@ public class MessageReader {
    * @throws Exception If construction or reading fails.
    */
   public ControlMessage create(ConnectionHandler connection) throws Exception {
+    if (connection.getStatus() == ConnectionStatus.UNAUTHENTICATED) {
+      throw WireMessage.protocolViolation("Cannot process control message before authentication");
+    }
     boolean validMessage = true;
     char nextMsg = readNextMsgIdentifier(connection);
     try {
@@ -139,19 +142,31 @@ public class MessageReader {
 
   /**
    * Read the format codes from the current message (useful for both input and output format codes).
-   *
-   * @param input The data stream for the connection.
-   * @return A list of format codes.
-   * @throws Exception If reading fails in any way.
    */
-  static short[] getFormatCodes(DataInputStream input) throws Exception {
+  static short[] getFormatCodes(DataInputStream input, int remainingBytes, int trailingMinBytes)
+      throws Exception {
+    if (remainingBytes < 2L + trailingMinBytes) {
+      throw WireMessage.protocolViolation(
+          String.format("invalid remaining length for format codes: %d", remainingBytes));
+    }
     short numberOfFormatCodes = input.readShort();
+    if (numberOfFormatCodes < 0) {
+      throw WireMessage.protocolViolation(
+          String.format("invalid number of format codes: %d", numberOfFormatCodes));
+    }
+    long availableForFormatCodes = (long) remainingBytes - 2L - trailingMinBytes;
+    if (2L * numberOfFormatCodes > availableForFormatCodes) {
+      throw WireMessage.protocolViolation(
+          String.format(
+              "number of format codes (%d) exceeds remaining message length (%d)",
+              numberOfFormatCodes, availableForFormatCodes));
+    }
     if (numberOfFormatCodes == 0) {
       return NO_FORMAT_CODES;
     }
     short[] formatCodes = new short[numberOfFormatCodes];
-    for (int i = 0; i < numberOfFormatCodes; i++) {
-      formatCodes[i] = input.readShort();
+    for (int index = 0; index < numberOfFormatCodes; index++) {
+      formatCodes[index] = input.readShort();
     }
     return formatCodes;
   }

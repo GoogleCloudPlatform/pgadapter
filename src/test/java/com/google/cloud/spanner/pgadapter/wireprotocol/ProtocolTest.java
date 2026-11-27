@@ -426,11 +426,13 @@ public class ProtocolTest {
     String payload =
         "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
 
-    byte[] length = intToBytes(4 + statementName.length() + payload.length() + 1);
+    byte[] parameterCount = {0, 0};
+    byte[] length =
+        intToBytes(4 + statementName.length() + payload.length() + parameterCount.length);
 
     byte[] value =
         Bytes.concat(
-            messageMetadata, length, statementName.getBytes(), payload.getBytes(), intToBytes(0));
+            messageMetadata, length, statementName.getBytes(), payload.getBytes(), parameterCount);
 
     int[] expectedParameterDataTypes = new int[0];
     String expectedSQL =

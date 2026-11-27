@@ -22,9 +22,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -95,6 +97,7 @@ public class WireMessageTest {
     when(metadata.getInputStream()).thenReturn(inputStream);
     when(metadata.getOutputStream()).thenReturn(outputStream);
     when(connection.getMaxMessageLength()).thenReturn(OptionsMetadata.DEFAULT_MAX_MESSAGE_LENGTH);
+    when(connection.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
     return connection;
   }
 
@@ -883,5 +886,428 @@ public class WireMessageTest {
     when(connection.getMaxMessageLength()).thenReturn(16);
     PasswordMessage passwordMessage = new PasswordMessage(connection, Collections.emptyMap());
     assertEquals("0123456789abcdef_secret_password", passwordMessage.getPassword());
+  }
+
+  private void assertFatalProtocolViolation(ThrowingRunnable action) {
+    PGException exception = assertThrows(PGException.class, action::run);
+    assertEquals(Severity.FATAL, exception.getSeverity());
+    assertEquals(SQLState.ProtocolViolation, exception.getSQLState());
+  }
+
+  @Test
+  public void testReadString_longStringWithoutMarkBufferExpansion() throws IOException {
+    byte[] rawString = new byte[512];
+    Arrays.fill(rawString, (byte) 'x');
+    byte[] wireBytes = new byte[rawString.length + 1];
+    System.arraycopy(rawString, 0, wireBytes, 0, rawString.length);
+    ConnectionHandler connection = createConnectionHandler(wireBytes);
+    TestWireMessage message = new TestWireMessage(connection, 4 + wireBytes.length);
+
+    assertEquals(new String(rawString, StandardCharsets.UTF_8), message.readString());
+  }
+
+  @Test
+  public void testGetParameters_validNullEmptyAndSmallValues() throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeShort(3);
+    dataOutputStream.writeInt(-1);
+    dataOutputStream.writeInt(0);
+    dataOutputStream.writeInt(5);
+    dataOutputStream.write("hello".getBytes(StandardCharsets.UTF_8));
+    byte[] payload = outputStream.toByteArray();
+
+    byte[][] parameters =
+        WireMessage.getParameters(
+            new DataInputStream(new ByteArrayInputStream(payload)), payload.length, 0);
+    assertEquals(3, parameters.length);
+    assertNull(parameters[0]);
+    assertArrayEquals(new byte[0], parameters[1]);
+    assertArrayEquals("hello".getBytes(StandardCharsets.UTF_8), parameters[2]);
+  }
+
+  @Test
+  public void testGetParameters_chunkBoundariesAndLargeChunkedParameter() throws Exception {
+    for (int size :
+        new int[] {
+          WireMessage.READ_CHUNK_SIZE,
+          WireMessage.READ_CHUNK_SIZE + 1,
+          WireMessage.READ_CHUNK_SIZE * 3 + 123
+        }) {
+      byte[] expectedBytes = new byte[size];
+      for (int index = 0; index < expectedBytes.length; index++) {
+        expectedBytes[index] = (byte) (index * 31 + 7);
+      }
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+      DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+      dataOutputStream.writeShort(1);
+      dataOutputStream.writeInt(expectedBytes.length);
+      dataOutputStream.write(expectedBytes);
+      byte[] payload = outputStream.toByteArray();
+
+      byte[][] parameters =
+          WireMessage.getParameters(
+              new DataInputStream(new ByteArrayInputStream(payload)), payload.length, 0);
+      assertEquals(1, parameters.length);
+      assertArrayEquals(expectedBytes, parameters[0]);
+    }
+  }
+
+  @Test
+  public void testGetParameters_remainingLengthTooSmall() {
+    DataInputStream emptyInput = new DataInputStream(new ByteArrayInputStream(new byte[0]));
+    assertFatalProtocolViolation(() -> WireMessage.getParameters(emptyInput, 3, 2));
+  }
+
+  @Test
+  public void testGetParameters_negativeParameterCount() throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeShort(-1);
+    DataInputStream inputStream =
+        new DataInputStream(new ByteArrayInputStream(outputStream.toByteArray()));
+
+    assertFatalProtocolViolation(() -> WireMessage.getParameters(inputStream, 100, 0));
+  }
+
+  @Test
+  public void testGetParameters_negativeParameterLength() throws Exception {
+    for (int invalidLength : new int[] {-2, -100, Integer.MIN_VALUE}) {
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+      DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+      dataOutputStream.writeShort(1);
+      dataOutputStream.writeInt(invalidLength);
+      DataInputStream inputStream =
+          new DataInputStream(new ByteArrayInputStream(outputStream.toByteArray()));
+
+      assertFatalProtocolViolation(() -> WireMessage.getParameters(inputStream, 100, 0));
+    }
+  }
+
+  @Test
+  public void testGetParameters_parameterCountExceedsRemainingBytes() throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeShort(3);
+    DataInputStream inputStream =
+        new DataInputStream(new ByteArrayInputStream(outputStream.toByteArray()));
+
+    assertFatalProtocolViolation(() -> WireMessage.getParameters(inputStream, 15, 2));
+  }
+
+  @Test
+  public void testGetParameters_parameterLengthExceedsRemainingBytes() throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeShort(1);
+    dataOutputStream.writeInt(Integer.MAX_VALUE);
+    DataInputStream inputStream =
+        new DataInputStream(new ByteArrayInputStream(outputStream.toByteArray()));
+
+    assertFatalProtocolViolation(() -> WireMessage.getParameters(inputStream, 8, 2));
+  }
+
+  @Test
+  public void testGetParameters_runningTotalExceedsRemainingBytes() throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeShort(2);
+    dataOutputStream.writeInt(4);
+    dataOutputStream.writeInt(1234);
+    dataOutputStream.writeInt(5);
+    byte[] payload = outputStream.toByteArray();
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(payload));
+    assertFatalProtocolViolation(() -> WireMessage.getParameters(inputStream, 20, 2));
+  }
+
+  @Test
+  public void testGetParameters_exactRemainingBoundarySucceedsAndPlusOneFails() throws Exception {
+    ByteArrayOutputStream validOutputStream = new ByteArrayOutputStream();
+    DataOutputStream validDataOutputStream = new DataOutputStream(validOutputStream);
+    validDataOutputStream.writeShort(1);
+    validDataOutputStream.writeInt(4);
+    validDataOutputStream.writeInt(99);
+    // 2 (count) + 4 (len) + 4 (data) + 2 (trailingMinBytes) = 12.
+    byte[][] valid =
+        WireMessage.getParameters(
+            new DataInputStream(new ByteArrayInputStream(validOutputStream.toByteArray())), 12, 2);
+    assertEquals(1, valid.length);
+    assertEquals(4, valid[0].length);
+
+    ByteArrayOutputStream invalidOutputStream = new ByteArrayOutputStream();
+    DataOutputStream invalidDataOutputStream = new DataOutputStream(invalidOutputStream);
+    invalidDataOutputStream.writeShort(1);
+    invalidDataOutputStream.writeInt(5);
+    DataInputStream invalidInput =
+        new DataInputStream(new ByteArrayInputStream(invalidOutputStream.toByteArray()));
+    assertFatalProtocolViolation(() -> WireMessage.getParameters(invalidInput, 12, 2));
+  }
+
+  @Test
+  public void testGetParameters_truncatedLargeParameterFailsWithEofWithoutPreallocating()
+      throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeShort(1);
+    dataOutputStream.writeInt(50_000_000);
+    dataOutputStream.write(new byte[64]);
+    DataInputStream inputStream =
+        new DataInputStream(new ByteArrayInputStream(outputStream.toByteArray()));
+
+    assertThrows(EOFException.class, () -> WireMessage.getParameters(inputStream, 60_000_000, 0));
+  }
+
+  private ConnectionHandler createAuthenticatedConnectionHandler(byte[] inputBytes) {
+    ConnectionHandler connection = createConnectionHandler(inputBytes);
+    when(connection.getExtendedQueryProtocolHandler())
+        .thenReturn(mock(ExtendedQueryProtocolHandler.class));
+    return connection;
+  }
+
+  @Test
+  public void testBindMessage_oversizedParameterLengthRejectedBeforeReading() throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeInt(16);
+    dataOutputStream.writeByte(0); // portalName = ""
+    dataOutputStream.writeByte(0); // statementName = ""
+    dataOutputStream.writeShort(0); // formatCodes = 0
+    dataOutputStream.writeShort(1); // parameters = 1
+    dataOutputStream.writeInt(Integer.MAX_VALUE); // malicious 2 GB parameter length
+    ConnectionHandler connection = createAuthenticatedConnectionHandler(outputStream.toByteArray());
+
+    assertFatalProtocolViolation(() -> new BindMessage(connection));
+  }
+
+  @Test
+  public void testBindMessage_unterminatedStringsExceedFrame() throws Exception {
+    // Unterminated portalName at maxBytes == 1
+    ByteArrayOutputStream portalOutputStream = new ByteArrayOutputStream();
+    DataOutputStream portalDataOutputStream = new DataOutputStream(portalOutputStream);
+    portalDataOutputStream.writeInt(12);
+    portalDataOutputStream.writeBytes("too-long-portal");
+    assertFatalProtocolViolation(
+        () ->
+            new BindMessage(
+                createAuthenticatedConnectionHandler(portalOutputStream.toByteArray())));
+
+    // Unterminated portalName at maxBytes > 1 (16 - 4 - 7 = 5 bytes max, 5 non-null bytes sent)
+    ByteArrayOutputStream multiBytePortalOutputStream = new ByteArrayOutputStream();
+    DataOutputStream multiBytePortalDataOutputStream =
+        new DataOutputStream(multiBytePortalOutputStream);
+    multiBytePortalDataOutputStream.writeInt(16);
+    multiBytePortalDataOutputStream.writeBytes("abcde");
+    assertFatalProtocolViolation(
+        () ->
+            new BindMessage(
+                createAuthenticatedConnectionHandler(multiBytePortalOutputStream.toByteArray())));
+
+    // Unterminated statementName
+    ByteArrayOutputStream statementOutputStream = new ByteArrayOutputStream();
+    DataOutputStream statementDataOutputStream = new DataOutputStream(statementOutputStream);
+    statementDataOutputStream.writeInt(12);
+    statementDataOutputStream.writeByte(0); // portalName = ""
+    statementDataOutputStream.writeBytes("too-long-statement");
+    assertFatalProtocolViolation(
+        () ->
+            new BindMessage(
+                createAuthenticatedConnectionHandler(statementOutputStream.toByteArray())));
+  }
+
+  @Test
+  public void testBindMessage_invalidFormatCodesAndTrailingBytes() throws Exception {
+    // Negative format code count.
+    ByteArrayOutputStream negativeFormatStream = new ByteArrayOutputStream();
+    DataOutputStream negativeFormatOutputStream = new DataOutputStream(negativeFormatStream);
+    negativeFormatOutputStream.writeInt(12);
+    negativeFormatOutputStream.writeByte(0);
+    negativeFormatOutputStream.writeByte(0);
+    negativeFormatOutputStream.writeShort(-1);
+    assertFatalProtocolViolation(
+        () ->
+            new BindMessage(
+                createAuthenticatedConnectionHandler(negativeFormatStream.toByteArray())));
+
+    // Result format code count exceeding remaining length.
+    ByteArrayOutputStream oversizedResultFormatStream = new ByteArrayOutputStream();
+    DataOutputStream oversizedResultFormatOutputStream =
+        new DataOutputStream(oversizedResultFormatStream);
+    oversizedResultFormatOutputStream.writeInt(12);
+    oversizedResultFormatOutputStream.writeByte(0);
+    oversizedResultFormatOutputStream.writeByte(0);
+    oversizedResultFormatOutputStream.writeShort(0);
+    oversizedResultFormatOutputStream.writeShort(0);
+    oversizedResultFormatOutputStream.writeShort(1);
+    assertFatalProtocolViolation(
+        () ->
+            new BindMessage(
+                createAuthenticatedConnectionHandler(oversizedResultFormatStream.toByteArray())));
+
+    // Trailing unused bytes in declared frame length.
+    ByteArrayOutputStream trailingBytesStream = new ByteArrayOutputStream();
+    DataOutputStream trailingBytesOutputStream = new DataOutputStream(trailingBytesStream);
+    trailingBytesOutputStream.writeInt(14);
+    trailingBytesOutputStream.writeByte(0);
+    trailingBytesOutputStream.writeByte(0);
+    trailingBytesOutputStream.writeShort(0);
+    trailingBytesOutputStream.writeShort(0);
+    trailingBytesOutputStream.writeShort(0);
+    trailingBytesOutputStream.writeShort(0);
+    assertFatalProtocolViolation(
+        () ->
+            new BindMessage(
+                createAuthenticatedConnectionHandler(trailingBytesStream.toByteArray())));
+  }
+
+  @Test
+  public void testBindMessage_honorsCustomMaxMessageLength() throws Exception {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeInt(24);
+    dataOutputStream.writeByte(0);
+    dataOutputStream.writeByte(0);
+    dataOutputStream.writeShort(0);
+    dataOutputStream.writeShort(1);
+    dataOutputStream.writeInt(8);
+    dataOutputStream.writeLong(42L);
+    dataOutputStream.writeShort(0);
+    byte[] bindBytes = outputStream.toByteArray();
+
+    ConnectionHandler smallLimitConnection = createAuthenticatedConnectionHandler(bindBytes);
+    when(smallLimitConnection.getMaxMessageLength()).thenReturn(20);
+    assertFatalProtocolViolation(() -> new BindMessage(smallLimitConnection));
+
+    ConnectionHandler exactLimitConnection = createAuthenticatedConnectionHandler(bindBytes);
+    when(exactLimitConnection.getMaxMessageLength()).thenReturn(24);
+    BindMessage bindMessage = new BindMessage(exactLimitConnection);
+    assertEquals(1, bindMessage.getParameters().length);
+  }
+
+  @Test
+  public void testFunctionCallMessage_argumentAndFormatCodeBounds() throws Exception {
+    // Oversized parameter length inside a small FunctionCall frame.
+    ByteArrayOutputStream oversizedArgumentStream = new ByteArrayOutputStream();
+    DataOutputStream oversizedArgumentOutputStream = new DataOutputStream(oversizedArgumentStream);
+    oversizedArgumentOutputStream.writeInt(18);
+    oversizedArgumentOutputStream.writeInt(1); // functionID
+    oversizedArgumentOutputStream.writeShort(0); // argumentFormatCodes
+    oversizedArgumentOutputStream.writeShort(1); // arguments
+    oversizedArgumentOutputStream.writeInt(Integer.MAX_VALUE); // malicious 2 GB argument length
+    assertFatalProtocolViolation(
+        () ->
+            new FunctionCallMessage(
+                createConnectionHandler(oversizedArgumentStream.toByteArray())));
+
+    // Argument format codes exceeding remaining frame length.
+    ByteArrayOutputStream oversizedFormatCodesStream = new ByteArrayOutputStream();
+    DataOutputStream oversizedFormatCodesOutputStream =
+        new DataOutputStream(oversizedFormatCodesStream);
+    oversizedFormatCodesOutputStream.writeInt(14);
+    oversizedFormatCodesOutputStream.writeInt(1);
+    oversizedFormatCodesOutputStream.writeShort(2);
+    assertFatalProtocolViolation(
+        () ->
+            new FunctionCallMessage(
+                createConnectionHandler(oversizedFormatCodesStream.toByteArray())));
+
+    // Trailing bytes mismatch.
+    ByteArrayOutputStream trailingStream = new ByteArrayOutputStream();
+    DataOutputStream trailingOutputStream = new DataOutputStream(trailingStream);
+    trailingOutputStream.writeInt(16);
+    trailingOutputStream.writeInt(1);
+    trailingOutputStream.writeShort(0);
+    trailingOutputStream.writeShort(0);
+    trailingOutputStream.writeShort(0);
+    trailingOutputStream.writeShort(0);
+    assertFatalProtocolViolation(
+        () -> new FunctionCallMessage(createConnectionHandler(trailingStream.toByteArray())));
+  }
+
+  @Test
+  public void testParseMessage_boundsAndTrailingBytes() throws Exception {
+    // Negative parameter count.
+    ByteArrayOutputStream negativeCountStream = new ByteArrayOutputStream();
+    DataOutputStream negativeCountOutputStream = new DataOutputStream(negativeCountStream);
+    negativeCountOutputStream.writeInt(8);
+    negativeCountOutputStream.writeByte(0);
+    negativeCountOutputStream.writeByte(0);
+    negativeCountOutputStream.writeShort(-1);
+    assertFatalProtocolViolation(
+        () ->
+            new ParseMessage(
+                createAuthenticatedConnectionHandler(negativeCountStream.toByteArray())));
+
+    // Parameter count exceeding remaining bytes.
+    ByteArrayOutputStream oversizedCountStream = new ByteArrayOutputStream();
+    DataOutputStream oversizedCountOutputStream = new DataOutputStream(oversizedCountStream);
+    oversizedCountOutputStream.writeInt(8);
+    oversizedCountOutputStream.writeByte(0);
+    oversizedCountOutputStream.writeByte(0);
+    oversizedCountOutputStream.writeShort(1);
+    assertFatalProtocolViolation(
+        () ->
+            new ParseMessage(
+                createAuthenticatedConnectionHandler(oversizedCountStream.toByteArray())));
+
+    // Trailing unused bytes in declared frame length.
+    ByteArrayOutputStream trailingStream = new ByteArrayOutputStream();
+    DataOutputStream trailingOutputStream = new DataOutputStream(trailingStream);
+    trailingOutputStream.writeInt(10);
+    trailingOutputStream.writeByte(0);
+    trailingOutputStream.writeByte(0);
+    trailingOutputStream.writeShort(0);
+    trailingOutputStream.writeShort(0);
+    assertFatalProtocolViolation(
+        () -> new ParseMessage(createAuthenticatedConnectionHandler(trailingStream.toByteArray())));
+  }
+
+  @Test
+  public void testMessageReader_rejectsUnauthenticatedConnection() {
+    ConnectionHandler connection = createConnectionHandler(new byte[] {'F', 0, 0, 0, 14});
+    when(connection.getStatus()).thenReturn(ConnectionStatus.UNAUTHENTICATED);
+    MessageReader reader = new MessageReader(connection.getServer().getOptions());
+
+    assertFatalProtocolViolation(() -> reader.create(connection));
+  }
+
+  @Test
+  public void testPasswordMessage_terminatesConnectionOnFailedAuth() throws Exception {
+    for (boolean shouldAuthenticate : new boolean[] {true, false}) {
+      byte[] passwordBytes = "invalid-password\0".getBytes(StandardCharsets.UTF_8);
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+      DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+      dataOutputStream.writeInt(4 + passwordBytes.length);
+      dataOutputStream.write(passwordBytes);
+
+      ConnectionHandler connection = createConnectionHandler(outputStream.toByteArray());
+      when(connection.getServer().getOptions().shouldAuthenticate()).thenReturn(shouldAuthenticate);
+
+      PasswordMessage passwordMessage =
+          new PasswordMessage(connection, Collections.singletonMap("user", "test-user"));
+      passwordMessage.sendPayload();
+
+      verify(connection).setStatus(ConnectionStatus.TERMINATED);
+    }
+  }
+
+  @Test
+  public void testBindMessage_portalNameExceedingInitialBufferSize() throws Exception {
+    byte[] longPortalNameBytes = new byte[65];
+    Arrays.fill(longPortalNameBytes, (byte) 'p');
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    dataOutputStream.writeInt(12 + longPortalNameBytes.length);
+    dataOutputStream.write(longPortalNameBytes);
+    dataOutputStream.writeByte(0); // portalName null terminator
+    dataOutputStream.writeByte(0); // statementName = ""
+    dataOutputStream.writeShort(0); // formatCodes = 0
+    dataOutputStream.writeShort(0); // parameters = 0
+    dataOutputStream.writeShort(0); // resultFormatCodes = 0
+
+    ConnectionHandler connection = createAuthenticatedConnectionHandler(outputStream.toByteArray());
+    BindMessage bindMessage = new BindMessage(connection);
+    assertEquals(0, bindMessage.getParameters().length);
+    assertEquals(0, bindMessage.getFormatCodes().length);
   }
 }

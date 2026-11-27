@@ -40,9 +40,10 @@ public class FunctionCallMessage extends ControlMessage {
 
   public FunctionCallMessage(ConnectionHandler connection) throws Exception {
     super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
-    this.functionID = this.inputStream.readInt();
-    this.argumentFormatCodes = MessageReader.getFormatCodes(this.inputStream);
-    this.arguments = getParameters(this.inputStream);
+    this.functionID = readInt("function call message");
+    this.argumentFormatCodes = readFormatCodes(4);
+    this.arguments = readParameters(2);
+    checkRemainingBytes(2, "function call message");
     this.resultFormatCode = this.inputStream.readShort();
   }
 

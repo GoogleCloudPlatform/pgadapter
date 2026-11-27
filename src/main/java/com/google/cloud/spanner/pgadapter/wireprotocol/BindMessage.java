@@ -51,27 +51,26 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   /** Constructor for Bind messages that are received from the front-end. */
   public BindMessage(ConnectionHandler connection) throws Exception {
     super(connection, MIN_MESSAGE_LENGTH, MESSAGE_NAME);
-    this.portalName = this.readString();
-    this.statementName = this.readString();
-    this.formatCodes = MessageReader.getFormatCodes(this.inputStream);
-    this.parameters = getParameters(this.inputStream);
-    this.resultFormatCodes = MessageReader.getFormatCodes(this.inputStream);
-    IntermediatePortalStatement portalStatement;
-    boolean bindException = false;
-    try {
-      IntermediatePreparedStatement statement = connection.getStatement(statementName);
-      portalStatement =
-          statement.createPortal(
-              this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
-    } catch (Exception exception) {
-      bindException = true;
-      portalStatement =
-          new InvalidStatement(
-              connection, connection.getServer().getOptions(), this.portalName, exception);
-    }
-    this.hasBindException = bindException;
-    this.statement = portalStatement;
+    this.portalName = readBoundedString(7, "bind message");
+    this.statementName = readBoundedString(6, "bind message");
+    this.formatCodes = readFormatCodes(4);
+    this.parameters = readParameters(2);
+    this.resultFormatCodes = readFormatCodes(0);
+    checkRemainingBytes(0, "bind message");
+    this.statement = createPortalStatement(connection);
+    this.hasBindException = this.statement instanceof InvalidStatement;
     this.connection.registerPortal(this.portalName, this.statement);
+  }
+
+  private IntermediatePortalStatement createPortalStatement(ConnectionHandler connection) {
+    try {
+      IntermediatePreparedStatement preparedStatement = connection.getStatement(this.statementName);
+      return preparedStatement.createPortal(
+          this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+    } catch (Exception exception) {
+      return new InvalidStatement(
+          connection, connection.getServer().getOptions(), this.portalName, exception);
+    }
   }
 
   /** Constructor for Bind messages that are constructed to execute a Query message. */

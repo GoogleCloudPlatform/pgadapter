@@ -23,6 +23,11 @@ import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.Builder;
 import com.google.cloud.spanner.pgadapter.wireprotocol.PasswordMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -223,6 +228,49 @@ public class AuthMockServerTest extends AbstractMockServerTest {
             PSQLException.class,
             () -> DriverManager.getConnection(createUrl(), username, password));
     assertEquals(CREDENTIALS_ERROR, exception.getMessage());
+  }
+
+  @Test(timeout = 30_000L)
+  public void testFailedAuthClosesConnectionBeforeControlMessages() throws Exception {
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort());
+        DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+        DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+      // Send StartupMessage
+      outputStream.writeInt(17);
+      outputStream.writeInt(StartupMessage.PROTOCOL_VERSION_3_0_IDENTIFIER);
+      outputStream.writeBytes("user");
+      outputStream.writeByte(0);
+      outputStream.writeBytes("foo");
+      outputStream.writeByte(0);
+      outputStream.flush();
+
+      // Expect AuthenticationCleartextPassword ('R')
+      assertEquals('R', inputStream.readByte());
+      int authLength = inputStream.readInt();
+      inputStream.readFully(new byte[authLength - 4]);
+
+      // Send invalid PasswordMessage ('p')
+      byte[] passwordBytes = "invalid-password\0".getBytes(StandardCharsets.UTF_8);
+      outputStream.writeByte('p');
+      outputStream.writeInt(4 + passwordBytes.length);
+      outputStream.write(passwordBytes);
+      outputStream.flush();
+
+      // Expect ErrorResponse ('E') followed by TerminateResponse ('X')
+      assertEquals('E', inputStream.readByte());
+      int errorLength = inputStream.readInt();
+      byte[] errorBytes = new byte[errorLength - 4];
+      inputStream.readFully(errorBytes);
+      assertTrue(
+          new String(errorBytes, StandardCharsets.UTF_8).contains("Invalid credentials received."));
+
+      assertEquals('X', inputStream.readByte());
+      assertEquals(4, inputStream.readInt());
+
+      // Even if the client keeps the socket open and ignores TerminateResponse, the server must
+      // close the connection rather than accepting FunctionCall ('F') pre-auth.
+      assertEquals(-1, inputStream.read());
+    }
   }
 
   private String generateRandomPrivateKey() throws NoSuchAlgorithmException {

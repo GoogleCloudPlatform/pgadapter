@@ -31,6 +31,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.OAuth2Credentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
@@ -86,6 +87,7 @@ public class PasswordMessage extends ControlMessage {
                   .build())
           .send(false);
       new TerminateResponse(this.outputStream).send();
+      this.connection.setStatus(ConnectionStatus.TERMINATED);
       return;
     }
 
@@ -104,6 +106,7 @@ public class PasswordMessage extends ControlMessage {
                   .build())
           .send(false);
       new TerminateResponse(this.outputStream).send();
+      this.connection.setStatus(ConnectionStatus.TERMINATED);
     } else {
       createConnectionAndSendStartupMessage(
           this.connection, this.parameters.get(DATABASE_KEY), this.parameters, credentials);
