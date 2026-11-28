@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.57.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.4...v0.57.0) (2026-11-28)
+
+
+### Features
+
+* use the default isolation level of the database ([#5205](https://github.com/GoogleCloudPlatform/pgadapter/issues/5205)) ([455d453](https://github.com/GoogleCloudPlatform/pgadapter/commit/455d453d50ac60409a44158e63329d87ecaa7ee2))
+
+
+### Bug Fixes
+
+* **deps:** pin distroless java25-debian13 base image digest ([#5231](https://github.com/GoogleCloudPlatform/pgadapter/issues/5231)) ([4d2fd89](https://github.com/GoogleCloudPlatform/pgadapter/commit/4d2fd894f947ce11d55bfea4def3c2eafcb00b09))
+* **deps:** update base OS container image digests ([#5217](https://github.com/GoogleCloudPlatform/pgadapter/issues/5217)) ([17f3749](https://github.com/GoogleCloudPlatform/pgadapter/commit/17f374946a353bf7c88beb2315dedc8a3a8d0a8d))
+* **deps:** update maven builder base image digest ([#5218](https://github.com/GoogleCloudPlatform/pgadapter/issues/5218)) ([e3ec938](https://github.com/GoogleCloudPlatform/pgadapter/commit/e3ec938744c5b9dd9fdcc5cb48a5e952d05502a5))
+* prevent DoS when parsing integer parameters in scientific notation ([#5219](https://github.com/GoogleCloudPlatform/pgadapter/issues/5219)) ([3c3505c](https://github.com/GoogleCloudPlatform/pgadapter/commit/3c3505ca9a1e2835791ad7b5abfb6eec22346326))
+* prevent infinite loop and NPE on malformed CREATE TABLE statements ([#5226](https://github.com/GoogleCloudPlatform/pgadapter/issues/5226)) ([85ed520](https://github.com/GoogleCloudPlatform/pgadapter/commit/85ed52042c61818406a74a27c309d7f06a457200))
+* prevent infinite loop on truncated binary COPY header extension ([#5227](https://github.com/GoogleCloudPlatform/pgadapter/issues/5227)) ([c31f4c9](https://github.com/GoogleCloudPlatform/pgadapter/commit/c31f4c9d59d332df3656c11addbaab7c2b1481af))
+* prevent unbounded memory allocation in binary COPY parser ([#5232](https://github.com/GoogleCloudPlatform/pgadapter/issues/5232)) ([80c94d8](https://github.com/GoogleCloudPlatform/pgadapter/commit/80c94d8b4091eb334dd3139ed7e27b8843db0e4e))
+* redact credentials and cancel secrets from PGAdapter logs ([#5220](https://github.com/GoogleCloudPlatform/pgadapter/issues/5220)) ([e0bbc27](https://github.com/GoogleCloudPlatform/pgadapter/commit/e0bbc27c61d7f10c3f456fa6c248899af7b1517e))
+* unflake Drizzle sample stale read and retry aborted transactions ([#5223](https://github.com/GoogleCloudPlatform/pgadapter/issues/5223)) ([6be7807](https://github.com/GoogleCloudPlatform/pgadapter/commit/6be7807bc398b484fd25908ac5ce81d8648b80d5))
+
+
+### Dependencies
+
+* update dependency npgsql to 10.0.4 ([#5241](https://github.com/GoogleCloudPlatform/pgadapter/issues/5241)) ([f107140](https://github.com/GoogleCloudPlatform/pgadapter/commit/f107140f8bc6917ccbaed2b4d150d59ab00dc891))
+* update dependency org.hibernate.orm:hibernate-core to v7.4.17.final ([#5214](https://github.com/GoogleCloudPlatform/pgadapter/issues/5214)) ([e5dfc5c](https://github.com/GoogleCloudPlatform/pgadapter/commit/e5dfc5cd3995274c15da1cbd8f2996327d4e8903))
+* update gcr.io/google.com/cloudsdktool/google-cloud-cli docker tag to v594 ([#5203](https://github.com/GoogleCloudPlatform/pgadapter/issues/5203)) ([b8ffcea](https://github.com/GoogleCloudPlatform/pgadapter/commit/b8ffcea1e4f69169c1f46db6278fc4ac25ba2edf))
+* update module github.com/googlecloudplatform/pgadapter/wrappers/golang to v0.56.4 ([#5209](https://github.com/GoogleCloudPlatform/pgadapter/issues/5209)) ([679a312](https://github.com/GoogleCloudPlatform/pgadapter/commit/679a312f607577f50725a350ce241a77d33e0f0a))
+* update ruby/setup-ruby action to v1.341.0 ([#5200](https://github.com/GoogleCloudPlatform/pgadapter/issues/5200)) ([593cc79](https://github.com/GoogleCloudPlatform/pgadapter/commit/593cc79de618c1a0834d3cc07b3770add1162e29))
+
 ## [0.56.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.56.3...v0.56.4) (2026-11-18)
 
 
