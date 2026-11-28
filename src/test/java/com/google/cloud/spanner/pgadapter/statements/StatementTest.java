@@ -754,12 +754,11 @@ public class StatementTest {
     statement.executeAsync(backendConnection);
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
-    executor.submit(
-        () -> {
-          byte[] payload = "2 3\n".getBytes();
-          MutationWriter mutationWriter = statement.getMutationWriter();
-          mutationWriter.addCopyData(payload);
-        });
+    executor.submit(() -> {
+      byte[] payload = "2 3\n".getBytes();
+      MutationWriter mutationWriter = statement.getMutationWriter();
+      mutationWriter.addCopyData(payload);
+    });
     executor.shutdown();
 
     backendConnection.flush();
@@ -874,13 +873,12 @@ public class StatementTest {
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
     Future<MutationWriter> future =
-        executor.submit(
-            () -> {
-              MutationWriter mw = copyStatement.getMutationWriter();
-              mw.addCopyData(payload);
-              mw.close();
-              return mw;
-            });
+        executor.submit(() -> {
+          MutationWriter mw = copyStatement.getMutationWriter();
+          mw.addCopyData(payload);
+          mw.close();
+          return mw;
+        });
     executor.shutdown();
 
     backendConnection.flush();
@@ -933,13 +931,12 @@ public class StatementTest {
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
     Future<MutationWriter> future =
-        executor.submit(
-            () -> {
-              MutationWriter mw = copyStatement.getMutationWriter();
-              mw.addCopyData(payload);
-              mw.close();
-              return mw;
-            });
+        executor.submit(() -> {
+          MutationWriter mw = copyStatement.getMutationWriter();
+          mw.addCopyData(payload);
+          mw.close();
+          return mw;
+        });
     executor.shutdown();
 
     backendConnection.flush();
@@ -964,18 +961,16 @@ public class StatementTest {
     when(spannerType.getString("spanner_type")).thenReturn("bigint", "character varying");
     when(spannerType.next()).thenReturn(true, true, false);
     when(singleUseReadContext.executeQuery(
-            ArgumentMatchers.argThat(
-                statement ->
-                    statement != null && statement.getSql().startsWith("SELECT column_name"))))
+            ArgumentMatchers.argThat(statement ->
+                statement != null && statement.getSql().startsWith("SELECT column_name"))))
         .thenReturn(spannerType);
 
     ResultSet countResult = mock(ResultSet.class);
     when(countResult.getLong(0)).thenReturn(2L);
     when(countResult.next()).thenReturn(true, false);
     when(singleUseReadContext.executeQuery(
-            ArgumentMatchers.argThat(
-                statement ->
-                    statement != null && statement.getSql().startsWith("SELECT COUNT(*)"))))
+            ArgumentMatchers.argThat(statement ->
+                statement != null && statement.getSql().startsWith("SELECT COUNT(*)"))))
         .thenReturn(countResult);
   }
 }

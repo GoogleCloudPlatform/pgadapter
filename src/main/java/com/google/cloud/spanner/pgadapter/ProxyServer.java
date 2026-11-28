@@ -233,9 +233,8 @@ public class ProxyServer extends AbstractApiService {
         boolean first = true;
         for (InetAddress address : InetAddress.getAllByName("localhost")) {
           final boolean waitForTcpLatch = !first;
-          serverSocketsBuilder.add(
-              (startupLatch, stoppedLatch) ->
-                  runTcpServer(waitForTcpLatch, address, startupLatch, stoppedLatch));
+          serverSocketsBuilder.add((startupLatch, stoppedLatch) ->
+              runTcpServer(waitForTcpLatch, address, startupLatch, stoppedLatch));
           first = false;
         }
       }
@@ -445,19 +444,17 @@ public class ProxyServer extends AbstractApiService {
         // continue to listen for new incoming connection requests as quickly as possible.
         // This prevents connection timeouts if there is a large 'connect storm' (i.e. a client
         // sends a large number of connection requests at the same time).
-        createConnectionHandlerExecutor.submit(
-            () -> {
-              try {
-                createConnectionHandler(socket);
-              } catch (SocketException socketException) {
-                logger.log(
-                    Level.WARNING,
-                    () ->
-                        String.format(
-                            "Failed to create connection on socket %s: %s.",
-                            socket, socketException));
-              }
-            });
+        createConnectionHandlerExecutor.submit(() -> {
+          try {
+            createConnectionHandler(socket);
+          } catch (SocketException socketException) {
+            logger.log(
+                Level.WARNING,
+                () ->
+                    String.format(
+                        "Failed to create connection on socket %s: %s.", socket, socketException));
+          }
+        });
       }
     } catch (SocketException e) {
       // This is a normal and expected exception when the server is shutting down.

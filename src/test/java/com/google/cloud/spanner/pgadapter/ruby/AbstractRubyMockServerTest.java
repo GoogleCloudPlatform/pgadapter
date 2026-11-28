@@ -997,11 +997,10 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         .build())
                 .addAllRows(
                     Arrays.stream(versions)
-                        .map(
-                            version ->
-                                ListValue.newBuilder()
-                                    .addValues(Value.newBuilder().setStringValue(version).build())
-                                    .build())
+                        .map(version ->
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue(version).build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }
@@ -1033,11 +1032,10 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                 .setMetadata(SELECT_RELNAME_METADATA)
                 .addAllRows(
                     Arrays.stream(tables)
-                        .map(
-                            table ->
-                                ListValue.newBuilder()
-                                    .addValues(Value.newBuilder().setStringValue(table).build())
-                                    .build())
+                        .map(table ->
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue(table).build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }
@@ -1068,11 +1066,10 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         .build())
                 .addAllRows(
                     Arrays.stream(columns)
-                        .map(
-                            column ->
-                                ListValue.newBuilder()
-                                    .addValues(Value.newBuilder().setStringValue(column).build())
-                                    .build())
+                        .map(column ->
+                            ListValue.newBuilder()
+                                .addValues(Value.newBuilder().setStringValue(column).build())
+                                .build())
                         .collect(Collectors.toList()))
                 .build()));
   }
